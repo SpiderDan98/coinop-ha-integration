@@ -1,6 +1,4 @@
-// One Run as its own page: its fields on the left, Flags and Line Items by kind on the
-// right. Every change saves at once. Refetches the Run whenever its summary changes,
-// so it follows live updates.
+// Refetches the Run whenever its summary changes, so it follows live updates.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -180,7 +178,6 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) summary?: RunSummary;
   /** Current Devices; any other Device is shown as removed. */
   @property({ attribute: false }) devices?: Device[];
-  /** Every Tag there is, for suggestions. */
   @property({ attribute: false }) tags: string[] = [];
   /** The Materials catalogue, archived ones included. */
   @property({ attribute: false }) materials: Material[] = [];

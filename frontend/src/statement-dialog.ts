@@ -1,5 +1,3 @@
-// The basket's "Cost Statement…" dialog: options for the PDF of the selected Runs, which
-// the backend renders and the browser downloads through a signed path. Fires `close`.
 // The browser remembers the options of the last statement made, all but title and note.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";

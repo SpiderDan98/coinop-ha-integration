@@ -1,7 +1,4 @@
-// The Overview's image-first gallery of Runs: filters (combined with AND), one tile per
-// Run, and checkboxes to select final Runs. Filter and selection belong to the
-// Overview, which sets them from its tiles and charts too; the gallery reports changes
-// as `filter-changed` and `selection-changed` events.
+// Filter and selection belong to the Overview, which sets them from its tiles and charts too.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";

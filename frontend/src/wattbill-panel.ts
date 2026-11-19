@@ -1,6 +1,3 @@
-// The WattBill sidebar panel. HA sets `hass`, `narrow`, `route` and `panel`; the
-// panel keeps the Runs and the catalogue subscription open while it is shown, loads
-// the Devices, and routes by `route.path`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { cache } from "lit/directives/cache.js";
@@ -44,10 +41,8 @@ export class WattbillPanel extends LitElement {
   @property({ attribute: false }) route: PanelRoute = { prefix: "/wattbill", path: "" };
   @property({ attribute: false }) panel?: PanelInfo;
 
-  /** Undefined until the first snapshot arrives. */
   @state() private runs?: Map<string, RunSummary>;
   @state() private failed = false;
-  /** Undefined until the first catalogue event arrives. */
   @state() private catalog?: Catalog;
   @state() private catalogFailed = false;
   /** Undefined until loaded, null if loading failed. */
