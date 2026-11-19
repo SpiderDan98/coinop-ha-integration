@@ -20,6 +20,12 @@ class Target(StrEnum):
     IGNORED = "ignored"
 
 
+class ConsumptionSource(StrEnum):
+    ENERGY = "energy"
+    POWER = "power"
+    ESTIMATE = "estimate"
+
+
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 
 
@@ -33,8 +39,8 @@ class DeviceConfig:
     mapping: Mapping[str, Target]
     job_entity_id: str | None
     job_attribute: str | None
-    running_power: float
-    paused_power: float | None
+    # The consumption section as Add Device wrote it.
+    consumption: Mapping[str, Any]
     price: float
     # The subentry data as the flow wrote it: the Device's HA-side settings.
     flow_data: Mapping[str, Any]
@@ -56,8 +62,7 @@ class DeviceConfig:
             },
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
-            running_power=data["consumption"]["running_power"],
-            paused_power=data["consumption"]["paused_power"],
+            consumption=data["consumption"],
             price=data["price"]["value"],
             flow_data=data,
         )

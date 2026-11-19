@@ -6,14 +6,15 @@
 - `tests/`: backend tests, run inside a real Home Assistant test instance.
 - `frontend/`: the sidebar panel (TypeScript + Lit). It builds into `custom_components/wattbill/frontend/wattbill-panel.js`, which is gitignored and built by CI.
 - `scripts/test_ha.py`: runs the tests against the minimum, stable or beta Home Assistant release.
+- `scripts/release.py`: builds the release asset `wattbill.zip` from a version tag (see [Release](#release)).
 - `GLOSSARY.md`: domain terms; use them in code, tests and docs. Decisions go in `docs/adr/`.
 
 ### Backend modules
 
-- `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
-- `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`).
-- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
-- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
+- `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry, including meter readings converted to kWh or W (`meter_reading`, units via HA's unit converters, else the user's conversion factor).
+- `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`). A Run keeps the consumption section it started with (`Run.consumption`, so a source change applies from the next Run) and, until finalised, its meter's `readings`.
+- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments: estimate, energy meter interpolated between readings, power sensor by the left rule), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
+- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; meter readings with gap and reset Flags; live refresh every minute, finalisation). A metered Run waits up to five minutes after its end for the meter's next report; `_end` returns a future done once the Run is finalised. On start, `async_start` fills each unfinalised metered Run's missed reports from recorder history before applying the Status input.
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
 - `device_settings.py`: a Device's panel settings (WattBill's own per-Device settings, set in the Devices tab), kept in the `device_settings` Store. A new setting is one entry in `FIELDS` (default and the schema a new value must pass); it then appears in `wattbill/devices/list` and can be changed with `wattbill/devices/update_settings`. Settings of removed Devices are dropped at setup.
 - `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
@@ -77,7 +78,7 @@ uv run scripts/test_ha.py minimum -q    # also: stable, beta (each in its own .v
   `Clock` and `CLOCK_START` come from `tests/clock.py`.
 
 - Schema changes: a minor bump only adds fields (read with a default); a major bump adds a migration to the Store's `Schema` and a folder to `tests/fixtures/storage/` for the version just released (see `tests/test_migrations.py`).
-- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
+- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`); `add_device(source="energy" | "power", meter={...})` picks a measured source, `walk_to_consumption` stops at its menu. `tests/test_measured.py` has `set_meter`, `set_power` and `add_metered_device`. Tests that need recorder history override `mock_recorder_before_hass` in their own module (see `tests/test_recorder_history.py`), so the recorder only runs there. Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
 - `tests/stored.py` places Runs in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`).
 - Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()`. It connects on first use, so set WattBill up first.
 
@@ -116,6 +117,16 @@ npm run typecheck
 ## CI
 
 `.github/workflows/ci.yaml` runs on every push, pull request and nightly: hassfest, HACS validation, lint and type check, the panel's lint, type check, tests and build, and the backend tests against the minimum, stable and beta HA releases.
+
+## Release
+
+The committed `manifest.json` keeps the placeholder version `0.0.0`; a release gets its version only from its tag.
+
+1. Push a tag with the version, without a `v` prefix: `1.2.0`, or `1.2.0b1` / `1.2.0rc1` for a pre-release (releases before 1.0 are pre-releases).
+2. `.github/workflows/release.yaml` builds the panel, runs `scripts/release.py` (which fails for any other tag) to zip `custom_components/wattbill/` with the tag as the manifest's version, and creates a **draft** release with `wattbill.zip` and generated notes, marked as a pre-release for `b` / `rc` tags.
+3. Edit the notes (they become the release notes users see in Home Assistant; mention any raise of the minimum HA version) and publish the release. HACS and the Marketplace only offer published releases.
+
+To check an asset locally: build the panel, then `uv run scripts/release.py 1.2.0b1 custom_components/wattbill dist`.
 
 ## Conventions
 

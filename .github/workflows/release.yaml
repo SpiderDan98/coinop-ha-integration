@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags: ["*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - uses: astral-sh/setup-uv@v10.3.3
+      - id: asset
+        run: uv run scripts/release.py "$GITHUB_REF_NAME" custom_components/wattbill dist >> "$GITHUB_OUTPUT"
+      # A draft, so the release is only published (and offered to users) after
+      # its notes are edited, and never without its asset.
+      - run: >-
+          gh release create "$GITHUB_REF_NAME" dist/wattbill.zip
+          --draft --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
+          ${{ steps.asset.outputs.prerelease == 'true' && '--prerelease' || '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -52,7 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     entry.async_on_unload(websocket.async_announce(hass, book))
     await panel.async_register(hass, entry)
     for tracker in entry.runtime_data.trackers:
-        tracker.async_start()
+        await tracker.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     entry.async_on_unload(ha_device.async_track_renames(hass, entry))
     return True
