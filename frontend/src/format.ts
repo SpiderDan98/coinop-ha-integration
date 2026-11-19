@@ -28,6 +28,7 @@ export function formatter(hass: HomeAssistant) {
     timeStyle: "short",
     timeZone,
   });
+  const time = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
   return {
     money: (amount: number) => currency.format(amount),
     unitPrice: (price: number) => unitPrice.format(price),
@@ -35,6 +36,7 @@ export function formatter(hass: HomeAssistant) {
       `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
+    timeRange: (start: string, end: string) => time.formatRange(new Date(start), new Date(end)),
     duration: (seconds: number) => {
       const minutes = Math.round(seconds / 60);
       return t("duration", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
