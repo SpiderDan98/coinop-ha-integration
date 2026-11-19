@@ -172,5 +172,37 @@
         "name": "Läufe"
       }
     }
+  },
+  "exceptions": {
+    "data_missing": {
+      "message": "WattBills gespeicherte Daten fehlen ({stores}), vermutlich weil die Datei beschädigt war. WattBill wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird. Öffne die Reparatur, um ein Backup wiederherzustellen oder neu zu beginnen."
+    },
+    "data_too_new": {
+      "message": "{store} wurde von einer neueren WattBill-Version geschrieben. Aktualisiere WattBill oder stelle ein Backup wieder her, das mit dieser Version erstellt wurde."
+    }
+  },
+  "issues": {
+    "data_missing": {
+      "title": "WattBills gespeicherte Daten fehlen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "WattBills gespeicherte Daten fehlen",
+            "description": "WattBill konnte {stores} nicht lesen, vermutlich weil die Datei beschädigt war; Home Assistant hat eine Kopie mit der Endung `.corrupt` behalten. WattBill wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle ein Backup wieder her, um die Daten zurückzuholen, oder beginne mit diesen Daten leer neu.",
+            "menu_options": {
+              "restore": "Backup wiederherstellen",
+              "fresh_start": "Neu beginnen"
+            }
+          },
+          "fresh_start": {
+            "title": "Neu beginnen",
+            "description": "WattBill startet mit {stores} leer. Was darin stand, ist verloren, außer du stellst später ein Backup wieder her; alle anderen Daten von WattBill bleiben erhalten."
+          }
+        },
+        "abort": {
+          "restore": "Stelle unter Einstellungen > System > Backups ein Backup von vor dem Datenverlust wieder her. Dadurch kommen alle Daten von WattBill so zurück, wie sie damals waren. Bis dahin bleibt WattBill gestoppt."
+        }
+      }
+    }
   }
 }

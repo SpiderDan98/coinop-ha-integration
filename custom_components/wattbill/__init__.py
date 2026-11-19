@@ -8,15 +8,17 @@ from .const import SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
-from .store import RunStore
+from .store import RunStore, WattBillStores
 from .tracker import DeviceTracker
 
 PLATFORMS = [Platform.EVENT, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> bool:
-    store = RunStore(hass)
-    book = RunBook(store, await store.async_load())
+    stores = WattBillStores(hass)
+    data = await stores.async_load(entry)
+    store = RunStore(stores)
+    book = RunBook(store, store.runs(data))
     devices = [
         DeviceConfig.from_subentry(subentry)
         for subentry in entry.subentries.values()
@@ -43,6 +45,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: WattBillConfigEntry) ->
         tracker.async_stop()
     await entry.runtime_data.book.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> None:
+    await WattBillStores(hass).async_remove()
 
 
 async def _async_reload(hass: HomeAssistant, entry: WattBillConfigEntry) -> None:

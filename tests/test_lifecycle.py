@@ -401,7 +401,7 @@ async def test_runs_have_no_timeout(
     await set_status(hass, "printing")
     for _ in range(3 * 24):
         await clock.advance(hours=1)
-    assert "wattbill.runs" not in hass_storage
+    assert stored_runs(hass_storage) == []
     await set_status(hass, "finished")
 
     [run] = stored_runs(hass_storage)

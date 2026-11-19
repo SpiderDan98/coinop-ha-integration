@@ -112,7 +112,7 @@ async def test_values_mapped_to_nothing_are_ignored(
     await clock.advance(hours=1)
 
     assert value(hass, RUNS) == 1
-    assert "wattbill.runs" not in hass_storage
+    assert stored_runs(hass_storage) == []
 
 
 async def test_each_print_is_its_own_run(

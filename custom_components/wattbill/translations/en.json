@@ -172,5 +172,37 @@
         "name": "Runs"
       }
     }
+  },
+  "exceptions": {
+    "data_missing": {
+      "message": "WattBill's stored data is missing ({stores}), probably because the file was corrupt. WattBill did not start so it cannot overwrite your history. Open the repair issue to restore a backup or start fresh."
+    },
+    "data_too_new": {
+      "message": "{store} was written by a newer version of WattBill. Update WattBill or restore a backup made with this version."
+    }
+  },
+  "issues": {
+    "data_missing": {
+      "title": "WattBill's stored data is missing",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "WattBill's stored data is missing",
+            "description": "WattBill could not read {stores}, probably because the file was corrupt; Home Assistant kept a copy ending in `.corrupt`. WattBill did not start so it cannot overwrite your history.\n\nRestore a backup to get the data back, or start fresh with that data empty.",
+            "menu_options": {
+              "restore": "Restore a backup",
+              "fresh_start": "Start fresh"
+            }
+          },
+          "fresh_start": {
+            "title": "Start fresh",
+            "description": "WattBill starts with {stores} empty. What it held is lost unless you restore a backup later; all other WattBill data is kept."
+          }
+        },
+        "abort": {
+          "restore": "Restore a backup from before the data went missing under Settings > System > Backups. Restoring brings back all of WattBill's data as it was then. Until then WattBill stays stopped."
+        }
+      }
+    }
   }
 }
