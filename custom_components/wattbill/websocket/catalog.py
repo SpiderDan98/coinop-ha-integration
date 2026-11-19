@@ -1,8 +1,7 @@
 """Catalogue changes pushed to every open panel.
 
 `CATALOGUES` names each catalogue and how the panel receives it; a new catalogue
-(e.g. Line Item Templates) only adds an entry there and announces its name from
-`Catalog`.
+only adds an entry there and announces its name from `Catalog`.
 """
 
 from collections.abc import Callable
@@ -20,6 +19,7 @@ from custom_components.wattbill.const import DOMAIN
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.tags import TAGS
+from custom_components.wattbill.templates import TEMPLATES
 
 from .command import command
 from .materials import material_dict
@@ -30,6 +30,7 @@ SIGNAL_CATALOG_CHANGED = f"{DOMAIN}_catalog_changed"
 CATALOGUES: dict[str, Callable[[Catalog], list[Any]]] = {
     MATERIALS: lambda catalog: [material_dict(m) for m in catalog.materials()],
     TAGS: lambda catalog: catalog.tags(),
+    TEMPLATES: lambda catalog: [t.as_dict() for t in catalog.templates()],
 }
 
 

@@ -68,7 +68,9 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
         for m in listed
     ] == current["catalog"]["materials"]
     await panel.subscribe("wattbill/catalog/subscribe")
-    assert (await panel.event())["tags"] == current["catalog"]["tags"]
+    catalog = await panel.event()
+    assert catalog["tags"] == current["catalog"]["tags"]
+    assert catalog["templates"] == current["catalog"]["templates"]
     for key, file in files.items():
         if file["version"] < hass_storage[key]["version"]:
             assert hass_storage[f"{key}.bak"]["data"] == file["data"]

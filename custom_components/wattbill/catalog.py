@@ -1,4 +1,4 @@
-"""WattBill's global catalogues (Materials, Tags) in memory and in the catalog Store.
+"""WattBill's global catalogues (Materials, Tags, Line Item Templates) in memory and in the catalog Store.
 
 Every change is saved at once and announced with the name of the catalogue that
 changed, so open panels can refresh it.
@@ -13,6 +13,7 @@ from homeassistant.util.ulid import ulid_now
 from .materials import DEFAULT_DIAMETER, Material, MaterialForm, PackUnit
 from .store import WattBillStore
 from .tags import TAGS, sort_tags
+from .templates import TEMPLATES, LineItemTemplate
 
 MATERIALS = "materials"
 
@@ -48,8 +49,14 @@ class Catalog:
             item["id"]: Material.from_dict(item) for item in data[MATERIALS]
         }
         self._tags: list[str] = sort_tags(data.get(TAGS, []))
+        self._templates = {
+            item["id"]: LineItemTemplate.from_dict(item)
+            for item in data.get(TEMPLATES, [])
+        }
         self._unknown = {
-            key: value for key, value in data.items() if key not in (MATERIALS, TAGS)
+            key: value
+            for key, value in data.items()
+            if key not in (MATERIALS, TAGS, TEMPLATES)
         }
         self._material_in_use = material_in_use
         self._listeners: list[Callable[[str], None]] = []
@@ -92,6 +99,38 @@ class Catalog:
     async def async_delete_tag(self, tag: str) -> None:
         self._tags.remove(tag)
         await self._save(TAGS)
+
+    def templates(self) -> list[LineItemTemplate]:
+        return list(self._templates.values())
+
+    def template(self, template_id: str) -> LineItemTemplate | None:
+        return self._templates.get(template_id)
+
+    def find_templates(self, template_ids: Iterable[str]) -> list[LineItemTemplate]:
+        """The templates with these ids, in this order; deleted ones are left out."""
+        return [
+            template
+            for template_id in template_ids
+            if (template := self.template(template_id)) is not None
+        ]
+
+    async def async_create_template(self, fields: dict[str, Any]) -> LineItemTemplate:
+        template = LineItemTemplate.from_dict({**fields, "id": ulid_now()})
+        self._templates[template.id] = template
+        await self._save(TEMPLATES)
+        return template
+
+    async def async_update_template(
+        self, template: LineItemTemplate, changes: dict[str, Any]
+    ) -> LineItemTemplate:
+        updated = LineItemTemplate.from_dict(template.as_dict() | changes)
+        self._templates[template.id] = updated
+        await self._save(TEMPLATES)
+        return updated
+
+    async def async_delete_template(self, template: LineItemTemplate) -> None:
+        del self._templates[template.id]
+        await self._save(TEMPLATES)
 
     @callback
     def async_listen(self, listener: Callable[[str], None]) -> CALLBACK_TYPE:
@@ -149,6 +188,7 @@ class Catalog:
                     material.as_dict() for material in self._materials.values()
                 ],
                 TAGS: self._tags,
+                TEMPLATES: [template.as_dict() for template in self.templates()],
             }
         )
         for listener in list(self._listeners):

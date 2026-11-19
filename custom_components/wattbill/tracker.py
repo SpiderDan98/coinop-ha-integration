@@ -36,6 +36,7 @@ from .images import DeviceImages
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
+from .templates import count_running_hours
 
 LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
@@ -527,5 +528,6 @@ class DeviceTracker:
             else ElectricityMethod.ESTIMATED,
         )
         run.line_items = [item] + [i for i in run.line_items if i.kind is not item.kind]
+        count_running_hours(run.line_items, run, until)
         if price_gap(run.started, until, run.prices):
             self._flag(run, Flag.PRICE_GAP)

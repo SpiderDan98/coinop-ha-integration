@@ -97,7 +97,7 @@ def _place_catalogue(
             "version": 1,
             "minor_version": 1,
             "key": "wattbill.catalog",
-            "data": {"materials": [], "tags": []},
+            "data": {"materials": [], "tags": [], "templates": []},
         },
     )
     catalog["data"][name] = entries

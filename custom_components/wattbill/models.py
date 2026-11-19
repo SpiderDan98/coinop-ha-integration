@@ -31,6 +31,13 @@ class LineItemKind(StrEnum):
     OTHER = "other"
 
 
+class QuantityBasis(StrEnum):
+    """Where a Line Item Template's quantity comes from."""
+
+    ENTERED = "entered"
+    RUNNING_HOURS = "running_hours"
+
+
 class ElectricityMethod(StrEnum):
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
@@ -89,7 +96,9 @@ class LineItem:
 
     Computed Line Items keep `label` None and are labelled by their kind in the
     output language. Material Line Items reference their Material by
-    `material_id`, which keeps it from being deleted. Quantity, unit price and
+    `material_id`, which keeps it from being deleted. A Line Item copied from a
+    Line Item Template keeps only `template_id` as its origin and the template's
+    `basis`; with running hours WattBill computes its quantity. Quantity, unit price and
     amount are what counts; once the user overrides a computed one, `computed`
     keeps what WattBill computed.
     """
@@ -102,6 +111,8 @@ class LineItem:
     amount: float
     label: str | None = None
     material_id: str | None = None
+    template_id: str | None = None
+    basis: QuantityBasis | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
@@ -110,7 +121,10 @@ class LineItem:
     @property
     def is_computed(self) -> bool:
         """WattBill computes its values, live while the Run is open."""
-        return self.kind is LineItemKind.ELECTRICITY
+        return (
+            self.kind is LineItemKind.ELECTRICITY
+            or self.basis is QuantityBasis.RUNNING_HOURS
+        )
 
     @property
     def negative_prices(self) -> bool:
@@ -137,6 +151,20 @@ class LineItem:
         else:
             self.amount = self.quantity * self.unit_price
 
+    def recompute(self, quantity: float) -> None:
+        """A new computed quantity at the computed unit price; overrides still count."""
+        unit_price = (self.computed or self.values())["unit_price"] or 0.0
+        values: dict[str, float | None] = {
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "amount": quantity * unit_price,
+        }
+        if self.computed is None:
+            for name, value in values.items():
+                setattr(self, name, value)
+        else:
+            self.computed = values
+
     def reset(self) -> None:
         """Back to the computed values."""
         for name, value in (self.computed or {}).items():
@@ -149,6 +177,8 @@ class LineItem:
             "kind": self.kind,
             "label": self.label,
             "material_id": self.material_id,
+            "template_id": self.template_id,
+            "basis": self.basis,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -165,6 +195,8 @@ class LineItem:
             kind=LineItemKind(data["kind"]),
             label=data["label"],
             material_id=data.get("material_id"),
+            template_id=data.get("template_id"),
+            basis=None if data.get("basis") is None else QuantityBasis(data["basis"]),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],

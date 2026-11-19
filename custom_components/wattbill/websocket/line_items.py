@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
 from custom_components.wattbill.models import VALUES, LineItem, LineItemKind, Run
@@ -159,6 +160,35 @@ async def _add(
     _send_run(hass, connection, msg["id"], run)
 
 
+@command(
+    {
+        vol.Required("type"): "wattbill/line_items/add_template",
+        vol.Required("run_id"): str,
+        vol.Required("template_id"): str,
+        vol.Optional("quantity"): vol.All(_number, vol.Range(min=0)),
+    }
+)
+async def _add_template(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+) -> None:
+    """A copy of the template; `quantity` replaces an entered default quantity."""
+    if (run := _find(connection, msg, wattbill)) is None:
+        return
+    if (template := wattbill.catalog.template(msg["template_id"])) is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item Template with this id"
+        )
+        return
+    run.line_items.append(
+        template.line_item(run, dt_util.utcnow(), msg.get("quantity"))
+    )
+    await wattbill.book.async_correct(run)
+    _send_run(hass, connection, msg["id"], run)
+
+
 @command({vol.Required("type"): "wattbill/line_items/delete", **_ITEM})
 async def _delete(
     hass: HomeAssistant,
@@ -179,4 +209,4 @@ async def _delete(
     _send_run(hass, connection, msg["id"], run)
 
 
-COMMANDS = (_update, _reset, _add, _delete)
+COMMANDS = (_update, _reset, _add, _add_template, _delete)

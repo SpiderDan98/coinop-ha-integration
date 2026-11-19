@@ -43,6 +43,16 @@
     ],
     "tags": [
       "Gift"
+    ],
+    "templates": [
+      {
+        "id": "01KF0000000000000000000T01",
+        "label": "Wear Kobra",
+        "unit": "h",
+        "unit_price": 0.15,
+        "default_quantity": 1,
+        "basis": "running_hours"
+      }
     ]
   }
 }
