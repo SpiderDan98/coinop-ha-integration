@@ -2,46 +2,30 @@
 // read afresh whenever a Run changes.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import {
-  KINDS,
-  OUTCOMES,
-  getAggregates,
-  type Device,
-  type Dimension,
-  type Group,
-  type RunSummary,
-} from "./api";
+import { KINDS, OUTCOMES, getGroupings, type Device, type Group, type RunSummary } from "./api";
 import { formatter, type Format } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { deviceName } from "./run-parts";
 import { shared } from "./styles";
 
-const GROUPINGS: Dimension[][] = [
-  [],
-  ["kind"],
-  ["device"],
-  ["month"],
-  ["kind", "material"],
-  ["outcome"],
-  ["tag"],
-];
-
 type Aggregates = Awaited<ReturnType<typeof loadAggregates>>;
 
 async function loadAggregates(hass: HomeAssistant) {
-  const [total, kind, device, month, material, outcome, tag] = await Promise.all(
-    GROUPINGS.map((groupBy) => getAggregates(hass, groupBy)),
-  );
+  const { total, material, ...groups } = await getGroupings(hass, {
+    total: [],
+    kind: ["kind"],
+    device: ["device"],
+    month: ["month"],
+    material: ["kind", "material"],
+    outcome: ["outcome"],
+    tag: ["tag"],
+  });
   return {
+    ...groups,
     cost: total[0]?.cost ?? 0,
-    kind,
-    device,
-    month,
     // Electricity and Other Line Items have no Material either.
     material: material.filter((group) => group.kind === "material"),
-    outcome,
-    tag,
   };
 }
 
