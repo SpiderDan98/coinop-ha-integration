@@ -13,7 +13,7 @@ describe("Run gallery", () => {
 
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
-      "⚑ 1 Helmet Kobra · Jan 13, 2026 · 9 h 0 min Failed €0.30 Cosplay helmet Gift",
+      "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h 0 min Failed €0.30 Cosplay helmet Gift",
       "Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86 €0.22 per part × 4 Gift",
     ]);
     expect(text(query(panel, ".head"))).toBe("Runs 3 · €1.23");
@@ -31,12 +31,12 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min In progress €0.03 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min In progress €0.14 Batch 7",
     );
     backend.push(SUBSCRIBE, ended);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min Completed €0.03 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min Completed €0.15 Batch 7",
     );
     backend.push(SUBSCRIBE, { ...ended, change: "deleted" });
     await settle(panel);
@@ -90,7 +90,7 @@ describe("Run gallery", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }));
 
     expect(tiles(panel)[1]).toBe(
-      "⚑ 1 Helmet Kobra · 13. Jan. 2026 · 9 Std. 0 Min. Fehlgeschlagen 0,30 € Cosplay helmet Gift",
+      "⚑ 2 Helmet Kobra · 13. Jan. 2026 · 9 Std. 0 Min. Fehlgeschlagen 0,30 € Cosplay helmet Gift",
     );
   });
 

@@ -15,6 +15,8 @@ import type {
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import devicesList from "./fixtures/backend/devices-list.json";
 import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
+import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
@@ -33,8 +35,10 @@ export const recorded = {
   snapshot: { runs: (snapshot as { runs: RunSummary[] }).runs },
   /** Then the Run "print-live" is started, updated (45 min in) and ended. */
   changes: changes as { change: RunChange; run: RunSummary }[],
-  /** `wattbill/runs/get` for every recorded Run; "print-live" while still open.
-   * "benchy" has a Thumbnail and a Snapshot, "helmet" only a Snapshot. */
+  /** `wattbill/runs/get` for every recorded Run; "print-live" while still open, with its
+   * measured Material ("print-live-material") locked. "benchy" has a Thumbnail and a
+   * Snapshot and its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and
+   * a measured length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
@@ -42,7 +46,13 @@ export const recorded = {
   lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
   /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
   lineItemsAdd: lineItemsAdd as { run: RunDetail },
-  /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
+  /** `wattbill/line_items/update`: PETG White picked for Helmet's measured 30 m
+   * ("helmet-filament"), which had no Material. */
+  lineItemsMaterial: lineItemsMaterial as { run: RunDetail },
+  /** `wattbill/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
+  lineItemsAddMaterial: lineItemsAddMaterial as { run: RunDetail },
+  /** `wattbill/devices/list`: only "device-kobra" (Material used input in mm, default
+   * Material "pla-black"); "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
   /**
    * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened

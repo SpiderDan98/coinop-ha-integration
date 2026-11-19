@@ -19,6 +19,33 @@ const sent = (backend: { calls: Message[] }, type: string) =>
   backend.calls.filter((call) => call.type === type);
 
 describe("Correcting a Run", () => {
+  it("names every kind of Flag", async () => {
+    const flags = ["consumption_gap", "meter_reset", "price_gap", "usage_missing"];
+    const run = { ...recorded.run("benchy"), flags };
+    for (const [language, labels] of [
+      [
+        "en",
+        "The energy meter or power sensor reported nothing for part of the Run|" +
+          "The energy meter was reset during the Run|" +
+          "The electricity price was unavailable for part of the Run|" +
+          "No material usage was reported: enter the quantity",
+      ],
+      [
+        "de",
+        "Der Energiezähler oder Leistungssensor hat während eines Teils des Laufs nichts gemeldet|" +
+          "Der Energiezähler wurde während des Laufs zurückgesetzt|" +
+          "Der Strompreis war während eines Teils des Laufs nicht verfügbar|" +
+          "Es wurde kein Materialverbrauch gemeldet: Menge eintragen",
+      ],
+    ]) {
+      const backend = recordedBackend({ language }).reply("wattbill/runs/get", () => ({ run }));
+      const panel = await mountPanel(backend, { path: "/run/benchy" });
+
+      expect(queryAll(panel, ".flag .text").map(text).join("|")).toBe(labels);
+      panel.remove();
+    }
+  });
+
   it("saves each field as soon as it changes", async () => {
     const backend = correcting();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
@@ -114,7 +141,9 @@ describe("Correcting a Run", () => {
       run: { ...recorded.run("helmet"), flags: [] },
     }));
     const panel = await mountPanel(backend, { path: "/run/helmet" });
-    expect(text(query(panel, ".flags"))).toBe("⚑ The Device reported a fault Mark checked");
+    expect(text(query(panel, ".flags"))).toBe(
+      "⚑ The Device reported a fault Mark checked ⚑ No Material was known for the usage: pick the Material Mark checked",
+    );
 
     await click(panel, query(panel, ".flag button"));
 
@@ -207,7 +236,7 @@ describe("Gallery tiles", () => {
 
     expect(text(benchy)).toContain("€0.22 per part × 4");
     expect(text(helmet)).not.toContain("per part");
-    expect(text(query(helmet, ".tile-flags"))).toBe("⚑ 1");
+    expect(text(query(helmet, ".tile-flags"))).toBe("⚑ 2");
     expect(queryAll(benchy, ".tile-flags")).toHaveLength(0);
   });
 });

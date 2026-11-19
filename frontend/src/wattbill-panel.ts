@@ -179,6 +179,7 @@ export class WattbillPanel extends LitElement {
         .hass=${this.hass}
         .devices=${this.devices}
         .tags=${this.catalog?.tags ?? []}
+        .materials=${this.catalog?.materials ?? []}
         ?narrow=${this.narrow}
       ></wattbill-devices-page>`;
     }
@@ -202,6 +203,7 @@ export class WattbillPanel extends LitElement {
           .summary=${run}
           .devices=${devices}
           .tags=${this.catalog?.tags ?? []}
+          .materials=${this.catalog?.materials ?? []}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-page>`

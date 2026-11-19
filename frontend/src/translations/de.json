@@ -147,5 +147,20 @@
   "tags.delete_hint": "Entfernt „{tag}“ von {count} Läufen und aus den Tags für neue Läufe jedes Geräts.",
   "tags.merge_hint": "Wird mit „{tag}“ zusammengeführt: Jeder Lauf und jedes Gerät behält ihn einmal.",
   "device.tags_for_new_runs": "Tags für neue Läufe",
-  "device.tags_hint": "Werden auf jeden Lauf übernommen, der auf diesem Gerät startet."
+  "device.tags_hint": "Werden auf jeden Lauf übernommen, der auf diesem Gerät startet.",
+  "flag.consumption_gap": "Der Energiezähler oder Leistungssensor hat während eines Teils des Laufs nichts gemeldet",
+  "flag.meter_reset": "Der Energiezähler wurde während des Laufs zurückgesetzt",
+  "flag.usage_missing": "Es wurde kein Materialverbrauch gemeldet: Menge eintragen",
+  "flag.material_missing": "Für den Verbrauch war kein Material bekannt: Material wählen",
+  "item.material": "Material",
+  "item.no_material": "Kein Material",
+  "item.add_material": "+ Material-Posten hinzufügen",
+  "evidence.length": "{length} bei {diameter} und {density}",
+  "evidence.length_only": "{length} gemessen; Material wählen, um es zu wiegen",
+  "evidence.measured": "Vom Drucker gemessen",
+  "materials.archived_name": "{name} (archiviert)",
+  "device.material": "Materialverbrauch",
+  "device.default_material": "Standardmaterial",
+  "device.default_material_hint": "Wird für den gemessenen Verbrauch eines Laufs berechnet und vorausgefüllt, wenn der Drucker keinen meldet.",
+  "device.no_default_material": "Keines"
 }

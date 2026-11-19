@@ -147,5 +147,20 @@
   "tags.delete_hint": "Removes “{tag}” from {count} Runs and from every Device's Tags for new Runs.",
   "tags.merge_hint": "Merges into “{tag}”: every Run and Device keeps it once.",
   "device.tags_for_new_runs": "Tags for new Runs",
-  "device.tags_hint": "Copied onto every Run that starts on this Device."
+  "device.tags_hint": "Copied onto every Run that starts on this Device.",
+  "flag.consumption_gap": "The energy meter or power sensor reported nothing for part of the Run",
+  "flag.meter_reset": "The energy meter was reset during the Run",
+  "flag.usage_missing": "No material usage was reported: enter the quantity",
+  "flag.material_missing": "No Material was known for the usage: pick the Material",
+  "item.material": "Material",
+  "item.no_material": "No Material",
+  "item.add_material": "+ Add Material Line Item",
+  "evidence.length": "{length} at {diameter} and {density}",
+  "evidence.length_only": "{length} measured; pick a Material to weigh it",
+  "evidence.measured": "Measured by the printer",
+  "materials.archived_name": "{name} (archived)",
+  "device.material": "Material used",
+  "device.default_material": "Default Material",
+  "device.default_material_hint": "Charged for a Run's measured usage, and pre-filled when the printer reports none.",
+  "device.no_default_material": "None"
 }

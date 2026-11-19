@@ -2,7 +2,7 @@
 // Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { updateDeviceSettings, type Device } from "./api";
+import { updateDeviceSettings, type Device, type Material } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
@@ -44,6 +44,8 @@ export class DevicesPage extends LitElement {
   @property({ attribute: false }) devices?: Device[] | null;
   /** Every Tag there is, for suggestions. */
   @property({ attribute: false }) tags: string[] = [];
+  /** The Materials catalogue, archived ones included. */
+  @property({ attribute: false }) materials: Material[] = [];
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   /** Settings saved since the Devices were loaded, by Device id. */
@@ -80,6 +82,13 @@ export class DevicesPage extends LitElement {
   private renderDevice({ id, name, ha_settings: ha, settings }: Device, t: Localize) {
     const format = formatter(this.hass);
     const current = this.saved.get(id) ?? settings;
+    // A default Material no longer in the catalogue counts as none, as in the backend.
+    const defaults = this.materials.filter(
+      (material) => !material.archived || material.id === current.default_material,
+    );
+    const defaultMaterial = defaults.some(({ id }) => id === current.default_material)
+      ? current.default_material
+      : null;
     return html`<div class="card device">
       <h3>${name}</h3>
       <dl>
@@ -87,6 +96,14 @@ export class DevicesPage extends LitElement {
         <dd>${input(ha.status, t)}</dd>
         <dt>${t("device.job")}</dt>
         <dd>${input(ha.job, t)}</dd>
+        <dt>${t("device.material")}</dt>
+        <dd class="material-used">
+          ${
+            ha.job.material
+              ? [input(ha.job.material, t), ha.job.material.unit].filter(Boolean).join(" · ")
+              : t("device.not_used")
+          }
+        </dd>
         <dt>${t("device.thumbnail")}</dt>
         <dd>${ha.images?.thumbnail ?? t("device.not_used")}</dd>
         <dt>${t("device.camera")}</dt>
@@ -116,7 +133,32 @@ export class DevicesPage extends LitElement {
       </dl>
       <p class="muted small">${t("device.ha_settings")}</p>
       <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
-      <div class="new-run-tags">
+      <div class="setting default-material">
+        <h4>${t("device.default_material")}</h4>
+        <select
+          aria-label=${t("device.default_material")}
+          @change=${(event: Event) =>
+            this.save(id, {
+              default_material: (event.target as HTMLSelectElement).value || null,
+            })}
+        >
+          <option value="" ?selected=${defaultMaterial === null}>
+            ${t("device.no_default_material")}
+          </option>
+          ${defaults.map(
+            (material) =>
+              html`<option value=${material.id} ?selected=${material.id === defaultMaterial}>
+                ${
+                  material.archived
+                    ? t("materials.archived_name", { name: material.name })
+                    : material.name
+                }
+              </option>`,
+          )}
+        </select>
+        <p class="muted small">${t("device.default_material_hint")}</p>
+      </div>
+      <div class="setting new-run-tags">
         <h4>${t("device.tags_for_new_runs")}</h4>
         <wattbill-tag-input
           .hass=${this.hass}
@@ -163,7 +205,7 @@ export class DevicesPage extends LitElement {
       p {
         margin: 0 0 8px;
       }
-      .new-run-tags {
+      .setting {
         margin-top: 16px;
         padding-top: 12px;
         border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
@@ -172,8 +214,18 @@ export class DevicesPage extends LitElement {
         margin: 0 0 6px;
         font-weight: 500;
       }
-      .new-run-tags p {
+      .setting p {
         margin: 6px 0 0;
+      }
+      select {
+        font: inherit;
+        color: var(--primary-text-color);
+        background: var(--card-background-color, #fff);
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        border-radius: 6px;
+        padding: 6px 8px;
+        width: 100%;
+        box-sizing: border-box;
       }
       .error {
         color: var(--error-color, #db4437);
