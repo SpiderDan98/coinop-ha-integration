@@ -53,8 +53,12 @@ Where a Line Item's unit price comes from: a fixed value, or a live value read f
 _Avoid_: Price provider, input
 
 **Cost Statement**:
-A document that lists selected Runs with their Line Items and a total; explicitly not an invoice.
+A document that lists selected ended Runs with their costs and a total, optionally plus a Markup; explicitly not an invoice.
 _Avoid_: Invoice, bill, Rechnung, quote
+
+**Markup**:
+A percentage added on top of a Cost Statement's total; never part of a Run's own costs.
+_Avoid_: Surcharge, margin, Aufschlag
 
 **Material**:
 A consumable a Device uses up during a Run, bought at one price, such as "PLA" or "eSun PLA+ black"; as broad or as specific as the user keeps it.
