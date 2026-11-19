@@ -15,7 +15,7 @@ from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.spoolman import SpoolmanUnreachable
 
-from .command import command
+from .command import command, found
 
 ERR_SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
 
@@ -33,11 +33,7 @@ async def spoolman_call[T](
             msg["id"], ERR_SPOOLMAN_UNREACHABLE, "Spoolman can't be reached"
         )
         return None
-    if result is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Spoolman Filament with this id"
-        )
-    return result
+    return found(connection, msg, result, "Spoolman Filament")
 
 
 @command({vol.Required("type"): "wattbill/spoolman/filaments"})
