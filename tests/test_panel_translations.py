@@ -38,6 +38,7 @@ SHARED_TERMS = {
 
 # Terms the panel and the Cost Statement both show: panel key -> statement key.
 STATEMENT_TERMS = {
+    "statement.default_title": "title",
     "run.untitled": "untitled",
     "duration": "duration",
     "kind.electricity": "kind.electricity",

@@ -519,3 +519,28 @@ async def test_record_what_spoolman_answers(
     ids = {created["material"]["id"]: "material-petg"}
     assert_recorded("materials-create-from-spoolman", stable_ids(created, ids))
     assert_recorded("materials-link-spoolman", linked)
+
+
+async def test_record_the_cost_statement_export(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, *history())
+    entry = await add_hub(hass)
+    await set_options(hass, entry, markup=10)
+
+    defaults = await panel.call("wattbill/cost_statement/defaults")
+    created = await panel.call(
+        "wattbill/cost_statement/create",
+        run_ids=["benchy", "helmet"],
+        detail="compact",
+        language="en",
+        markup=10,
+    )
+
+    path, signature = created["path"].split("?authSig=")
+    token = path.rsplit("/", 1)[1]
+    assert_recorded("cost-statement-defaults", defaults)
+    assert_recorded(
+        "cost-statement-create",
+        stable_ids(created, {token: "export-token", signature: "signature"}),
+    )

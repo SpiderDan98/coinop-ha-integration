@@ -20,6 +20,8 @@ import type {
 } from "../src/api";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
+import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
+import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
@@ -66,6 +68,10 @@ export const recorded = {
   /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
+  /** `wattbill/cost_statement/defaults` with the hub's default Markup at 10 %. */
+  statementDefaults: costStatementDefaults,
+  /** `wattbill/cost_statement/create`: the signed path to download it from. */
+  statementCreate: costStatementCreate,
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Totals },
   /** The upload of one photo to "benchy", and of ten more, refused. */
@@ -261,6 +267,7 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       return { run };
     })
     .reply("wattbill/devices/list", () => ({ devices: recorded.devices }))
+    .reply("wattbill/cost_statement/defaults", () => recorded.statementDefaults)
     .reply("wattbill/aggregates/get", (msg) => ({
       groups: found(
         recorded.aggregates.find((answer) => String(answer.group_by) === String(msg.group_by)),

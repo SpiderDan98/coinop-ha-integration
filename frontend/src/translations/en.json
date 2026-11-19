@@ -251,5 +251,20 @@
   "basket.delete": "Delete",
   "basket.clear": "Clear",
   "basket.delete_failed": "The selected Runs could not be deleted.",
-  "delete.title_many": "Delete {count} Runs?"
+  "delete.title_many": "Delete {count} Runs?",
+  "basket.statement": "Cost Statement…",
+  "statement.dialog_title": "Cost Statement for {count} Runs",
+  "statement.dialog_title_one": "Cost Statement for 1 Run",
+  "statement.hint": "A PDF of what the selected Runs cost, to hand over. It is not an invoice.",
+  "statement.title": "Title",
+  "statement.default_title": "Cost Statement",
+  "statement.note": "Note (optional)",
+  "statement.detail": "Level of detail",
+  "statement.detailed": "Detailed",
+  "statement.compact": "Compact",
+  "statement.language": "Language",
+  "statement.markup": "Markup (%)",
+  "statement.cancel": "Cancel",
+  "statement.download": "Download PDF",
+  "statement.failed": "The Cost Statement could not be made."
 }
