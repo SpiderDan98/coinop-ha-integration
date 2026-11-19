@@ -6,11 +6,15 @@ import { customElement, property, state } from "lit/decorators.js";
 import {
   KINDS,
   OUTCOMES,
+  addLineItem,
   clearFlag,
+  deleteLineItem,
   deleteRuns,
   endRun,
   getRun,
   previewDelete,
+  resetLineItem,
+  updateLineItem,
   updateRun,
   type Device,
   type Drop,
@@ -70,6 +74,57 @@ const correction = (field: Field, value: string, format: Format) => {
   }
 };
 
+/** A number input's number: null when emptied, undefined if it is no number. */
+const parseNumber = (value: string) => {
+  if (value.trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+};
+
+/** What each Line Item field shows, as its input's value. */
+const itemValues = (item: LineItem, format: Format) => ({
+  label: item.label ?? "",
+  unit: item.unit,
+  quantity: format.toNumberInput(item.quantity, 4),
+  unit_price: format.toNumberInput(item.unit_price, 4),
+  amount: format.toAmountInput(item.amount),
+});
+
+type ItemField = keyof ReturnType<typeof itemValues>;
+
+/** The change an edited Line Item field asks for; undefined if it is no valid value. */
+const itemChange = (field: ItemField, value: string) => {
+  switch (field) {
+    case "label":
+      return { label: value.trim() || null };
+    case "unit":
+      return { unit: value.trim() };
+    case "quantity": {
+      const quantity = parseNumber(value);
+      return quantity === undefined ? undefined : { quantity };
+    }
+    case "unit_price":
+    case "amount": {
+      const price = parseNumber(value);
+      return price === undefined || price === null ? undefined : { [field]: price };
+    }
+  }
+};
+
+const VALUES = ["quantity", "unit_price", "amount"] as const;
+
+/** A Line Item value as the user reads it, e.g. "0.15 kWh" or "€0.30". */
+const shownValue = (
+  item: LineItem,
+  values: NonNullable<LineItem["computed"]>,
+  field: (typeof VALUES)[number],
+  format: Format,
+) => {
+  if (field === "amount") return format.money(values.amount);
+  if (field === "unit_price") return format.unitPrice(values.unit_price);
+  return values.quantity === null ? "—" : format.quantity(values.quantity, item.unit);
+};
+
 @customElement("wattbill-run-page")
 export class RunPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
@@ -85,17 +140,21 @@ export class RunPage extends LitElement {
 
   @state() private run?: RunDetail;
   @state() private missing = false;
-  @state() private failed = false;
+  /** Where the last change that could not be saved was made. */
+  @state() private failed?: "fields" | "items";
   /** Set while the delete confirmation is open. */
   @state() private drop?: Drop;
+  /** Set while the form for a new Other Line Item is open. */
+  @state() private adding = false;
   private request = 0;
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runId")) {
       this.run = undefined;
       this.missing = false;
-      this.failed = false;
+      this.failed = undefined;
       this.drop = undefined;
+      this.adding = false;
     }
     if (changed.has("runId") || changed.has("summary")) void this.load();
   }
@@ -111,15 +170,52 @@ export class RunPage extends LitElement {
   }
 
   /** Show the Run as a command returned it; `undo` puts the field back on failure. */
-  private async save(result: Promise<RunDetail>, undo = () => {}) {
-    this.failed = false;
+  private async save(
+    result: Promise<RunDetail>,
+    undo = () => {},
+    where: "fields" | "items" = "fields",
+  ) {
+    this.failed = undefined;
     try {
       ++this.request;
       this.run = await result;
+      return true;
     } catch {
-      this.failed = true;
+      this.failed = where;
       undo();
+      return false;
     }
+  }
+
+  /** Run a Line Item command; its failure is shown with the Line Items. */
+  private saveItems(result: Promise<RunDetail>, undo?: () => void) {
+    return this.save(result, undo, "items");
+  }
+
+  private onItemChange(item: LineItem, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const field = input.name as ItemField;
+    const shown = itemValues(item, formatter(this.hass))[field];
+    const undo = () => (input.value = shown);
+    const changes = itemChange(field, input.value);
+    if (!changes) return undo();
+    void this.saveItems(updateLineItem(this.hass, this.runId, item.id, changes), undo);
+  }
+
+  private async onAdd(event: SubmitEvent) {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const entered = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    const quantity = parseNumber(entered.quantity ?? "");
+    const unitPrice = parseNumber(entered.unit_price ?? "");
+    if (quantity === undefined || unitPrice === undefined || unitPrice === null) return;
+    const item = {
+      label: (entered.label ?? "").trim() || null,
+      quantity,
+      unit: (entered.unit ?? "").trim(),
+      unit_price: unitPrice,
+    };
+    if (await this.saveItems(addLineItem(this.hass, this.runId, item))) this.adding = false;
   }
 
   private onFieldChange(event: Event) {
@@ -135,11 +231,11 @@ export class RunPage extends LitElement {
   }
 
   private async confirmDelete() {
-    this.failed = false;
+    this.failed = undefined;
     try {
       this.drop = await previewDelete(this.hass, [this.runId]);
     } catch {
-      this.failed = true;
+      this.failed = "fields";
     }
   }
 
@@ -148,7 +244,7 @@ export class RunPage extends LitElement {
       await deleteRuns(this.hass, [this.runId]);
       navigate(this.basePath);
     } catch {
-      this.failed = true;
+      this.failed = "fields";
     }
     this.drop = undefined;
   }
@@ -237,6 +333,7 @@ export class RunPage extends LitElement {
                 </div>`
               : nothing
           }
+          ${this.failed === "items" ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
           ${KINDS.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
             return html`
@@ -245,15 +342,12 @@ export class RunPage extends LitElement {
                   <h3>${t(`kind.${kind}`)}</h3>
                   <b class="num">${format.money(run.subtotals[kind])}</b>
                 </div>
-                <table>
-                  ${
-                    items.length
-                      ? items.map((item) => this.renderItem(item, t, format))
-                      : html`<tr>
-                          <td class="muted small">${t("run.none")}</td>
-                        </tr>`
-                  }
-                </table>
+                ${
+                  items.length
+                    ? items.map((item) => this.renderItem(item, t, format))
+                    : html`<p class="muted small">${t("run.none")}</p>`
+                }
+                ${kind === "other" ? this.renderAdd(t) : nothing}
               </div>
             `;
           })}
@@ -327,7 +421,7 @@ export class RunPage extends LitElement {
         ></wattbill-tag-input>
       </div>
       <p class="wide muted small">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
-      ${this.failed ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
+      ${this.failed === "fields" ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
     </div>`;
   }
 
@@ -363,9 +457,35 @@ export class RunPage extends LitElement {
 
   private renderItem(item: LineItem, t: Localize, format: Format) {
     const why = evidence(item, t);
-    return html`<tr>
-      <td>
-        <div>${item.label ?? t(`kind.${item.kind}`)}</div>
+    const shown = itemValues(item, format);
+    const { computed, locked } = item;
+    // Labels and units WattBill sets stay as they are, rendered in the output language.
+    const entered = item.kind !== "electricity";
+    const number = (field: (typeof VALUES)[number]) => {
+      const manual = computed !== null && computed[field] !== item[field];
+      return html`<input
+        type="number"
+        step="any"
+        name=${field}
+        class=${manual ? "manual" : ""}
+        title=${manual ? t("item.computed", { value: shownValue(item, computed, field, format) }) : ""}
+        aria-label=${t(`item.${field}`)}
+        min=${field === "quantity" || item.kind !== "other" ? "0" : nothing}
+        .value=${shown[field]}
+        ?disabled=${locked}
+      />`;
+    };
+    return html`<div
+      class="item ${computed ? "manual" : ""} ${locked ? "locked" : ""}"
+      data-id=${item.id}
+      @change=${(event: Event) => this.onItemChange(item, event)}
+    >
+      <div class="label">
+        ${
+          entered
+            ? html`<input name="label" aria-label=${t("item.label")} .value=${shown.label} />`
+            : html`<div>${item.label ?? t(`kind.${item.kind}`)}</div>`
+        }
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
         ${
           item.segments.length > 1
@@ -381,16 +501,95 @@ export class RunPage extends LitElement {
               </ul>`
             : nothing
         }
-      </td>
-      <td class="num small muted">
+      </div>
+      <div class="quantity">
+        ${number("quantity")}
         ${
-          item.quantity === null
-            ? nothing
-            : `${format.quantity(item.quantity, item.unit)} × ${format.unitPrice(item.unit_price)}`
+          entered
+            ? html`<input
+                name="unit"
+                class="unit"
+                aria-label=${t("item.unit")}
+                .value=${shown.unit}
+              />`
+            : html`<span class="unit muted small">${item.unit}</span>`
         }
-      </td>
-      <td class="num amount">${format.money(item.amount)}</td>
-    </tr>`;
+      </div>
+      ${number("unit_price")} ${number("amount")}
+      <div class="actions">
+        ${locked ? html`<span class="lock" title=${t("item.locked")}>🔒</span>` : nothing}
+        ${
+          computed
+            ? html`<button
+                class="icon reset"
+                title=${t(
+                  "item.reset",
+                  Object.fromEntries(
+                    VALUES.map((field) => [field, shownValue(item, computed, field, format)]),
+                  ),
+                )}
+                @click=${() => this.saveItems(resetLineItem(this.hass, this.runId, item.id))}
+              >
+                ↺
+              </button>`
+            : nothing
+        }
+        ${
+          item.deletable
+            ? html`<button
+                class="icon delete"
+                title=${t("item.delete")}
+                @click=${() => this.saveItems(deleteLineItem(this.hass, this.runId, item.id))}
+              >
+                🗑
+              </button>`
+            : nothing
+        }
+      </div>
+    </div>`;
+  }
+
+  private renderAdd(t: Localize) {
+    return html`<div class="add-item">
+      ${
+        this.adding
+          ? html`<form @submit=${this.onAdd}>
+              <input
+                name="label"
+                class="label"
+                placeholder=${t("item.label")}
+                aria-label=${t("item.label")}
+              />
+              <input
+                type="number"
+                step="any"
+                min="0"
+                name="quantity"
+                value="1"
+                aria-label=${t("item.quantity")}
+              />
+              <input name="unit" placeholder=${t("item.unit")} aria-label=${t("item.unit")} />
+              <input
+                type="number"
+                step="any"
+                name="unit_price"
+                required
+                placeholder=${t("item.unit_price")}
+                aria-label=${t("item.unit_price")}
+              />
+              <p class="muted small">${t("item.negative_hint")}</p>
+              <div class="row">
+                <button class="btn" type="submit">${t("item.add")}</button>
+                <button class="btn" type="button" @click=${() => (this.adding = false)}>
+                  ${t("item.cancel")}
+                </button>
+              </div>
+            </form>`
+          : html`<button class="btn small add-other" @click=${() => (this.adding = true)}>
+              ${t("item.add_other")}
+            </button>`
+      }
+    </div>`;
   }
 
   static override styles = [
@@ -523,21 +722,87 @@ export class RunPage extends LitElement {
         margin-right: 8px;
         background: var(--kind-color);
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 6px;
+      .kind > p {
+        margin: 6px 0 0;
       }
-      td {
+      .item {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 52px;
+        gap: 6px;
+        align-items: start;
         padding: 6px 4px;
-        border-bottom: 1px dotted var(--divider-color, rgba(0, 0, 0, 0.12));
-        vertical-align: top;
       }
-      tr:last-child td {
-        border-bottom: 0;
+      .item + .item {
+        border-top: 1px dotted var(--divider-color, rgba(0, 0, 0, 0.12));
       }
-      .amount {
-        width: 90px;
+      .item > * {
+        min-width: 0;
+      }
+      .item.manual {
+        box-shadow: inset 3px 0 var(--wattbill-manual);
+        padding-left: 10px;
+      }
+      :host([narrow]) .item {
+        grid-template-columns: 1fr 1fr 1fr 52px;
+      }
+      :host([narrow]) .item .label {
+        grid-column: 1 / -1;
+      }
+      .item .label > div:first-child {
+        padding-top: 6px;
+      }
+      .item input[type="number"] {
+        text-align: right;
+      }
+      .item input.manual {
+        border-color: var(--wattbill-manual);
+        color: var(--wattbill-manual);
+      }
+      .quantity {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .quantity .unit {
+        flex: 0 0 44px;
+      }
+      .actions {
+        display: flex;
+        gap: 2px;
+        align-items: center;
+        justify-content: flex-end;
+        padding-top: 4px;
+      }
+      .icon {
+        font: inherit;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 6px;
+        color: var(--secondary-text-color);
+      }
+      .icon.reset {
+        color: var(--wattbill-manual);
+        font-weight: 700;
+      }
+      .add-item {
+        margin-top: 8px;
+      }
+      .add-item form {
+        display: grid;
+        grid-template-columns: 1fr 72px 72px 110px;
+        gap: 6px;
+      }
+      .add-item form > :is(p, .row) {
+        grid-column: 1 / -1;
+        margin: 0;
+      }
+      :host([narrow]) .add-item form {
+        grid-template-columns: 1fr 1fr;
+      }
+      :host([narrow]) .add-item form .label {
+        grid-column: 1 / -1;
       }
       .evidence {
         font-size: 11px;

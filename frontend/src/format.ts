@@ -58,6 +58,12 @@ export function formatter(hass: HomeAssistant) {
       return new Date(asUtc - zoneOffset(guess)).toISOString();
     },
     money: (amount: number) => currency.format(amount),
+    /** A number input's value: no grouping, at most `digits` decimals. */
+    toNumberInput: (value: number | null, digits: number) =>
+      value === null ? "" : String(Number(value.toFixed(digits))),
+    /** An amount input's value, with the currency's decimals. */
+    toAmountInput: (amount: number) =>
+      amount.toFixed(currency.resolvedOptions().maximumFractionDigits ?? 2),
     unitPrice: (price: number) => unitPrice.format(price),
     quantity: (quantity: number, unit: string) =>
       `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,

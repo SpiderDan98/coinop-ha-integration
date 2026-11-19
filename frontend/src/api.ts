@@ -45,6 +45,11 @@ export interface LineItem {
   amount: number;
   method: Method | null;
   segments: { start: string; end: string; kwh: number; unit_price: number }[];
+  /** What WattBill computed, kept while the user's override counts instead. */
+  computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
+  /** Computed values update live until the Run is final. */
+  locked: boolean;
+  deletable: boolean;
 }
 
 export interface RunDetail extends RunSummary {
@@ -129,6 +134,32 @@ export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
 /** End Run now: the open Run ends as Unknown and is finalised. */
 export const endRun = (hass: HomeAssistant, runId: string) =>
   runResult(hass, { type: "wattbill/runs/end", run_id: runId });
+
+type Entered = Partial<Pick<LineItem, "label" | "unit" | "quantity" | "unit_price" | "amount">>;
+
+/** An amount back-computes the unit price; a computed Line Item becomes manual. */
+export const updateLineItem = (
+  hass: HomeAssistant,
+  runId: string,
+  lineItemId: string,
+  changes: Entered,
+) =>
+  runResult(hass, {
+    type: "wattbill/line_items/update",
+    run_id: runId,
+    line_item_id: lineItemId,
+    ...changes,
+  });
+
+export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
+  runResult(hass, { type: "wattbill/line_items/reset", run_id: runId, line_item_id: lineItemId });
+
+/** Only Other Line Items are added by hand so far. */
+export const addLineItem = (hass: HomeAssistant, runId: string, item: Entered) =>
+  runResult(hass, { type: "wattbill/line_items/add", run_id: runId, kind: "other", ...item });
+
+export const deleteLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
+  runResult(hass, { type: "wattbill/line_items/delete", run_id: runId, line_item_id: lineItemId });
 
 export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
   (await hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete_preview", run_ids: runIds }))

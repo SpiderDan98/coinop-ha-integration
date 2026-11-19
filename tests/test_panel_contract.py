@@ -144,6 +144,32 @@ async def test_record_the_runs_the_panel_shows(
     assert_recorded("devices-list", stable_ids(devices, ids))
 
 
+async def test_record_line_item_corrections(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, *history())
+    await add_hub(hass)
+
+    overridden = await panel.call(
+        "wattbill/line_items/update",
+        run_id="benchy",
+        line_item_id="electricity",
+        amount=0.1,
+    )
+    added = await panel.call(
+        "wattbill/line_items/add",
+        run_id="helmet",
+        kind="other",
+        label="Refund for the failed print",
+        quantity=1,
+        unit_price=-2,
+    )
+
+    assert_recorded("line-items-update", overridden)
+    refund = added["run"]["line_items"][-1]["id"]
+    assert_recorded("line-items-add", stable_ids(added, {refund: "helmet-refund"}))
+
+
 async def test_record_what_deleting_a_run_drops(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

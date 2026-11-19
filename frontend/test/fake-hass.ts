@@ -14,6 +14,8 @@ import type {
 } from "../src/api";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
@@ -36,6 +38,10 @@ export const recorded = {
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
+  /** `wattbill/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
+  lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
+  /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
+  lineItemsAdd: lineItemsAdd as { run: RunDetail },
   /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
   /**

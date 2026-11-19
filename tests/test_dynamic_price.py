@@ -18,6 +18,13 @@ from .test_runs import TOTAL_COST, set_status, stored_runs, value
 PRICE_ENTITY = {"entity_id": PRICE}
 
 
+@pytest.fixture(autouse=True)
+async def settle_reload(hass: HomeAssistant) -> Any:
+    """A Device added last reloads the hub; its tracker must not start during teardown."""
+    yield
+    await hass.async_block_till_done()
+
+
 async def set_price(
     hass: HomeAssistant, value: float | str, unit: str = "EUR/kWh"
 ) -> None:

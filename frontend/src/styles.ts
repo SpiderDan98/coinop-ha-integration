@@ -6,6 +6,7 @@ export const shared = css`
     --wattbill-electricity: #f9a825;
     --wattbill-material: #26a69a;
     --wattbill-other: #7e57c2;
+    --wattbill-manual: #7e57c2;
     color: var(--primary-text-color);
     font-family: var(--ha-font-family-body, Roboto, system-ui, sans-serif);
     font-size: 14px;

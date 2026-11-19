@@ -41,7 +41,10 @@
               "kwh": 0.15,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         },
         {
           "id": "benchy-pla",
@@ -53,7 +56,10 @@
           "unit_price": 0.025,
           "amount": 0.31,
           "method": null,
-          "segments": []
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         },
         {
           "id": "benchy-wear",
@@ -65,7 +71,10 @@
           "unit_price": 0.5,
           "amount": 0.5,
           "method": null,
-          "segments": []
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         }
       ],
       "images": [
@@ -152,7 +161,10 @@
               "kwh": 0.48,
               "unit_price": 0.25
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         }
       ],
       "images": [
@@ -221,7 +233,10 @@
               "kwh": 0.24,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         }
       ],
       "images": [],
@@ -296,7 +311,10 @@
               "kwh": 0.09,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": true,
+          "deletable": false
         }
       ],
       "images": [],

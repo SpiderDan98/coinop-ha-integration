@@ -67,7 +67,8 @@
                 "kwh": 0.06,
                 "unit_price": 0.3
               }
-            ]
+            ],
+            "computed": null
           }
         ],
         "images": []

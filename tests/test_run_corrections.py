@@ -22,14 +22,6 @@ from .websocket import PanelClient
 ENERGY = "sensor.kobra_energy_in_runs"
 
 
-@pytest.fixture
-def watcher(
-    connect_panel: Callable[[MockUser], PanelClient], hass_admin_user: MockUser
-) -> PanelClient:
-    """A second open panel, subscribed to what the first one changes."""
-    return connect_panel(hass_admin_user)
-
-
 async def test_name_note_and_part_count_are_saved_at_once(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
@@ -327,6 +319,14 @@ async def test_only_final_runs_that_exist_are_deleted(
         ("wattbill/runs/end", {"run_id": "plate"}),
         ("wattbill/runs/delete_preview", {"run_ids": ["plate"]}),
         ("wattbill/runs/delete", {"run_ids": ["plate"]}),
+        *(
+            (
+                f"wattbill/line_items/{verb}",
+                {"run_id": "plate", "line_item_id": "electricity"},
+            )
+            for verb in ("update", "reset", "delete")
+        ),
+        ("wattbill/line_items/add", {"run_id": "plate", "kind": "other"}),
     ],
 )
 async def test_only_admins_correct_runs(
