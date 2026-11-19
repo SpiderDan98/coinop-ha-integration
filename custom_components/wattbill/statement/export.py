@@ -27,13 +27,17 @@ def language_for(language: str) -> str:
 
 @dataclass(frozen=True)
 class Options:
-    """`title` None means the default title in `language`; `markup` is a percentage."""
+    """`title` None means the default title in `language`; `markup` is a percentage.
+
+    `images`: each Run's Cover Image in its Detailed section.
+    """
 
     language: str
     markup: float
     title: str | None = None
     note: str | None = None
     detail: Detail = Detail.DETAILED
+    images: bool = True
 
 
 @dataclass(frozen=True)
