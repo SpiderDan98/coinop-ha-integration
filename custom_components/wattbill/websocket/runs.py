@@ -32,6 +32,7 @@ from custom_components.wattbill.models import LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
+from custom_components.wattbill.tags import tag_name
 
 from .command import command
 
@@ -63,6 +64,7 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "part_count": run.part_count,
         "cost_per_part": float(round_amount(float(total) / run.part_count, decimals)),
         "flags": list(run.flags),
+        "tags": list(run.tags),
         "cover": None if (cover := run.cover) is None else image_info(run, cover),
     }
 
@@ -192,6 +194,7 @@ _FINAL_FIELDS = ("started", "ended", "outcome")
         vol.Optional("ended"): _moment,
         vol.Optional("outcome"): vol.Coerce(Outcome),
         vol.Optional("part_count"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("tags"): [tag_name],
     }
 )
 async def _update(
@@ -220,6 +223,8 @@ async def _update(
         run.note = _text(msg["note"])
     run.outcome = msg.get("outcome", run.outcome)
     run.part_count = msg.get("part_count", run.part_count)
+    if "tags" in msg:
+        run.tags = await wattbill.catalog.async_add_tags(msg["tags"])
     await wattbill.book.async_correct(run)
     _send_run(hass, connection, msg["id"], run)
 

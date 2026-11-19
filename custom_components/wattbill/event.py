@@ -41,7 +41,9 @@ class RunEvent(DeviceEntity, EventEntity):
     def _on_run_change(self, change: RunChange, run: Run) -> None:
         # Only finalisation sends ENDED, so later corrections never refire it.
         if change is RunChange.STARTED:
-            self._trigger_event(change, {"name": run.name, "start": run.started})
+            self._trigger_event(
+                change, {"name": run.name, "start": run.started, "tags": list(run.tags)}
+            )
         elif change is RunChange.ENDED:
             totals = run_totals(run, dt_util.utcnow())
             self._trigger_event(
@@ -58,6 +60,7 @@ class RunEvent(DeviceEntity, EventEntity):
                     "energy_kwh": totals.energy_kwh,
                     "material_grams": totals.material_grams,
                     "has_flags": bool(run.flags),
+                    "tags": list(run.tags),
                 },
             )
         else:

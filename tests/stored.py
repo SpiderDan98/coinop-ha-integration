@@ -88,13 +88,27 @@ def stored_material(material_id: str, **fields: Any) -> dict[str, Any]:
     } | fields
 
 
+def _place_catalogue(
+    hass_storage: dict[str, Any], name: str, entries: list[Any]
+) -> None:
+    catalog = hass_storage.setdefault(
+        "wattbill.catalog",
+        {
+            "version": 1,
+            "minor_version": 1,
+            "key": "wattbill.catalog",
+            "data": {"materials": [], "tags": []},
+        },
+    )
+    catalog["data"][name] = entries
+
+
 def place_materials(hass_storage: dict[str, Any], *materials: dict[str, Any]) -> None:
-    hass_storage["wattbill.catalog"] = {
-        "version": 1,
-        "minor_version": 1,
-        "key": "wattbill.catalog",
-        "data": {"materials": list(materials)},
-    }
+    _place_catalogue(hass_storage, "materials", list(materials))
+
+
+def place_tags(hass_storage: dict[str, Any], *tags: str) -> None:
+    _place_catalogue(hass_storage, "tags", sorted(tags))
 
 
 def place_runs(hass_storage: dict[str, Any], *runs: dict[str, Any]) -> None:

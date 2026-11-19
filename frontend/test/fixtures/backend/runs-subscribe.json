@@ -15,6 +15,9 @@
         "part_count": 4,
         "cost_per_part": 0.22,
         "flags": [],
+        "tags": [
+          "Gift"
+        ],
         "cover": {
           "id": "benchy-thumbnail",
           "kind": "thumbnail",
@@ -39,6 +42,10 @@
         "flags": [
           "fault"
         ],
+        "tags": [
+          "Cosplay helmet",
+          "Gift"
+        ],
         "cover": {
           "id": "helmet-snapshot",
           "kind": "snapshot",
@@ -61,6 +68,7 @@
         "part_count": 1,
         "cost_per_part": 0.07,
         "flags": [],
+        "tags": [],
         "cover": null
       }
     ]
@@ -81,6 +89,9 @@
       "part_count": 1,
       "cost_per_part": 0.0,
       "flags": [],
+      "tags": [
+        "Batch 7"
+      ],
       "cover": null
     }
   },
@@ -100,6 +111,9 @@
       "part_count": 1,
       "cost_per_part": 0.03,
       "flags": [],
+      "tags": [
+        "Batch 7"
+      ],
       "cover": null
     }
   },
@@ -119,6 +133,9 @@
       "part_count": 1,
       "cost_per_part": 0.03,
       "flags": [],
+      "tags": [
+        "Batch 7"
+      ],
       "cover": null
     }
   }

@@ -11,8 +11,13 @@ from typing import Any
 
 from .schema import vol
 from .store import WattBillStore
+from .tags import retag, tag_name
 
-FIELDS: dict[str, tuple[Any, Any]] = {}
+TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
+
+FIELDS: dict[str, tuple[Any, Any]] = {
+    TAGS_FOR_NEW_RUNS: ([], [tag_name]),
+}
 
 
 class DeviceSettings:
@@ -39,16 +44,33 @@ class DeviceSettings:
             for name, (default, _) in FIELDS.items()
         }
 
+    @staticmethod
+    def validate(changes: Mapping[str, Any]) -> dict[str, Any]:
+        """`changes` as stored; raises `vol.Invalid` for an unknown field or value."""
+        valid: dict[str, Any] = vol.Schema(
+            {vol.Optional(name): schema for name, (_, schema) in FIELDS.items()}
+        )(dict(changes))
+        return valid
+
     async def async_update(
         self, device_id: str, changes: Mapping[str, Any]
     ) -> dict[str, Any]:
         """Apply `changes` (raises `vol.Invalid` for an unknown field or value)."""
-        valid = vol.Schema(
-            {vol.Optional(name): schema for name, (_, schema) in FIELDS.items()}
-        )(dict(changes))
-        self._devices[device_id] = self._devices[device_id] | valid
+        self._devices[device_id] = self._devices[device_id] | self.validate(changes)
         await self._save()
         return self.get(device_id)
+
+    async def async_retag(self, tag: str, new: str | None) -> None:
+        """Replace `tag` by `new` in every Device's Tags for new Runs, or remove it."""
+        tagged = [
+            settings
+            for settings in self._devices.values()
+            if tag in settings.get(TAGS_FOR_NEW_RUNS, [])
+        ]
+        for settings in tagged:
+            settings[TAGS_FOR_NEW_RUNS] = retag(settings[TAGS_FOR_NEW_RUNS], tag, new)
+        if tagged:
+            await self._save()
 
     async def async_prune(self) -> None:
         """Drop removed Devices' settings from the Store."""

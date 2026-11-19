@@ -25,6 +25,7 @@ import { isKey, localize, type Localize } from "./localize";
 import "./run-image";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
+import "./tag-input";
 
 const evidence = (item: LineItem, t: Localize) =>
   [
@@ -77,6 +78,8 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) summary?: RunSummary;
   /** Current Devices; any other Device is shown as removed. */
   @property({ attribute: false }) devices?: Device[];
+  /** Every Tag there is, for suggestions. */
+  @property({ attribute: false }) tags: string[] = [];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
@@ -312,6 +315,17 @@ export class RunPage extends LitElement {
       <label class="wide"
         >${t("run.note")}<textarea name="note" .value=${values.note}></textarea>
       </label>
+      <div class="wide label">
+        ${t("run.tags")}
+        <wattbill-tag-input
+          .hass=${this.hass}
+          .tags=${run.tags}
+          .catalog=${this.tags}
+          .label=${t("run.tags")}
+          @tags-change=${(event: CustomEvent<string[]>) =>
+            this.save(updateRun(this.hass, this.runId, { tags: event.detail }))}
+        ></wattbill-tag-input>
+      </div>
       <p class="wide muted small">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
       ${this.failed ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
     </div>`;
@@ -435,7 +449,8 @@ export class RunPage extends LitElement {
       .wide {
         grid-column: span 2;
       }
-      label {
+      label,
+      .label {
         display: flex;
         flex-direction: column;
         gap: 3px;

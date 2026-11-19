@@ -47,7 +47,11 @@
           "value": 0.3
         }
       },
-      "settings": {}
+      "settings": {
+        "tags_for_new_runs": [
+          "Batch 7"
+        ]
+      }
     }
   ]
 }

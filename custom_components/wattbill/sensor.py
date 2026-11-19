@@ -139,6 +139,7 @@ class CurrentRunCostSensor(DeviceSensor):
             "name": run.name,
             "start": run.started,
             "running_hours": run_totals(run, dt_util.utcnow()).running_hours,
+            "tags": list(run.tags),
         }
 
 
@@ -170,4 +171,5 @@ class LastRunCostSensor(DeviceSensor):
             "part_count": run.part_count,
             "cost_per_part": cost / run.part_count,
             "has_flags": bool(run.flags),
+            "tags": list(run.tags),
         }
