@@ -205,7 +205,17 @@ export class RunPage extends LitElement {
   @state() private templateId?: string;
   /** The label of the Line Item last saved as a template. */
   @state() private savedTemplate?: string;
+  /** The Material picked in the new Material Line Item form; the first one until then. */
+  @state() private materialPick?: string;
+  /** Shown for a moment after each change saved. */
+  @state() private saved = false;
   private request = 0;
+  private savedTimer?: ReturnType<typeof setTimeout>;
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    clearTimeout(this.savedTimer);
+  }
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runId")) {
@@ -238,6 +248,9 @@ export class RunPage extends LitElement {
     try {
       ++this.request;
       this.run = await result;
+      this.saved = true;
+      clearTimeout(this.savedTimer);
+      this.savedTimer = setTimeout(() => (this.saved = false), 2000);
       return true;
     } catch {
       this.failed = where;
@@ -368,7 +381,9 @@ export class RunPage extends LitElement {
         ${outcomeChip(run, t)}
         <span class="muted">${device} · ${format.dateTime(run.started)}</span>
         <span class="spacer"></span>
-        <span class="muted small">${t("run.saves")}</span>
+        <span class="muted small saves" aria-live="polite"
+          >${this.saved ? t("run.saved") : t("run.saves")}</span
+        >
         ${
           run.ended === null
             ? html`<ha-button
@@ -687,13 +702,37 @@ export class RunPage extends LitElement {
   }
 
   private renderAddMaterial(t: Localize) {
+    const materials = this.pickable(null);
+    const picked = materials.find(({ id }) => id === this.materialPick) ?? materials[0];
+    const unit = picked?.form === "resin" ? "ml" : "g";
+    if (this.adding === "material" && !picked) {
+      return html`<div class="add-item no-materials">
+        <p class="muted small">
+          ${t("item.no_materials")}
+          <a href="${this.basePath}/materials" @click=${followLink}>${t("item.to_materials")}</a>
+        </p>
+        <ha-button class="small" appearance="plain" @click=${() => (this.adding = undefined)}>
+          ${t("item.cancel")}
+        </ha-button>
+      </div>`;
+    }
     return html`<div class="add-item">
       ${
         this.adding === "material"
           ? html`<form class="material" @submit=${this.onAdd}>
-              <select name="material_id" class="label" required aria-label=${t("item.material")}>
-                ${this.pickable(null).map(
-                  (material) => html`<option value=${material.id}>${material.name}</option>`,
+              <select
+                name="material_id"
+                class="label"
+                required
+                aria-label=${t("item.material")}
+                @change=${(event: Event) =>
+                  (this.materialPick = (event.target as HTMLSelectElement).value)}
+              >
+                ${materials.map(
+                  (material) =>
+                    html`<option value=${material.id} ?selected=${material === picked}>
+                      ${material.name}
+                    </option>`,
                 )}
               </select>
               <input
@@ -705,8 +744,8 @@ export class RunPage extends LitElement {
                 aria-label=${t("item.quantity")}
               />
               <select name="unit" aria-label=${t("item.unit")}>
-                <option value="g">g</option>
-                <option value="ml">ml</option>
+                <option value="g" .selected=${unit === "g"}>g</option>
+                <option value="ml" .selected=${unit === "ml"}>ml</option>
               </select>
               <div class="row">
                 <ha-button class="small" type="submit">${t("item.add")}</ha-button>
@@ -722,7 +761,10 @@ export class RunPage extends LitElement {
           : html`<ha-button
               class="small add-material"
               appearance="filled"
-              @click=${() => (this.adding = "material")}
+              @click=${() => {
+                this.adding = "material";
+                this.materialPick = undefined;
+              }}
             >
               <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
               ${t("item.add_material")}

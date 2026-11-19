@@ -116,3 +116,31 @@ describe("Default Material", () => {
     ]);
   });
 });
+
+describe("A new Material Line Item", () => {
+  it("counts g or ml by the Material's form", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
+    await click(panel, query(panel, "ha-button.add-material"));
+    const form = query(panel, ".add-item form");
+    expect((query(form, "select[name=unit]") as HTMLSelectElement).value).toBe("g");
+
+    await fill(panel, query(form, "select[name=material_id]"), "material-2");
+
+    expect((query(form, "select[name=unit]") as HTMLSelectElement).value).toBe("ml");
+  });
+
+  it("points to the Materials tab while there are no Materials", async () => {
+    const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
+      recorded.catalog.empty,
+    ]);
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+
+    await click(panel, query(panel, "ha-button.add-material"));
+
+    expect(queryAll(panel, ".add-item form")).toEqual([]);
+    expect(text(query(panel, ".no-materials"))).toContain(
+      "A Material Line Item needs a Material from the catalogue.",
+    );
+    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/wattbill/materials");
+  });
+});

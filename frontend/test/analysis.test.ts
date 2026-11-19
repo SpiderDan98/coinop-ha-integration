@@ -150,3 +150,27 @@ describe("Analysis tab", () => {
     expect(rows(panel, "by-tag")).toContain("Ohne Tag 1 0,07 €");
   });
 });
+
+describe("An empty Analysis tab", () => {
+  it("says there are no Runs instead of empty tables", async () => {
+    const backend = recordedBackend()
+      .subscription("wattbill/runs/subscribe", () => [{ runs: [] }])
+      .reply(AGGREGATES, () => ({ groups: [] }));
+
+    const panel = await mountPanel(backend, { path: "/analysis" });
+
+    expect(queryAll(panel, "table")).toEqual([]);
+    expect(text(panel)).toContain("No Runs yet.");
+  });
+
+  it("says a table has nothing yet instead of showing only its head", async () => {
+    const backend = recordedBackend().reply(AGGREGATES, (msg) => {
+      const key = (msg.group_by as string[]).join();
+      return { groups: key === "kind,material" ? [] : groups(key) };
+    });
+
+    const panel = await mountPanel(backend, { path: "/analysis" });
+
+    expect(rows(panel, "by-material")).toEqual(["No Material costs yet."]);
+  });
+});

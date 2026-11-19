@@ -248,3 +248,14 @@ describe("Gallery tiles", () => {
     expect(queryAll(benchy, ".tile-flags")).toHaveLength(0);
   });
 });
+
+describe("Saving a correction", () => {
+  it("confirms it for a moment where the page says every change is saved", async () => {
+    const panel = await mountPanel(correcting(), { path: "/run/benchy" });
+    expect(text(query(panel, ".saves"))).toBe("Every change saves at once.");
+
+    await change(panel, query(panel, "input[name=name]"), "Benchy v2");
+
+    expect(text(query(panel, ".saves"))).toBe("Saved.");
+  });
+});
