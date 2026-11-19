@@ -4,8 +4,10 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OUTCOMES, createRun, type Device, type Outcome } from "./api";
 import { formatter } from "./format";
-import { navigate, type HomeAssistant } from "./hass";
-import { localize } from "./localize";
+import { followLink, navigate, type HomeAssistant } from "./hass";
+import { localize, type Localize } from "./localize";
+import { RECONFIGURE } from "./devices-page";
+import "./dialog";
 import { shared } from "./styles";
 import "./tag-input";
 
@@ -31,21 +33,32 @@ export class ManualRunDialog extends LitElement {
     return this.devices.find((device) => device.id === this.deviceId) ?? this.devices[0];
   }
 
+  override connectedCallback() {
+    super.connectedCallback();
+    this.ended ||= formatter(this.hass).toInput(new Date().toISOString());
+  }
+
+  /** The times entered, or why they are no Run's times yet. */
   private get times() {
     const format = formatter(this.hass);
     const [started, ended] = [format.fromInput(this.started), format.fromInput(this.ended)];
-    return started && ended && Date.parse(ended) > Date.parse(started)
-      ? { started, ended }
-      : undefined;
+    if (!started || !ended) return { problem: undefined };
+    const now = Date.now();
+    if (Date.parse(started) > now || Date.parse(ended) > now) return { problem: "future" as const };
+    if (Date.parse(ended) <= Date.parse(started)) return { problem: "order" as const };
+    return { started, ended };
   }
 
   override render() {
     const t = localize(this.hass);
+    if (!this.devices.length) return this.renderNoDevices(t);
     const device = this.device;
+    const times = this.times;
+    const now = formatter(this.hass).toInput(new Date().toISOString());
     const tags = this.runTags ?? device?.settings.tags_for_new_runs ?? [];
     const input = (event: Event) => (event.target as HTMLInputElement).value;
-    return html`<div class="scrim">
-      <div class="manual-dialog card" role="dialog" aria-modal="true">
+    return html`<wattbill-dialog .label=${t("manual.title")} @cancel=${this.close}>
+      <div class="manual-dialog dialog card">
         <h2>${t("manual.title")}</h2>
         <p class="muted small">${t("manual.hint")}</p>
         <label
@@ -65,6 +78,7 @@ export class ManualRunDialog extends LitElement {
         <label
           >${t("run.name")}<input
             name="name"
+            autofocus
             .value=${this.name}
             placeholder=${t("run.untitled")}
             @input=${(event: Event) => (this.name = input(event))}
@@ -74,6 +88,7 @@ export class ManualRunDialog extends LitElement {
             >${t("run.started")}<input
               type="datetime-local"
               name="started"
+              max=${now}
               .value=${this.started}
               @input=${(event: Event) => (this.started = input(event))}
           /></label>
@@ -81,10 +96,17 @@ export class ManualRunDialog extends LitElement {
             >${t("run.ended")}<input
               type="datetime-local"
               name="ended"
+              max=${now}
+              aria-invalid=${times.problem ? "true" : "false"}
               .value=${this.ended}
               @input=${(event: Event) => (this.ended = input(event))}
           /></label>
         </div>
+        ${
+          times.problem
+            ? html`<p class="error small times-problem">${t(`manual.${times.problem}`)}</p>`
+            : nothing
+        }
         <label
           >${t("run.outcome")}<select
             name="outcome"
@@ -115,7 +137,7 @@ export class ManualRunDialog extends LitElement {
           </ha-button>
           <ha-button
             class="create"
-            ?disabled=${!device || !this.times || this.saving}
+            ?disabled=${!device || !times.started || this.saving}
             .loading=${this.saving}
             @click=${() => this.create(tags)}
           >
@@ -123,20 +145,43 @@ export class ManualRunDialog extends LitElement {
           </ha-button>
         </div>
       </div>
-    </div>`;
+    </wattbill-dialog>`;
+  }
+
+  private renderNoDevices(t: Localize) {
+    return html`<wattbill-dialog .label=${t("manual.title")} @cancel=${this.close}>
+      <div class="manual-dialog dialog card">
+        <h2>${t("manual.title")}</h2>
+        <p class="no-devices">${t("devices.empty")}</p>
+        <a
+          href=${RECONFIGURE}
+          @click=${(event: MouseEvent) => {
+            followLink(event);
+            this.close();
+          }}
+          >${t("manual.add_device")}</a
+        >
+        <div class="row end">
+          <ha-button class="cancel" appearance="plain" autofocus @click=${this.close}>
+            ${t("manual.close")}
+          </ha-button>
+        </div>
+      </div>
+    </wattbill-dialog>`;
   }
 
   private async create(tags: string[]) {
     const device = this.device;
-    const times = this.times;
-    if (!device || !times) return;
+    const { started, ended } = this.times;
+    if (!device || !started || !ended) return;
     this.saving = true;
     this.failed = false;
     try {
       const run = await createRun(this.hass, {
         device_id: device.id,
         name: this.name.trim() || null,
-        ...times,
+        started,
+        ended,
         outcome: this.outcome,
         tags,
       });
@@ -156,30 +201,8 @@ export class ManualRunDialog extends LitElement {
   static override styles = [
     shared,
     css`
-      .scrim {
-        position: fixed;
-        inset: 0;
-        z-index: 5;
-        display: grid;
-        place-items: center;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.4);
-      }
-      .manual-dialog {
-        width: min(480px, 100%);
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .manual-dialog p {
-        margin: 0;
-      }
       .times > label {
         flex: 1 1 180px;
-      }
-      .end {
-        justify-content: flex-end;
       }
       .error {
         color: var(--error-color, #db4437);
@@ -191,6 +214,9 @@ export class ManualRunDialog extends LitElement {
         gap: 3px;
         font-size: 12px;
         color: var(--secondary-text-color);
+      }
+      input[aria-invalid="true"] {
+        border-color: var(--error-color, #db4437);
       }
       input,
       select {

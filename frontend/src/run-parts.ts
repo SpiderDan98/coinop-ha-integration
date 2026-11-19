@@ -1,6 +1,7 @@
 // Pieces of a Run shown on both the gallery and the Run page.
 import { html } from "lit";
 import type { Device, Group, RunSummary, Totals } from "./api";
+import "./dialog";
 import type { Format } from "./format";
 import type { Localize } from "./localize";
 
@@ -36,8 +37,8 @@ export const deleteDialog = (
     [t("runs.title"), String(drop.runs)],
     [t("sensor.flagged_runs"), String(drop.flagged_runs)],
   ];
-  return html`<div class="scrim">
-    <div class="dialog card" role="alertdialog" aria-modal="true">
+  return html`<wattbill-dialog alert .label=${title} @cancel=${cancel}>
+    <div class="dialog card">
       <h2>${title}</h2>
       <p>${t("delete.drop")}</p>
       <dl>
@@ -49,7 +50,7 @@ export const deleteDialog = (
       </dl>
       <p class="muted small">${t("delete.warning")}</p>
       <div class="row end">
-        <ha-button class="cancel" appearance="plain" @click=${cancel}>
+        <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
           ${t("delete.cancel")}
         </ha-button>
         <ha-button class="confirm" variant="danger" @click=${confirm}>
@@ -57,5 +58,5 @@ export const deleteDialog = (
         </ha-button>
       </div>
     </div>
-  </div>`;
+  </wattbill-dialog>`;
 };

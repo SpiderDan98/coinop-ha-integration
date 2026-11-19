@@ -6,6 +6,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { deleteImage, getRun, setCover, uploadImages, type RunDetail, type RunImage } from "./api";
 import type { HomeAssistant } from "./hass";
 import { isKey, localize } from "./localize";
+import "./dialog";
 import "./run-image";
 import { shared } from "./styles";
 
@@ -130,13 +131,14 @@ export class RunImages extends LitElement {
 
   private renderDeleteDialog(image: RunImage) {
     const t = localize(this.hass);
-    return html`<div class="scrim">
-      <div class="image-dialog card" role="alertdialog" aria-modal="true">
+    const cancel = () => (this.deleting = undefined);
+    return html`<wattbill-dialog alert .label=${t("images.delete_title")} @cancel=${cancel}>
+      <div class="image-dialog dialog card">
         <h2>${t("images.delete_title")}</h2>
         <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
         <p class="muted small">${t("images.delete_warning")}</p>
         <div class="row end">
-          <ha-button class="cancel" appearance="plain" @click=${() => (this.deleting = undefined)}>
+          <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
             ${t("delete.cancel")}
           </ha-button>
           <ha-button class="confirm" variant="danger" @click=${() => this.delete(image)}>
@@ -144,7 +146,7 @@ export class RunImages extends LitElement {
           </ha-button>
         </div>
       </div>
-    </div>`;
+    </wattbill-dialog>`;
   }
 
   static override styles = [
@@ -198,27 +200,8 @@ export class RunImages extends LitElement {
       .images-error {
         color: var(--error-color, #db4437);
       }
-      .scrim {
-        position: fixed;
-        inset: 0;
-        z-index: 5;
-        display: grid;
-        place-items: center;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.4);
-      }
-      .image-dialog {
-        width: min(360px, 100%);
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .image-dialog p {
-        margin: 0;
-      }
-      .end {
-        justify-content: flex-end;
+      wattbill-dialog {
+        --wattbill-dialog-width: 360px;
       }
     `,
   ];
