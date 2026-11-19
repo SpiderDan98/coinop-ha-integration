@@ -18,7 +18,17 @@
       "step": {
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs WattBill records.",
+          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty.",
+          "data": {
+            "device": "Printer's Home Assistant device (optional)"
+          },
+          "data_description": {
+            "device": "WattBill's own device for this printer is linked to it. Entity pickers in the next steps still offer every entity."
+          }
+        },
+        "name": {
+          "title": "Name",
+          "description": "Name of the Device. You can rename it later on its Home Assistant device page.",
           "data": {
             "name": "Name"
           }

@@ -5,6 +5,7 @@ from typing import Any
 from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.wattbill.const import DOMAIN
@@ -27,10 +28,30 @@ async def add_hub(hass: HomeAssistant) -> ConfigEntry:
     return entry
 
 
-async def start_add_device(hass: HomeAssistant, entry: ConfigEntry) -> Any:
-    return await hass.config_entries.subentries.async_init(
+def add_printer(hass: HomeAssistant, name: str = "Kobra S1") -> dr.DeviceEntry:
+    """A printer's HA device, as its own integration registers it."""
+    printer_entry = MockConfigEntry(domain="printer_integration")
+    printer_entry.add_to_hass(hass)
+    return dr.async_get(hass).async_get_or_create(
+        config_entry_id=printer_entry.entry_id,
+        identifiers={("printer_integration", name)},
+        name=name,
+    )
+
+
+async def start_add_device(
+    hass: HomeAssistant, entry: ConfigEntry, *, printer: str | None = None
+) -> Any:
+    """Open Add Device and pick the printer's HA device (or none); returns the name form."""
+    result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
+    assert result["step_id"] == "user"
+    result = await configure(
+        hass, result, {} if printer is None else {"device": printer}
+    )
+    assert result["step_id"] == "name", result.get("errors")
+    return result
 
 
 async def configure(hass: HomeAssistant, result: Any, user_input: Any) -> Any:
@@ -44,10 +65,13 @@ async def walk_to_mapping(
     entry: ConfigEntry,
     *,
     name: str = "Kobra",
+    printer: str | None = None,
     status: str = STATUS,
     attribute: str | None = None,
 ) -> Any:
-    result = await configure(hass, await start_add_device(hass, entry), {"name": name})
+    result = await configure(
+        hass, await start_add_device(hass, entry, printer=printer), {"name": name}
+    )
     assert result["step_id"] == "status"
     status_input = {"entity_id": status} | (
         {"attribute": attribute} if attribute else {}
@@ -62,6 +86,7 @@ async def add_device(
     entry: ConfigEntry,
     *,
     name: str = "Kobra",
+    printer: str | None = None,
     status: str = STATUS,
     attribute: str | None = None,
     mapping: dict[str, list[str]] = MAPPING,
@@ -71,7 +96,7 @@ async def add_device(
 ) -> ConfigSubentry:
     """Walk Add Device to the end; returns the new Device once the entry reloaded."""
     result = await walk_to_mapping(
-        hass, entry, name=name, status=status, attribute=attribute
+        hass, entry, name=name, printer=printer, status=status, attribute=attribute
     )
     result = await configure(hass, result, mapping)
     assert result["type"] is FlowResultType.MENU, result.get("errors")

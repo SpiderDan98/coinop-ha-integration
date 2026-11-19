@@ -12,6 +12,7 @@ from .devices import (
     STATUS,
     add_device,
     add_hub,
+    add_printer,
     configure,
     start_add_device,
     walk_to_mapping,
@@ -152,6 +153,50 @@ async def test_a_value_mapped_to_two_targets_is_refused(hass: HomeAssistant) -> 
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "value_mapped_twice"}
+
+
+def suggested(result: Any, field: str) -> Any:
+    [key] = [key for key in result["data_schema"].schema if key == field]
+    return (key.description or {}).get("suggested_value")
+
+
+async def test_picking_the_printers_ha_device_pre_fills_the_name(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_printer(hass, "Kobra S1")
+    entry = await add_hub(hass)
+
+    result = await start_add_device(hass, entry, printer=printer.id)
+
+    assert suggested(result, "name") == "Kobra S1"
+
+
+async def test_the_printers_ha_device_is_optional(hass: HomeAssistant) -> None:
+    entry = await add_hub(hass)
+
+    result = await start_add_device(hass, entry)
+
+    assert suggested(result, "name") is None
+
+
+async def test_entity_pickers_are_not_limited_to_the_printers_ha_device(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_printer(hass)
+    entry = await add_hub(hass)
+
+    result = await configure(
+        hass, await start_add_device(hass, entry, printer=printer.id), {"name": "S1"}
+    )
+
+    assert result["step_id"] == "status"
+    [selector] = [
+        value
+        for key, value in result["data_schema"].schema.items()
+        if key == "entity_id"
+    ]
+    assert not selector.config.get("filter")
+    assert not selector.config.get("include_entities")
 
 
 async def test_a_status_entity_used_by_another_device_is_refused(

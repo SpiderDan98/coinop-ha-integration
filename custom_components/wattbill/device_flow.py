@@ -3,7 +3,9 @@
 from typing import Any
 
 from homeassistant.config_entries import ConfigSubentryFlow, SubentryFlowResult
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import (
+    DeviceSelector,
     EntitySelector,
     NumberSelector,
     NumberSelectorConfig,
@@ -52,11 +54,28 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         if user_input is not None:
-            self._name = user_input["name"]
-            return await self.async_step_status()
+            self._data["printer_device_id"] = user_input.get("device")
+            return await self.async_step_name()
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required("name"): TextSelector()}),
+            data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
+        )
+
+    async def async_step_name(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            self._name = user_input["name"]
+            return await self.async_step_status()
+        device_id = self._data["printer_device_id"]
+        printer = dr.async_get(self.hass).async_get(device_id) if device_id else None
+        schema = vol.Schema({vol.Required("name"): TextSelector()})
+        return self.async_show_form(
+            step_id="name",
+            data_schema=self.add_suggested_values_to_schema(
+                schema,
+                {"name": printer.name_by_user or printer.name} if printer else None,
+            ),
         )
 
     async def async_step_status(
