@@ -138,6 +138,7 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
+    part_count: int = 1
 
     @property
     def electricity(self) -> LineItem:
@@ -158,6 +159,7 @@ class Run:
                 for pause in self.pauses
             ],
             "flags": list(self.flags),
+            "part_count": self.part_count,
             "line_items": [item.as_dict() for item in self.line_items],
         }
 
@@ -177,5 +179,6 @@ class Run:
                 for p in data["pauses"]
             ],
             flags=list(data["flags"]),
+            part_count=data["part_count"],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
         )

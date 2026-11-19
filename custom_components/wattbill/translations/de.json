@@ -111,6 +111,9 @@
       "current_run_cost": {
         "name": "Kosten aktueller Lauf"
       },
+      "last_run_cost": {
+        "name": "Kosten letzter Lauf"
+      },
       "runs": {
         "name": "Läufe"
       }

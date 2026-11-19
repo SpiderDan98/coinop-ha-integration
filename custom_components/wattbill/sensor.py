@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from .cost.totals import run_totals
 from .device_config import DeviceConfig
 from .entity import DeviceEntity
+from .models import Run
 from .run_book import RunBook
 from .runtime import WattBillConfigEntry
 
@@ -71,6 +72,12 @@ CURRENT_RUN_COST = SensorEntityDescription(
     device_class=SensorDeviceClass.MONETARY,
     suggested_display_precision=2,
 )
+LAST_RUN_COST = SensorEntityDescription(
+    key="last_run_cost",
+    translation_key="last_run_cost",
+    device_class=SensorDeviceClass.MONETARY,
+    suggested_display_precision=2,
+)
 
 
 async def async_setup_entry(
@@ -87,6 +94,7 @@ async def async_setup_entry(
                     for description in TOTALS
                 ),
                 CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
+                LastRunCostSensor(hass, book, device, LAST_RUN_COST),
             ],
             config_subentry_id=device.device_id,
         )
@@ -130,4 +138,35 @@ class CurrentRunCostSensor(DeviceSensor):
             "name": run.name,
             "start": run.started,
             "running_hours": run_totals(run, dt_util.utcnow()).running_hours,
+        }
+
+
+class LastRunCostSensor(DeviceSensor):
+    def _last_run(self) -> Run | None:
+        ended = [
+            run
+            for run in self._book.runs()
+            if run.device_id == self._device_id and run.ended is not None
+        ]
+        return max(ended, key=lambda run: run.ended or run.started, default=None)
+
+    @property
+    def native_value(self) -> float | None:
+        run = self._last_run()
+        return None if run is None else run_totals(run, dt_util.utcnow()).cost
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        run = self._last_run()
+        if run is None:
+            return None
+        cost = run_totals(run, dt_util.utcnow()).cost
+        return {
+            "name": run.name,
+            "outcome": run.outcome,
+            "start": run.started,
+            "end": run.ended,
+            "part_count": run.part_count,
+            "cost_per_part": cost / run.part_count,
+            "has_flags": bool(run.flags),
         }

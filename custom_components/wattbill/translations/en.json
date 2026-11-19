@@ -111,6 +111,9 @@
       "current_run_cost": {
         "name": "Current Run cost"
       },
+      "last_run_cost": {
+        "name": "Last Run cost"
+      },
       "runs": {
         "name": "Runs"
       }
