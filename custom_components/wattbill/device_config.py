@@ -43,6 +43,8 @@ class DeviceConfig:
     consumption: Mapping[str, Any]
     # The price section: a fixed value or a price entity.
     price: Mapping[str, Any]
+    # The subentry data as the flow wrote it: the Device's HA-side settings.
+    flow_data: Mapping[str, Any]
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
@@ -63,6 +65,7 @@ class DeviceConfig:
             job_attribute=job.get("attribute"),
             consumption=data["consumption"],
             price=data["price"],
+            flow_data=data,
         )
 
     @property

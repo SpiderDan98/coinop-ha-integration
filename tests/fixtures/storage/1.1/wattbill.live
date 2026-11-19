@@ -24,6 +24,7 @@
         ],
         "flags": [],
         "part_count": 1,
+        "note": null,
         "consumption": {
           "source": "estimate",
           "running_power": 120,

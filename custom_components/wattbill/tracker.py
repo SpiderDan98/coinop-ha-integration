@@ -350,10 +350,18 @@ class DeviceTracker:
         else:
             self._record_price(run, state)
 
-    async def async_end_run(self) -> None:
-        """End the open Run now as Unknown, e.g. because its Device is removed."""
+    @callback
+    def async_end_run(self) -> asyncio.Future[None]:
+        """End the open Run now as Unknown ("End Run now", or its Device is removed).
+
+        The result is done once the Run is finalised, which a metered Run awaits
+        up to five minutes for.
+        """
         if run := self._book.open_run(self._config.device_id):
-            await self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+            return self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+        done = self._hass.loop.create_future()
+        done.set_result(None)
+        return done
 
     def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Future[None]:
         """End the Run now; the result is done once it is finalised."""

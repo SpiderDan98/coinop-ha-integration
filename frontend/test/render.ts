@@ -74,3 +74,10 @@ export async function click(panel: Element, element: HTMLElement) {
   element.click();
   await settle(panel);
 }
+
+/** What the user does to a field: enter a value, then leave it. */
+export async function change(panel: Element, element: HTMLElement, value: string) {
+  (element as HTMLInputElement).value = value;
+  element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  await settle(panel);
+}

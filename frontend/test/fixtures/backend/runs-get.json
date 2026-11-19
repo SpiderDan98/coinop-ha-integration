@@ -14,7 +14,8 @@
       "finalised": true,
       "pauses": [],
       "flags": [],
-      "part_count": 1,
+      "part_count": 4,
+      "note": "Four on one plate",
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -63,6 +64,7 @@
       ],
       "running_seconds": 4500,
       "total": 0.86,
+      "cost_per_part": 0.22,
       "subtotals": {
         "electricity": 0.05,
         "material": 0.31,
@@ -84,8 +86,11 @@
       "end_reconstructed": false,
       "finalised": true,
       "pauses": [],
-      "flags": [],
+      "flags": [
+        "fault"
+      ],
       "part_count": 1,
+      "note": null,
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -118,6 +123,7 @@
       ],
       "running_seconds": 32400,
       "total": 0.3,
+      "cost_per_part": 0.3,
       "subtotals": {
         "electricity": 0.3,
         "material": 0.0,
@@ -141,6 +147,7 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "note": null,
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -167,6 +174,7 @@
       ],
       "running_seconds": 1800,
       "total": 0.07,
+      "cost_per_part": 0.07,
       "subtotals": {
         "electricity": 0.07,
         "material": 0.0,
@@ -190,10 +198,11 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "note": null,
       "consumption": {
         "source": "estimate",
         "running_power": 120.0,
-        "paused_power": null
+        "paused_power": 8.0
       },
       "cost_source": {
         "source": "fixed",
@@ -209,7 +218,7 @@
         [
           "2026-01-15T10:00:00+00:00",
           120.0,
-          null
+          8.0
         ]
       ],
       "line_items": [
@@ -234,6 +243,7 @@
       ],
       "running_seconds": 2700,
       "total": 0.03,
+      "cost_per_part": 0.03,
       "subtotals": {
         "electricity": 0.03,
         "material": 0.0,

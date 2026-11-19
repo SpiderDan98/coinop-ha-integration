@@ -6,6 +6,7 @@ const SUBSCRIBE = "wattbill/runs/subscribe";
 const GET = "wattbill/runs/get";
 const [started, updated, ended] = recorded.changes;
 const cards = (panel: Element) => queryAll(panel, ".kind").map(text);
+const endedField = (panel: Element) => query(panel, "input[name=ended]") as HTMLInputElement;
 
 describe("Run page", () => {
   it("opens from its gallery tile", async () => {
@@ -29,17 +30,16 @@ describe("Run page", () => {
       "Material €0.31 PLA Basic Black 12.5 g × €0.025 €0.31",
       "Other €0.50 Nozzle wear 1 pcs × €0.50 €0.50",
     ]);
-    expect(text(query(panel, ".totals"))).toBe("Total €0.86");
+    expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (4) €0.22");
   });
 
   it("shows the Run's facts next to its Line Items", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
-    expect(text(query(panel, ".runbar"))).toBe("Completed Kobra · Jan 12, 2026, 10:00 AM");
-    expect(text(query(panel, ".facts"))).toBe(
-      "No image Benchy Device Kobra Started Jan 12, 2026, 10:00 AM " +
-        "Ended Jan 12, 2026, 11:15 AM Running time 1 h 15 min",
+    expect(text(query(panel, ".runbar"))).toBe(
+      "Completed Kobra · Jan 12, 2026, 10:00 AM Every change saves at once. Delete",
     );
+    expect(text(query(panel, ".facts dl"))).toBe("Device Kobra Running time 1 h 15 min");
   });
 
   it("names the price segments of electricity and marks empty kinds", async () => {
@@ -78,7 +78,8 @@ describe("Run page", () => {
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });
     expect(text(query(panel, ".runbar"))).toMatch(/^In progress/);
-    expect(text(query(panel, ".facts"))).toContain("Ended — Running time 0 h 45 min");
+    expect(endedField(panel).value).toBe("");
+    expect(text(query(panel, ".facts dl"))).toContain("Running time 0 h 45 min");
     const live = recorded.run("print-live");
 
     backend.reply(GET, () => ({ run: { ...live, ...ended.run } }));
@@ -87,7 +88,7 @@ describe("Run page", () => {
     await settle(panel);
 
     expect(text(query(panel, ".runbar"))).toMatch(/^Completed/);
-    expect(text(query(panel, ".facts"))).toContain("Ended Jan 15, 2026, 10:45 AM");
+    expect(endedField(panel).value).toBe("2026-01-15T10:45");
   });
 
   it("says so when the Run is deleted while shown", async () => {
@@ -116,7 +117,7 @@ describe("Run page", () => {
     expect(cards(panel)[0]).toBe(
       "Strom 0,05 € Strom Aus der Durchschnittsleistung geschätzt 0,15 kWh × 0,30 € 0,05 €",
     );
-    expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 €");
+    expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
   });
 
   it("collapses to one column on narrow screens", async () => {
