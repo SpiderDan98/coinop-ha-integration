@@ -35,7 +35,8 @@ def input_value(state: State | None, attribute: str | None) -> str | None:
     """The input's current value, or None while it has none to give."""
     if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
         return None
-    if attribute is None and state.domain == "event":
+    # Not state.domain: states from recorder history don't have it.
+    if attribute is None and split_entity_id(state.entity_id)[0] == "event":
         # An event entity's state is the time it fired; the value is the event type.
         attribute = ATTR_EVENT_TYPE
     value = state.state if attribute is None else state.attributes.get(attribute)

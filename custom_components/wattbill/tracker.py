@@ -4,8 +4,10 @@ import asyncio
 from bisect import bisect_right
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Any
 
+from homeassistant.components.recorder import history
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -21,6 +23,7 @@ from homeassistant.helpers.event import (
     async_track_state_report_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.recorder import get_instance
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
@@ -30,9 +33,13 @@ from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
+from .store import LIVE_SAVE_DELAY
 
 LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
+# An open Run is refreshed every minute and saved about a minute later; a longer
+# silence means WattBill wasn't watching the meter.
+OUTAGE = LIVE_INTERVAL + LIVE_SAVE_DELAY
 OUTCOMES = {
     Target.FINISHED: Outcome.COMPLETED,
     Target.CANCELLED: Outcome.CANCELLED,
@@ -60,8 +67,7 @@ class DeviceTracker:
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
 
-    @callback
-    def async_start(self) -> None:
+    async def async_start(self) -> None:
         self._unsubscribe = [
             async_track_state_change_event(
                 self._hass, self._config.status_entity_id, self._on_status
@@ -79,9 +85,51 @@ class DeviceTracker:
                 async_track_state_report_event(self._hass, meters, self._on_meter),
             ]
         for run in self._unfinalised_runs():
+            await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
         self._apply(self._hass.states.get(self._config.status_entity_id))
+
+    async def _async_catch_up(self, run: Run) -> None:
+        """Add the meter reports missed while WattBill wasn't running."""
+        if not (meter := _meter(run.consumption)):
+            return
+        entity_id = meter["entity_id"]
+        now = dt_util.utcnow()
+        since = run.readings[-1][0] if run.readings else run.started
+        missed = await self._async_history(entity_id, since, now)
+        for state in missed:
+            self._record(run, state)
+        if current := self._hass.states.get(entity_id):
+            self._record(run, current)
+        watched = max(
+            [
+                run.electricity.segments[-1].end,
+                *(state.last_updated for state in missed),
+            ]
+        )
+        if now - watched > OUTAGE:
+            self._add_reading(run, watched, None)
+        if run.ended is None:
+            self._refresh(run, now)
+        self._book.async_update(run)
+
+    async def _async_history(
+        self, entity_id: str, start: datetime, end: datetime
+    ) -> list[State]:
+        if "recorder" not in self._hass.config.components:
+            return []
+        states = await get_instance(self._hass).async_add_executor_job(
+            partial(
+                history.state_changes_during_period,
+                self._hass,
+                start,
+                end,
+                entity_id,
+                include_start_time_state=False,
+            )
+        )
+        return states.get(entity_id, [])
 
     @callback
     def async_stop(self) -> None:

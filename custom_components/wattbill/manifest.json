@@ -1,6 +1,7 @@
 {
   "domain": "wattbill",
   "name": "WattBill",
+  "after_dependencies": ["recorder"],
   "categories": ["energy.meters_monitoring", "computers_network.printers"],
   "codeowners": ["@SpiderDan98"],
   "config_flow": true,

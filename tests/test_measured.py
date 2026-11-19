@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -16,7 +17,8 @@ from .devices import (
     configure,
     walk_to_consumption,
 )
-from .test_persistence import live_runs
+from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_persistence import live_runs, restart
 from .test_runs import set_status, stored_runs
 
 
@@ -29,11 +31,11 @@ async def set_meter(
 
 async def add_metered_device(
     hass: HomeAssistant, source: str = "energy", **meter: Any
-) -> None:
+) -> ConfigEntry:
     entity = ENERGY if source == "energy" else POWER
-    await add_device(
-        hass, await add_hub(hass), source=source, meter={"entity_id": entity} | meter
-    )
+    entry = await add_hub(hass)
+    await add_device(hass, entry, source=source, meter={"entity_id": entity} | meter)
+    return entry
 
 
 def electricity(run: dict[str, Any]) -> dict[str, Any]:
@@ -316,3 +318,85 @@ async def test_a_meter_attribute_is_read_in_the_unit_given_for_it(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.3)
+
+
+async def test_meter_readings_survive_a_restart(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    entry = await add_metered_device(hass)
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.2)
+    await clock.advance(minutes=10)
+
+    await restart(hass, entry)
+    await clock.advance(minutes=10)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=2)
+    await set_meter(hass, 10.5)
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(10.2 + 0.3 * 20 / 22 - 10.1)
+    assert run["flags"] == []
+
+
+async def test_a_restart_during_the_final_wait_keeps_waiting(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    entry = await add_metered_device(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=1)
+
+    await restart(hass, entry)
+    assert stored_runs(hass_storage) == []
+    await clock.advance(minutes=1)
+    await set_meter(hass, 10.4)
+
+    [run] = stored_runs(hass_storage)
+    assert run["outcome"] == "completed"
+    assert electricity(run)["quantity"] == pytest.approx(0.4 * 30 / 32)
+
+
+async def test_an_outage_during_a_run_is_a_consumption_gap(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    entry = await add_metered_device(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+
+    await stop_wattbill(hass, entry)
+    await clock.advance(minutes=30)
+    await start_wattbill(hass, entry)
+    await set_meter(hass, 10.4)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.4)
+    assert run["flags"] == ["consumption_gap"]
+
+
+async def test_an_outage_holds_the_average_power(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_power(hass, 100)
+    entry = await add_metered_device(hass, "power", running_power=200)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+
+    await stop_wattbill(hass, entry)
+    await clock.advance(minutes=30)
+    await start_wattbill(hass, entry)
+    await set_power(hass, 150)
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=5)
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx((100 + 200 + 150) / 2 / 1000)
+    assert run["flags"] == ["consumption_gap"]
