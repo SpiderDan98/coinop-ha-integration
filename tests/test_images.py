@@ -159,3 +159,79 @@ async def test_reconfigure_pre_fills_the_images_and_turns_the_snapshot_on_with_a
         "camera": CAMERA,
         "snapshot": True,
     }
+
+
+async def thumbnail_colour(panel: PanelClient, http: HttpClient) -> str | None:
+    images = [i for i in await run_images(panel) if i["kind"] == "thumbnail"]
+    if not images:
+        return None
+    [image] = images
+    return colour(await http.content(image["url"]))
+
+
+async def test_the_thumbnail_follows_the_image_entity_while_the_run_is_open(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    thumbnail = await add_thumbnail(hass, picture("red"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+
+    await clock.advance(minutes=1)
+    thumbnail.show(picture("green"))
+    await hass.async_block_till_done()
+
+    assert await thumbnail_colour(panel, http) == "green"
+    assert len(stored_files(files)) == 2, "the replaced image's files are deleted"
+
+
+async def test_a_run_started_without_a_thumbnail_gets_the_first_one_shown(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    thumbnail = await add_thumbnail(hass)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    assert await thumbnail_colour(panel, http) is None
+
+    thumbnail.show(picture("blue"))
+    await hass.async_block_till_done()
+
+    assert await thumbnail_colour(panel, http) == "blue"
+
+
+async def test_an_unavailable_or_empty_thumbnail_never_replaces_the_stored_one(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    thumbnail = await add_thumbnail(hass, picture("red"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+
+    await clock.advance(minutes=1)
+    thumbnail.show(picture("green"), available=False)
+    await hass.async_block_till_done()
+    await clock.advance(minutes=1)
+    thumbnail.show(b"")
+    await hass.async_block_till_done()
+    await clock.advance(minutes=1)
+    thumbnail.show(b"not an image")
+    await hass.async_block_till_done()
+
+    assert await thumbnail_colour(panel, http) == "red"
+
+
+async def test_the_thumbnail_is_frozen_when_the_run_ends(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    thumbnail = await add_thumbnail(hass, picture("red"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    thumbnail.show(picture("green"))
+    await hass.async_block_till_done()
+
+    assert await thumbnail_colour(panel, http) == "red"
