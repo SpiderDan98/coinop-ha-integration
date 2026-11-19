@@ -26,9 +26,9 @@
 
 ### Panel modules
 
-- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription and routes by `route.path` (`""` gallery, `/run/<id>` Run page).
+- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription, loads the Devices (again when the Devices tab opens or a Run of an unlisted Device changes) and routes by `route.path` (`""` gallery, `/run/<id>` Run page, `/<tab>` for each toolbar tab in `TABS`). A Run whose `device_id` is not among the loaded Devices belongs to a removed Device (`deviceName` in `run-parts.ts`).
 - `src/api.ts`: the websocket commands and the shapes they return. `src/hass.ts`: the part of `hass` the panel uses, plus `navigate` / `followLink` for in-app links.
-- `src/run-gallery.ts`, `src/run-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
+- `src/run-gallery.ts`, `src/run-page.ts`, `src/devices-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
 - `src/localize.ts` with `src/translations/{en,de}.json` (flat keys): panel strings, chosen by `hass.language`, falling back to English. `src/format.ts`: money, dates and durations.
 
 ## Setup
