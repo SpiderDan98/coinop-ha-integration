@@ -16,8 +16,13 @@ from .test_measured import add_metered_device, electricity, set_meter
 from .test_run_event import record_events
 from .test_runs import RUNS, TOTAL_COST, stored_runs, value
 from .test_sensors import LAST, print_runs, state_of
-from .test_templates import INSERTS, WEAR, other_items, set_automatic
-from .test_templates import create as create_template
+from .test_templates import (
+    INSERTS,
+    WEAR,
+    create as create_template,
+    other_items,
+    set_automatic,
+)
 from .websocket import PanelClient
 
 ENERGY = "sensor.kobra_energy_in_runs"
@@ -131,7 +136,11 @@ async def test_without_history_or_average_power_the_user_enters_the_electricity(
         quantity=0.5,
     )
     item = electricity(entered["run"])
-    assert (item["method"], item["quantity"], item["computed"]) == ("entered", 0.5, None)
+    assert (item["method"], item["quantity"], item["computed"]) == (
+        "entered",
+        0.5,
+        None,
+    )
     assert item["amount"] == pytest.approx(0.15)
     error = await panel.error(
         "wattbill/line_items/update",
