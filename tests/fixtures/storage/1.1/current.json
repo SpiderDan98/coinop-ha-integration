@@ -25,6 +25,7 @@
           "id": "01KF0000000000000000000I01",
           "kind": "electricity",
           "label": null,
+          "material_id": null,
           "quantity": 0.2833333333333333,
           "unit": "kWh",
           "unit_price": 0.31176470588235294,
@@ -67,6 +68,7 @@
           "id": "01KF0000000000000000000I02",
           "kind": "electricity",
           "label": null,
+          "material_id": null,
           "quantity": 0.04,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -110,6 +112,7 @@
           "id": "01KF0000000000000000000I03",
           "kind": "electricity",
           "label": null,
+          "material_id": null,
           "quantity": 0.06,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -126,5 +129,45 @@
         }
       ]
     }
-  ]
+  ],
+  "catalog": {
+    "materials": [
+      {
+        "id": "01KF0000000000000000000M01",
+        "name": "eSun PLA+ black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 19.99,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        }
+      },
+      {
+        "id": "01KF0000000000000000000M02",
+        "name": "Standard Resin grey",
+        "form": "resin",
+        "type": "Standard resin",
+        "density": 1.1,
+        "vendor": null,
+        "colour": null,
+        "diameter": null,
+        "default_for_type": false,
+        "archived": true,
+        "price": {
+          "source": "fixed",
+          "pack_price": 29.99,
+          "pack_size": 1000.0,
+          "pack_unit": "ml"
+        }
+      }
+    ]
+  }
 }

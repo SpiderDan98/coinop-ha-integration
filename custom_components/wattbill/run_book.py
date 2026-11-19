@@ -44,6 +44,13 @@ class RunBook:
             None,
         )
 
+    def uses_material(self, material_id: str) -> bool:
+        return any(
+            item.material_id == material_id
+            for run in self._runs.values()
+            for item in run.line_items
+        )
+
     def totals(self, device_id: str) -> Totals:
         return self._totals[device_id].sum
 

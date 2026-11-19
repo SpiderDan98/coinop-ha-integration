@@ -6,6 +6,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from . import ha_device, panel, websocket
+from .catalog import Catalog
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .run_book import RunBook
@@ -34,6 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     ]
     entry.runtime_data = WattBill(
         book=book,
+        catalog=Catalog(stores["catalog"], data["catalog"], book.uses_material),
         devices=devices,
         trackers=[DeviceTracker(hass, book, device) for device in devices],
     )
@@ -42,6 +44,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         await book.async_rename_device(device.device_id, device.name)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(websocket.async_announce(hass, book))
+    entry.async_on_unload(
+        websocket.async_announce_catalog(hass, entry.runtime_data.catalog)
+    )
     await panel.async_register(hass, entry)
     for tracker in entry.runtime_data.trackers:
         tracker.async_start()

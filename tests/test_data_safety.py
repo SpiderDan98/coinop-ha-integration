@@ -46,7 +46,7 @@ async def set_up_again(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return result
 
 
-@pytest.mark.parametrize("lost", ["wattbill.runs", "wattbill.live"])
+@pytest.mark.parametrize("lost", ["wattbill.catalog", "wattbill.runs", "wattbill.live"])
 async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_issue(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], lost: str
 ) -> None:
@@ -146,10 +146,13 @@ async def test_a_first_setup_starts_with_empty_stores(
 
     assert entry.state is ConfigEntryState.LOADED
     assert value(hass, RUNS) == 0
+    assert hass_storage["wattbill.catalog"]["data"] == {"materials": []}
     assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
 
 
-@pytest.mark.parametrize("store", ["wattbill.runs", "wattbill.live"])
+@pytest.mark.parametrize(
+    "store", ["wattbill.catalog", "wattbill.runs", "wattbill.live"]
+)
 async def test_data_from_a_newer_major_version_stops_setup_without_writing(
     hass: HomeAssistant, hass_storage: dict[str, Any], store: str
 ) -> None:
@@ -184,7 +187,11 @@ async def test_removing_the_hub_deletes_all_stored_data(
     files = tmp_path / "wattbill"
     (files / "runs").mkdir(parents=True)
     (files / "runs" / "image.webp").write_bytes(b"webp")
-    assert wattbill_keys(hass_storage) >= {"wattbill.runs", "wattbill.live"}
+    assert wattbill_keys(hass_storage) >= {
+        "wattbill.catalog",
+        "wattbill.runs",
+        "wattbill.live",
+    }
 
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()

@@ -66,6 +66,37 @@ def stored_run(
     } | fields
 
 
+def stored_material(material_id: str, **fields: Any) -> dict[str, Any]:
+    """A PLA filament at 0.02 per gram."""
+    return {
+        "id": material_id,
+        "name": material_id.upper(),
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": None,
+        "colour": None,
+        "diameter": 1.75,
+        "default_for_type": False,
+        "archived": False,
+        "price": {
+            "source": "fixed",
+            "pack_price": 20.0,
+            "pack_size": 1000.0,
+            "pack_unit": "g",
+        },
+    } | fields
+
+
+def place_materials(hass_storage: dict[str, Any], *materials: dict[str, Any]) -> None:
+    hass_storage["wattbill.catalog"] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": "wattbill.catalog",
+        "data": {"materials": list(materials)},
+    }
+
+
 def place_runs(hass_storage: dict[str, Any], *runs: dict[str, Any]) -> None:
     """Ended Runs go to the runs Store, open ones to the live Store."""
     for key, finalised in (("wattbill.runs", True), ("wattbill.live", False)):

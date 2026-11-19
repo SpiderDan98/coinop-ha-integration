@@ -12,6 +12,8 @@
 
 - `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
 - `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`).
+- `materials.py`: `Material`, free of HA types, with its built-in types (form and density for pre-filling) and its Cost Source (`PRICE_SOURCES`: each source gives a `per_gram(density)` price; only `fixed` so far).
+- `catalog.py`: `Catalog`, the global catalogues (Materials so far) in the `catalog` Store. Every change is saved at once and announced by catalogue name (`async_listen`). Deleting a Material a Run's Line Item references (`LineItem.material_id`) archives it instead.
 - `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
 - `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
@@ -21,7 +23,7 @@
 - `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
 - `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts.
 - `panel.py`: registers the admin-only panel while the hub entry is loaded and serves the bundle at a URL that changes with its content.
-- `websocket/`: the panel's backend API, one module per area (`runs.py`, ...). See [Websocket commands](#websocket-commands).
+- `websocket/`: the panel's backend API, one module per area (`runs.py`, `materials.py`, `catalog.py`, ...). See [Websocket commands](#websocket-commands).
 
 ### Panel modules
 
@@ -77,8 +79,8 @@ uv run scripts/test_ha.py minimum -q    # also: stable, beta (each in its own .v
 
 - Schema changes: a minor bump only adds fields (read with a default); a major bump adds a migration to the Store's `Schema` and a folder to `tests/fixtures/storage/` for the version just released (see `tests/test_migrations.py`).
 - `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
-- `tests/stored.py` places Runs in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`).
-- Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()`. It connects on first use, so set WattBill up first.
+- `tests/stored.py` places Runs and Materials in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`, `place_materials(hass_storage, stored_material("id", ...))`).
+- Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()` (events pushed before a command's result are kept for `event()`). It connects on first use, so set WattBill up first.
 
 ### Panel tests
 
@@ -129,3 +131,5 @@ npm run typecheck
 - Build each with `@command({vol.Required("type"): "wattbill/...", ...})` from `websocket/command.py`: it makes the command admin-only, answers `not_loaded` while the hub entry isn't loaded, and passes the loaded `WattBill` (sync or async handler).
 - Results are objects (`{"runs": [...]}`, `{"run": {...}}`), never bare lists. Missing things answer `not_found`. Amounts are sent rounded with `cost/rounding.py`; the panel never adds amounts up itself.
 - Subscriptions send their full state as the first event, then one event per change. Run changes reach them through the `SIGNAL_RUN_CHANGED` dispatcher signal, so a subscription survives reloads of the hub entry. Every `RunBook` change (`RunChange`) is forwarded as `{"change": ..., "run": summary}`; the panel already handles `"deleted"`.
+- `wattbill/catalog/subscribe` sends every catalogue first (`{"materials": [...]}`), then, after each change, the whole changed catalogue (`{"materials": [...]}`) through `SIGNAL_CATALOG_CHANGED`. A new catalogue adds its entry to `CATALOGUES` in `websocket/catalog.py` and announces its name from `Catalog`; the panel keeps one catalogue subscription and merges each event into what it has.
+- Fields of a catalogue entry travel nested (`{"type": "wattbill/materials/create", "material": {...}}`), since a Material's `type` would clash with the command's.

@@ -48,7 +48,8 @@ class Schema:
 
 
 RUNS_SCHEMA = Schema(STORAGE_VERSION, STORAGE_MINOR_VERSION, {"runs": []})
-SCHEMAS = {"runs": RUNS_SCHEMA, "live": RUNS_SCHEMA}
+CATALOG_SCHEMA = Schema(1, 1, {"materials": []})
+SCHEMAS = {"catalog": CATALOG_SCHEMA, "runs": RUNS_SCHEMA, "live": RUNS_SCHEMA}
 
 
 def files_path(hass: HomeAssistant) -> Path:
