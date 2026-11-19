@@ -1,4 +1,4 @@
-"""The Cost Statement: a PDF of selected ended Runs, never stored, always current."""
+"""The Cost Statement: a PDF of selected final Runs, never stored, always current."""
 
 from .export import (
     CONF_MARKUP,

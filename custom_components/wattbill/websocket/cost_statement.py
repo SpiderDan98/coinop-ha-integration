@@ -58,9 +58,9 @@ def _create(
                 msg["id"], websocket_api.ERR_NOT_FOUND, "No Run with this id"
             )
             return
-        if run.ended is None:
+        if not run.finalised:
             connection.send_error(
-                msg["id"], websocket_api.ERR_NOT_ALLOWED, "Only ended Runs"
+                msg["id"], websocket_api.ERR_NOT_ALLOWED, "Only final Runs"
             )
             return
     options = Options(

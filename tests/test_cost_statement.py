@@ -1,4 +1,4 @@
-"""The Cost Statement: a PDF of selected ended Runs, downloaded through a signed path."""
+"""The Cost Statement: a PDF of selected final Runs, downloaded through a signed path."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -532,21 +532,30 @@ async def test_the_pdf_shows_the_runs_as_they_are_at_download(
     assert "Total €1.11" in text
 
 
-async def test_only_ended_runs_can_be_exported(
+async def test_only_final_runs_can_be_exported(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
-    place_runs(hass_storage, benchy(), stored_run("live", ended=False))
+    place_runs(
+        hass_storage,
+        benchy(),
+        stored_run("live", ended=False),
+        stored_run("waiting") | {"finalised": False},
+    )
     await add_hub(hass)
 
     open_run = await panel.error(
         "wattbill/cost_statement/create", run_ids=["benchy", "live"]
+    )
+    waiting = await panel.error(
+        "wattbill/cost_statement/create", run_ids=["benchy", "waiting"]
     )
     missing = await panel.error(
         "wattbill/cost_statement/create", run_ids=["benchy", "gone"]
     )
     empty = await panel.error("wattbill/cost_statement/create", run_ids=[])
 
-    assert [open_run["code"], missing["code"], empty["code"]] == [
+    assert [open_run["code"], waiting["code"], missing["code"], empty["code"]] == [
+        "not_allowed",
         "not_allowed",
         "not_found",
         "invalid_format",

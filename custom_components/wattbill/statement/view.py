@@ -56,7 +56,7 @@ class CostStatementView(HomeAssistantView):
                 # A copy, as rendering runs outside the event loop.
                 Run.from_dict(run.as_dict())
                 for run_id in export.run_ids
-                if (run := wattbill.book.run(run_id)) and run.ended
+                if (run := wattbill.book.run(run_id)) and run.finalised
             ),
             key=lambda run: run.started,
         )
