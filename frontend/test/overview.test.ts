@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Group } from "../src/api";
-import type { Message } from "../src/hass";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
@@ -8,8 +7,6 @@ const AGGREGATES = "wattbill/aggregates/get";
 const SUBSCRIBE = "wattbill/runs/subscribe";
 const [started, updated] = recorded.changes;
 
-const sent = (backend: { calls: Message[] }, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const names = (panel: Element) => queryAll(panel, ".tile .strong").map(text);
 const stats = (panel: Element) => queryAll(panel, ".stat").map(text);
 const pick = (panel: Element, name: string) =>
@@ -141,7 +138,7 @@ describe("Overview", () => {
       "e €3.00",
       "Other Materials €1.50",
     ]);
-    expect(sent(backend, AGGREGATES).find((call) => call.material_ids)).toEqual({
+    expect(backend.sent(AGGREGATES).find((call) => call.material_ids)).toEqual({
       type: AGGREGATES,
       group_by: ["kind"],
       material_ids: ["f", null],
@@ -152,7 +149,7 @@ describe("Overview", () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend);
     expect(queryAll(panel, ".running")).toHaveLength(0);
-    const loaded = sent(backend, AGGREGATES).length;
+    const loaded = backend.sent(AGGREGATES).length;
 
     backend.push(SUBSCRIBE, started);
     backend.push(SUBSCRIBE, updated);
@@ -162,7 +159,7 @@ describe("Overview", () => {
       "Running now Untitled Run Kobra · 0 h 45 min €0.25 Provisional, updates live",
     );
     expect(query(panel, ".running a").getAttribute("href")).toBe("/wattbill/run/print-live");
-    expect(sent(backend, AGGREGATES).length).toBeGreaterThan(loaded);
+    expect(backend.sent(AGGREGATES).length).toBeGreaterThan(loaded);
   });
 
   it("says when the totals can't be loaded and still shows the Runs", async () => {
@@ -285,7 +282,7 @@ describe("Selection basket", () => {
     await fill(panel, pick(panel, "Benchy"), "on");
 
     await click(panel, query(panel, ".basket .delete"));
-    expect(sent(backend, "wattbill/runs/delete_preview")).toEqual([
+    expect(backend.sent("wattbill/runs/delete_preview")).toEqual([
       { type: "wattbill/runs/delete_preview", run_ids: ["benchy", "helmet"] },
     ]);
     expect(text(query(panel, ".dialog"))).toBe(
@@ -294,12 +291,12 @@ describe("Selection basket", () => {
         "This cannot be undone. Cancel Delete",
     );
     await click(panel, query(panel, ".dialog .cancel"));
-    expect(sent(backend, "wattbill/runs/delete")).toEqual([]);
+    expect(backend.sent("wattbill/runs/delete")).toEqual([]);
 
     await click(panel, query(panel, ".basket .delete"));
     await click(panel, query(panel, ".dialog .confirm"));
 
-    expect(sent(backend, "wattbill/runs/delete")).toEqual([
+    expect(backend.sent("wattbill/runs/delete")).toEqual([
       { type: "wattbill/runs/delete", run_ids: ["benchy", "helmet"] },
     ]);
     expect(queryAll(panel, ".dialog, .basket")).toHaveLength(0);

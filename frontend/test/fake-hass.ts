@@ -214,6 +214,11 @@ export class FakeBackend {
     };
   }
 
+  /** The messages of `type` the panel sent, in order. */
+  sent(type: string) {
+    return this.calls.filter((call) => call.type === type);
+  }
+
   /** Answer `callWS({type, ...})`; throw `new WsError(code)` to fail it. */
   reply(type: string, reply: Reply) {
     this.replies.set(type, reply);

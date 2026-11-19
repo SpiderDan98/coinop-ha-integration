@@ -15,9 +15,6 @@ const correcting = (options?: Parameters<typeof recordedBackend>[0]) =>
     return { run: { ...recorded.run(String(msg.run_id)), ...changes } };
   });
 
-const sent = (backend: { calls: Message[] }, type: string) =>
-  backend.calls.filter((call) => call.type === type);
-
 describe("Correcting a Run", () => {
   it("names every kind of Flag", async () => {
     const flags = [
@@ -65,7 +62,7 @@ describe("Correcting a Run", () => {
     await change(panel, query(panel, "textarea[name=note]"), "Printed for a friend");
     await change(panel, query(panel, "select[name=outcome]"), "failed");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, run_id: "benchy", name: "Benchy XL" },
       { type: UPDATE, run_id: "benchy", note: "Printed for a friend" },
       { type: UPDATE, run_id: "benchy", outcome: "failed" },
@@ -96,7 +93,7 @@ describe("Correcting a Run", () => {
 
     await change(panel, query(panel, "input[name=started]"), "2026-01-12T10:30");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, run_id: "benchy", started: "2026-01-12T09:30:00.000Z" },
     ]);
   });
@@ -111,7 +108,7 @@ describe("Correcting a Run", () => {
     }));
     await change(panel, query(panel, "input[name=part_count]"), "2");
 
-    expect(sent(backend, UPDATE)).toEqual([{ type: UPDATE, run_id: "benchy", part_count: 2 }]);
+    expect(backend.sent(UPDATE)).toEqual([{ type: UPDATE, run_id: "benchy", part_count: 2 }]);
     expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (2) €0.43");
   });
 
@@ -123,7 +120,7 @@ describe("Correcting a Run", () => {
     await change(panel, input, "0");
     await change(panel, input, "1.5");
 
-    expect(sent(backend, UPDATE)).toEqual([]);
+    expect(backend.sent(UPDATE)).toEqual([]);
     expect(input.value).toBe("4");
   });
 
@@ -206,11 +203,11 @@ describe("Deleting a Run", () => {
 
     await click(panel, query(panel, ".dialog button.cancel"));
     expect(queryAll(panel, ".dialog")).toHaveLength(0);
-    expect(sent(backend, "wattbill/runs/delete")).toEqual([]);
+    expect(backend.sent("wattbill/runs/delete")).toEqual([]);
 
     await click(panel, query(panel, "button.delete-run"));
     await click(panel, query(panel, ".dialog button.confirm"));
-    expect(sent(backend, "wattbill/runs/delete")).toEqual([
+    expect(backend.sent("wattbill/runs/delete")).toEqual([
       { type: "wattbill/runs/delete", run_ids: ["helmet"] },
     ]);
     expect(location.pathname).toBe("/wattbill");

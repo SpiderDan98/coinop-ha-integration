@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { change, click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
-const sent = (backend: ReturnType<typeof recordedBackend>, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const row = (panel: Element, id: string) => query(panel, `tr.template[data-id="${id}"]`);
 const field = (root: HTMLElement, name: string) =>
   query(root, `[name=${name}]`) as HTMLInputElement;
@@ -60,7 +58,7 @@ describe("Line Item Templates tab", () => {
     await change(panel, field(row(panel, "template-inserts"), "label"), " M3 inserts ");
     await change(panel, field(row(panel, "template-inserts"), "basis"), "running_hours");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, template_id: "template-packaging", template: { unit_price: 0.6 } },
       { type: UPDATE, template_id: "template-inserts", template: { label: "M3 inserts" } },
       { type: UPDATE, template_id: "template-inserts", template: { basis: "running_hours" } },
@@ -75,7 +73,7 @@ describe("Line Item Templates tab", () => {
     const label = field(row(panel, "template-inserts"), "label");
 
     await change(panel, label, "  ");
-    expect(sent(backend, UPDATE)).toEqual([]);
+    expect(backend.sent(UPDATE)).toEqual([]);
     expect(label.value).toBe("Threaded inserts");
 
     await change(panel, label, "M3 inserts");
@@ -95,7 +93,7 @@ describe("Line Item Templates tab", () => {
     await fill(panel, field(form, "default_quantity"), "0.5");
     await click(panel, query(form, "button[type=submit]"));
 
-    expect(sent(backend, "wattbill/templates/create")).toEqual([
+    expect(backend.sent("wattbill/templates/create")).toEqual([
       {
         type: "wattbill/templates/create",
         template: {
@@ -118,7 +116,7 @@ describe("Line Item Templates tab", () => {
     expect(remove.title).toBe("Delete (past Runs keep their copies)");
     await click(panel, remove);
 
-    expect(sent(backend, "wattbill/templates/delete")).toEqual([
+    expect(backend.sent("wattbill/templates/delete")).toEqual([
       { type: "wattbill/templates/delete", template_id: "template-wear" },
     ]);
   });
@@ -157,7 +155,7 @@ describe("Line Item Templates on a Run", () => {
     expect(text(query(panel, ".items"))).toContain("Saved “Nozzle wear” as a Line Item Template.");
     await click(panel, query(item(panel, "electricity"), "button.save-template"));
 
-    expect(sent(backend, SAVE)).toEqual([
+    expect(backend.sent(SAVE)).toEqual([
       { type: SAVE, run_id: "benchy", line_item_id: "benchy-wear" },
       { type: SAVE, run_id: "benchy", line_item_id: "electricity", label: "Electricity" },
     ]);
@@ -184,7 +182,7 @@ describe("Line Item Templates on a Run", () => {
     await fill(panel, field(query(panel, "form.template"), "quantity"), "2");
     await click(panel, query(panel, "form.template button[type=submit]"));
 
-    expect(sent(backend, ADD)).toEqual([
+    expect(backend.sent(ADD)).toEqual([
       { type: ADD, run_id: "benchy", template_id: "template-inserts" },
       { type: ADD, run_id: "benchy", template_id: "template-packaging", quantity: 2 },
     ]);
@@ -235,7 +233,7 @@ describe("Automatic templates", () => {
     expect(chosen(panel)).toEqual(["Wear Kobra", "Threaded inserts"]);
     await click(panel, query(panel, `.template-chip button[aria-label="Remove Wear Kobra"]`));
 
-    expect(sent(backend, SETTINGS)).toEqual([
+    expect(backend.sent(SETTINGS)).toEqual([
       {
         type: SETTINGS,
         device_id: "device-kobra",
