@@ -61,6 +61,8 @@ export interface Device {
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
     job: { entity_id: string | null; attribute: string | null };
+    /** Missing for Devices added before images existed. */
+    images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
       | { source: "estimate"; running_power: number; paused_power: number | null }
       | { source: "energy"; entity_id: string; attribute: string | null }
