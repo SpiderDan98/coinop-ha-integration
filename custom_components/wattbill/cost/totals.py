@@ -69,3 +69,6 @@ class DeviceTotals:
 
     def remove(self, run_id: str) -> None:
         self.sum = self.sum - self._by_run.pop(run_id, Totals())
+        if not self._by_run:
+            # Float residue of the deltas must not outlive the last Run.
+            self.sum = Totals()
