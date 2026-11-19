@@ -48,3 +48,11 @@ def panel(
 ) -> PanelClient:
     """An admin's websocket connection, as the panel has one."""
     return connect_panel(hass_admin_user)
+
+
+@pytest.fixture
+def watcher(
+    connect_panel: Callable[[MockUser], PanelClient], hass_admin_user: MockUser
+) -> PanelClient:
+    """A second open panel, subscribed to what the first one changes."""
+    return connect_panel(hass_admin_user)

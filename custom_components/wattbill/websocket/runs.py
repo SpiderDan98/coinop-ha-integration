@@ -26,7 +26,7 @@ from custom_components.wattbill.cost.rounding import (
 )
 from custom_components.wattbill.cost.running_time import running_time
 from custom_components.wattbill.cost.totals import Totals, run_totals
-from custom_components.wattbill.models import LineItemKind, Outcome, Run
+from custom_components.wattbill.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
@@ -64,16 +64,24 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
     }
 
 
+def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
+    def rounded(values: dict[str, Any]) -> dict[str, Any]:
+        return values | {"amount": float(round_amount(values["amount"], decimals))}
+
+    return rounded(item.as_dict()) | {
+        "computed": None if item.computed is None else rounded(item.computed),
+        "locked": run.locked(item),
+        "deletable": run.deletable(item),
+    }
+
+
 def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
     # Meter readings are long on an open Run and of no use to the panel.
     stored = {key: value for key, value in run.as_dict().items() if key != "readings"}
     return {
         **stored,
         **_summary(run, now, decimals),
-        "line_items": [
-            item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
-            for item in run.line_items
-        ],
+        "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "subtotals": {
             kind: float(
                 rounded_sum(

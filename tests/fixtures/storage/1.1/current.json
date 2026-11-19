@@ -50,7 +50,8 @@
               "kwh": 0.16333333333333333,
               "unit_price": 0.35714285714285715
             }
-          ]
+          ],
+          "computed": null
         }
       ]
     },
@@ -93,7 +94,8 @@
               "kwh": 0.04,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null
         }
       ]
     }
@@ -143,7 +145,8 @@
               "kwh": 0.06,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null
         }
       ]
     }

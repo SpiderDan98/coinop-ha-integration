@@ -1,0 +1,83 @@
+{
+  "run": {
+    "id": "benchy",
+    "device_id": "device-kobra",
+    "device_name": "Kobra",
+    "name": "Benchy",
+    "job_name": null,
+    "started": "2026-01-12T10:00:00+00:00",
+    "last_seen": null,
+    "ended": "2026-01-12T11:15:00+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": 4,
+    "note": "Four on one plate",
+    "consumption": null,
+    "line_items": [
+      {
+        "id": "electricity",
+        "kind": "electricity",
+        "label": null,
+        "quantity": 0.15,
+        "unit": "kWh",
+        "unit_price": 0.6666666666666667,
+        "amount": 0.1,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-12T10:00:00+00:00",
+            "end": "2026-01-12T11:15:00+00:00",
+            "kwh": 0.15,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": {
+          "quantity": 0.15,
+          "unit_price": 0.3,
+          "amount": 0.05
+        },
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "benchy-pla",
+        "kind": "material",
+        "label": "PLA Basic Black",
+        "quantity": 12.5,
+        "unit": "g",
+        "unit_price": 0.025,
+        "amount": 0.31,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      },
+      {
+        "id": "benchy-wear",
+        "kind": "other",
+        "label": "Nozzle wear",
+        "quantity": 1,
+        "unit": "pcs",
+        "unit_price": 0.5,
+        "amount": 0.5,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "running_seconds": 4500,
+    "total": 0.91,
+    "cost_per_part": 0.23,
+    "subtotals": {
+      "electricity": 0.1,
+      "material": 0.31,
+      "other": 0.5
+    }
+  }
+}

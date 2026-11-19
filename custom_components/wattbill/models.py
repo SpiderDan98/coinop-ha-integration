@@ -79,12 +79,16 @@ class PriceSegment:
         )
 
 
+VALUES = ("quantity", "unit_price", "amount")
+
+
 @dataclass
 class LineItem:
     """One cost line: amount = quantity * unit price.
 
     Computed Line Items keep `label` None and are labelled by their kind in the
-    output language.
+    output language. Quantity, unit price and amount are what counts; once the
+    user overrides a computed one, `computed` keeps what WattBill computed.
     """
 
     id: str
@@ -96,7 +100,44 @@ class LineItem:
     label: str | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
+    computed: dict[str, float | None] | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    @property
+    def is_computed(self) -> bool:
+        """WattBill computes its values, live while the Run is open."""
+        return self.kind is LineItemKind.ELECTRICITY
+
+    @property
+    def negative_prices(self) -> bool:
+        """Only Other Line Items record discounts and refunds."""
+        return self.kind is LineItemKind.OTHER
+
+    def values(self) -> dict[str, float | None]:
+        return {name: getattr(self, name) for name in VALUES}
+
+    def override(self, values: dict[str, float | None]) -> None:
+        """Take the user's quantity, unit price and/or amount.
+
+        An amount back-computes the unit price; with an empty or zero quantity
+        the amount stands.
+        """
+        if self.is_computed and self.computed is None:
+            self.computed = self.values()
+        for name, value in values.items():
+            setattr(self, name, value)
+        if not self.quantity:
+            return
+        if "amount" in values:
+            self.unit_price = self.amount / self.quantity
+        else:
+            self.amount = self.quantity * self.unit_price
+
+    def reset(self) -> None:
+        """Back to the computed values."""
+        for name, value in (self.computed or {}).items():
+            setattr(self, name, value)
+        self.computed = None
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
@@ -109,6 +150,7 @@ class LineItem:
             "amount": self.amount,
             "method": self.method,
             "segments": [segment.as_dict() for segment in self.segments],
+            "computed": self.computed,
         }
 
     @classmethod
@@ -125,6 +167,7 @@ class LineItem:
             if data["method"] is None
             else ElectricityMethod(data["method"]),
             segments=[PriceSegment.from_dict(s) for s in data["segments"]],
+            computed=data.get("computed"),
             unknown=_unknown(cls, data),
         )
 
@@ -172,6 +215,14 @@ class Run:
     @property
     def electricity(self) -> LineItem:
         return next(i for i in self.line_items if i.kind is LineItemKind.ELECTRICITY)
+
+    def locked(self, item: LineItem) -> bool:
+        """Computed values update live until the Run is final; then they are the user's."""
+        return not self.finalised and item.is_computed
+
+    def deletable(self, item: LineItem) -> bool:
+        """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
+        return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
