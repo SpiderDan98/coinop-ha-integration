@@ -261,3 +261,56 @@ async def test_only_known_dimensions_group(
     twice = await panel.error("wattbill/aggregates/get", group_by=["tag", "tag"])
 
     assert (unknown["code"], twice["code"]) == ("invalid_format", "invalid_format")
+
+
+async def test_totals_of_only_some_runs(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """The basket, the gallery's filtered Runs, failed and cancelled Runs."""
+    place_runs(
+        hass_storage,
+        stored_run("helmet", outcome="failed"),
+        stored_run("vase"),
+        stored_run("hook", outcome="cancelled"),
+    )
+    await add_hub(hass)
+
+    result = await panel.call(
+        "wattbill/aggregates/get", run_ids=["helmet", "hook", "gone"]
+    )
+    none = await panel.call("wattbill/aggregates/get", run_ids=[])
+
+    assert pick(result["groups"], "cost", "runs") == [{"cost": 0.14, "runs": 2}]
+    assert none["groups"] == []
+
+
+async def test_totals_of_only_some_materials(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """The Materials the Overview's chart sums up as "other materials"."""
+    used = {"quantity": 10, "unit": "g"}
+    place_runs(
+        hass_storage,
+        stored_run(
+            "vase",
+            line_items=receipt(
+                CLOCK_START - DAY,
+                2,
+                0.4,
+                line_item("material", 0.4, id="a", material_id="pla", **used),
+                line_item("material", 0.2, id="b", material_id="petg", **used),
+                line_item("material", 0.1, id="c", material_id="tpu", **used),
+                line_item("material", 0.05, id="d", **used),
+            ),
+        ),
+    )
+    await add_hub(hass)
+
+    result = await panel.call(
+        "wattbill/aggregates/get", group_by=["kind"], material_ids=["petg", None]
+    )
+
+    assert pick(result["groups"], "kind", "cost", "material_grams") == [
+        {"kind": "electricity", "cost": 0.1, "material_grams": 0},
+        {"kind": "material", "cost": 0.25, "material_grams": 20},
+    ]

@@ -2,7 +2,7 @@
 // Run, and checkboxes to select final Runs. Filter and selection belong to the
 // Overview, which sets them from its tiles and charts too; the gallery reports changes
 // as `filter-changed` and `selection-changed` events.
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { OUTCOMES, type Device, type RunSummary } from "./api";
@@ -10,6 +10,7 @@ import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-image";
+import { RunsTotal } from "./runs-total";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import { sortTags, tagChip } from "./tag-input";
@@ -65,6 +66,19 @@ export class RunGallery extends LitElement {
   @property({ attribute: false }) filter = NO_FILTER;
   @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
 
+  private readonly total = new RunsTotal(this);
+  private all: RunSummary[] = [];
+  private shown: RunSummary[] = [];
+
+  protected override willUpdate(changed: PropertyValues<this>) {
+    if (!changed.has("runs") && !changed.has("filter") && !changed.has("hass")) return;
+    const t = localize(this.hass);
+    const format = formatter(this.hass);
+    this.all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
+    this.shown = this.all.filter((run) => matches(run, this.filter, t, format));
+    this.total.load(this.hass, this.shown);
+  }
+
   private setFilter(changes: Partial<Filter>) {
     this.dispatchEvent(
       new CustomEvent("filter-changed", { detail: { ...this.filter, ...changes } }),
@@ -111,13 +125,14 @@ export class RunGallery extends LitElement {
   override render() {
     const t = localize(this.hass);
     const format = formatter(this.hass);
-    const all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
-    const runs = all.filter((run) => matches(run, this.filter, t, format));
-    const total = runs.reduce((sum, run) => sum + run.total, 0);
+    const { all, shown: runs } = this;
+    const total = this.total.cost;
     return html`
       <div class="head">
         <h2>${t("runs.title")}</h2>
-        <span class="muted">${runs.length} · ${format.money(total)}</span>
+        <span class="muted"
+          >${runs.length}${total === undefined ? nothing : ` · ${format.money(total)}`}</span
+        >
       </div>
       ${all.length ? this.renderFilters(all, runs, t, format) : ""}
       ${

@@ -116,6 +116,38 @@ describe("Overview", () => {
     expect(queryAll(panel, ".by-material .bar-row").map(text)).toEqual(["PLA Basic Black €0.31"]);
   });
 
+  it("charts the cheapest Materials together as the backend totals them", async () => {
+    const material = (id: string | null, cost: number): Group => ({
+      ...zero,
+      kind: "material",
+      material_id: id,
+      material_name: id,
+      cost,
+    });
+    const backend = recordedBackend().reply(AGGREGATES, (msg) => {
+      const key = (msg.group_by as string[]).join();
+      if (key === "kind,material")
+        return { groups: ["a", "b", "c", "d", "e", "f", null].map((id, i) => material(id, 7 - i)) };
+      if (msg.material_ids) return { groups: [{ ...zero, kind: "material", cost: 1.5 }] };
+      return { groups: groups(key) };
+    });
+    const panel = await mountPanel(backend);
+
+    expect(queryAll(panel, ".by-material .bar-row").map(text)).toEqual([
+      "a €7.00",
+      "b €6.00",
+      "c €5.00",
+      "d €4.00",
+      "e €3.00",
+      "Other Materials €1.50",
+    ]);
+    expect(sent(backend, AGGREGATES).find((call) => call.material_ids)).toEqual({
+      type: AGGREGATES,
+      group_by: ["kind"],
+      material_ids: ["f", null],
+    });
+  });
+
   it("shows the Run running now at its live cost and reads the totals afresh", async () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend);

@@ -7,10 +7,9 @@ import {
   KINDS,
   deleteRuns,
   getAggregates,
+  getGroupings,
   previewDelete,
   type Device,
-  type Dimension,
-  type Group,
   type RunSummary,
   type Totals,
 } from "./api";
@@ -22,32 +21,39 @@ import "./run-gallery";
 import "./statement-dialog";
 import { NO_FILTER, selectable, type Filter } from "./run-gallery";
 import { deleteDialog, deviceName, runName } from "./run-parts";
+import { RunsTotal } from "./runs-total";
 import { shared } from "./styles";
 
-const GROUPINGS: Dimension[][] = [
-  [],
-  ["month"],
-  ["month", "kind"],
-  ["outcome"],
-  ["kind", "material"],
-];
 const MONTHS_SHOWN = 12;
 const MATERIALS_SHOWN = 6;
 
 type Aggregates = Awaited<ReturnType<typeof loadAggregates>>;
 
 async function loadAggregates(hass: HomeAssistant) {
-  const [total, month, monthKind, outcome, material] = await Promise.all(
-    GROUPINGS.map((groupBy) => getAggregates(hass, groupBy)),
-  );
-  return { total: total[0], month, monthKind, outcome, material };
+  const { total, month, monthKind, material } = await getGroupings(hass, {
+    total: [],
+    month: ["month"],
+    monthKind: ["month", "kind"],
+    material: ["kind", "material"],
+  });
+  const materials = material
+    .filter((group) => group.kind === "material" && (group.cost !== 0 || group.material_grams > 0))
+    .sort((a, b) => b.cost - a.cost);
+  const shown = materials.length > MATERIALS_SHOWN ? MATERIALS_SHOWN - 1 : MATERIALS_SHOWN;
+  const rest = materials.slice(shown).map((group) => group.material_id ?? null);
+  const others = rest.length
+    ? (await getAggregates(hass, ["kind"], { material_ids: rest })).find(
+        (group) => group.kind === "material",
+      )
+    : undefined;
+  return { total: total[0], month, monthKind, materials: materials.slice(0, shown), others };
 }
 
 const runCount = (count: number, t: Localize) =>
   count === 1 ? t("overview.run_one") : t("overview.runs", { count });
 
-const sum = (groups: Group[], key: "cost" | "runs") =>
-  groups.reduce((total, group) => total + group[key], 0);
+const failedOrCancelled = (run: RunSummary) =>
+  run.outcome === "failed" || run.outcome === "cancelled";
 
 /** Every "YYYY-MM" from `first` to `last`. */
 function monthsBetween(first: string, last: string) {
@@ -80,9 +86,14 @@ export class Overview extends LitElement {
   @state() private deleteFailed = false;
   @state() private exporting = false;
   private request = 0;
+  private readonly failedTotal = new RunsTotal(this);
+  private readonly basketTotal = new RunsTotal(this);
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runs")) void this.load();
+    // Each reads again only when its Runs or their costs changed.
+    this.failedTotal.load(this.hass, [...this.runs.values()].filter(failedOrCancelled));
+    this.basketTotal.load(this.hass, this.selectedRuns());
   }
 
   private async load() {
@@ -171,13 +182,11 @@ export class Overview extends LitElement {
   private renderStats(t: Localize, format: Format) {
     if (this.aggregates === null) return html`<p class="muted">${t("overview.error")}</p>`;
     if (!this.aggregates) return nothing;
-    const { total, month, outcome } = this.aggregates;
+    const { total, month } = this.aggregates;
     const now = format.month(new Date().toISOString());
     const thisMonth = month.find((group) => group.month === now);
-    const failed = outcome.filter(
-      (group) => group.outcome === "failed" || group.outcome === "cancelled",
-    );
-    const failedCost = sum(failed, "cost");
+    const failed = [...this.runs.values()].filter(failedOrCancelled).length;
+    const failedCost = this.failedTotal.cost;
     const flagged = total?.flagged_runs ?? 0;
     const failedOn = this.filter.outcome === "failed_cancelled";
     return html`
@@ -198,15 +207,15 @@ export class Overview extends LitElement {
           @click=${() => this.setFilter({ outcome: failedOn ? "" : "failed_cancelled" })}
         >
           <div class="muted small">${t("overview.failed_cancelled")}</div>
-          <div class="value">${format.money(failedCost)}</div>
+          <div class="value">${failedCost === undefined ? "–" : format.money(failedCost)}</div>
           <div class="muted small">
             ${
-              total && total.cost > 0
+              total && total.cost > 0 && failedCost !== undefined
                 ? t("overview.failed_share", {
-                    runs: runCount(sum(failed, "runs"), t),
+                    runs: runCount(failed, t),
                     share: format.percent(failedCost / total.cost),
                   })
-                : runCount(sum(failed, "runs"), t)
+                : runCount(failed, t)
             }
           </div>
         </button>
@@ -265,19 +274,12 @@ export class Overview extends LitElement {
     </div>`;
   }
 
-  private renderMaterials({ material }: Aggregates, t: Localize, format: Format) {
-    const groups = material
-      .filter(
-        (group) => group.kind === "material" && (group.cost !== 0 || group.material_grams > 0),
-      )
-      .sort((a, b) => b.cost - a.cost);
-    const shown = groups.length > MATERIALS_SHOWN ? MATERIALS_SHOWN - 1 : MATERIALS_SHOWN;
-    const rows = groups.slice(0, shown).map((group) => ({
+  private renderMaterials({ materials, others }: Aggregates, t: Localize, format: Format) {
+    const rows = materials.map((group) => ({
       label: group.material_name ?? t("item.no_material"),
       cost: group.cost,
     }));
-    if (groups.length > shown)
-      rows.push({ label: t("overview.other_materials"), cost: sum(groups.slice(shown), "cost") });
+    if (others) rows.push({ label: t("overview.other_materials"), cost: others.cost });
     return html`<div class="card by-material">
       <h3>${t("overview.by_material")}</h3>
       ${
@@ -318,7 +320,9 @@ export class Overview extends LitElement {
     return html`<aside class="basket card" aria-label=${t("basket.title")}>
       <div class="row between">
         <b>${runCount(runs.length, t)}</b>
-        <b class="num">${format.money(runs.reduce((total, run) => total + run.total, 0))}</b>
+        <b class="num"
+          >${this.basketTotal.cost === undefined ? nothing : format.money(this.basketTotal.cost)}</b
+        >
       </div>
       <div class="muted small names">${runs.map((run) => runName(run, t)).join(", ")}</div>
       <div class="row actions">

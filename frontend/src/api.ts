@@ -161,10 +161,33 @@ export type Group = Totals &
     tag: string | null;
   }>;
 
-/** Only combinations that have Line Items; no Runs, no groups. */
-export const getAggregates = async (hass: HomeAssistant, groupBy: Dimension[]) =>
-  (await hass.callWS<{ groups: Group[] }>({ type: "wattbill/aggregates/get", group_by: groupBy }))
-    .groups;
+/** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some
+ * Runs and to the Line Items of some Materials (`null` for none). */
+export const getAggregates = async (
+  hass: HomeAssistant,
+  groupBy: Dimension[],
+  only: { run_ids?: string[]; material_ids?: (string | null)[] } = {},
+) =>
+  (
+    await hass.callWS<{ groups: Group[] }>({
+      type: "wattbill/aggregates/get",
+      group_by: groupBy,
+      ...only,
+    })
+  ).groups;
+
+/** `getAggregates` of every named grouping at once. */
+export async function getGroupings<const G extends Record<string, Dimension[]>>(
+  hass: HomeAssistant,
+  groupings: G,
+) {
+  const names = Object.keys(groupings) as (keyof G)[];
+  const groups = await Promise.all(names.map((name) => getAggregates(hass, groupings[name])));
+  return Object.fromEntries(names.map((name, index) => [name, groups[index]])) as Record<
+    keyof G,
+    Group[]
+  >;
+}
 
 export const KINDS: Kind[] = ["electricity", "material", "other"];
 export const OUTCOMES: Outcome[] = ["completed", "cancelled", "failed", "unknown"];
