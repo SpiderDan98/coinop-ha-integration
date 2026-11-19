@@ -16,6 +16,9 @@
       "flags": [],
       "part_count": 4,
       "note": "Four on one plate",
+      "tags": [
+        "Gift"
+      ],
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -38,7 +41,10 @@
               "kwh": 0.15,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         },
         {
           "id": "benchy-pla",
@@ -50,7 +56,10 @@
           "unit_price": 0.025,
           "amount": 0.31,
           "method": null,
-          "segments": []
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         },
         {
           "id": "benchy-wear",
@@ -62,7 +71,10 @@
           "unit_price": 0.5,
           "amount": 0.5,
           "method": null,
-          "segments": []
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         }
       ],
       "images": [
@@ -118,6 +130,10 @@
       ],
       "part_count": 1,
       "note": null,
+      "tags": [
+        "Cosplay helmet",
+        "Gift"
+      ],
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -146,7 +162,10 @@
               "kwh": 0.48,
               "unit_price": 0.25
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         }
       ],
       "images": [
@@ -193,6 +212,7 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "tags": [],
       "consumption": null,
       "cost_source": null,
       "prices": [],
@@ -215,7 +235,10 @@
               "kwh": 0.24,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
         }
       ],
       "images": [],
@@ -248,6 +271,9 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "tags": [
+        "Batch 7"
+      ],
       "consumption": {
         "source": "estimate",
         "running_power": 120.0,
@@ -288,7 +314,10 @@
               "kwh": 0.09,
               "unit_price": 0.3
             }
-          ]
+          ],
+          "computed": null,
+          "locked": true,
+          "deletable": false
         }
       ],
       "images": [],

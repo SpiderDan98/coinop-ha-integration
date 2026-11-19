@@ -4,9 +4,9 @@
 // exactly the shapes the backend sends.
 import type { HomeAssistant, Message } from "../src/hass";
 import type {
+  Catalog,
   Device,
   Drop,
-  Material,
   MaterialType,
   RunChange,
   RunDetail,
@@ -19,10 +19,13 @@ import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
 import imagesUpload from "./fixtures/backend/images-upload.json";
+import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
+import tagsRename from "./fixtures/backend/tags-rename.json";
 
 const [snapshot, ...changes] = runsSubscribe;
 const found = <T>(value: T | undefined, what: string) => {
@@ -47,17 +50,24 @@ export const recorded = {
   setCover: imagesSetCover.run as RunDetail,
   /** `wattbill/images/delete` of that upload: "benchy" without it again. */
   deleteImage: imagesDelete.run as RunDetail,
+  /** `wattbill/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
+  lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
+  /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
+  lineItemsAdd: lineItemsAdd as { run: RunDetail },
   /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
   /**
-   * `wattbill/catalog/subscribe`: first empty, then after "material-1" (eSun PLA+ black,
-   * default for PLA), "material-2" (Standard Resin grey) and "material-3" (PLA red,
-   * archived) were added.
+   * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened
+   * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
+   * Resin grey), "material-3" (PLA red, archived) and the Tags "Cosplay helmet", "Gift"
+   * and "Spare parts".
    */
   catalog: {
-    empty: catalogSubscribe[0] as { materials: Material[] },
-    filled: catalogSubscribe[1] as { materials: Material[] },
+    empty: catalogSubscribe[0] as Catalog,
+    filled: catalogSubscribe[1] as Catalog,
   },
+  /** `wattbill/tags/rename` of "Spare" to "Spare parts". */
+  tagRename: tagsRename,
   /** `wattbill/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
   material: (id: string) =>

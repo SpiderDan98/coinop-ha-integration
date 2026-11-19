@@ -25,6 +25,9 @@
         "flags": [],
         "part_count": 1,
         "note": null,
+        "tags": [
+          "Gift"
+        ],
         "consumption": {
           "source": "estimate",
           "running_power": 120,
@@ -70,7 +73,8 @@
                 "kwh": 0.16333333333333333,
                 "unit_price": 0.35714285714285715
               }
-            ]
+            ],
+            "computed": null
           }
         ],
         "images": [],
@@ -92,6 +96,7 @@
         "flags": [],
         "part_count": 1,
         "note": null,
+        "tags": [],
         "consumption": {
           "source": "estimate",
           "running_power": 120,
@@ -128,7 +133,8 @@
                 "kwh": 0.04,
                 "unit_price": 0.3
               }
-            ]
+            ],
+            "computed": null
           }
         ],
         "images": [],

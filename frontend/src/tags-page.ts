@@ -1,0 +1,220 @@
+// The Tags tab: each Tag with its Run count and total cost, renamed (or merged into
+// another by its name) and deleted here. The catalogue follows by subscription.
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import { deleteTag, renameTag, type RunSummary } from "./api";
+import { formatter } from "./format";
+import type { HomeAssistant } from "./hass";
+import { localize, type Localize } from "./localize";
+import { shared } from "./styles";
+
+@customElement("wattbill-tags-page")
+export class TagsPage extends LitElement {
+  @property({ attribute: false }) hass!: HomeAssistant;
+  /** Undefined until the catalogue arrives. */
+  @property({ attribute: false }) tags?: string[];
+  @property({ attribute: false }) runs: RunSummary[] = [];
+  @property({ type: Boolean, reflect: true }) narrow = false;
+
+  /** The Tag being renamed and the name typed so far. */
+  @state() private renaming?: { tag: string; name: string };
+  @state() private confirming?: string;
+  @state() private failed = false;
+
+  override render() {
+    const t = localize(this.hass);
+    if (!this.tags) return html`<p class="muted">${t("tags.loading")}</p>`;
+    return html`
+      <h2>${t("tags.title")}</h2>
+      ${
+        this.tags.length
+          ? html`<table>
+              <thead>
+                <tr>
+                  <th>${t("tags.tag")}</th>
+                  <th class="num">${t("runs.title")}</th>
+                  <th class="num">${t("sensor.total_cost")}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${this.tags.map((tag) => this.renderTag(tag, t))}
+              </tbody>
+            </table>`
+          : html`<p class="muted">${t("tags.empty")}</p>`
+      }
+      ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+    `;
+  }
+
+  private renderTag(tag: string, t: Localize) {
+    const format = formatter(this.hass);
+    const runs = this.runs.filter((run) => run.tags.includes(tag));
+    const total = runs.reduce((sum, run) => sum + run.total, 0);
+    return html`<tr class="tag">
+      <td>
+        ${this.renaming?.tag === tag ? this.renderRename(tag, t) : html`<span class="tag-name">${tag}</span>`}
+      </td>
+      <td class="num">${runs.length}</td>
+      <td class="num">${format.money(total)}</td>
+      <td class="actions">${this.renderActions(tag, runs.length, t)}</td>
+    </tr>`;
+  }
+
+  private renderRename(tag: string, t: Localize) {
+    const name = this.renaming?.name ?? tag;
+    const typed = name.trim().toLocaleLowerCase();
+    const target = this.tags?.find((other) => other !== tag && other.toLocaleLowerCase() === typed);
+    return html`<input
+        class="rename"
+        maxlength="40"
+        aria-label=${t("tags.rename")}
+        .value=${name}
+        @input=${(event: Event) =>
+          (this.renaming = { tag, name: (event.target as HTMLInputElement).value })}
+        @keydown=${(event: KeyboardEvent) => {
+          if (event.key === "Enter") void this.rename();
+          else if (event.key === "Escape") this.renaming = undefined;
+        }}
+      />${
+        target
+          ? html`<div class="merge-hint muted small">${t("tags.merge_hint", { tag: target })}</div>`
+          : nothing
+      }`;
+  }
+
+  private renderActions(tag: string, runs: number, t: Localize) {
+    if (this.renaming?.tag === tag) {
+      return html`<button
+          class="btn small"
+          ?disabled=${!this.renaming.name.trim()}
+          @click=${this.rename}
+        >
+          ${t("tags.save")}</button
+        ><button class="btn small" @click=${() => (this.renaming = undefined)}>
+          ${t("tags.cancel")}
+        </button>`;
+    }
+    if (this.confirming === tag) {
+      return html`<div class="delete-hint muted small">
+          ${t("tags.delete_hint", { tag, count: runs })}
+        </div>
+        <button class="btn small danger" @click=${() => this.delete(tag)}>
+          ${t("tags.delete_confirm")}</button
+        ><button class="btn small" @click=${() => (this.confirming = undefined)}>
+          ${t("tags.cancel")}
+        </button>`;
+    }
+    return html`<button
+        class="btn small"
+        @click=${() => {
+          this.renaming = { tag, name: tag };
+          this.confirming = undefined;
+        }}
+      >
+        ${t("tags.rename")}</button
+      ><button
+        class="btn small danger"
+        @click=${() => {
+          this.confirming = tag;
+          this.renaming = undefined;
+        }}
+      >
+        ${t("tags.delete")}
+      </button>`;
+  }
+
+  private async rename() {
+    const renaming = this.renaming;
+    const name = renaming?.name.trim();
+    if (!renaming || !name) return;
+    this.renaming = undefined;
+    await this.attempt(renameTag(this.hass, renaming.tag, name));
+  }
+
+  private async delete(tag: string) {
+    this.confirming = undefined;
+    await this.attempt(deleteTag(this.hass, tag));
+  }
+
+  private async attempt(request: Promise<unknown>) {
+    this.failed = false;
+    try {
+      await request;
+    } catch {
+      this.failed = true;
+    }
+  }
+
+  static override styles = [
+    shared,
+    css`
+      h2 {
+        margin: 8px 0 12px;
+      }
+      table {
+        width: 100%;
+        max-width: 900px;
+        border-collapse: collapse;
+        background: var(--card-background-color, #fff);
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        border-radius: 12px;
+      }
+      th,
+      td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        vertical-align: middle;
+      }
+      th {
+        font-weight: 500;
+        color: var(--secondary-text-color);
+      }
+      th.num,
+      td.num {
+        text-align: right;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .actions {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .actions .btn + .btn {
+        margin-left: 6px;
+      }
+      .delete-hint {
+        white-space: normal;
+        margin-bottom: 6px;
+      }
+      input {
+        font: inherit;
+        color: var(--primary-text-color);
+        background: var(--card-background-color, #fff);
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        border-radius: 6px;
+        padding: 4px 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .error {
+        color: var(--error-color, #db4437);
+      }
+      :host([narrow]) th,
+      :host([narrow]) td {
+        padding: 6px 8px;
+      }
+      :host([narrow]) .actions {
+        white-space: normal;
+      }
+    `,
+  ];
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "wattbill-tags-page": TagsPage;
+  }
+}

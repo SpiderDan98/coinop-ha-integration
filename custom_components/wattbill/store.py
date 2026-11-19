@@ -49,7 +49,7 @@ class Schema:
 
 RUNS_SCHEMA = Schema(STORAGE_VERSION, STORAGE_MINOR_VERSION, {"runs": []})
 SCHEMAS = {
-    "catalog": Schema(1, 1, {"materials": []}),
+    "catalog": Schema(1, 1, {"materials": [], "tags": []}),
     "runs": RUNS_SCHEMA,
     "live": RUNS_SCHEMA,
     "device_settings": Schema(1, 1, {"devices": {}}),

@@ -1,6 +1,7 @@
 [
   {
-    "materials": []
+    "materials": [],
+    "tags": []
   },
   {
     "materials": [
@@ -61,6 +62,11 @@
         },
         "price_per_gram": 0.01599
       }
+    ],
+    "tags": [
+      "Cosplay helmet",
+      "Gift",
+      "Spare parts"
     ]
   }
 ]

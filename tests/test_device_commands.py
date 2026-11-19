@@ -7,20 +7,12 @@ from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
-from custom_components.wattbill import device_settings
-
 from .devices import STATUS, add_device, add_hub
 from .test_device_management import remove
 from .test_persistence import restart
 from .websocket import PanelClient
 
 SETTINGS = "wattbill.device_settings"
-
-
-@pytest.fixture
-def a_setting(monkeypatch: pytest.MonkeyPatch) -> None:
-    """One panel setting, until the real ones (default Material, ...) exist."""
-    monkeypatch.setitem(device_settings.FIELDS, "note", ("", str))
 
 
 async def test_each_device_lists_its_ha_side_settings(
@@ -65,13 +57,13 @@ async def test_each_device_lists_its_ha_side_settings(
                 },
                 "price": {"source": "fixed", "value": 0.30},
             },
-            "settings": {},
+            "settings": {"tags_for_new_runs": []},
         },
         {
             "id": mini.subentry_id,
             "name": "Mini",
             "ha_settings": result["devices"][1]["ha_settings"],
-            "settings": {},
+            "settings": {"tags_for_new_runs": []},
         },
     ]
     assert result["devices"][1]["ha_settings"]["status"]["entity_id"] == (
@@ -80,45 +72,45 @@ async def test_each_device_lists_its_ha_side_settings(
 
 
 async def test_a_panel_setting_is_kept_across_restarts(
-    hass: HomeAssistant, panel: PanelClient, a_setting: None
+    hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"] == {"note": ""}
+    assert listed["settings"] == {"tags_for_new_runs": []}
 
     result = await panel.call(
         "wattbill/devices/update_settings",
         device_id=kobra.subentry_id,
-        settings={"note": "Workshop"},
+        settings={"tags_for_new_runs": ["Workshop"]},
     )
     await restart(hass, entry)
 
-    assert result == {"settings": {"note": "Workshop"}}
+    assert result == {"settings": {"tags_for_new_runs": ["Workshop"]}}
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"] == {"note": "Workshop"}
+    assert listed["settings"] == {"tags_for_new_runs": ["Workshop"]}
 
 
 async def test_an_update_leaves_settings_it_does_not_name_alone(
-    hass: HomeAssistant, panel: PanelClient, a_setting: None
+    hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
     await panel.call(
         "wattbill/devices/update_settings",
         device_id=kobra.subentry_id,
-        settings={"note": "Workshop"},
+        settings={"tags_for_new_runs": ["Workshop"]},
     )
 
     result = await panel.call(
         "wattbill/devices/update_settings", device_id=kobra.subentry_id, settings={}
     )
 
-    assert result == {"settings": {"note": "Workshop"}}
+    assert result == {"settings": {"tags_for_new_runs": ["Workshop"]}}
 
 
 async def test_an_unknown_setting_or_value_is_rejected(
-    hass: HomeAssistant, panel: PanelClient, a_setting: None
+    hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
@@ -131,14 +123,14 @@ async def test_an_unknown_setting_or_value_is_rejected(
     wrong = await panel.error(
         "wattbill/devices/update_settings",
         device_id=kobra.subentry_id,
-        settings={"note": 3},
+        settings={"tags_for_new_runs": "Workshop"},
     )
 
     assert unknown["code"] == wrong["code"] == "invalid_format"
 
 
 async def test_a_removed_device_has_no_settings_to_update(
-    hass: HomeAssistant, panel: PanelClient, a_setting: None
+    hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
@@ -147,7 +139,7 @@ async def test_a_removed_device_has_no_settings_to_update(
     error = await panel.error(
         "wattbill/devices/update_settings",
         device_id=kobra.subentry_id,
-        settings={"note": "Workshop"},
+        settings={"tags_for_new_runs": ["Workshop"]},
     )
 
     assert error["code"] == "not_found"
@@ -158,7 +150,6 @@ async def test_a_removed_devices_settings_are_dropped(
     hass: HomeAssistant,
     panel: PanelClient,
     hass_storage: dict[str, Any],
-    a_setting: None,
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
@@ -167,13 +158,13 @@ async def test_a_removed_devices_settings_are_dropped(
         await panel.call(
             "wattbill/devices/update_settings",
             device_id=device.subentry_id,
-            settings={"note": device.title},
+            settings={"tags_for_new_runs": [device.title]},
         )
 
     await remove(hass, entry, kobra)
 
     assert hass_storage[SETTINGS]["data"] == {
-        "devices": {mini.subentry_id: {"note": "Mini"}}
+        "devices": {mini.subentry_id: {"tags_for_new_runs": ["Mini"]}}
     }
 
 
@@ -181,7 +172,6 @@ async def test_settings_written_by_a_newer_version_are_kept(
     hass: HomeAssistant,
     panel: PanelClient,
     hass_storage: dict[str, Any],
-    a_setting: None,
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
@@ -192,12 +182,12 @@ async def test_settings_written_by_a_newer_version_are_kept(
     await panel.call(
         "wattbill/devices/update_settings",
         device_id=kobra.subentry_id,
-        settings={"note": "Workshop"},
+        settings={"tags_for_new_runs": ["Workshop"]},
     )
 
     assert hass_storage[SETTINGS]["data"]["devices"][kobra.subentry_id] == {
         "snapshot": True,
-        "note": "Workshop",
+        "tags_for_new_runs": ["Workshop"],
     }
 
 

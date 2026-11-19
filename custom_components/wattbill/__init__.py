@@ -52,7 +52,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         devices=devices,
         settings=settings,
         trackers=[
-            DeviceTracker(hass, book, device, DeviceImages(hass, book, images, device))
+            DeviceTracker(
+                hass,
+                book,
+                device,
+                settings,
+                DeviceImages(hass, book, images, device),
+            )
             for device in devices
         ],
     )

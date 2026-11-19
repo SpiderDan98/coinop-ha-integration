@@ -28,10 +28,11 @@ from custom_components.wattbill.cost.rounding import (
 from custom_components.wattbill.cost.running_time import running_time
 from custom_components.wattbill.cost.totals import Totals, run_totals
 from custom_components.wattbill.images import image_info
-from custom_components.wattbill.models import LineItemKind, Outcome, Run
+from custom_components.wattbill.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
+from custom_components.wattbill.tags import tag_name
 
 from .command import command
 
@@ -63,7 +64,19 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "part_count": run.part_count,
         "cost_per_part": float(round_amount(float(total) / run.part_count, decimals)),
         "flags": list(run.flags),
+        "tags": list(run.tags),
         "cover": None if (cover := run.cover) is None else image_info(run, cover),
+    }
+
+
+def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
+    def rounded(values: dict[str, Any]) -> dict[str, Any]:
+        return values | {"amount": float(round_amount(values["amount"], decimals))}
+
+    return rounded(item.as_dict()) | {
+        "computed": None if item.computed is None else rounded(item.computed),
+        "locked": run.locked(item),
+        "deletable": run.deletable(item),
     }
 
 
@@ -73,10 +86,7 @@ def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
     return {
         **stored,
         **_summary(run, now, decimals),
-        "line_items": [
-            item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
-            for item in run.line_items
-        ],
+        "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
         "subtotals": {
             kind: float(
@@ -192,6 +202,7 @@ _FINAL_FIELDS = ("started", "ended", "outcome")
         vol.Optional("ended"): _moment,
         vol.Optional("outcome"): vol.Coerce(Outcome),
         vol.Optional("part_count"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("tags"): [tag_name],
     }
 )
 async def _update(
@@ -220,6 +231,8 @@ async def _update(
         run.note = _text(msg["note"])
     run.outcome = msg.get("outcome", run.outcome)
     run.part_count = msg.get("part_count", run.part_count)
+    if "tags" in msg:
+        run.tags = await wattbill.catalog.async_add_tags(msg["tags"])
     await wattbill.book.async_correct(run)
     _send_run(hass, connection, msg["id"], run)
 

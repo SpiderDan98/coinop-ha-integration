@@ -6,6 +6,7 @@ export const shared = css`
     --wattbill-electricity: #f9a825;
     --wattbill-material: #26a69a;
     --wattbill-other: #7e57c2;
+    --wattbill-manual: #7e57c2;
     color: var(--primary-text-color);
     font-family: var(--ha-font-family-body, Roboto, system-ui, sans-serif);
     font-size: 14px;
@@ -92,6 +93,20 @@ export const shared = css`
     color: var(--secondary-text-color);
     background: var(--secondary-background-color, #ededed);
     font-size: 12px;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+  }
+  .tag-chip .tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .outcome {
     display: inline-block;

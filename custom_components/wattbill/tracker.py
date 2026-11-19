@@ -31,6 +31,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
 from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading, price_reading
+from .device_settings import TAGS_FOR_NEW_RUNS, DeviceSettings
 from .images import DeviceImages
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
@@ -61,11 +62,13 @@ class DeviceTracker:
         hass: HomeAssistant,
         book: RunBook,
         config: DeviceConfig,
+        settings: DeviceSettings,
         images: DeviceImages,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
+        self._settings = settings
         self._images = images
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
@@ -344,6 +347,7 @@ class DeviceTracker:
             line_items=[],
             consumption=dict(self._config.consumption),
             cost_source=dict(self._config.price),
+            tags=self._settings.get(self._config.device_id)[TAGS_FOR_NEW_RUNS],
         )
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
