@@ -1,10 +1,13 @@
 """After setup: WattBill's own HA device per Device, renaming and removing Devices."""
 
+from typing import Any
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+from .clock import Clock
 from .devices import add_device, add_hub, add_printer
-from .test_runs import TOTAL_COST
+from .test_runs import TOTAL_COST, set_status, stored_runs
 
 
 def wattbill_device(hass: HomeAssistant, entity_id: str = TOTAL_COST) -> dr.DeviceEntry:
@@ -41,3 +44,36 @@ async def test_without_a_printer_device_the_ha_device_stands_alone(
     device = wattbill_device(hass)
     assert device.name == "Kobra"
     assert device.via_device_id is None
+
+
+async def rename(hass: HomeAssistant, name: str) -> None:
+    dr.async_get(hass).async_update_device(wattbill_device(hass).id, name_by_user=name)
+    await hass.async_block_till_done()
+
+
+async def test_renaming_the_ha_device_renames_the_device(hass: HomeAssistant) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, name="Kobra")
+
+    await rename(hass, "Workshop Kobra")
+
+    assert entry.subentries[subentry.subentry_id].title == "Workshop Kobra"
+    assert wattbill_device(hass).name == "Workshop Kobra"
+
+
+async def test_runs_carry_the_devices_new_name(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, name="Kobra")
+    await set_status(hass, "printing")
+    await set_status(hass, "finished")
+    await set_status(hass, "printing")
+
+    await rename(hass, "Workshop Kobra")
+    await set_status(hass, "finished")
+
+    assert [run["device_name"] for run in stored_runs(hass_storage)] == [
+        "Workshop Kobra",
+        "Workshop Kobra",
+    ]

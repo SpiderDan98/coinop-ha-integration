@@ -29,10 +29,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     )
     for device in devices:
         ha_device.async_register(hass, entry, device)
+        await book.async_rename_device(device.device_id, device.name)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     for tracker in entry.runtime_data.trackers:
         tracker.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+    entry.async_on_unload(ha_device.async_track_renames(hass, entry))
     return True
 
 
