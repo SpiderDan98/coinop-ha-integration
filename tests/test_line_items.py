@@ -7,6 +7,9 @@ import pytest
 
 from .clock import Clock
 from .devices import add_device, add_hub
+from .stored import place_materials, stored_material
+from .test_lifecycle import WITH_FAULT
+from .test_material_usage import material_items
 from .test_run_event import record_events
 from .test_runs import TOTAL_COST, set_status, stored_runs, value
 from .test_sensors import CURRENT, print_runs
@@ -345,3 +348,28 @@ async def test_line_items_that_dont_exist_are_not_found(
         "wattbill/line_items/add", run_id=run["id"], kind="electricity"
     )
     assert error["code"] == "invalid_format"
+
+
+async def test_filling_in_the_material_leaves_a_fault_flagged(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], panel: PanelClient
+) -> None:
+    place_materials(hass_storage, stored_material("pla"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, mapping=WITH_FAULT)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "error")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+
+    result = await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        material_id="pla",
+        quantity=12,
+    )
+
+    assert result["run"]["flags"] == ["fault"]

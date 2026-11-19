@@ -110,6 +110,58 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dd"))).toBe("Kobra Print status sensor.kobra_status");
   });
 
+  it("names the price, consumption and Slot entities too, their entity ids below", async () => {
+    const [kobra] = recorded.devices;
+    const named = {
+      "sensor.tibber_price": "Tibber price",
+      "sensor.plug_power": "Plug power",
+      "sensor.ace_slot_1": "ACE Slot 1",
+      "sensor.ace_loaded_slot": "ACE Loaded slot",
+    };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        {
+          ...kobra,
+          ha_settings: {
+            ...kobra.ha_settings,
+            job: {
+              ...kobra.ha_settings.job,
+              slots: ["sensor.ace_slot_1"],
+              colour_attribute: null,
+              loaded_slot: "sensor.ace_loaded_slot",
+            },
+            consumption: {
+              source: "power",
+              entity_id: "sensor.plug_power",
+              attribute: null,
+              running_power: null,
+            },
+            price: {
+              source: "entity",
+              entity_id: "sensor.tibber_price",
+              attribute: null,
+              unit: "€/kWh",
+              factor: null,
+            },
+          },
+        },
+      ],
+    }));
+    backend.hass.states = Object.fromEntries(
+      Object.entries(named).map(([id, name]) => [id, { attributes: { friendly_name: name } }]),
+    );
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device .slots"))).toBe(
+      "ACE Slot 1 sensor.ace_slot_1 Loaded slot ACE Loaded slot sensor.ace_loaded_slot",
+    );
+    expect(text(query(panel, ".device .consumption"))).toBe(
+      "Power sensor Plug power sensor.plug_power",
+    );
+    expect(text(query(panel, ".device .price"))).toBe("From Tibber price sensor.tibber_price");
+  });
+
   it("shows no images for a Device added before they existed", async () => {
     const [kobra] = recorded.devices;
     const backend = recordedBackend().reply(LIST, () => ({
@@ -140,7 +192,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device .slots"))).toBe(
-      "sensor.ace_slot_1 sensor.ace_slot_2 Colour from color_hex · Loaded slot sensor.ace_loaded_slot",
+      "sensor.ace_slot_1 sensor.ace_slot_2 Colour from color_hex Loaded slot sensor.ace_loaded_slot",
     );
   });
 
@@ -162,7 +214,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toContain(
-      "Electricity price From sensor.electricity_price · current",
+      "Electricity price From sensor.electricity_price current",
     );
   });
 
@@ -200,7 +252,7 @@ describe("Devices tab", () => {
 
     expect(queryAll(panel, ".device .consumption").map(text)).toEqual([
       "Energy meter sensor.plug_energy",
-      "Power sensor sensor.plug · power · 60 W running",
+      "Power sensor sensor.plug power · 60 W running",
     ]);
   });
 
