@@ -119,13 +119,18 @@ describe("Line Item Templates tab", () => {
     expect(queryAll(panel, "form.new")).toHaveLength(0);
   });
 
-  it("deletes a template", async () => {
+  it("deletes a template once confirmed, naming the Devices that add it", async () => {
     const backend = templatesBackend();
     const panel = await mountPanel(backend, { path: "/templates" });
 
     const remove = query(row(panel, "template-wear"), "ha-icon-button.delete");
     expect(label(remove)).toBe("Delete (past Runs keep their copies)");
     await click(panel, remove);
+    expect(backend.sent("wattbill/templates/delete")).toEqual([]);
+    expect(text(query(row(panel, "template-wear"), ".delete-hint"))).toContain(
+      "No longer added automatically for: Kobra.",
+    );
+    await click(panel, query(row(panel, "template-wear"), "ha-button.confirm-delete"));
 
     expect(backend.sent("wattbill/templates/delete")).toEqual([
       { type: "wattbill/templates/delete", template_id: "template-wear" },

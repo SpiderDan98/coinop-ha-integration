@@ -63,6 +63,8 @@ export class TemplatesPage extends LitElement {
   /** The new template's basis while its form is open. */
   @state() private adding?: QuantityBasis;
   @state() private failed = false;
+  /** The template whose delete confirmation is open. */
+  @state() private confirming?: string;
 
   override render() {
     const t = localize(this.hass);
@@ -111,6 +113,7 @@ export class TemplatesPage extends LitElement {
       .filter((device) => device.settings.automatic_templates.includes(template.id))
       .map((device) => device.name)
       .join(", ");
+    const confirming = this.confirming === template.id;
     return html`<tr
       class="template"
       data-id=${template.id}
@@ -144,12 +147,33 @@ export class TemplatesPage extends LitElement {
       <td>${this.renderBasis(template.basis, t)}</td>
       <td class="automatic small">${automatic || html`<span class="muted">–</span>`}</td>
       <td class="actions">
-        <ha-icon-button
-          class="delete"
-          .label=${t("templates.delete")}
-          .path=${mdiDelete}
-          @click=${() => this.attempt(deleteTemplate(this.hass, template.id))}
-        ></ha-icon-button>
+        ${
+          confirming
+            ? html`<div class="delete-hint muted small">
+                  ${t("templates.delete_hint", { label: template.label })}
+                  ${automatic ? t("templates.delete_automatic", { devices: automatic }) : nothing}
+                </div>
+                <ha-button
+                  class="small confirm-delete"
+                  variant="danger"
+                  @click=${() => this.delete(template)}
+                >
+                  ${t("templates.delete_confirm")}
+                </ha-button>
+                <ha-button
+                  class="small"
+                  appearance="plain"
+                  @click=${() => (this.confirming = undefined)}
+                >
+                  ${t("item.cancel")}
+                </ha-button>`
+            : html`<ha-icon-button
+                class="delete"
+                .label=${t("templates.delete")}
+                .path=${mdiDelete}
+                @click=${() => (this.confirming = template.id)}
+              ></ha-icon-button>`
+        }
       </td>
     </tr>`;
   }
@@ -205,6 +229,11 @@ export class TemplatesPage extends LitElement {
         </ha-button>
       </div>
     </form>`;
+  }
+
+  private async delete(template: LineItemTemplate) {
+    this.confirming = undefined;
+    await this.attempt(deleteTemplate(this.hass, template.id));
   }
 
   private onChange(template: LineItemTemplate, event: Event) {
@@ -301,6 +330,11 @@ export class TemplatesPage extends LitElement {
       }
       .actions {
         text-align: right;
+      }
+      .delete-hint {
+        max-width: 260px;
+        margin: 0 0 6px auto;
+        text-align: left;
       }
       .actions ha-icon-button {
         --ha-icon-button-size: 36px;

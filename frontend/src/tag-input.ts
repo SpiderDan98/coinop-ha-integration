@@ -27,21 +27,36 @@ export class TagInput extends LitElement {
   @property({ attribute: false }) label = "";
 
   @state() private text = "";
+  /** False once focus left the field, so the suggestions close. */
+  @state() private open = true;
+  /** The suggestion picked with the arrow keys; -1 for none. */
+  @state() private active = -1;
+
+  /** What Enter or a click can add: matching Tags, then the typed text as a new one. */
+  private options() {
+    const typed = this.text.trim();
+    if (!typed) return [];
+    const suggestions = this.catalog
+      .filter(
+        (tag) =>
+          tag.toLocaleLowerCase().includes(typed.toLocaleLowerCase()) &&
+          !this.tags.some((own) => same(own, tag)),
+      )
+      .slice(0, MAX_SUGGESTIONS)
+      .map((tag) => ({ tag, create: false }));
+    const known = [...this.catalog, ...this.tags].some((tag) => same(tag, typed));
+    return known ? suggestions : [...suggestions, { tag: typed, create: true }];
+  }
 
   override render() {
     const t = localize(this.hass);
-    const typed = this.text.trim();
-    const suggestions = typed
-      ? this.catalog
-          .filter(
-            (tag) =>
-              tag.toLocaleLowerCase().includes(typed.toLocaleLowerCase()) &&
-              !this.tags.some((own) => same(own, tag)),
-          )
-          .slice(0, MAX_SUGGESTIONS)
-      : [];
-    const known = [...this.catalog, ...this.tags].some((tag) => same(tag, typed));
-    return html`<div class="tag-input">
+    const options = this.open ? this.options() : [];
+    return html`<div
+      class="tag-input"
+      @focusout=${(event: FocusEvent) => {
+        if (!this.renderRoot.contains(event.relatedTarget as Node | null)) this.open = false;
+      }}
+    >
       <div class="row chips">
         ${this.tags.map(
           (tag) =>
@@ -56,28 +71,45 @@ export class TagInput extends LitElement {
             ></span>`,
         )}
         <input
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="suggestions"
+          aria-expanded=${options.length ? "true" : "false"}
+          aria-activedescendant=${this.active >= 0 && options[this.active] ? `option-${this.active}` : nothing}
           .value=${this.text}
           maxlength=${MAX_LENGTH}
           placeholder=${t("tags.add")}
           aria-label=${this.label || t("tags.add")}
-          @input=${(event: Event) => (this.text = (event.target as HTMLInputElement).value)}
+          @input=${(event: Event) => {
+            this.text = (event.target as HTMLInputElement).value;
+            this.open = true;
+            this.active = -1;
+          }}
+          @focus=${() => (this.open = true)}
           @keydown=${this.onKeydown}
         />
       </div>
       ${
-        suggestions.length || (typed && !known)
-          ? html`<div class="suggestions" role="listbox">
-              ${suggestions.map(
-                (tag) =>
-                  html`<button class="suggestion" @click=${() => this.add(tag)}>${tag}</button>`,
+        options.length
+          ? html`<div
+              class="suggestions"
+              id="suggestions"
+              role="listbox"
+              @mousedown=${(event: Event) => event.preventDefault()}
+            >
+              ${options.map(
+                ({ tag, create }, index) =>
+                  html`<button
+                    id="option-${index}"
+                    class="suggestion ${create ? "create" : ""} ${index === this.active ? "active" : ""}"
+                    role="option"
+                    tabindex="-1"
+                    aria-selected=${index === this.active ? "true" : "false"}
+                    @click=${() => this.add(tag)}
+                  >
+                    ${create ? t("tags.create", { tag }) : tag}
+                  </button>`,
               )}
-              ${
-                typed && !known
-                  ? html`<button class="suggestion create" @click=${() => this.add(typed)}>
-                      ${t("tags.create", { tag: typed })}
-                    </button>`
-                  : nothing
-              }
             </div>`
           : nothing
       }
@@ -85,15 +117,26 @@ export class TagInput extends LitElement {
   }
 
   private onKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
+    const options = this.options();
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!options.length) return;
       event.preventDefault();
-      this.add(this.text);
-    } else if (event.key === "Escape") this.text = "";
+      this.open = true;
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      this.active = Math.max(-1, Math.min(options.length - 1, this.active + step));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      this.add(options[this.active]?.tag ?? this.text);
+    } else if (event.key === "Escape") {
+      this.text = "";
+      this.active = -1;
+    }
   }
 
   private add(name: string) {
     const typed = name.trim();
     this.text = "";
+    this.active = -1;
     if (!typed || this.tags.some((own) => same(own, typed))) return;
     const tag = this.catalog.find((existing) => same(existing, typed)) ?? typed;
     this.change([...this.tags, tag]);
@@ -155,7 +198,7 @@ export class TagInput extends LitElement {
         cursor: pointer;
       }
       .suggestion:hover,
-      .suggestion:focus-visible {
+      .suggestion.active {
         background: var(--secondary-background-color, #ededed);
       }
       .create {

@@ -278,3 +278,44 @@ describe("Tags on a Run", () => {
     expect(chips(panel)).toEqual(["Cosplay helmet"]);
   });
 });
+
+describe("The Tag field", () => {
+  it("picks a suggestion with the arrow keys and Enter", async () => {
+    const backend = taggingBackend();
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+    const input = query(panel, ".tag-input input");
+
+    await fill(panel, input, "s");
+    await press(panel, input, "ArrowDown");
+    await press(panel, input, "ArrowDown");
+    expect(text(query(panel, ".suggestion.active"))).toBe("Spare parts");
+    await press(panel, input, "Enter");
+
+    expect(backend.sent("wattbill/runs/update").at(-1)).toMatchObject({
+      tags: ["Gift", "Spare parts"],
+    });
+  });
+
+  it("closes its suggestions when focus leaves it", async () => {
+    const panel = await mountPanel(taggingBackend(), { path: "/run/benchy" });
+    const input = query(panel, ".tag-input input");
+    await fill(panel, input, "s");
+
+    input.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
+    await settle(panel);
+
+    expect(queryAll(panel, ".suggestion")).toEqual([]);
+  });
+});
+
+describe("The Tag filter", () => {
+  it("closes on a click outside it", async () => {
+    const panel = await mountPanel(recordedBackend());
+    const details = query(panel, "details.tag-filter") as HTMLDetailsElement;
+    details.open = true;
+
+    await click(panel, query(panel, ".name-filter"));
+
+    expect(details.open).toBe(false);
+  });
+});
