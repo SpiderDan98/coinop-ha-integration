@@ -86,6 +86,19 @@
     }
   },
   "entity": {
+    "event": {
+      "run": {
+        "name": "Run",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Started",
+              "ended": "Ended"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "total_cost": {
         "name": "Total cost"
