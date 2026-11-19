@@ -50,6 +50,11 @@ module = ["pytest_homeassistant_custom_component.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# HA components re-export their API (websocket_api, http) by plain import.
+module = ["homeassistant.components.*"]
+implicit_reexport = true
+
+[[tool.mypy.overrides]]
 # Asserting a state change after an awaited call trips strict_equality's narrowing.
 module = ["tests.*"]
 strict_equality = false
