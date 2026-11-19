@@ -2,8 +2,10 @@
 // subtotals and totals arrive rounded to the currency; the panel only formats them.
 import type { HomeAssistant, Message } from "./hass";
 
-export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
-export type Kind = "electricity" | "material" | "other";
+export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
+export const KINDS = ["electricity", "material", "other"] as const;
+export type Outcome = (typeof OUTCOMES)[number];
+export type Kind = (typeof KINDS)[number];
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
@@ -188,9 +190,6 @@ export async function getGroupings<const G extends Record<string, Dimension[]>>(
     Group[]
   >;
 }
-
-export const KINDS: Kind[] = ["electricity", "material", "other"];
-export const OUTCOMES: Outcome[] = ["completed", "cancelled", "failed", "unknown"];
 
 /** All Runs first, then each change; resolves to the unsubscribe function. */
 export const subscribeRuns = (hass: HomeAssistant, onEvent: (event: RunsEvent) => void) =>
