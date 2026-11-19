@@ -9,6 +9,7 @@ from collections.abc import Callable
 from enum import StrEnum
 
 from homeassistant.core import CALLBACK_TYPE, callback
+from homeassistant.util import dt as dt_util
 
 from .cost.totals import DeviceTotals, Totals
 from .models import Run
@@ -27,7 +28,7 @@ class RunBook:
         self._runs = {run.id: run for run in runs}
         self._totals: defaultdict[str, DeviceTotals] = defaultdict(DeviceTotals)
         for run in runs:
-            self._totals[run.device_id].apply(run)
+            self._totals[run.device_id].apply(run, dt_util.utcnow())
         self._listeners: list[Callable[[RunChange, Run], None]] = []
 
     def runs(self) -> list[Run]:
@@ -64,11 +65,9 @@ class RunBook:
     async def async_finalise(self, run: Run) -> None:
         """Freeze the Run: written to runs first, then dropped from live."""
         run.finalised = True
-        self._totals[run.device_id].apply(run)
         await self._store.async_save_runs(r for r in self.runs() if r.finalised)
         await self._store.async_save_live(self._unfinalised())
-        for listener in list(self._listeners):
-            listener(RunChange.ENDED, run)
+        self._announce(RunChange.ENDED, run)
 
     async def async_rename_device(self, device_id: str, name: str) -> None:
         """Keep every Run's Device name current, so removed Devices keep their last one."""
@@ -92,7 +91,18 @@ class RunBook:
         return [run for run in self._runs.values() if not run.finalised]
 
     def _changed(self, change: RunChange, run: Run) -> None:
-        self._totals[run.device_id].apply(run)
         self._store.schedule_live_save(self._unfinalised)
+        self._announce(change, run)
+
+    def _announce(self, change: RunChange, run: Run) -> None:
+        """Move the Device's totals by this Run's delta, then tell listeners.
+
+        Any kind of change works: a Run no longer in the book leaves the totals.
+        """
+        totals = self._totals[run.device_id]
+        if run.id in self._runs:
+            totals.apply(run, dt_util.utcnow())
+        else:
+            totals.remove(run.id)
         for listener in list(self._listeners):
             listener(change, run)

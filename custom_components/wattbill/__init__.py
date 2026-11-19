@@ -11,7 +11,7 @@ from .runtime import WattBill, WattBillConfigEntry
 from .store import RunStore
 from .tracker import DeviceTracker
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.EVENT, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> bool:

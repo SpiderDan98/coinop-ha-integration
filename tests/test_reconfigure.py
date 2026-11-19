@@ -31,14 +31,22 @@ async def test_reconfigure_is_a_menu_of_the_devices_sections(
     result = await start_reconfigure(hass, entry, subentry)
 
     assert result["step_id"] == "reconfigure"
-    assert result["menu_options"] == ["status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "status",
+        "job",
+        "consumption",
+        "price",
+        "save",
+    ]
 
 
 async def test_each_section_is_pre_filled_and_returns_to_the_menu(
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
-    subentry = await add_device(hass, entry, running_power=95, price=0.31)
+    subentry = await add_device(
+        hass, entry, job="sensor.kobra_job", running_power=95, price=0.31
+    )
     menu = await start_reconfigure(hass, entry, subentry)
 
     result = await configure(hass, menu, {"next_step_id": "status"})
@@ -47,6 +55,11 @@ async def test_each_section_is_pre_filled_and_returns_to_the_menu(
     assert result["step_id"] == "mapping"
     assert suggested(result, "finished") == ["finished"]
     result = await configure(hass, result, MAPPING)
+    assert result["step_id"] == "reconfigure"
+
+    result = await configure(hass, result, {"next_step_id": "job"})
+    assert suggested(result, "entity_id") == "sensor.kobra_job"
+    result = await configure(hass, result, {"entity_id": "sensor.kobra_job"})
     assert result["step_id"] == "reconfigure"
 
     result = await configure(hass, result, {"next_step_id": "consumption"})
@@ -73,6 +86,8 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
         {"next_step_id": "status"},
         {"entity_id": "sensor.other_status", "attribute": "job_state"},
         {"running": ["on"], "ended": ["off"]},
+        {"next_step_id": "job"},
+        {"entity_id": "sensor.kobra_job", "attribute": "file_name"},
         {"next_step_id": "consumption"},
         {"next_step_id": "estimate"},
         {"running_power": 90, "paused_power": 10},
@@ -89,6 +104,7 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
     }
     assert data["mapping"]["running"] == ["on"]
     assert data["mapping"]["finished"] == []
+    assert data["job"] == {"entity_id": "sensor.kobra_job", "attribute": "file_name"}
     assert data["consumption"]["running_power"] == 90
     assert data["consumption"]["paused_power"] == 10
     assert data["price"]["value"] == 0.5

@@ -63,6 +63,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         """Each section's first step, in Add Device order."""
         return {
             "status": self.async_step_status,
+            "job": self.async_step_job,
             "consumption": self.async_step_consumption,
             "price": self.async_step_price,
         }
@@ -187,6 +188,28 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 schema, user_input or self._data.get("mapping")
             ),
             errors=errors,
+        )
+
+    async def async_step_job(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            self._data["job"] = {
+                "entity_id": user_input.get("entity_id"),
+                "attribute": user_input.get("attribute") or None,
+            }
+            return await self._section_done("job")
+        schema = vol.Schema(
+            {
+                vol.Optional("entity_id"): EntitySelector(),
+                vol.Optional("attribute"): TextSelector(),
+            }
+        )
+        return self.async_show_form(
+            step_id="job",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self._data.get("job")
+            ),
         )
 
     async def async_step_consumption(
