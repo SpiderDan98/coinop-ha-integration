@@ -6,7 +6,17 @@ Each area module lists its handlers in `COMMANDS`, built with `command.command`.
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
-from . import catalog, devices, images, line_items, materials, runs, tags, templates
+from . import (
+    aggregates,
+    catalog,
+    devices,
+    images,
+    line_items,
+    materials,
+    runs,
+    tags,
+    templates,
+)
 from .catalog import async_announce as async_announce_catalog
 from .runs import async_announce
 
@@ -17,6 +27,7 @@ __all__ = ["async_announce", "async_announce_catalog", "async_setup"]
 def async_setup(hass: HomeAssistant) -> None:
     for module in (
         runs,
+        aggregates,
         line_items,
         images,
         devices,

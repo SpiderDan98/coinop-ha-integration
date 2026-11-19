@@ -19,6 +19,7 @@ from homeassistant.helpers.dispatcher import (
 )
 from homeassistant.util import dt as dt_util
 
+from custom_components.wattbill.aggregates import run_measures
 from custom_components.wattbill.const import DOMAIN
 from custom_components.wattbill.cost.rounding import (
     currency_decimals,
@@ -26,7 +27,6 @@ from custom_components.wattbill.cost.rounding import (
     rounded_sum,
 )
 from custom_components.wattbill.cost.running_time import running_time
-from custom_components.wattbill.cost.totals import Totals, run_totals
 from custom_components.wattbill.images import image_info
 from custom_components.wattbill.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
@@ -285,26 +285,6 @@ def _end(
     _send_run(hass, connection, msg["id"], run)
 
 
-def _drop(runs: list[Run], now: datetime, decimals: int) -> dict[str, Any]:
-    """How much the Devices' sensor totals fall when these Runs go."""
-    totals = sum((run_totals(run, now) for run in runs), Totals())
-    items = [item for run in runs for item in run.line_items]
-    return {
-        "cost": float(rounded_sum((i.amount for i in items), decimals)),
-        **{
-            f"{kind}_cost": float(
-                rounded_sum((i.amount for i in items if i.kind is kind), decimals)
-            )
-            for kind in LineItemKind
-        },
-        "material_grams": totals.material_grams,
-        "energy_kwh": totals.energy_kwh,
-        "runs": totals.runs,
-        "running_hours": totals.running_hours,
-        "flagged_runs": totals.flagged_runs,
-    }
-
-
 def _deletable(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> list[Run] | None:
@@ -337,7 +317,7 @@ def _delete_preview(
     """What `delete` would take off the sensor totals, for the confirmation."""
     if (runs := _deletable(connection, msg, wattbill)) is not None:
         connection.send_result(
-            msg["id"], {"drop": _drop(runs, dt_util.utcnow(), _decimals(hass))}
+            msg["id"], {"drop": run_measures(runs, dt_util.utcnow(), _decimals(hass))}
         )
 
 
@@ -350,7 +330,7 @@ async def _delete(
 ) -> None:
     if (runs := _deletable(connection, msg, wattbill)) is None:
         return
-    drop = _drop(runs, dt_util.utcnow(), _decimals(hass))
+    drop = run_measures(runs, dt_util.utcnow(), _decimals(hass))
     await wattbill.book.async_delete(runs)
     connection.send_result(msg["id"], {"drop": drop})
 
