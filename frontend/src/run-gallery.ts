@@ -1,8 +1,12 @@
+// The Overview's image-first gallery of Runs: filters (combined with AND), one tile per
+// Run, and checkboxes to select final Runs. Filter and selection belong to the
+// Overview, which sets them from its tiles and charts too; the gallery reports changes
+// as `filter-changed` and `selection-changed` events.
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
-import type { Device, RunSummary } from "./api";
-import { formatter } from "./format";
+import { OUTCOMES, type Device, type RunSummary } from "./api";
+import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-image";
@@ -11,6 +15,41 @@ import { shared } from "./styles";
 import { sortTags, tagChip } from "./tag-input";
 
 const SHOWN_TAGS = 2;
+
+/** `outcome` is an Outcome, "open" or "failed_cancelled"; Tags match any of `tags`,
+ * or no Tag at all with `untagged`. */
+export const NO_FILTER = {
+  name: "",
+  deviceId: "",
+  month: "",
+  outcome: "",
+  flagged: false,
+  tags: [] as string[],
+  untagged: false,
+};
+
+export type Filter = typeof NO_FILTER;
+
+/** Only final Runs go into a Cost Statement or can be deleted. */
+export const selectable = (run: RunSummary) => run.finalised;
+
+export function matches(run: RunSummary, filter: Filter, t: Localize, format: Format) {
+  const outcome = run.ended === null ? "open" : (run.outcome ?? "unknown");
+  const name = filter.name.trim().toLocaleLowerCase();
+  return (
+    (!name || runName(run, t).toLocaleLowerCase().includes(name)) &&
+    (!filter.deviceId || run.device_id === filter.deviceId) &&
+    (!filter.month || format.month(run.started) === filter.month) &&
+    (!filter.outcome ||
+      (filter.outcome === "failed_cancelled"
+        ? outcome === "failed" || outcome === "cancelled"
+        : outcome === filter.outcome)) &&
+    (!filter.flagged || run.flags.length > 0) &&
+    ((!filter.tags.length && !filter.untagged) ||
+      (filter.untagged && !run.tags.length) ||
+      run.tags.some((tag) => filter.tags.includes(tag)))
+  );
+}
 
 @customElement("wattbill-run-gallery")
 export class RunGallery extends LitElement {
@@ -23,135 +62,223 @@ export class RunGallery extends LitElement {
   /** Where Run pages live, e.g. "/wattbill". */
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
+  @property({ attribute: false }) filter = NO_FILTER;
+  @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
 
-  @state() private deviceId = "";
-  /** Runs with any of these Tags pass the Tag filter, and untagged ones if `untagged`. */
-  @state() private tagFilter: string[] = [];
-  @state() private untagged = false;
-
-  private matchesTags(run: RunSummary) {
-    if (!this.tagFilter.length && !this.untagged) return true;
-    return (
-      (this.untagged && !run.tags.length) || run.tags.some((tag) => this.tagFilter.includes(tag))
+  private setFilter(changes: Partial<Filter>) {
+    this.dispatchEvent(
+      new CustomEvent("filter-changed", { detail: { ...this.filter, ...changes } }),
     );
+  }
+
+  private select(selected: Set<string>) {
+    this.dispatchEvent(new CustomEvent("selection-changed", { detail: selected }));
+  }
+
+  private toggle(run: RunSummary, on: boolean) {
+    const selected = new Set(this.selected);
+    if (on) selected.add(run.id);
+    else selected.delete(run.id);
+    this.select(selected);
+  }
+
+  /** Selects every final Run the filter shows, or clears them if all are selected. */
+  private selectAll(runs: RunSummary[]) {
+    const ids = runs.filter(selectable).map((run) => run.id);
+    const selected = new Set(this.selected);
+    const all = ids.every((id) => selected.has(id));
+    for (const id of ids) {
+      if (all) selected.delete(id);
+      else selected.add(id);
+    }
+    this.select(selected);
+  }
+
+  // Options are rendered after their select, so an option added in this render (a month
+  // picked in the chart) can only be chosen once it exists.
+  protected override updated() {
+    const values = {
+      ".device-filter": this.filter.deviceId,
+      ".month-filter": this.filter.month,
+      ".outcome-filter": this.filter.outcome,
+    };
+    for (const [selector, value] of Object.entries(values)) {
+      const select = this.renderRoot.querySelector<HTMLSelectElement>(selector);
+      if (select) select.value = value;
+    }
   }
 
   override render() {
     const t = localize(this.hass);
     const format = formatter(this.hass);
     const all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
-    const runs = all.filter(
-      (run) => (!this.deviceId || run.device_id === this.deviceId) && this.matchesTags(run),
-    );
+    const runs = all.filter((run) => matches(run, this.filter, t, format));
     const total = runs.reduce((sum, run) => sum + run.total, 0);
     return html`
       <div class="head">
         <h2>${t("runs.title")}</h2>
         <span class="muted">${runs.length} · ${format.money(total)}</span>
       </div>
-      ${all.length ? this.renderFilters(all, t) : ""}
+      ${all.length ? this.renderFilters(all, runs, t, format) : ""}
       ${
         runs.length
           ? html`<div class="gallery">
               ${repeat(
                 runs,
                 (run) => run.id,
-                (run) => html`
-                  <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
-                    <div class="image">
-                      <wattbill-run-image
-                        .hass=${this.hass}
-                        .src=${run.cover?.tile_url}
-                      ></wattbill-run-image>
-                      ${
-                        run.flags.length
-                          ? html`<span class="tile-flags">⚑ ${run.flags.length}</span>`
-                          : nothing
-                      }
-                    </div>
-                    <div class="body">
-                      <div class="strong ellipsis">${runName(run, t)}</div>
-                      <div class="muted small">
-                        ${deviceName(run, this.devices, t)} · ${format.date(run.started)} ·
-                        ${format.duration(run.running_seconds)}
-                      </div>
-                      <div class="row between">
-                        ${outcomeChip(run, t)}<b>${format.money(run.total)}</b>
-                      </div>
-                      ${
-                        run.part_count > 1
-                          ? html`<div class="muted small">
-                              ${t("run.per_part", {
-                                amount: format.money(run.cost_per_part),
-                                count: run.part_count,
-                              })}
-                            </div>`
-                          : nothing
-                      }
-                      ${
-                        run.tags.length
-                          ? html`<div class="tags">
-                              ${run.tags.slice(0, SHOWN_TAGS).map(tagChip)}
-                              ${
-                                run.tags.length > SHOWN_TAGS
-                                  ? html`<span class="more-tags muted small"
-                                      >${`+${run.tags.length - SHOWN_TAGS}`}</span
-                                    >`
-                                  : nothing
-                              }
-                            </div>`
-                          : nothing
-                      }
-                    </div>
-                  </a>
-                `,
+                (run) => this.renderTile(run, t, format),
               )}
             </div>`
-          : html`<p class="muted empty">${t("runs.empty")}</p>`
+          : html`<p class="muted empty">${t(all.length ? "runs.no_match" : "runs.empty")}</p>`
       }
     `;
   }
 
-  private renderFilters(runs: RunSummary[], t: Localize) {
+  private renderTile(run: RunSummary, t: Localize, format: Format) {
+    const selected = this.selected.has(run.id);
+    return html`<div class="pick-tile ${selected ? "selected" : ""}">
+      <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
+        <div class="image">
+          <wattbill-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></wattbill-run-image>
+          ${run.flags.length ? html`<span class="tile-flags">⚑ ${run.flags.length}</span>` : nothing}
+        </div>
+        <div class="body">
+          <div class="strong ellipsis">${runName(run, t)}</div>
+          <div class="muted small">
+            ${deviceName(run, this.devices, t)} · ${format.date(run.started)} ·
+            ${format.duration(run.running_seconds)}
+          </div>
+          <div class="row between">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
+          ${
+            run.part_count > 1
+              ? html`<div class="muted small">
+                  ${t("run.per_part", {
+                    amount: format.money(run.cost_per_part),
+                    count: run.part_count,
+                  })}
+                </div>`
+              : nothing
+          }
+          ${
+            run.tags.length
+              ? html`<div class="tags">
+                  ${run.tags.slice(0, SHOWN_TAGS).map(tagChip)}
+                  ${
+                    run.tags.length > SHOWN_TAGS
+                      ? html`<span class="more-tags muted small"
+                          >${`+${run.tags.length - SHOWN_TAGS}`}</span
+                        >`
+                      : nothing
+                  }
+                </div>`
+              : nothing
+          }
+        </div>
+      </a>
+      ${
+        selectable(run)
+          ? html`<input
+              type="checkbox"
+              class="pick"
+              aria-label=${t("runs.select", { name: runName(run, t) })}
+              .checked=${selected}
+              @change=${(event: Event) =>
+                this.toggle(run, (event.target as HTMLInputElement).checked)}
+            />`
+          : nothing
+      }
+    </div>`;
+  }
+
+  private renderFilters(runs: RunSummary[], shown: RunSummary[], t: Localize, format: Format) {
     const devices = new Map(this.devices?.map((device) => [device.id, device.name]));
     for (const run of runs) {
       if (!devices.has(run.device_id)) devices.set(run.device_id, deviceName(run, this.devices, t));
     }
+    const months = [
+      ...new Set([this.filter.month, ...runs.map((run) => format.month(run.started))]),
+    ]
+      .filter(Boolean)
+      .sort()
+      .reverse();
+    const outcomes = ["open" as const, ...OUTCOMES];
+    const value = (event: Event) => (event.target as HTMLInputElement | HTMLSelectElement).value;
     return html`<div class="filters row">
+      <input
+        type="search"
+        class="name-filter"
+        placeholder=${t("runs.search")}
+        aria-label=${t("runs.search")}
+        .value=${this.filter.name}
+        @input=${(event: Event) => this.setFilter({ name: value(event) })}
+      />
       <select
         class="device-filter"
         aria-label=${t("runs.filter_device")}
-        @change=${(event: Event) => (this.deviceId = (event.target as HTMLSelectElement).value)}
+        @change=${(event: Event) => this.setFilter({ deviceId: value(event) })}
       >
         <option value="">${t("runs.all_devices")}</option>
-        ${[...devices].map(
-          ([id, name]) =>
-            html`<option value=${id} ?selected=${id === this.deviceId}>${name}</option>`,
+        ${[...devices].map(([id, name]) => html`<option value=${id}>${name}</option>`)}
+      </select>
+      <select
+        class="month-filter"
+        aria-label=${t("runs.filter_month")}
+        @change=${(event: Event) => this.setFilter({ month: value(event) })}
+      >
+        <option value="">${t("runs.all_months")}</option>
+        ${months.map((month) => html`<option value=${month}>${format.monthName(month)}</option>`)}
+      </select>
+      <select
+        class="outcome-filter"
+        aria-label=${t("runs.filter_outcome")}
+        @change=${(event: Event) => this.setFilter({ outcome: value(event) })}
+      >
+        <option value="">${t("runs.any_outcome")}</option>
+        ${outcomes.map(
+          (outcome) => html`<option value=${outcome}>${t(`outcome.${outcome}`)}</option>`,
         )}
+        <option value="failed_cancelled">${t("runs.failed_cancelled")}</option>
       </select>
       ${this.renderTagFilter(runs, t)}
+      <label class="flagged-filter">
+        <input
+          type="checkbox"
+          .checked=${this.filter.flagged}
+          @change=${(event: Event) =>
+            this.setFilter({ flagged: (event.target as HTMLInputElement).checked })}
+        />⚑ ${t("runs.flagged_only")}
+      </label>
+      ${
+        shown.some(selectable)
+          ? html`<button class="btn small select-all" @click=${() => this.selectAll(shown)}>
+              ${t("runs.select_all")}
+            </button>`
+          : nothing
+      }
     </div>`;
   }
 
   private renderTagFilter(runs: RunSummary[], t: Localize) {
     const tags = sortTags([...new Set([...this.tags, ...runs.flatMap((run) => run.tags)])]);
     const chosen = [
-      ...(this.untagged ? [t("runs.no_tag")] : []),
-      ...tags.filter((tag) => this.tagFilter.includes(tag)),
+      ...(this.filter.untagged ? [t("runs.no_tag")] : []),
+      ...tags.filter((tag) => this.filter.tags.includes(tag)),
     ];
     const toggle = (event: Event) => {
       const box = event.target as HTMLInputElement;
-      if (box.classList.contains("no-tag")) this.untagged = box.checked;
+      if (box.classList.contains("no-tag")) this.setFilter({ untagged: box.checked });
       else
-        this.tagFilter = box.checked
-          ? [...this.tagFilter, box.value]
-          : this.tagFilter.filter((tag) => tag !== box.value);
+        this.setFilter({
+          tags: box.checked
+            ? [...this.filter.tags, box.value]
+            : this.filter.tags.filter((tag) => tag !== box.value),
+        });
     };
     return html`<details class="tag-filter" aria-label=${t("runs.filter_tags")}>
       <summary>${chosen.length ? chosen.join(", ") : t("runs.all_tags")}</summary>
       <div class="options" @change=${toggle}>
         <label
-          ><input type="checkbox" class="no-tag" .checked=${this.untagged} />${t(
+          ><input type="checkbox" class="no-tag" .checked=${this.filter.untagged} />${t(
             "runs.no_tag",
           )}</label
         >
@@ -161,7 +288,7 @@ export class RunGallery extends LitElement {
               ><input
                 type="checkbox"
                 .value=${tag}
-                .checked=${this.tagFilter.includes(tag)}
+                .checked=${this.filter.tags.includes(tag)}
               />${tag}</label
             >`,
         )}
@@ -178,11 +305,16 @@ export class RunGallery extends LitElement {
         gap: 8px;
         margin: 8px 0 12px;
       }
+      .select-all {
+        margin-left: auto;
+      }
       .filters {
         margin-bottom: 12px;
       }
+      input[type="search"],
       select,
-      .tag-filter summary {
+      .tag-filter summary,
+      .flagged-filter {
         font: inherit;
         color: inherit;
         background: var(--card-background-color, #fff);
@@ -190,6 +322,16 @@ export class RunGallery extends LitElement {
         border-radius: 6px;
         padding: 6px 8px;
         max-width: 100%;
+        box-sizing: border-box;
+      }
+      .flagged-filter {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      :host([narrow]) .name-filter {
+        width: 100%;
       }
       .tag-filter {
         position: relative;
@@ -238,6 +380,23 @@ export class RunGallery extends LitElement {
       }
       :host([narrow]) .gallery {
         grid-template-columns: 1fr;
+      }
+      .pick-tile {
+        position: relative;
+        border-radius: 12px;
+      }
+      .pick-tile.selected {
+        outline: 3px solid var(--primary-color);
+      }
+      .pick {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        cursor: pointer;
+        accent-color: var(--primary-color);
       }
       .tile {
         display: block;

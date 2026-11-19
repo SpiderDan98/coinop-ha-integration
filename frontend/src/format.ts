@@ -46,7 +46,22 @@ export function formatter(hass: HomeAssistant) {
     return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
   };
   const zoneOffset = (time: number) => Date.parse(`${wallClock(time)}Z`) - (time - (time % 60000));
+  // Month keys name a calendar month, so they are formatted as UTC dates.
+  const monthName = new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const monthShort = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
+  const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
   return {
+    /** "YYYY-MM" of `iso` in HA's time zone, as the backend groups months. */
+    month: (iso: string) => wallClock(Date.parse(iso)).slice(0, 7),
+    /** "January 2026" for "2026-01". */
+    monthName: (month: string) => monthName.format(new Date(`${month}-01T00:00Z`)),
+    /** "Jan" for "2026-01". */
+    monthShort: (month: string) => monthShort.format(new Date(`${month}-01T00:00Z`)),
+    percent: (share: number) => percent.format(share),
     /** A `datetime-local` input's value, in HA's time zone. */
     toInput: (iso: string) => wallClock(Date.parse(iso)),
     /** The ISO time a `datetime-local` value means in HA's time zone, if it is one. */
