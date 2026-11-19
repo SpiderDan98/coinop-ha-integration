@@ -28,6 +28,10 @@ _Avoid_: Job, session, cycle, print
 How a Run ended: Completed, Cancelled, Failed or Unknown; a Run still going has no Outcome yet.
 _Avoid_: Result, status (for the ending)
 
+**Flag**:
+A marker on a Run pointing out something the user may want to check, such as a reported fault or a gap in price or consumption data.
+_Avoid_: Warning, error, notice
+
 **Line Item**:
 One cost line on a Run, such as electricity, filament, or inserting threaded inserts.
 _Avoid_: Position, entry, cost line
