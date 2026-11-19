@@ -46,4 +46,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: WattBillConfigEntry) ->
 
 
 async def _async_reload(hass: HomeAssistant, entry: WattBillConfigEntry) -> None:
+    runtime = entry.runtime_data
+    for device, tracker in zip(runtime.devices, runtime.trackers, strict=True):
+        if device.device_id not in entry.subentries:
+            await tracker.async_end_run()
     await hass.config_entries.async_reload(entry.entry_id)

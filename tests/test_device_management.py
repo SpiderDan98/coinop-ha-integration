@@ -2,12 +2,15 @@
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import pytest
 
 from .clock import Clock
 from .devices import add_device, add_hub, add_printer
-from .test_runs import TOTAL_COST, set_status, stored_runs
+from .test_persistence import live_runs, restart
+from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
 
 def wattbill_device(hass: HomeAssistant, entity_id: str = TOTAL_COST) -> dr.DeviceEntry:
@@ -77,3 +80,80 @@ async def test_runs_carry_the_devices_new_name(
         "Workshop Kobra",
         "Workshop Kobra",
     ]
+
+
+async def remove(
+    hass: HomeAssistant, entry: ConfigEntry, device: ConfigSubentry
+) -> None:
+    assert hass.config_entries.async_remove_subentry(entry, device.subentry_id)
+    await hass.async_block_till_done()
+
+
+async def test_removing_a_device_ends_its_open_run_as_unknown(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, running_power=100, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await remove(hass, entry, kobra)
+
+    [run] = stored_runs(hass_storage)
+    assert run["outcome"] == "unknown"
+    assert run["ended"] == clock.now().isoformat()
+    assert run["line_items"][0]["amount"] == pytest.approx(0.1)
+    assert live_runs(hass_storage) == []
+
+
+async def test_removing_a_device_removes_its_ha_device_and_entities(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_printer(hass)
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, printer=printer.id)
+    device_id = wattbill_device(hass).id
+
+    await remove(hass, entry, kobra)
+
+    assert dr.async_get(hass).async_get(device_id) is None
+    assert dr.async_get(hass).async_get(printer.id) is not None
+    assert er.async_get(hass).async_get(TOTAL_COST) is None
+    assert hass.states.get(TOTAL_COST) is None
+
+
+async def test_a_removed_devices_runs_are_kept_under_its_last_name(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry)
+    await set_status(hass, "printing")
+    await set_status(hass, "finished")
+    await rename(hass, "Workshop Kobra")
+
+    await remove(hass, entry, kobra)
+    await restart(hass, entry)
+
+    [run] = stored_runs(hass_storage)
+    assert run["device_id"] == kobra.subentry_id
+    assert run["device_name"] == "Workshop Kobra"
+
+
+async def test_re_adding_the_same_printer_creates_a_new_unlinked_device(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    printer = add_printer(hass)
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, printer=printer.id, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await remove(hass, entry, kobra)
+
+    again = await add_device(hass, entry, printer=printer.id)
+
+    assert again.subentry_id != kobra.subentry_id
+    assert value(hass, RUNS) == 0
+    assert value(hass, TOTAL_COST) == 0
+    [run] = stored_runs(hass_storage)
+    assert run["device_id"] == kobra.subentry_id
