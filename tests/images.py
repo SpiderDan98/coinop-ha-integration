@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
-from PIL import ExifTags, Image
+from PIL import ExifTags, Image, ImageCms
 from pytest_homeassistant_custom_component.common import MockPlatform, mock_platform
 
 THUMBNAIL = "image.kobra_thumbnail"
@@ -33,9 +33,10 @@ def picture(
     }
     if orientation is not None:
         exif[ExifTags.Base.Orientation] = orientation
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
     buffer = BytesIO()
     Image.new("RGB", size, COLOURS[colour]).save(
-        buffer, image_format, exif=exif.tobytes()
+        buffer, image_format, exif=exif.tobytes(), icc_profile=icc
     )
     return buffer.getvalue()
 

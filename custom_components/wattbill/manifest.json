@@ -1,7 +1,7 @@
 {
   "domain": "wattbill",
   "name": "WattBill",
-  "after_dependencies": ["frontend", "panel_custom"],
+  "after_dependencies": ["camera", "frontend", "image", "panel_custom"],
   "categories": ["energy.meters_monitoring", "computers_network.printers"],
   "codeowners": ["@SpiderDan98"],
   "config_flow": true,
@@ -10,7 +10,7 @@
   "integration_type": "hub",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/SpiderDan98/wattbill-ha-integration/issues",
-  "requirements": ["fpdf2==2.9.0"],
+  "requirements": ["fpdf2==2.9.0", "Pillow>=12.0.0"],
   "single_config_entry": true,
   "version": "0.0.0"
 }
