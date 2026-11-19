@@ -9,10 +9,10 @@
 
 ### Backend modules
 
-- `config_flow.py`: the hub entry; `device_flow.py`: the Add Device subentry flow, one step per section of the Device's data (`status`, `mapping`, `consumption`, `price`). `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
+- `config_flow.py`: the hub entry; `device_flow.py`: the Add Device subentry flow, one step per section of the Device's data (`status`, `mapping`, `job`, `consumption`, `price`). `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
 - `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`).
 - `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `totals.py` (per-Device totals advanced by deltas).
-- `tracker.py`: the Run engine for one Device (Status input → open / end Run, live refresh every minute, finalisation).
+- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
 - `store.py`: the `runs` and `live` Stores. `sensor.py`: per-Device entities.
 

@@ -10,7 +10,7 @@ import pytest
 
 from .clock import CLOCK_START, Clock
 from .devices import MAPPING, add_device, add_hub
-from .test_runs import RUNS, set_status, stored_runs, value
+from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
 WITH_FAULT = MAPPING | {"fault": ["error"]}
 PRINT_EVENT = "event.kobra_print"
@@ -372,3 +372,60 @@ async def test_a_paused_print_with_another_job_closes_including_its_pause(
     assert benchy["ended"] == at(hours=2)
     assert benchy["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
     assert kwh(benchy) == pytest.approx(0.11)
+
+
+async def test_runs_have_no_minimum_duration(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+
+    await set_status(hass, "printing")
+    await clock.advance(seconds=1)
+    await set_status(hass, "cancelled")
+
+    [run] = stored_runs(hass_storage)
+    assert run["ended"] == at(seconds=1)
+
+
+async def test_runs_have_no_timeout(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, running_power=100)
+
+    await set_status(hass, "printing")
+    for _ in range(3 * 24):
+        await clock.advance(hours=1)
+    assert "wattbill.runs" not in hass_storage
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["ended"] == at(days=3)
+    assert kwh(run) == pytest.approx(7.2)
+
+
+async def test_every_run_books_its_full_consumption_whatever_its_outcome(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, mapping=WITH_FAULT, running_power=100, price=1)
+
+    for ending in ("finished", "cancelled", "idle"):
+        await set_status(hass, "printing")
+        await clock.advance(hours=1)
+        await set_status(hass, ending)
+    await set_status(hass, "printing")
+    await set_status(hass, "error")
+    await clock.advance(hours=1)
+    await set_status(hass, "cancelled")
+
+    runs = stored_runs(hass_storage)
+    assert [run["outcome"] for run in runs] == [
+        "completed",
+        "cancelled",
+        "unknown",
+        "failed",
+    ]
+    assert [kwh(run) for run in runs] == pytest.approx([0.1] * 4)
+    assert value(hass, TOTAL_COST) == pytest.approx(0.4)

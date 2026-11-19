@@ -106,7 +106,12 @@ class DeviceTracker:
                 outcome = Outcome.FAILED
             run.end_reconstructed = returned
             self._end(run, at, outcome)
-            return
+        else:
+            self._continue(run, target, at, job_name)
+
+    def _continue(
+        self, run: Run, target: Target, at: datetime, job_name: str | None
+    ) -> None:
         run.last_seen = max(run.last_seen or run.started, at)
         if target in (Target.PAUSED, Target.FAULT):
             if target is Target.FAULT and Flag.FAULT not in run.flags:
