@@ -1,7 +1,7 @@
 """Run images on disk and on their Run, kept in step.
 
 Files live in `<files_path>/images/<run id>/<image id>.webp` (and `.tile.webp`).
-A Run's file folder goes when the Run leaves the RunBook; files no Run refers
+A Run's file folder goes when the Run is deleted; files no Run refers
 to are removed at startup.
 """
 
