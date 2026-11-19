@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -9,13 +11,17 @@ from .clock import Clock
 from .devices import add_device, add_hub, configure, start_reconfigure
 from .stored import place_materials, stored_material
 from .test_device_flow import suggested
+from .test_lifecycle import start_wattbill, stop_wattbill
 from .test_material_usage import (
     GRAMS_PER_METRE,
+    MATERIAL_USED,
+    PETG,
+    PETG_GRAMS_PER_METRE,
     add_measuring_device,
     material_items,
     set_usage,
 )
-from .test_runs import set_status, stored_runs
+from .test_runs import set_status, stored_runs, value
 from .websocket import PanelClient
 
 SLOTS = [f"sensor.ace_slot_{number}" for number in range(1, 5)]
@@ -38,9 +44,9 @@ async def fill(
 
 async def add_ace_device(
     hass: HomeAssistant, panel: PanelClient, *, default: str | None = "pla"
-) -> None:
+) -> ConfigEntry:
     """A measuring Device with a four-Slot unit whose colour attribute is color_hex."""
-    await add_measuring_device(
+    return await add_measuring_device(
         hass,
         panel,
         default=default,
@@ -198,4 +204,159 @@ async def test_a_loaded_slot_outside_the_slots_is_no_slot(
     [run] = stored_runs(hass_storage)
     [item] = material_items(run)
     assert (item["material_id"], item["slots"]) == ("pla", [])
+    assert run["flags"] == []
+
+
+async def split_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> dict[str, Any]:
+    """1 m printed: 40 running minutes from a PETG Slot, 60 from a red PLA one."""
+    place_materials(
+        hass_storage, stored_material("pla"), RED_PLA, PETG | {"default_for_type": True}
+    )
+    await fill(hass, 1, "PETG", "#000000")
+    await fill(hass, 2, "PLA", "#ff0000")
+    await fill(hass, 3, "PLA", "#ffffff")
+    await load(hass, 1)
+    await add_ace_device(hass, panel)
+
+    await set_status(hass, "printing")
+    await clock.advance(minutes=20)
+    await set_status(hass, "paused")
+    await clock.advance(minutes=10)
+    # Only loaded while paused: it printed nothing.
+    await load(hass, 3)
+    await clock.advance(minutes=10)
+    await load(hass, 2)
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=60)
+    await load(hass, 1)
+    await clock.advance(minutes=20)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    detail: dict[str, Any] = (await panel.call("wattbill/runs/get", run_id=run["id"]))[
+        "run"
+    ]
+    return detail
+
+
+async def test_several_slots_split_the_measured_total_by_running_time(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run = await split_run(hass, clock, panel, hass_storage)
+
+    petg, red = material_items(run)
+    assert (petg["material_id"], petg["share"], petg["length"]) == (
+        "petg",
+        pytest.approx(0.4),
+        pytest.approx(400),
+    )
+    assert petg["quantity"] == pytest.approx(0.4 * PETG_GRAMS_PER_METRE)
+    assert evidence(petg) == [(1, "PETG", "#000000")]
+    assert (red["material_id"], red["share"], red["length"]) == (
+        "red-pla",
+        pytest.approx(0.6),
+        pytest.approx(600),
+    )
+    assert evidence(red) == [(2, "PLA", "#ff0000")]
+    assert run["flags"] == ["estimated_split"]
+    assert run["usage"]["value"] == 1000
+    assert value(hass, MATERIAL_USED) == pytest.approx(
+        0.4 * PETG_GRAMS_PER_METRE + 0.6 * GRAMS_PER_METRE
+    )
+
+
+async def test_slots_holding_the_same_material_make_one_line_item(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"))
+    await fill(hass, 1, "PLA", "#000000")
+    await fill(hass, 2, "PLA", "#ffffff")
+    await load(hass, 1)
+    await add_ace_device(hass, panel)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await load(hass, 2)
+
+    await clock.advance(minutes=30)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert (item["material_id"], item["share"], item["length"]) == ("pla", None, 1000)
+    assert evidence(item) == [(1, "PLA", "#000000"), (2, "PLA", "#ffffff")]
+    assert run["flags"] == ["slot_fallback"]
+
+
+async def test_split_line_items_are_corrected_independently(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run = await split_run(hass, clock, panel, hass_storage)
+    petg, red = material_items(run)
+
+    result = await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=red["id"],
+        quantity=1,
+    )
+
+    after_petg, after_red = material_items(result["run"])
+    assert after_petg == petg
+    assert after_red["quantity"] == 1
+    assert after_red["computed"]["quantity"] == pytest.approx(0.6 * GRAMS_PER_METRE)
+    assert result["run"]["usage"] == run["usage"]
+
+
+async def test_the_loaded_slots_survive_a_restart(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"), RED_PLA)
+    await fill(hass, 1, "PLA", "#ff0000")
+    await fill(hass, 2, "ASA")
+    await load(hass, 1)
+    entry = await add_ace_device(hass, panel)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=45)
+    await stop_wattbill(hass, entry)
+
+    await load(hass, 2)
+    await clock.advance(minutes=1)
+    await start_wattbill(hass, entry)
+    await clock.advance(minutes=14)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    red, fallback = material_items(run)
+    assert (red["material_id"], red["share"]) == ("red-pla", pytest.approx(0.75))
+    assert (fallback["material_id"], fallback["share"]) == ("pla", pytest.approx(0.25))
+    assert run["flags"] == ["estimated_split", "slot_fallback"]
+    assert run["loaded_slots"] == []
+
+
+async def test_a_slot_without_a_report_yet_counts_from_its_first_one(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"), RED_PLA)
+    await fill(hass, 2, STATE_UNAVAILABLE)
+    await load(hass, 2)
+    await add_ace_device(hass, panel)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await fill(hass, 2, "PLA", "#FF0000")
+    await clock.advance(minutes=10)
+    await fill(hass, 2, STATE_UNAVAILABLE)
+    await load(hass, STATE_UNAVAILABLE)
+
+    await clock.advance(minutes=20)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert (item["material_id"], item["share"]) == ("red-pla", None)
     assert run["flags"] == []

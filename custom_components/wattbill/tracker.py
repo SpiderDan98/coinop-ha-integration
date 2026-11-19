@@ -149,7 +149,7 @@ class DeviceTracker:
                 )
             )
         if run := self._book.open_run(self._config.device_id):
-            self._record_slot(run, dt_util.utcnow())
+            self._record_slot(run)
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
@@ -301,12 +301,12 @@ class DeviceTracker:
     @callback
     def _on_slot(self, event: Event[EventStateChangedData]) -> None:
         if (run := self._book.open_run(self._config.device_id)) and self._record_slot(
-            run, dt_util.utcnow()
+            run
         ):
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
-    def _record_slot(self, run: Run, at: datetime) -> bool:
+    def _record_slot(self, run: Run) -> bool:
         """Note a change of the loaded Slot or its report; whether there was one.
 
         While the Loaded slot input or the loaded Slot's entity has no value, the
@@ -314,11 +314,15 @@ class DeviceTracker:
         """
         if (entity_id := self._config.loaded_slot_entity_id) is None:
             return False
-        value = input_value(self._hass.states.get(entity_id), None)
-        if value is None:
+        loaded_state = self._hass.states.get(entity_id)
+        if (value := input_value(loaded_state, None)) is None:
             return False
+        assert loaded_state is not None
+        at = loaded_state.last_changed
         slot: SlotReport | None = None
         slots = self._config.slots
+        loaded = run.loaded_slots
+        previous = loaded[-1].slot if loaded else None
         if number := slot_number(value, len(slots)):
             state = self._hass.states.get(slots[number - 1])
             if (material_type := input_value(state, None)) is None:
@@ -330,8 +334,10 @@ class DeviceTracker:
                 material_type,
                 slot_colour(state.attributes.get(colour)) if colour else None,
             )
-        loaded = run.loaded_slots
-        if loaded and loaded[-1].slot == slot:
+            if previous and previous.number == number:
+                # The same Slot, refilled.
+                at = state.last_updated
+        if loaded and previous == slot:
             return False
         loaded.append(
             LoadedSlot(max(at, loaded[-1].since) if loaded else run.started, slot)
@@ -480,7 +486,7 @@ class DeviceTracker:
             self._record(run, self._hass.states.get(meter["entity_id"]))
         self._follow_average_power(run, at)
         self._record_usage(run, self._usage_state())
-        self._record_slot(run, at)
+        self._record_slot(run)
         self._open_prices(run, at)
         self._refresh(run, at)
         add_templates(
