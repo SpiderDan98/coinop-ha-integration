@@ -98,9 +98,9 @@ class LineItem:
     output language. Material Line Items reference their Material by
     `material_id`, which keeps it from being deleted. A Line Item copied from a
     Line Item Template keeps only `template_id` as its origin and the template's
-    `basis`; with running hours WattBill computes its quantity. Quantity, unit price and
-    amount are what counts; once the user overrides a computed one, `computed`
-    keeps what WattBill computed.
+    `basis`; with running hours WattBill computes its quantity. Quantity, unit
+    price and amount are what counts; once the user overrides a computed one,
+    `computed` keeps what WattBill computed.
     """
 
     id: str

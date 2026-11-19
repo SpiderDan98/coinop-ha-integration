@@ -363,6 +363,23 @@ async def test_automatic_templates_are_added_at_run_start_and_count_live(
     ]
 
 
+async def test_running_hours_keep_counting_after_a_restart(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, running_power=100, price=1)
+    await set_automatic(panel, kobra, await create(panel, **WEAR))
+    await set_status(hass, "printing")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    await clock.advance(minutes=30)
+
+    await restart(hass, entry)
+    await clock.advance(minutes=30)
+
+    wear = await wear_of(panel, run["id"])
+    assert (wear["quantity"], wear["locked"]) == (pytest.approx(1), True)
+
+
 async def test_changing_automatic_templates_affects_only_future_runs(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
