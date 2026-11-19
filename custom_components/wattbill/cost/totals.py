@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, fields
 
-from custom_components.wattbill.models import Run
+from custom_components.wattbill.models import LineItemKind, Run
 
 
 @dataclass(frozen=True)
@@ -10,6 +10,10 @@ class Totals:
     """What a Run (or a sum of Runs) contributes to its Device's total sensors."""
 
     cost: float = 0.0
+    electricity_cost: float = 0.0
+    material_cost: float = 0.0
+    other_cost: float = 0.0
+    material_grams: float = 0.0
     energy_kwh: float = 0.0
     runs: int = 0
 
@@ -24,9 +28,21 @@ class Totals:
         )
 
 
+def _amount(run: Run, kind: LineItemKind) -> float:
+    return sum(item.amount for item in run.line_items if item.kind is kind)
+
+
 def run_totals(run: Run) -> Totals:
     return Totals(
         cost=sum(item.amount for item in run.line_items),
+        electricity_cost=_amount(run, LineItemKind.ELECTRICITY),
+        material_cost=_amount(run, LineItemKind.MATERIAL),
+        other_cost=_amount(run, LineItemKind.OTHER),
+        material_grams=sum(
+            item.quantity or 0.0
+            for item in run.line_items
+            if item.kind is LineItemKind.MATERIAL
+        ),
         energy_kwh=run.electricity.quantity or 0.0,
         runs=1,
     )

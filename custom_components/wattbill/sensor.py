@@ -6,6 +6,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.const import UnitOfEnergy, UnitOfMass
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -16,14 +17,38 @@ from .models import Run
 from .run_book import RunBook, RunChange
 from .runtime import WattBillConfigEntry
 
-# Each key names the `Totals` field the sensor shows.
-TOTALS = (
-    SensorEntityDescription(
-        key="cost",
-        translation_key="total_cost",
+
+def _cost(key: str, translation_key: str) -> SensorEntityDescription:
+    return SensorEntityDescription(
+        key=key,
+        translation_key=translation_key,
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
+    )
+
+
+# Each key names the `Totals` field the sensor shows.
+TOTALS = (
+    _cost("cost", "total_cost"),
+    _cost("electricity_cost", "electricity_cost"),
+    _cost("material_cost", "material_cost"),
+    _cost("other_cost", "other_cost"),
+    SensorEntityDescription(
+        key="material_grams",
+        translation_key="material_used",
+        device_class=SensorDeviceClass.WEIGHT,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfMass.GRAMS,
+        suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="energy_kwh",
+        translation_key="energy_in_runs",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=3,
     ),
     SensorEntityDescription(
         key="runs", translation_key="runs", state_class=SensorStateClass.TOTAL
