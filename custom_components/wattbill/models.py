@@ -20,6 +20,8 @@ class Outcome(StrEnum):
 
 class Flag(StrEnum):
     FAULT = "fault"
+    CONSUMPTION_GAP = "consumption_gap"
+    METER_RESET = "meter_reset"
 
 
 class LineItemKind(StrEnum):
@@ -142,6 +144,9 @@ class Run:
     WattBill only learnt about after the Status input or WattBill itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
     `last_seen` is the last time the Status input was seen during the open Run.
+    `consumption` is the Device's consumption section when the Run started;
+    `readings` are its meter's (time, kWh or W) reports, None while it had no
+    value, kept until finalised.
     """
 
     id: str
@@ -159,6 +164,8 @@ class Run:
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
     part_count: int = 1
+    consumption: dict[str, Any] | None = None
+    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -184,6 +191,8 @@ class Run:
             ],
             "flags": list(self.flags),
             "part_count": self.part_count,
+            "consumption": self.consumption,
+            "readings": [[at.isoformat(), value] for at, value in self.readings],
             "line_items": [item.as_dict() for item in self.line_items],
         }
 
@@ -207,6 +216,11 @@ class Run:
             ],
             flags=list(data["flags"]),
             part_count=data["part_count"],
+            consumption=data.get("consumption"),
+            readings=[
+                (datetime.fromisoformat(at), value)
+                for at, value in data.get("readings", [])
+            ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             unknown=_unknown(cls, data),
         )

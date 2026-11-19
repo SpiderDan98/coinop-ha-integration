@@ -21,9 +21,18 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import SUBENTRY_DEVICE
-from .device_config import ENDING_TARGETS, Target
-from .device_inputs import offered_values
+from .device_config import ENDING_TARGETS, ConsumptionSource, Target
+from .device_inputs import entity_unit, offered_values, unit_scale
 from .schema import vol
+
+# Offered when a meter attribute is picked, which has no unit of its own.
+ATTRIBUTE_UNITS = {
+    ConsumptionSource.ENERGY: ["Wh", "kWh", "MWh"],
+    ConsumptionSource.POWER: ["W", "kW"],
+}
+FACTOR = NumberSelector(
+    NumberSelectorConfig(min=0, step="any", mode=NumberSelectorMode.BOX)
+)
 
 
 def _watts(minimum: float) -> NumberSelector:
@@ -58,6 +67,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._name = ""
+        # The consumption section while its unit is still being asked for.
+        self._meter: dict[str, Any] = {}
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
         """Each section's first step, in Add Device order."""
@@ -215,7 +226,110 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_consumption(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        return self.async_show_menu(step_id="consumption", menu_options=["estimate"])
+        return self.async_show_menu(
+            step_id="consumption", menu_options=[s.value for s in ConsumptionSource]
+        )
+
+    async def async_step_energy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_meter_step(ConsumptionSource.ENERGY, user_input)
+
+    async def async_step_power(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_meter_step(ConsumptionSource.POWER, user_input)
+
+    async def async_step_energy_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_unit_step(ConsumptionSource.ENERGY, user_input)
+
+    async def async_step_power_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_unit_step(ConsumptionSource.POWER, user_input)
+
+    async def _async_meter_step(
+        self, source: ConsumptionSource, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._meter = {
+                "source": source.value,
+                "entity_id": user_input["entity_id"],
+                "attribute": user_input.get("attribute") or None,
+                "unit": None,
+                "factor": None,
+            }
+            if source is ConsumptionSource.POWER:
+                self._meter["running_power"] = user_input.get("running_power")
+            if self._meter["attribute"]:
+                return await (
+                    self.async_step_energy_unit()
+                    if source is ConsumptionSource.ENERGY
+                    else self.async_step_power_unit()
+                )
+            self._meter["unit"] = entity_unit(self.hass, self._meter["entity_id"])
+            if self._unit_understood(source, user_input):
+                return await self._meter_done()
+            errors["entity_id"] = "unknown_unit"
+        schema: dict[Any, Any] = {
+            vol.Required("entity_id"): EntitySelector(),
+            vol.Optional("attribute"): TextSelector(),
+        }
+        if source is ConsumptionSource.POWER:
+            schema[vol.Optional("running_power")] = _watts(1)
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id=source.value,
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_meter(source)
+            ),
+            errors=errors,
+        )
+
+    async def _async_unit_step(
+        self, source: ConsumptionSource, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._meter["unit"] = user_input["unit"]
+            if self._unit_understood(source, user_input):
+                return await self._meter_done()
+            errors["unit"] = "unknown_unit"
+        schema: dict[Any, Any] = {
+            vol.Required("unit"): SelectSelector(
+                SelectSelectorConfig(options=ATTRIBUTE_UNITS[source], custom_value=True)
+            )
+        }
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id=f"{source}_unit",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_meter(source)
+            ),
+            errors=errors,
+        )
+
+    def _stored_meter(self, source: ConsumptionSource) -> dict[str, Any] | None:
+        stored: dict[str, Any] | None = self._data.get("consumption")
+        return stored if stored and stored["source"] == source else None
+
+    def _unit_understood(
+        self, source: ConsumptionSource, user_input: dict[str, Any]
+    ) -> bool:
+        """A recognised unit, or else a conversion factor the user entered."""
+        if unit_scale(source, self._meter["unit"]) is not None:
+            return True
+        self._meter["factor"] = user_input.get("factor") or None
+        return self._meter["factor"] is not None
+
+    async def _meter_done(self) -> SubentryFlowResult:
+        self._data["consumption"] = self._meter
+        return await self._section_done("consumption")
 
     async def async_step_estimate(
         self, user_input: dict[str, Any] | None = None
