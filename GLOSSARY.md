@@ -21,8 +21,12 @@ The known Device Inputs of a specific printer integration, used to fill in a Dev
 _Avoid_: Preset, adapter, template
 
 **Run**:
-One completed working cycle of a Device, such as a single print job, together with its costs.
+One working cycle of a Device, such as a single print job, from start to end and together with its costs, whatever its Outcome.
 _Avoid_: Job, session, cycle, print
+
+**Outcome**:
+How a Run ended: Completed, Cancelled, Failed or Unknown; a Run still going has no Outcome yet.
+_Avoid_: Result, status (for the ending)
 
 **Line Item**:
 One cost line on a Run, such as electricity, filament, or inserting threaded inserts.
