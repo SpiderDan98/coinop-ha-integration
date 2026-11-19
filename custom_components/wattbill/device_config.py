@@ -41,7 +41,8 @@ class DeviceConfig:
     job_attribute: str | None
     # The consumption section as Add Device wrote it.
     consumption: Mapping[str, Any]
-    price: float
+    # The price section: a fixed value or a price entity.
+    price: Mapping[str, Any]
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
@@ -61,8 +62,13 @@ class DeviceConfig:
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
             consumption=data["consumption"],
-            price=data["price"]["value"],
+            price=data["price"],
         )
+
+    @property
+    def price_entity_id(self) -> str | None:
+        entity_id: str | None = self.price.get("entity_id")
+        return entity_id
 
     def target(self, value: str) -> Target:
         return self.mapping.get(value, Target.IGNORED)

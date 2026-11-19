@@ -66,7 +66,9 @@ def input_value(state: State | None, attribute: str | None) -> str | None:
 
 def input_time(state: State, attribute: str | None) -> datetime:
     """When the input took its current value."""
-    if state.domain == "event" and (fired := dt_util.parse_datetime(state.state)):
+    if split_entity_id(state.entity_id)[0] == "event" and (
+        fired := dt_util.parse_datetime(state.state)
+    ):
         return fired
     return state.last_changed if attribute is None else state.last_updated
 

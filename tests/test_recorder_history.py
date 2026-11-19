@@ -10,6 +10,8 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 from pytest_homeassistant_custom_component.typing import RecorderInstanceGenerator
 
 from .clock import Clock
+from .devices import add_device, add_hub
+from .test_dynamic_price import PRICE_ENTITY, set_price
 from .test_lifecycle import start_wattbill, stop_wattbill
 from .test_measured import add_metered_device, electricity, set_meter
 from .test_runs import set_status, stored_runs
@@ -52,3 +54,26 @@ async def test_reports_missed_while_stopped_are_filled_from_recorder_history(
     assert run["ended"] == "2026-01-15T10:30:00+00:00"
     assert electricity(run)["quantity"] == pytest.approx(0.3)
     assert run["flags"] == []
+
+
+async def test_price_changes_missed_while_stopped_come_from_recorder_history(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_price(hass, 0.20)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, running_power=1000, price=PRICE_ENTITY)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+
+    await stop_wattbill(hass, entry)
+    await clock.advance(minutes=20)
+    await set_price(hass, 0.40)
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    await async_wait_recording_done(hass)
+    await clock.advance(minutes=1)
+    await start_wattbill(hass, entry)
+
+    [run] = stored_runs(hass_storage)
+    assert [s["unit_price"] for s in electricity(run)["segments"]] == [0.20, 0.40]
+    assert electricity(run)["amount"] == pytest.approx(0.5 * 0.20 + 0.5 * 0.40)

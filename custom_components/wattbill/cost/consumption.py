@@ -100,3 +100,20 @@ def power(
         return joules / 3_600_000
 
     return kwh
+
+
+def piecewise(
+    models: Sequence[tuple[datetime, Callable[[datetime, datetime], float]]],
+) -> Callable[[datetime, datetime], float]:
+    """Each model from its moment until the next one's; the first also before it."""
+
+    def kwh(start: datetime, end: datetime) -> float:
+        total = 0.0
+        for i, (since, model) in enumerate(models):
+            low = start if i == 0 else max(start, since)
+            high = end if i + 1 == len(models) else min(end, models[i + 1][0])
+            if low < high:
+                total += model(low, high)
+        return total
+
+    return kwh
