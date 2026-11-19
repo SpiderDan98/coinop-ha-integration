@@ -342,16 +342,19 @@ async def test_record_what_deleting_a_run_drops(
     assert_recorded("runs-delete-preview", preview)
 
 
-OVERVIEW_GROUPINGS = [
+PANEL_GROUPINGS = [
     [],
     ["month"],
     ["month", "kind"],
     ["outcome"],
     ["kind", "material"],
+    ["kind"],
+    ["device"],
+    ["tag"],
 ]
 
 
-async def test_record_the_overview_aggregates(
+async def test_record_the_aggregates_of_overview_and_analysis(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     place_runs(hass_storage, *history())
@@ -361,7 +364,7 @@ async def test_record_the_overview_aggregates(
     answers = [
         {"group_by": group_by}
         | await panel.call("wattbill/aggregates/get", group_by=group_by)
-        for group_by in OVERVIEW_GROUPINGS
+        for group_by in PANEL_GROUPINGS
     ]
 
     assert_recorded("aggregates-get", answers)

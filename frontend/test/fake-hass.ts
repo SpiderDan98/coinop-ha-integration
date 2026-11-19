@@ -62,7 +62,7 @@ export const recorded = {
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/aggregates/get` over the snapshot's Runs (all in January 2026), for each
-   * grouping the Overview asks for. */
+   * grouping the Overview and Analysis ask for. */
   aggregates: aggregatesGet as { group_by: Dimension[]; groups: Group[] }[],
   /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */

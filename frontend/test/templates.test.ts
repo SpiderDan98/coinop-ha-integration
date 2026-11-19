@@ -25,6 +25,7 @@ describe("Line Item Templates tab", () => {
 
     expect(location.pathname).toBe("/wattbill/templates");
     expect(queryAll(panel, "a.tab").map(text)).toEqual([
+      "Analysis",
       "Materials",
       "Line Item Templates",
       "Tags",
