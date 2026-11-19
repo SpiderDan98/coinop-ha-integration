@@ -118,14 +118,43 @@ export interface Device {
 export type RunChange = "started" | "created" | "updated" | "ended" | "deleted";
 export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSummary };
 
-/** How much the sensor totals fall when Runs are deleted. */
-export interface Drop {
+/** What Runs add up to; also how much the sensor totals fall when they are deleted. */
+export interface Totals {
   cost: number;
-  energy_kwh: number;
+  electricity_cost: number;
+  material_cost: number;
+  other_cost: number;
   material_grams: number;
+  energy_kwh: number;
   runs: number;
+  running_hours: number;
   flagged_runs: number;
 }
+
+export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag";
+
+/**
+ * One group's values along the dimensions asked for, then its totals. Cost, grams and
+ * kWh sum the group's Line Items; a Run counts once in every group holding one of its
+ * Line Items, so Material and Tag groups overlap. `month` is "YYYY-MM" of the Run's
+ * start in HA's time zone; `null` is "none" (no Material, no Tag, Run still open).
+ */
+export type Group = Totals &
+  Partial<{
+    kind: Kind;
+    device_id: string;
+    device_name: string;
+    month: string;
+    material_id: string | null;
+    material_name: string | null;
+    outcome: Outcome | null;
+    tag: string | null;
+  }>;
+
+/** Only combinations that have Line Items; no Runs, no groups. */
+export const getAggregates = async (hass: HomeAssistant, groupBy: Dimension[]) =>
+  (await hass.callWS<{ groups: Group[] }>({ type: "wattbill/aggregates/get", group_by: groupBy }))
+    .groups;
 
 export const KINDS: Kind[] = ["electricity", "material", "other"];
 export const OUTCOMES: Outcome[] = ["completed", "cancelled", "failed", "unknown"];
@@ -251,11 +280,11 @@ export const deleteLineItem = (hass: HomeAssistant, runId: string, lineItemId: s
   runResult(hass, { type: "wattbill/line_items/delete", run_id: runId, line_item_id: lineItemId });
 
 export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
-  (await hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete_preview", run_ids: runIds }))
+  (await hass.callWS<{ drop: Totals }>({ type: "wattbill/runs/delete_preview", run_ids: runIds }))
     .drop;
 
 export const deleteRuns = (hass: HomeAssistant, runIds: string[]) =>
-  hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete", run_ids: runIds });
+  hass.callWS<{ drop: Totals }>({ type: "wattbill/runs/delete", run_ids: runIds });
 /** Names a Tag doesn't exist under yet are created. */
 export const updateDeviceSettings = async (
   hass: HomeAssistant,

@@ -3,6 +3,7 @@
 // the Devices, and routes by `route.path`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { cache } from "lit/directives/cache.js";
 import {
   listDevices,
   subscribeCatalog,
@@ -17,7 +18,7 @@ import { localize } from "./localize";
 import "./devices-page";
 import "./manual-run-dialog";
 import "./materials-page";
-import "./run-gallery";
+import "./overview";
 import "./run-page";
 import "./tags-page";
 import "./templates-page";
@@ -170,7 +171,22 @@ export class WattbillPanel extends LitElement {
           ${t("manual.open")}
         </button>
       </header>
-      <main>${this.renderPage(current, run)}</main>
+      <main>
+        ${cache(
+          current.name === "overview" && this.runs && !this.failed
+            ? html`<wattbill-overview
+                .hass=${this.hass}
+                .runs=${this.runs}
+                .devices=${this.devices ?? undefined}
+                .tags=${this.catalog?.tags ?? []}
+                .basePath=${this.route.prefix}
+                ?narrow=${this.narrow}
+              ></wattbill-overview>`
+            : // One template for every other page, so only the Overview's filter and
+              // selection are kept while the user looks elsewhere.
+              html`<div>${this.renderPage(current, run)}</div>`,
+        )}
+      </main>
       ${
         this.manualRun && this.devices
           ? html`<wattbill-manual-run-dialog
@@ -228,27 +244,17 @@ export class WattbillPanel extends LitElement {
             ?narrow=${this.narrow}
           ></wattbill-tags-page>`;
     }
-    const devices = this.devices ?? undefined;
-    return current.name === "run"
-      ? html`<wattbill-run-page
-          .hass=${this.hass}
-          .runId=${current.runId}
-          .summary=${run}
-          .devices=${devices}
-          .tags=${this.catalog?.tags ?? []}
-          .materials=${this.catalog?.materials ?? []}
-          .templates=${this.catalog?.templates ?? []}
-          .basePath=${this.route.prefix}
-          ?narrow=${this.narrow}
-        ></wattbill-run-page>`
-      : html`<wattbill-run-gallery
-          .hass=${this.hass}
-          .runs=${[...this.runs.values()]}
-          .devices=${devices}
-          .tags=${this.catalog?.tags ?? []}
-          .basePath=${this.route.prefix}
-          ?narrow=${this.narrow}
-        ></wattbill-run-gallery>`;
+    return html`<wattbill-run-page
+      .hass=${this.hass}
+      .runId=${current.name === "run" ? current.runId : ""}
+      .summary=${run}
+      .devices=${this.devices ?? undefined}
+      .tags=${this.catalog?.tags ?? []}
+      .materials=${this.catalog?.materials ?? []}
+      .templates=${this.catalog?.templates ?? []}
+      .basePath=${this.route.prefix}
+      ?narrow=${this.narrow}
+    ></wattbill-run-page>`;
   }
 
   private toggleMenu() {

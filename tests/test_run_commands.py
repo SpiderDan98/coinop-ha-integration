@@ -173,6 +173,7 @@ async def test_a_new_subscriber_first_gets_every_run(
         ("wattbill/runs/list", {}),
         ("wattbill/runs/subscribe", {}),
         ("wattbill/runs/get", {"run_id": "a"}),
+        ("wattbill/aggregates/get", {"group_by": ["month"]}),
     ],
 )
 async def test_only_admins_read_runs(

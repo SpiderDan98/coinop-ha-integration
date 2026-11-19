@@ -19,7 +19,7 @@ import {
   updateLineItem,
   updateRun,
   type Device,
-  type Drop,
+  type Totals,
   type LineItem,
   type Material,
   type LineItemTemplate,
@@ -31,7 +31,7 @@ import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { isKey, localize, type Localize } from "./localize";
 import "./run-images";
-import { deviceName, outcomeChip, runName } from "./run-parts";
+import { deleteDialog, deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import "./tag-input";
 
@@ -169,7 +169,7 @@ export class RunPage extends LitElement {
   /** Where the last change that could not be saved was made. */
   @state() private failed?: "fields" | "items";
   /** Set while the delete confirmation is open. */
-  @state() private drop?: Drop;
+  @state() private drop?: Totals;
   /** Which form for a new Line Item is open: Material, Other by hand or from a template. */
   @state() private adding?: "material" | "other" | "template";
   /** The template picked in its form; the first one until the user picks. */
@@ -426,7 +426,14 @@ export class RunPage extends LitElement {
           </div>
         </div>
       </div>
-      ${this.drop ? this.renderDeleteDialog(run, this.drop, t, format) : nothing}
+      ${
+        this.drop
+          ? deleteDialog(t("delete.title", { name: runName(run, t) }), this.drop, t, format, {
+              cancel: () => (this.drop = undefined),
+              confirm: () => void this.delete(),
+            })
+          : nothing
+      }
     `;
   }
 
@@ -489,36 +496,6 @@ export class RunPage extends LitElement {
       </div>
       <p class="wide muted small">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
       ${this.failed === "fields" ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
-    </div>`;
-  }
-
-  private renderDeleteDialog(run: RunDetail, drop: Drop, t: Localize, format: Format) {
-    const rows = [
-      [t("sensor.total_cost"), format.money(drop.cost)],
-      [t("sensor.energy_in_runs"), format.quantity(drop.energy_kwh, "kWh")],
-      [t("sensor.material_used"), format.quantity(drop.material_grams, "g")],
-      [t("runs.title"), String(drop.runs)],
-      [t("sensor.flagged_runs"), String(drop.flagged_runs)],
-    ];
-    return html`<div class="scrim">
-      <div class="dialog card" role="alertdialog" aria-modal="true">
-        <h2>${t("delete.title", { name: runName(run, t) })}</h2>
-        <p>${t("delete.drop")}</p>
-        <dl>
-          ${rows.map(
-            ([label, value]) =>
-              html`<dt>${label}</dt>
-                <dd class="num">${value}</dd>`,
-          )}
-        </dl>
-        <p class="muted small">${t("delete.warning")}</p>
-        <div class="row end">
-          <button class="btn cancel" @click=${() => (this.drop = undefined)}>
-            ${t("delete.cancel")}
-          </button>
-          <button class="btn danger confirm" @click=${this.delete}>${t("delete.confirm")}</button>
-        </div>
-      </div>
     </div>`;
   }
 
@@ -1010,28 +987,6 @@ export class RunPage extends LitElement {
       .big {
         font-size: 22px;
         font-weight: 600;
-      }
-      .scrim {
-        position: fixed;
-        inset: 0;
-        z-index: 5;
-        display: grid;
-        place-items: center;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.4);
-      }
-      .dialog {
-        width: min(480px, 100%);
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .dialog p {
-        margin: 0;
-      }
-      .end {
-        justify-content: flex-end;
       }
     `,
   ];

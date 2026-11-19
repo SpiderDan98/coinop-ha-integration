@@ -43,7 +43,7 @@ describe("Run gallery", () => {
     expect(tiles(panel)).toHaveLength(3);
   });
 
-  it("subscribes once to Runs and catalogue, loads the Devices once and never polls", async () => {
+  it("subscribes once to Runs and catalogue, loads Devices and totals once and never polls", async () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend);
 
@@ -54,6 +54,10 @@ describe("Run gallery", () => {
       { type: SUBSCRIBE },
       { type: CATALOG },
       { type: "wattbill/devices/list" },
+      ...recorded.aggregates.map(({ group_by }) => ({
+        type: "wattbill/aggregates/get",
+        group_by,
+      })),
     ]);
   });
 

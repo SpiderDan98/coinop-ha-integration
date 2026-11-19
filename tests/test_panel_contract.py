@@ -342,6 +342,31 @@ async def test_record_what_deleting_a_run_drops(
     assert_recorded("runs-delete-preview", preview)
 
 
+OVERVIEW_GROUPINGS = [
+    [],
+    ["month"],
+    ["month", "kind"],
+    ["outcome"],
+    ["kind", "material"],
+]
+
+
+async def test_record_the_overview_aggregates(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, *history())
+    place_materials(hass_storage, *materials())
+    await add_hub(hass)
+
+    answers = [
+        {"group_by": group_by}
+        | await panel.call("wattbill/aggregates/get", group_by=group_by)
+        for group_by in OVERVIEW_GROUPINGS
+    ]
+
+    assert_recorded("aggregates-get", answers)
+
+
 async def test_record_what_the_image_commands_answer(
     hass: HomeAssistant,
     clock: Clock,

@@ -6,7 +6,9 @@ import type { HomeAssistant, Message } from "../src/hass";
 import type {
   Catalog,
   Device,
-  Drop,
+  Dimension,
+  Group,
+  Totals,
   Filaments,
   LineItemTemplate,
   Material,
@@ -16,6 +18,7 @@ import type {
   RunImage,
   RunSummary,
 } from "../src/api";
+import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import devicesList from "./fixtures/backend/devices-list.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
@@ -57,11 +60,14 @@ export const recorded = {
    * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
+  /** `wattbill/aggregates/get` over the snapshot's Runs (all in January 2026), for each
+   * grouping the Overview asks for. */
+  aggregates: aggregatesGet as { group_by: Dimension[]; groups: Group[] }[],
   /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
   /** `wattbill/runs/delete_preview` for "helmet". */
-  deletePreview: runsDeletePreview as { drop: Drop },
+  deletePreview: runsDeletePreview as { drop: Totals },
   /** The upload of one photo to "benchy", and of ten more, refused. */
   upload: imagesUpload as { images: RunImage[] },
   uploadTooMany: imagesUploadTooMany,
@@ -254,5 +260,11 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       if (!run) throw new WsError("not_found");
       return { run };
     })
-    .reply("wattbill/devices/list", () => ({ devices: recorded.devices }));
+    .reply("wattbill/devices/list", () => ({ devices: recorded.devices }))
+    .reply("wattbill/aggregates/get", (msg) => ({
+      groups: found(
+        recorded.aggregates.find((answer) => String(answer.group_by) === String(msg.group_by)),
+        `grouping ${String(msg.group_by)}`,
+      ).groups,
+    }));
 }

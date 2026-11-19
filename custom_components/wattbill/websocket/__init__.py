@@ -7,6 +7,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
 from . import (
+    aggregates,
     catalog,
     devices,
     images,
@@ -27,6 +28,7 @@ __all__ = ["async_announce", "async_announce_catalog", "async_setup"]
 def async_setup(hass: HomeAssistant) -> None:
     for module in (
         runs,
+        aggregates,
         line_items,
         images,
         devices,
