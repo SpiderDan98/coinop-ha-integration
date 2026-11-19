@@ -1,7 +1,8 @@
 """Runs for the panel: the gallery list (live via subscription) and one Run in full.
 
-Summaries carry what a gallery tile shows; `get` returns the stored Run with
-amounts rounded to the currency and the derived subtotals and total.
+Summaries carry what a gallery tile shows (with its Cover Image); `get` returns
+the stored Run with amounts rounded to the currency, the derived subtotals and
+total, and every image with the URLs to fetch it from.
 """
 
 from datetime import datetime
@@ -22,6 +23,7 @@ from custom_components.wattbill.cost.rounding import (
     rounded_sum,
 )
 from custom_components.wattbill.cost.running_time import running_time
+from custom_components.wattbill.images import image_info
 from custom_components.wattbill.models import LineItemKind, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
@@ -53,6 +55,7 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "finalised": run.finalised,
         "running_seconds": round(running_time(run, now).total_seconds()),
         "total": float(rounded_sum((i.amount for i in run.line_items), decimals)),
+        "cover": None if (cover := run.cover) is None else image_info(run, cover),
     }
 
 
@@ -64,6 +67,7 @@ def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
             item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
             for item in run.line_items
         ],
+        "images": [image_info(run, image) for image in run.images],
         "subtotals": {
             kind: float(
                 rounded_sum(

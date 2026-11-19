@@ -22,6 +22,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import DeviceConfig, Target
 from .device_inputs import input_time, input_value
+from .images import DeviceImages
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 
@@ -35,11 +36,16 @@ OUTCOMES = {
 
 class DeviceTracker:
     def __init__(
-        self, hass: HomeAssistant, book: RunBook, config: DeviceConfig
+        self,
+        hass: HomeAssistant,
+        book: RunBook,
+        config: DeviceConfig,
+        images: DeviceImages,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
+        self._images = images
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
@@ -52,12 +58,14 @@ class DeviceTracker:
             ),
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
         ]
+        self._images.async_start()
         self._apply(self._hass.states.get(self._config.status_entity_id))
 
     @callback
     def async_stop(self) -> None:
         while self._unsubscribe:
             self._unsubscribe.pop()()
+        self._images.async_stop()
 
     @callback
     def _on_status(self, event: Event[EventStateChangedData]) -> None:
@@ -98,7 +106,10 @@ class DeviceTracker:
             and job_name != run.job_name
         ):
             run.end_reconstructed = True
-            self._end(run, run.last_seen or run.started, Outcome.UNKNOWN)
+            # The camera already shows the next print.
+            self._end(
+                run, run.last_seen or run.started, Outcome.UNKNOWN, snapshot=False
+            )
             run = None
         if run is None:
             if target is Target.RUNNING:
@@ -149,19 +160,25 @@ class DeviceTracker:
         )
         self._refresh(run, at)
         self._book.async_start(run)
+        self._images.async_run_started(run)
 
     async def async_end_run(self) -> None:
         """End the open Run now as Unknown, e.g. because its Device is removed."""
         if run := self._book.open_run(self._config.device_id):
             await self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
 
-    def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Task[None]:
+    def _end(
+        self, run: Run, at: datetime, outcome: Outcome, *, snapshot: bool = True
+    ) -> asyncio.Task[None]:
         run.ended = at
         if run.pauses and run.pauses[-1].end is None:
             run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
-        return self._hass.async_create_task(self._book.async_finalise(run))
+        finalise = self._hass.async_create_task(self._book.async_finalise(run))
+        if snapshot:
+            self._images.async_run_ended(run)
+        return finalise
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""

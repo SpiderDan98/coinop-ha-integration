@@ -2823,6 +2823,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyturbojpeg"
+version = "1.8.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f2/2b/5fc7a7f51af947708a5d75d7637e923d2d4e60f43f6a4cfe55ae1ea241a2/pyturbojpeg-1.8.3.tar.gz", hash = "sha256:c131591a3990cc57f45a8b2705d6261c25df913a19b1fe88de5e911dbe04a1d4", size = 12757, upload-time = "2026-02-17T02:32:53.192Z" }
+
+[[package]]
 name = "pytz"
 version = "2026.6"
 source = { registry = "https://pypi.org/simple" }
@@ -3347,7 +3356,9 @@ source = { virtual = "." }
 dev = [
     { name = "fpdf2" },
     { name = "mypy" },
+    { name = "pillow" },
     { name = "pytest-homeassistant-custom-component" },
+    { name = "pyturbojpeg" },
     { name = "ruff" },
 ]
 lint = [
@@ -3356,7 +3367,9 @@ lint = [
 ]
 test = [
     { name = "fpdf2" },
+    { name = "pillow" },
     { name = "pytest-homeassistant-custom-component" },
+    { name = "pyturbojpeg" },
 ]
 
 [package.metadata]
@@ -3365,7 +3378,9 @@ test = [
 dev = [
     { name = "fpdf2", specifier = "==2.9.0" },
     { name = "mypy", specifier = "==2.4.1" },
+    { name = "pillow", specifier = "==12.3.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.375" },
+    { name = "pyturbojpeg", specifier = "==1.8.3" },
     { name = "ruff", specifier = "==0.17.4" },
 ]
 lint = [
@@ -3374,7 +3389,9 @@ lint = [
 ]
 test = [
     { name = "fpdf2", specifier = "==2.9.0" },
+    { name = "pillow", specifier = "==12.3.0" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.375" },
+    { name = "pyturbojpeg", specifier = "==1.8.3" },
 ]
 
 [[package]]

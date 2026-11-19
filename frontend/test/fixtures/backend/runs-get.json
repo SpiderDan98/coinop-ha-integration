@@ -57,8 +57,10 @@
           "segments": []
         }
       ],
+      "images": [],
       "running_seconds": 4500,
       "total": 0.86,
+      "cover": null,
       "subtotals": {
         "electricity": 0.05,
         "material": 0.31,
@@ -108,8 +110,10 @@
           ]
         }
       ],
+      "images": [],
       "running_seconds": 32400,
       "total": 0.3,
+      "cover": null,
       "subtotals": {
         "electricity": 0.3,
         "material": 0.0,
@@ -153,8 +157,10 @@
           ]
         }
       ],
+      "images": [],
       "running_seconds": 1800,
       "total": 0.07,
+      "cover": null,
       "subtotals": {
         "electricity": 0.07,
         "material": 0.0,
@@ -198,8 +204,10 @@
           ]
         }
       ],
+      "images": [],
       "running_seconds": 2700,
       "total": 0.03,
+      "cover": null,
       "subtotals": {
         "electricity": 0.03,
         "material": 0.0,

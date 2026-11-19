@@ -42,6 +42,7 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
         "finalised": True,
         "running_seconds": 7200,
         "total": 0.07,
+        "cover": None,
     }
 
 
