@@ -6,6 +6,7 @@ import { KINDS, getRun, type LineItem, type RunDetail, type RunSummary } from ".
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
+import "./run-image";
 import { outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 
@@ -64,7 +65,27 @@ export class RunPage extends LitElement {
       </div>
       <div class="grid">
         <div class="card facts">
-          <div class="no-image">${t("run.no_image")}</div>
+          <wattbill-run-image
+            class="cover"
+            .hass=${this.hass}
+            .src=${run.cover?.url}
+          ></wattbill-run-image>
+          ${
+            run.images.length
+              ? html`<div class="strip">
+                  ${run.images.map(
+                    (image) =>
+                      html`<figure>
+                        <wattbill-run-image
+                          .hass=${this.hass}
+                          .src=${image.tile_url}
+                        ></wattbill-run-image>
+                        <figcaption>${t(`image.${image.kind}`)}</figcaption>
+                      </figure>`,
+                  )}
+                </div>`
+              : nothing
+          }
           <h1>${runName(run, t)}</h1>
           <dl>
             <dt>${t("run.device")}</dt>
@@ -139,9 +160,28 @@ export class RunPage extends LitElement {
       :host([narrow]) .grid {
         grid-template-columns: 1fr;
       }
-      .facts .no-image {
+      .cover {
         border-radius: 10px;
+        overflow: hidden;
         margin-bottom: 12px;
+      }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      figure {
+        margin: 0;
+        width: 96px;
+        text-align: center;
+        font-size: 11px;
+        color: var(--secondary-text-color);
+      }
+      figure wattbill-run-image {
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 2px;
       }
       dl {
         display: grid;

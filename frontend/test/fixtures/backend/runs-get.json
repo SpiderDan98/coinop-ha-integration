@@ -57,10 +57,31 @@
           "segments": []
         }
       ],
-      "images": [],
+      "images": [
+        {
+          "id": "benchy-thumbnail",
+          "kind": "thumbnail",
+          "created": "2026-01-12T10:00:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+        },
+        {
+          "id": "benchy-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-12T11:15:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-snapshot",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
+        }
+      ],
       "running_seconds": 4500,
       "total": 0.86,
-      "cover": null,
+      "cover": {
+        "id": "benchy-thumbnail",
+        "kind": "thumbnail",
+        "created": "2026-01-12T10:00:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+      },
       "subtotals": {
         "electricity": 0.05,
         "material": 0.31,
@@ -110,10 +131,24 @@
           ]
         }
       ],
-      "images": [],
+      "images": [
+        {
+          "id": "helmet-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-13T19:00:00+00:00",
+          "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+          "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+        }
+      ],
       "running_seconds": 32400,
       "total": 0.3,
-      "cover": null,
+      "cover": {
+        "id": "helmet-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-13T19:00:00+00:00",
+        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      },
       "subtotals": {
         "electricity": 0.3,
         "material": 0.0,

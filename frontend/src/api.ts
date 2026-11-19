@@ -6,6 +6,15 @@ export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
 export type Kind = "electricity" | "material" | "other";
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 
+/** Fetched with `hass.fetchWithAuth`: the image views need authentication. */
+export interface RunImage {
+  id: string;
+  kind: "thumbnail" | "snapshot" | "upload";
+  created: string;
+  url: string;
+  tile_url: string;
+}
+
 export interface RunSummary {
   id: string;
   device_id: string;
@@ -17,6 +26,7 @@ export interface RunSummary {
   finalised: boolean;
   running_seconds: number;
   total: number;
+  cover: RunImage | null;
 }
 
 export interface LineItem {
@@ -33,6 +43,8 @@ export interface LineItem {
 
 export interface RunDetail extends RunSummary {
   line_items: LineItem[];
+  /** Thumbnail, Snapshot, then uploads by time. */
+  images: RunImage[];
   subtotals: Record<Kind, number>;
 }
 

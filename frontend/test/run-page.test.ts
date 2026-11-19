@@ -37,7 +37,7 @@ describe("Run page", () => {
 
     expect(text(query(panel, ".runbar"))).toBe("Completed Kobra · Jan 12, 2026, 10:00 AM");
     expect(text(query(panel, ".facts"))).toBe(
-      "No image Benchy Device Kobra Started Jan 12, 2026, 10:00 AM " +
+      "Thumbnail Snapshot Benchy Device Kobra Started Jan 12, 2026, 10:00 AM " +
         "Ended Jan 12, 2026, 11:15 AM Running time 1 h 15 min",
     );
   });
