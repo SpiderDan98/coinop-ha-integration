@@ -45,15 +45,13 @@ describe("Run images on the Run page", () => {
     expect(backend.fetches).toContain(upload.tile_url);
   });
 
-  it("accept JPEG, PNG and WebP and say what fits", async () => {
+  it("accept JPEG, PNG and WebP without a permanent line of limits", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
     const input = query(panel, "input[type=file]") as HTMLInputElement;
     expect(input.multiple).toBe(true);
     expect(input.accept).toBe("image/jpeg,image/png,image/webp");
-    expect(text(query(panel, ".facts"))).toContain(
-      "Up to 10 photos per Run: JPEG, PNG or WebP, up to 20 MB each.",
-    );
+    expect(text(query(panel, ".facts"))).not.toContain("Up to 10 photos");
   });
 
   it("say why an upload was refused", async () => {

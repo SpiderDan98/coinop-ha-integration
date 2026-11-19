@@ -1,7 +1,16 @@
 // The Materials tab: the global catalogue, edited in place. The list itself comes
 // from the panel's catalogue subscription, so every open panel shows each change.
 // Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
-import { mdiClose, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
+import {
+  mdiArchiveArrowUpOutline,
+  mdiArchiveOutline,
+  mdiClose,
+  mdiDelete,
+  mdiPencil,
+  mdiPlus,
+  mdiStar,
+  mdiStarOutline,
+} from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -229,7 +238,7 @@ export class MaterialsPage extends LitElement {
           ${
             filament.price_per_gram === null
               ? html`<span class="muted">${t("spoolman.no_price")}</span>`
-              : `${format.unitPrice(filament.price_per_gram)} / g`
+              : `${format.money(filament.price_per_gram * 1000)} / kg`
           }
         </td>
         <td class="actions">
@@ -259,7 +268,7 @@ export class MaterialsPage extends LitElement {
                     <tr>
                       <th>${t("spoolman.filament")}</th>
                       <th>${t("materials.type")}</th>
-                      <th class="num">${t("materials.price_per_gram")}</th>
+                      <th class="num">${t("materials.price_per_kg")}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -282,8 +291,8 @@ export class MaterialsPage extends LitElement {
           <th>${t("materials.form_type")}</th>
           <th>${t("materials.properties")}</th>
           <th>${t("materials.pack")}</th>
-          <th class="num">${t("materials.price_per_gram")}</th>
-          <th class="star-head">${t("materials.default")}</th>
+          <th class="num">${t("materials.price_per_kg")}</th>
+          <th class="star-head">${t("materials.default_for_type")}</th>
           <th></th>
         </tr>
       </thead>
@@ -318,7 +327,7 @@ export class MaterialsPage extends LitElement {
                     : t("materials.from_spoolman")
                 }
               </td>
-              <td class="num">${format.unitPrice(material.price_per_gram)} / g</td>
+              <td class="num">${format.money(material.price_per_gram * 1000)} / kg</td>
               <td>
                 ${
                   material.archived
@@ -353,34 +362,26 @@ export class MaterialsPage extends LitElement {
           ${t("materials.cancel")}
         </ha-button>`;
     }
-    const remove = html`<ha-button
-      class="small"
-      appearance="plain"
-      variant="danger"
-      @click=${() => (this.confirming = material.id)}
-    >
-      ${t("materials.delete")}
-    </ha-button>`;
+    const action = (name: string, label: string, path: string, run: () => void) =>
+      html`<ha-icon-button
+        class=${name}
+        .label=${label}
+        .path=${path}
+        @click=${run}
+      ></ha-icon-button>`;
+    const remove = action("delete", t("materials.delete"), mdiDelete, () => {
+      this.confirming = material.id;
+    });
     return material.archived
-      ? html`<ha-button
-            class="small"
-            appearance="plain"
-            @click=${() => this.act(() => restoreMaterial(this.hass, material.id))}
-          >
-            ${t("materials.restore")}
-          </ha-button>
-          ${remove}`
-      : html`<ha-button class="small" appearance="plain" @click=${() => this.open(material)}>
-            ${t("materials.edit")}
-          </ha-button>
-          <ha-button
-            class="small"
-            appearance="plain"
-            @click=${() => this.act(() => archiveMaterial(this.hass, material.id))}
-          >
-            ${t("materials.archive")}
-          </ha-button>
-          ${remove}`;
+      ? html`${action("restore", t("materials.restore"), mdiArchiveArrowUpOutline, () =>
+          this.act(() => restoreMaterial(this.hass, material.id)),
+        )}${remove}`
+      : html`${action("edit", t("materials.edit"), mdiPencil, () => this.open(material))}${action(
+          "archive",
+          t("materials.archive"),
+          mdiArchiveOutline,
+          () => this.act(() => archiveMaterial(this.hass, material.id)),
+        )}${remove}`;
   }
 
   private renderForm(draft: Draft, t: Localize) {
@@ -714,6 +715,11 @@ export class MaterialsPage extends LitElement {
       .actions {
         white-space: nowrap;
         text-align: right;
+      }
+      .actions ha-icon-button {
+        --ha-icon-button-size: 36px;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
       }
       .swatch {
         width: 14px;

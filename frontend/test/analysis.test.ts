@@ -42,8 +42,8 @@ describe("Analysis tab", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/analysis" });
 
     expect(rows(panel, "by-device")).toEqual([
-      "Kobra 2 10.25 h 1.23 kWh €1.16",
-      "Mini (removed) 1 0.5 h 0.24 kWh €0.07",
+      "Kobra 2 10 h 15 min 1.23 kWh €1.16",
+      "Mini (removed) 1 30 min 0.24 kWh €0.07",
     ]);
   });
 
@@ -103,7 +103,7 @@ describe("Analysis tab", () => {
       "No tag 1 €0.07",
     ]);
     expect(text(query(panel, ".by-tag header"))).toBe(
-      "By Tag Overlapping: a Run counts in each of its Tags, so the rows add up to more than the total.",
+      "By Tag A Run with several Tags counts in each of them.",
     );
     expect(queryAll(panel, ".by-tag tfoot")).toEqual([]);
   });

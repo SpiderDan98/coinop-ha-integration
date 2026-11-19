@@ -72,6 +72,7 @@ export function formatter(hass: HomeAssistant) {
       const guess = asUtc - zoneOffset(asUtc);
       return new Date(asUtc - zoneOffset(guess)).toISOString();
     },
+    currencySymbol: currency.formatToParts(0).find(({ type }) => type === "currency")?.value ?? "",
     money: (amount: number) => currency.format(amount),
     /** A number input's value: no grouping, at most `digits` decimals. */
     toNumberInput: (value: number | null, digits: number) =>
@@ -86,9 +87,12 @@ export function formatter(hass: HomeAssistant) {
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
     timeRange: (start: string, end: string) =>
       timeOfDay.formatRange(new Date(start), new Date(end)),
+    /** "40 min", "3 h", "2 h 35 min"; never broken across lines. */
     duration: (seconds: number) => {
-      const minutes = Math.round(seconds / 60);
-      return t("duration", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+      const total = Math.round(seconds / 60);
+      const [hours, minutes] = [Math.floor(total / 60), total % 60];
+      const key = !hours ? "duration.minutes" : minutes ? "duration" : "duration.hours";
+      return t(key, { hours, minutes }).replaceAll(" ", "\u00a0");
     },
   };
 }

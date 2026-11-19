@@ -81,9 +81,7 @@ describe("Correcting a Run", () => {
     expect((query(panel, "input[name=started]") as HTMLInputElement).value).toBe(
       "2026-01-12T10:00",
     );
-    expect(text(query(panel, ".facts"))).toContain(
-      "Changing start, end or Outcome never recalculates costs.",
-    );
+    expect(text(query(panel, ".facts"))).toContain("Changing these doesn't recalculate costs.");
   });
 
   it("enters times in Home Assistant's time zone", async () => {

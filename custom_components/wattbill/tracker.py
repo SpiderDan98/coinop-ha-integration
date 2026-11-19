@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from functools import partial
+import re
 
 from homeassistant.components.recorder import history
 from homeassistant.core import (
@@ -83,6 +84,15 @@ OUTCOMES = {
     Target.CANCELLED: Outcome.CANCELLED,
     Target.ENDED: Outcome.UNKNOWN,
 }
+
+PRINT_FILE = re.compile(r"(\.gcode)?\.(gcode|bgcode|gco|3mf)$", re.IGNORECASE)
+
+
+def job_title(job_name: str | None) -> str | None:
+    """A Run's name from its job: "Gear_Set.gcode.3mf" becomes "Gear Set"."""
+    if job_name is None:
+        return None
+    return PRINT_FILE.sub("", job_name).replace("_", " ").strip() or job_name
 
 
 class DeviceTracker:
@@ -459,7 +469,7 @@ class DeviceTracker:
                 run.pauses[-1].end = at
             if run.job_name is None:
                 run.job_name = job_name
-                run.name = run.name or job_name
+                run.name = run.name or job_title(job_name)
         self._book.async_update(run)
 
     def _job_name(self) -> str | None:
@@ -474,7 +484,7 @@ class DeviceTracker:
             id=ulid_now(),
             device_id=self._config.device_id,
             device_name=self._config.name,
-            name=job_name,
+            name=job_title(job_name),
             job_name=job_name,
             started=at,
             last_seen=at,

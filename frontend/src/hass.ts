@@ -6,6 +6,7 @@ export interface HomeAssistant {
   language: string;
   config: { currency: string; time_zone: string };
   dockedSidebar?: "docked" | "always_hidden" | "auto";
+  states: Record<string, { attributes: { friendly_name?: string } } | undefined>;
   callWS<T>(msg: Message): Promise<T>;
   fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
   connection: {

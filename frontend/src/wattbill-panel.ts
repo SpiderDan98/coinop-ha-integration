@@ -333,7 +333,23 @@ export class WattbillPanel extends LitElement {
         white-space: nowrap;
       }
       :host([narrow]) .title {
+        flex: 1;
+        overflow: hidden;
         margin-inline-start: var(--ha-space-2, 8px);
+      }
+      /* The tabs get their own scrolling row, so they never squeeze the title. */
+      :host([narrow]) .toolbar {
+        flex-wrap: wrap;
+        row-gap: 0;
+        height: auto;
+        padding-bottom: 0;
+      }
+      :host([narrow]) .tabs {
+        order: 1;
+        flex: 1 0 100%;
+        height: 40px;
+        margin: 0 -12px;
+        padding: 0 4px;
       }
       main {
         padding: 16px 24px 48px;

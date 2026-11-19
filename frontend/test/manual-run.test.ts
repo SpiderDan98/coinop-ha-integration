@@ -35,21 +35,34 @@ const enter = async (panel: HTMLElement, dialog: HTMLElement) => {
 };
 
 describe("A manual Run", () => {
-  it("asks for Device, name, start, end and Outcome with the Device's Tags pre-filled", async () => {
+  it("asks for name, start, end and Outcome with the Device's Tags pre-filled", async () => {
     const panel = await mountPanel(creating());
 
     const dialog = await open(panel);
 
     expect(text(dialog)).toContain("Manual Run");
-    expect(field(dialog, "device").value).toBe("device-kobra");
-    expect(queryAll(field(dialog, "device"), "option").map((option) => text(option))).toEqual([
-      "Kobra",
-    ]);
+    // With one Device there is nothing to pick.
+    expect(queryAll(dialog, "[name=device]")).toHaveLength(0);
     expect(field(dialog, "name").value).toBe("");
     expect(field(dialog, "started").type).toBe("datetime-local");
     expect(field(dialog, "ended").type).toBe("datetime-local");
     expect(field(dialog, "outcome").value).toBe("completed");
     expect(text(query(dialog, "wattbill-tag-input"))).toContain("Batch 7");
+  });
+
+  it("asks for the Device when there is more than one", async () => {
+    const [kobra] = recorded.devices;
+    const mini = { ...kobra, id: "device-mini", name: "Mini" };
+    const backend = creating().reply("wattbill/devices/list", () => ({ devices: [kobra, mini] }));
+    const panel = await mountPanel(backend);
+
+    const dialog = await open(panel);
+
+    expect(field(dialog, "device").value).toBe("device-kobra");
+    expect(queryAll(field(dialog, "device"), "option").map((option) => text(option))).toEqual([
+      "Kobra",
+      "Mini",
+    ]);
   });
 
   it("is created with what was entered and opens on its Run page", async () => {

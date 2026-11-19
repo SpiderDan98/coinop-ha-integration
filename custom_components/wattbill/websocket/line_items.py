@@ -39,6 +39,11 @@ _QUANTITY = vol.Any(None, vol.All(_number, vol.Range(min=0)))
 _PRICES = {vol.Optional("unit_price"): _number, vol.Optional("amount"): _number}
 
 
+async def _correct(wattbill: WattBill, run: Run) -> None:
+    run.drop_fixed_flags()
+    await wattbill.book.async_correct(run)
+
+
 def _find_item(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
@@ -125,7 +130,7 @@ async def _update(
         item.unit = msg["unit"].strip()
     if values:
         item.override(values)
-    await wattbill.book.async_correct(run)
+    await _correct(wattbill, run)
     _send_run(hass, connection, msg["id"], run)
 
 
@@ -142,7 +147,7 @@ async def _reset(
     run, item = found
     if item.computed is not None:
         item.reset()
-        await wattbill.book.async_correct(run)
+        await _correct(wattbill, run)
     _send_run(hass, connection, msg["id"], run)
 
 
@@ -202,7 +207,7 @@ async def _add(
         return
     item.override(values)
     run.line_items.append(item)
-    await wattbill.book.async_correct(run)
+    await _correct(wattbill, run)
     _send_run(hass, connection, msg["id"], run)
 
 
@@ -229,7 +234,7 @@ async def _add_template(
     run.line_items.append(
         template.line_item(run, dt_util.utcnow(), msg.get("quantity"))
     )
-    await wattbill.book.async_correct(run)
+    await _correct(wattbill, run)
     _send_run(hass, connection, msg["id"], run)
 
 
@@ -280,7 +285,7 @@ async def _delete(
         )
         return
     run.line_items.remove(item)
-    await wattbill.book.async_correct(run)
+    await _correct(wattbill, run)
     _send_run(hass, connection, msg["id"], run)
 
 

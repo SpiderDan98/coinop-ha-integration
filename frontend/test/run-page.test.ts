@@ -8,13 +8,14 @@ const [started, updated, ended] = recorded.changes;
 /** A Line Item row as a receipt line: "label evidence quantity unit × unit price = amount". */
 const receiptLine = (item: HTMLElement) => {
   const shown = (selector: string) => {
-    const element = query(item, selector);
+    const element = queryAll(item, selector)[0];
+    if (!element) return undefined;
     if (element instanceof HTMLSelectElement)
       return text(query(element, `option[value="${element.value}"]`));
     return element instanceof HTMLInputElement ? element.value : text(element);
   };
   return [
-    shown(".label > :first-child"),
+    shown(".label > :not(.evidence)"),
     ...queryAll(item, ".evidence").map(text),
     shown("[name=quantity]"),
     shown(".unit"),
@@ -22,7 +23,9 @@ const receiptLine = (item: HTMLElement) => {
     shown("[name=unit_price]"),
     "=",
     shown("[name=amount]"),
-  ].join(" ");
+  ]
+    .filter((part) => part !== undefined)
+    .join(" ");
 };
 const cards = (panel: Element) =>
   queryAll(panel, ".kind").map((card) => [
@@ -49,7 +52,7 @@ describe("Run page", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
     expect(cards(panel)).toEqual([
-      ["Electricity €0.05", "Electricity Estimated from average power 0.15 kWh × 0.3 = 0.05"],
+      ["Electricity €0.05", "Estimated from average power 0.15 kWh × 0.3 = 0.05"],
       [
         "Material €0.31",
         "PLA Basic Black 4,191 mm at 1.75 mm and 1.24 g/cm³ 12.5 g × 0.025 = 0.31",
@@ -74,7 +77,7 @@ describe("Run page", () => {
     expect(cards(panel)).toEqual([
       [
         "Electricity €0.30",
-        "Electricity Estimated from average power · 2 price segments " +
+        "Estimated from average power · 2 price segments " +
           "10:00 AM – 4:00 PM · 0.6 kWh × €0.30 4:00 – 7:00 PM · 0.48 kWh × €0.25 " +
           "1.08 kWh × 0.2778 = 0.30",
       ],
@@ -113,7 +116,7 @@ describe("Run page", () => {
     const panel = await mountPanel(backend, { path: "/run/print-live" });
     expect(text(query(panel, ".runbar"))).toMatch(/^In progress/);
     expect(endedField(panel).value).toBe("");
-    expect(text(query(panel, ".facts dl"))).toContain("Running time 0 h 45 min");
+    expect(text(query(panel, ".facts dl"))).toContain("Running time 45 min");
     const live = recorded.run("print-live");
 
     backend.reply(GET, () => ({ run: { ...live, ...ended.run } }));
@@ -150,7 +153,7 @@ describe("Run page", () => {
 
     expect(cards(panel)[0]).toEqual([
       "Strom 0,05 €",
-      "Strom Aus der Durchschnittsleistung geschätzt 0.15 kWh × 0.3 = 0.05",
+      "Aus der Durchschnittsleistung geschätzt 0.15 kWh × 0.3 = 0.05",
     ]);
     expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
   });

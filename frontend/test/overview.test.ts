@@ -87,8 +87,7 @@ describe("Overview", () => {
     const panel = await mountPanel(backend);
 
     const columns = queryAll(panel, ".per-month .column");
-    // Only the highest month and the one picked carry their value.
-    expect(columns.map(text)).toEqual(["€2.00 Dec", "Jan"]);
+    expect(columns.map(text)).toEqual(["€2.00 Dec", "€1.23 Jan"]);
     expect(columns[1].title).toBe(
       "January 2026\nElectricity: €0.42\nMaterial: €0.31\nOther: €0.50",
     );
@@ -96,7 +95,6 @@ describe("Overview", () => {
     expect(text(query(panel, ".per-month .legend"))).toBe("Electricity Material Other");
 
     await click(panel, columns[1]);
-    expect(queryAll(panel, ".per-month .column").map(text)).toEqual(["€2.00 Dec", "€1.23 Jan"]);
     await click(panel, queryAll(panel, ".per-month .column")[0]);
     expect(text(panel)).toContain("No Runs match the filters.");
     expect((query(panel, ".month-filter") as HTMLSelectElement).value).toBe("2025-12");
@@ -106,6 +104,41 @@ describe("Overview", () => {
     await click(panel, queryAll(panel, ".per-month .column")[1]);
     // Every Run is from January, so the month filter shows only while it filters.
     expect(queryAll(panel, ".month-filter")).toHaveLength(0);
+  });
+
+  it("labels only the highest month and the one picked once the values would overlap", async () => {
+    const months = ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"];
+    const backend = recordedBackend().reply(AGGREGATES, (msg) => {
+      const key = (msg.group_by as string[]).join();
+      if (key === "month")
+        return {
+          groups: [
+            ...months.map((key, index) => ({ ...zero, month: key, cost: index + 1 })),
+            ...groups("month"),
+          ],
+        };
+      if (key === "month,kind")
+        return {
+          groups: [
+            ...months.map((key, index) => month(key, "material", index + 1)),
+            ...groups("month,kind"),
+          ],
+        };
+      return { groups: groups(key) };
+    });
+    const panel = await mountPanel(backend);
+
+    await click(panel, queryAll(panel, ".per-month .column")[0]);
+
+    expect(queryAll(panel, ".per-month .column").map(text)).toEqual([
+      "€1.00 Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "€6.00 Dec",
+      "Jan",
+    ]);
   });
 
   it("charts the cost by Material", async () => {
@@ -157,7 +190,7 @@ describe("Overview", () => {
     await settle(panel);
 
     expect(text(query(panel, ".running"))).toBe(
-      "Running now Untitled Run Kobra · 0 h 45 min €0.25 Provisional, updates live",
+      "Running now Untitled Run Kobra · 45 min €0.25 Provisional, updates live",
     );
     expect(query(panel, ".running a").getAttribute("href")).toBe("/wattbill/run/print-live");
     expect(backend.sent(AGGREGATES).length).toBeGreaterThan(loaded);
@@ -233,7 +266,7 @@ describe("Selection basket", () => {
     await fill(panel, pick(panel, "Helmet"), "on");
     await fill(panel, pick(panel, "Benchy"), "on");
 
-    expect(basket(panel)).toBe("2 Runs €1.16 Benchy, Helmet Cost Statement… Delete Clear");
+    expect(basket(panel)).toBe("2 Runs €1.16 Benchy, Helmet Cost Statement… Clear Delete");
     expect(queryAll(panel, ".pick-tile.selected")).toHaveLength(2);
     // The open Run can't be selected.
     expect(queryAll(panel, "input.pick")).toHaveLength(3);

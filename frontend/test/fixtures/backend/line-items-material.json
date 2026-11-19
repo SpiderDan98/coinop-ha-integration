@@ -13,8 +13,7 @@
     "finalised": true,
     "pauses": [],
     "flags": [
-      "fault",
-      "material_missing"
+      "fault"
     ],
     "part_count": 1,
     "note": null,
