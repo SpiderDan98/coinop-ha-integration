@@ -329,6 +329,23 @@
           "pack_size": 1000.0,
           "pack_unit": "ml"
         }
+      },
+      {
+        "id": "01KF0000000000000000000M03",
+        "name": "Prusament PETG blue",
+        "form": "filament",
+        "type": "PETG",
+        "density": 1.27,
+        "vendor": "Prusament",
+        "colour": "#0000ff",
+        "diameter": 1.75,
+        "default_for_type": false,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 7,
+          "per_gram": 0.027
+        }
       }
     ],
     "tags": [

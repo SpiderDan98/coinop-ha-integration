@@ -25,6 +25,7 @@ class Flag(StrEnum):
     PRICE_GAP = "price_gap"
     USAGE_MISSING = "usage_missing"
     MATERIAL_MISSING = "material_missing"
+    SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
 
@@ -233,7 +234,10 @@ class LineItem:
     def is_computed(self) -> bool:
         """WattBill computes its values, live while the Run is open."""
         return (
-            self.kind is LineItemKind.ELECTRICITY
+            (
+                self.kind is LineItemKind.ELECTRICITY
+                and self.method is not ElectricityMethod.ENTERED
+            )
             or self.measured
             or self.basis is QuantityBasis.RUNNING_HOURS
         )
