@@ -9,6 +9,7 @@ import pytest
 ROOT = Path(__file__).parents[1]
 PANEL = ROOT / "frontend" / "src" / "translations"
 BACKEND = ROOT / "custom_components" / "wattbill" / "translations"
+STATEMENT = ROOT / "custom_components" / "wattbill" / "statement" / "strings"
 LANGUAGES = sorted(path.stem for path in PANEL.glob("*.json"))
 
 # Terms both sides show: panel key -> backend key. Add a pair whenever the panel
@@ -35,6 +36,23 @@ SHARED_TERMS = {
     ),
 }
 
+# Terms the panel and the Cost Statement both show: panel key -> statement key.
+STATEMENT_TERMS = {
+    "statement.default_title": "title",
+    "run.untitled": "untitled",
+    "duration": "duration",
+    "kind.electricity": "kind.electricity",
+    "kind.material": "kind.material",
+    "kind.other": "kind.other",
+    "outcome.completed": "outcome_name.completed",
+    "outcome.cancelled": "outcome_name.cancelled",
+    "outcome.failed": "outcome_name.failed",
+    "outcome.unknown": "outcome_name.unknown",
+    "item.quantity": "column.quantity",
+    "item.unit_price": "column.unit_price",
+    "item.amount": "column.amount",
+}
+
 
 def _panel(language: str) -> dict[str, str]:
     strings: dict[str, str] = json.loads(
@@ -43,7 +61,7 @@ def _panel(language: str) -> dict[str, str]:
     return strings
 
 
-def _backend(language: str) -> dict[str, str]:
+def _flat(path: Path) -> dict[str, str]:
     def flatten(tree: dict[str, Any], prefix: str = "") -> dict[str, str]:
         flat: dict[str, str] = {}
         for name, value in tree.items():
@@ -53,7 +71,11 @@ def _backend(language: str) -> dict[str, str]:
                 flat[f"{prefix}{name}"] = value
         return flat
 
-    return flatten(json.loads((BACKEND / f"{language}.json").read_text("utf-8")))
+    return flatten(json.loads(path.read_text("utf-8")))
+
+
+def _backend(language: str) -> dict[str, str]:
+    return _flat(BACKEND / f"{language}.json")
 
 
 def test_the_panel_ships_english_and_german() -> None:
@@ -76,4 +98,13 @@ def test_shared_terms_read_the_same_in_panel_and_backend(language: str) -> None:
 
     assert {key: panel[key] for key in SHARED_TERMS} == {
         key: backend[backend_key] for key, backend_key in SHARED_TERMS.items()
+    }
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_shared_terms_read_the_same_in_panel_and_cost_statement(language: str) -> None:
+    panel, statement = _panel(language), _flat(STATEMENT / f"{language}.json")
+
+    assert {key: panel[key] for key in STATEMENT_TERMS} == {
+        key: statement[statement_key] for key, statement_key in STATEMENT_TERMS.items()
     }

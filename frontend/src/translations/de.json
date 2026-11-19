@@ -277,5 +277,20 @@
   "analysis.by_outcome": "Nach Ausgang",
   "analysis.by_tag": "Nach Tag",
   "analysis.tag_overlap": "Überlappend: Ein Lauf zählt in jedem seiner Tags, daher ergeben die Zeilen zusammen mehr als die Gesamtsumme.",
-  "analysis.intro": "Summen über alle Geräte. Laufende Läufe zählen mit ihren vorläufigen Werten."
+  "analysis.intro": "Summen über alle Geräte. Laufende Läufe zählen mit ihren vorläufigen Werten.",
+  "basket.statement": "Kostenaufstellung…",
+  "statement.dialog_title": "Kostenaufstellung für {count} Läufe",
+  "statement.dialog_title_one": "Kostenaufstellung für 1 Lauf",
+  "statement.hint": "Ein PDF mit den Kosten der ausgewählten Läufe zum Weitergeben. Es ist keine Rechnung.",
+  "statement.title": "Titel",
+  "statement.default_title": "Kostenaufstellung",
+  "statement.note": "Hinweis (optional)",
+  "statement.detail": "Detailgrad",
+  "statement.detailed": "Ausführlich",
+  "statement.compact": "Kompakt",
+  "statement.language": "Sprache",
+  "statement.markup": "Aufschlag (%)",
+  "statement.cancel": "Abbrechen",
+  "statement.download": "PDF herunterladen",
+  "statement.failed": "Die Kostenaufstellung konnte nicht erstellt werden."
 }

@@ -14,6 +14,7 @@ from .images import DeviceImages, ImageLibrary, RunImageView, RunUploadView
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
 from .spoolman import CONF_SPOOLMAN_URL, Spoolman
+from .statement import CONF_MARKUP, CostStatements, CostStatementView
 from .store import RunStore, WattBillStores
 from .tracker import DeviceTracker
 
@@ -25,6 +26,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket.async_setup(hass)
     hass.http.register_view(RunImageView())
     hass.http.register_view(RunUploadView())
+    hass.http.register_view(CostStatementView())
     return True
 
 
@@ -67,6 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
             )
             for device in devices
         ],
+        statements=CostStatements(markup=entry.options.get(CONF_MARKUP, 0.0)),
     )
     entry.async_on_unload(images.async_follow_deletions())
     for device in devices:

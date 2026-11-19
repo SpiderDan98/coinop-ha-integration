@@ -246,10 +246,12 @@
       "init": {
         "title": "WattBill-Optionen",
         "data": {
-          "spoolman_url": "Spoolman-URL"
+          "spoolman_url": "Spoolman-URL",
+          "markup": "Standard-Aufschlag"
         },
         "data_description": {
-          "spoolman_url": "Optional. Die Adresse deines Spoolman-Servers, z. B. http://192.168.1.20:7912. Materialien, die mit einem Spoolman-Filament verknüpft sind, beziehen ihren Preis pro Gramm von dort. Leer lassen, um Spoolman nicht mehr zu lesen: Verknüpfte Materialien behalten den zuletzt gelesenen Preis."
+          "spoolman_url": "Optional. Die Adresse deines Spoolman-Servers, z. B. http://192.168.1.20:7912. Materialien, die mit einem Spoolman-Filament verknüpft sind, beziehen ihren Preis pro Gramm von dort. Leer lassen, um Spoolman nicht mehr zu lesen: Verknüpfte Materialien behalten den zuletzt gelesenen Preis.",
+          "markup": "Der Aufschlag, mit dem eine neue Kostenaufstellung beginnt: ein Prozentsatz auf ihre Zwischensumme. Du kannst ihn bei jedem Export ändern."
         }
       }
     },

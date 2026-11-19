@@ -8,6 +8,7 @@ from aiohttp import FormData, web
 from aiohttp.test_utils import TestClient
 from homeassistant.auth.models import User
 from homeassistant.core import HomeAssistant
+from multidict import CIMultiDictProxy
 from pytest_homeassistant_custom_component.common import CLIENT_ID
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
@@ -27,8 +28,12 @@ class HttpClient:
         return self._client
 
     async def get(self, path: str) -> tuple[int, bytes]:
+        status, _, body = await self.download(path)
+        return status, body
+
+    async def download(self, path: str) -> tuple[int, CIMultiDictProxy[str], bytes]:
         response = await (await self._session()).get(path)
-        return response.status, await response.read()
+        return response.status, response.headers, await response.read()
 
     async def upload(
         self, path: str, *files: bytes | tuple[bytes, str]

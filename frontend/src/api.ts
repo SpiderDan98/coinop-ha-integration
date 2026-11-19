@@ -295,6 +295,33 @@ export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
 
 export const deleteRuns = (hass: HomeAssistant, runIds: string[]) =>
   hass.callWS<{ drop: Totals }>({ type: "wattbill/runs/delete", run_ids: runIds });
+
+export const STATEMENT_DETAILS = ["detailed", "compact"] as const;
+export const STATEMENT_LANGUAGES = ["en", "de"] as const;
+
+/** The only option with a server-side default: the hub's Markup in %. */
+export const getStatementDefaults = (hass: HomeAssistant) =>
+  hass.callWS<{ markup: number }>({ type: "wattbill/cost_statement/defaults" });
+
+/** The signed path to download the PDF from, briefly; a null title means the default. */
+export const createStatement = async (
+  hass: HomeAssistant,
+  runIds: string[],
+  options: {
+    title: string | null;
+    note: string | null;
+    detail: (typeof STATEMENT_DETAILS)[number];
+    language: (typeof STATEMENT_LANGUAGES)[number];
+    markup: number;
+  },
+) =>
+  (
+    await hass.callWS<{ path: string }>({
+      type: "wattbill/cost_statement/create",
+      run_ids: runIds,
+      ...options,
+    })
+  ).path;
 /** Names a Tag doesn't exist under yet are created. */
 export const updateDeviceSettings = async (
   hass: HomeAssistant,

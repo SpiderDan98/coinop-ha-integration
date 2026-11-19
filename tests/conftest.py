@@ -64,6 +64,12 @@ def http(
 
 
 @pytest.fixture
+def browser(hass_client_no_auth: ClientSessionGenerator) -> HttpClient:
+    """A plain browser request: no auth header, so only a signed path gets in."""
+    return HttpClient(hass_client_no_auth)
+
+
+@pytest.fixture
 def files(hass: HomeAssistant, tmp_path: Path) -> Path:
     """WattBill's file folder, in a config directory of the test's own."""
     hass.config.config_dir = str(tmp_path)

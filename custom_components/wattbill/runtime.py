@@ -1,6 +1,6 @@
 """What a loaded hub entry holds while it runs."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
 
@@ -10,6 +10,7 @@ from .device_settings import DeviceSettings
 from .images import ImageLibrary
 from .run_book import RunBook
 from .spoolman import Spoolman
+from .statement import CostStatements
 from .tracker import DeviceTracker
 
 
@@ -22,6 +23,7 @@ class WattBill:
     settings: DeviceSettings
     spoolman: Spoolman
     trackers: list[DeviceTracker]
+    statements: CostStatements = field(default_factory=CostStatements)
 
 
 type WattBillConfigEntry = ConfigEntry[WattBill]

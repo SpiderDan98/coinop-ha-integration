@@ -1,0 +1,3 @@
+{
+  "path": "/api/wattbill/cost_statement/export-token?authSig=signature"
+}

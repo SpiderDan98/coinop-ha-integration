@@ -19,6 +19,7 @@ import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-gallery";
+import "./statement-dialog";
 import { NO_FILTER, selectable, type Filter } from "./run-gallery";
 import { deleteDialog, deviceName, runName } from "./run-parts";
 import { shared } from "./styles";
@@ -77,6 +78,7 @@ export class Overview extends LitElement {
   /** Set while the delete confirmation is open. */
   @state() private drop?: Totals;
   @state() private deleteFailed = false;
+  @state() private exporting = false;
   private request = 0;
 
   protected override willUpdate(changed: PropertyValues<this>) {
@@ -145,6 +147,15 @@ export class Overview extends LitElement {
         @selection-changed=${(event: CustomEvent<Set<string>>) => (this.selected = event.detail)}
       ></wattbill-run-gallery>
       ${selected.length ? this.renderBasket(selected, t, format) : nothing}
+      ${
+        this.exporting && selected.length
+          ? html`<wattbill-statement-dialog
+              .hass=${this.hass}
+              .runIds=${selected.map((run) => run.id)}
+              @close=${() => (this.exporting = false)}
+            ></wattbill-statement-dialog>`
+          : nothing
+      }
       ${
         this.drop
           ? deleteDialog(t("delete.title_many", { count: selected.length }), this.drop, t, format, {
@@ -310,6 +321,9 @@ export class Overview extends LitElement {
       </div>
       <div class="muted small names">${runs.map((run) => runName(run, t)).join(", ")}</div>
       <div class="row actions">
+        <button class="btn small statement" @click=${() => (this.exporting = true)}>
+          ${t("basket.statement")}
+        </button>
         <button class="btn small danger delete" @click=${this.confirmDelete}>
           ${t("basket.delete")}
         </button>

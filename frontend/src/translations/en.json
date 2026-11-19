@@ -277,5 +277,20 @@
   "analysis.by_outcome": "By Outcome",
   "analysis.by_tag": "By Tag",
   "analysis.tag_overlap": "Overlapping: a Run counts in each of its Tags, so the rows add up to more than the total.",
-  "analysis.intro": "Totals across all Devices. Open Runs count at their provisional values."
+  "analysis.intro": "Totals across all Devices. Open Runs count at their provisional values.",
+  "basket.statement": "Cost Statement…",
+  "statement.dialog_title": "Cost Statement for {count} Runs",
+  "statement.dialog_title_one": "Cost Statement for 1 Run",
+  "statement.hint": "A PDF of what the selected Runs cost, to hand over. It is not an invoice.",
+  "statement.title": "Title",
+  "statement.default_title": "Cost Statement",
+  "statement.note": "Note (optional)",
+  "statement.detail": "Level of detail",
+  "statement.detailed": "Detailed",
+  "statement.compact": "Compact",
+  "statement.language": "Language",
+  "statement.markup": "Markup (%)",
+  "statement.cancel": "Cancel",
+  "statement.download": "Download PDF",
+  "statement.failed": "The Cost Statement could not be made."
 }

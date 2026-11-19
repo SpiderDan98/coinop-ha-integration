@@ -28,6 +28,17 @@ export function navigate(path: string) {
   window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
 }
 
+/** Download a file the way HA's frontend does: a plain link, so the path must be signed. */
+export function download(path: string) {
+  const link = document.createElement("a");
+  link.href = path;
+  link.download = "";
+  link.style.display = "none";
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 /** Follow a link inside HA unless the user wants it in a new tab or window. */
 export function followLink(event: MouseEvent) {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)

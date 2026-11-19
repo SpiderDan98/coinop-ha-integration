@@ -207,7 +207,7 @@ describe("Selection basket", () => {
     await fill(panel, pick(panel, "Helmet"), "on");
     await fill(panel, pick(panel, "Benchy"), "on");
 
-    expect(basket(panel)).toBe("2 Runs €1.16 Benchy, Helmet Delete Clear");
+    expect(basket(panel)).toBe("2 Runs €1.16 Benchy, Helmet Cost Statement… Delete Clear");
     expect(queryAll(panel, ".pick-tile.selected")).toHaveLength(2);
     // The open Run can't be selected.
     expect(queryAll(panel, "input.pick")).toHaveLength(3);

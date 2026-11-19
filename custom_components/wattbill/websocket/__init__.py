@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant, callback
 from . import (
     aggregates,
     catalog,
+    cost_statement,
     devices,
     images,
     line_items,
@@ -37,6 +38,7 @@ def async_setup(hass: HomeAssistant) -> None:
         catalog,
         tags,
         templates,
+        cost_statement,
     ):
         for handler in module.COMMANDS:
             websocket_api.async_register_command(hass, handler)

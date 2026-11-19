@@ -1,0 +1,45 @@
+{
+  "title": "Kostenaufstellung",
+  "created": "Erstellt am {date}",
+  "period": "Zeitraum {start} – {end}",
+  "period_day": "Zeitraum {day}",
+  "running_time": "Laufzeit {duration}",
+  "part_one": "1 Teil",
+  "parts": "{count} Teile",
+  "per_part": "{amount} pro Teil",
+  "outcome": "Ausgang: {outcome}",
+  "untitled": "Unbenannter Lauf",
+  "with_outcome": "{name} ({outcome})",
+  "column": {
+    "line_item": "Posten",
+    "quantity": "Menge",
+    "unit_price": "Stückpreis",
+    "amount": "Betrag",
+    "run": "Lauf",
+    "device": "Gerät",
+    "started": "Start",
+    "part_count": "Teile",
+    "cost_per_part": "Pro Teil",
+    "total": "Summe"
+  },
+  "run_total": "Summe Lauf",
+  "subtotal": "Zwischensumme",
+  "markup": "Aufschlag {percent} %",
+  "total": "Gesamtsumme",
+  "footer": "Dies ist eine Kostenaufstellung, keine Rechnung.",
+  "page": "Seite {page} von {pages}",
+  "kind": {
+    "electricity": "Strom",
+    "material": "Material",
+    "other": "Sonstiges"
+  },
+  "outcome_name": {
+    "completed": "Abgeschlossen",
+    "cancelled": "Abgebrochen",
+    "failed": "Fehlgeschlagen",
+    "unknown": "Unbekannt"
+  },
+  "duration": "{hours} Std. {minutes} Min.",
+  "date": "{dd}.{mm}.{year}",
+  "months": "Jan. Feb. März Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez."
+}
