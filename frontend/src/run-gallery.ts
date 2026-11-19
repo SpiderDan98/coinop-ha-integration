@@ -14,13 +14,14 @@ import { sortTags, tagChip } from "./tag-input";
 
 const SHOWN_TAGS = 2;
 
-/** `outcome` is an Outcome, "open" or "failed_cancelled"; Tags match any of `tags`,
- * or no Tag at all with `untagged`. */
+const OUTCOME_FILTERS = ["open", ...OUTCOMES, "failed_cancelled"] as const;
+
+/** Tags match any of `tags`, or no Tag at all with `untagged`. */
 export const NO_FILTER = {
   name: "",
   deviceId: "",
   month: "",
-  outcome: "",
+  outcome: "" as "" | (typeof OUTCOME_FILTERS)[number],
   flagged: false,
   tags: [] as string[],
   untagged: false,
@@ -213,7 +214,6 @@ export class RunGallery extends LitElement {
       .filter(Boolean)
       .sort()
       .reverse();
-    const outcomes = ["open" as const, ...OUTCOMES];
     const value = (event: Event) => (event.target as HTMLInputElement | HTMLSelectElement).value;
     return html`<div class="filters row">
       <input
@@ -243,13 +243,15 @@ export class RunGallery extends LitElement {
       <select
         class="outcome-filter"
         aria-label=${t("runs.filter_outcome")}
-        @change=${(event: Event) => this.setFilter({ outcome: value(event) })}
+        @change=${(event: Event) => this.setFilter({ outcome: value(event) as Filter["outcome"] })}
       >
         <option value="">${t("runs.any_outcome")}</option>
-        ${outcomes.map(
-          (outcome) => html`<option value=${outcome}>${t(`outcome.${outcome}`)}</option>`,
+        ${OUTCOME_FILTERS.map(
+          (outcome) =>
+            html`<option value=${outcome}>
+              ${t(outcome === "failed_cancelled" ? "runs.failed_cancelled" : `outcome.${outcome}`)}
+            </option>`,
         )}
-        <option value="failed_cancelled">${t("runs.failed_cancelled")}</option>
       </select>
       ${this.renderTagFilter(runs, t)}
       <label class="flagged-filter">
