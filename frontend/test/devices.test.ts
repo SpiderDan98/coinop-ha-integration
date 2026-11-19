@@ -71,6 +71,44 @@ describe("Devices tab", () => {
     );
   });
 
+  it("names the entity of a measured consumption source", async () => {
+    const [kobra] = recorded.devices;
+    const meter = { attribute: null, unit: "kWh", factor: null };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        {
+          ...kobra,
+          ha_settings: {
+            ...kobra.ha_settings,
+            consumption: { ...meter, source: "energy", entity_id: "sensor.plug_energy" },
+          },
+        },
+        {
+          ...kobra,
+          id: "device-mini",
+          name: "Mini",
+          ha_settings: {
+            ...kobra.ha_settings,
+            consumption: {
+              ...meter,
+              source: "power",
+              entity_id: "sensor.plug",
+              attribute: "power",
+              running_power: 60,
+            },
+          },
+        },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device .consumption").map(text)).toEqual([
+      "Energy meter sensor.plug_energy",
+      "Power sensor sensor.plug · power · 60 W running",
+    ]);
+  });
+
   it("shows no card for a removed Device", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/devices" });
 

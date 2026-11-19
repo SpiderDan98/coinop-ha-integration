@@ -19,6 +19,17 @@ SHARED_TERMS = {
     "run.running_time": "entity.sensor.running_time.name",
     "run.started": "entity.event.run.state_attributes.event_type.state.started",
     "run.ended": "entity.event.run.state_attributes.event_type.state.ended",
+    "device.status": "config_subentries.device.step.status.title",
+    "device.job": "config_subentries.device.step.job.title",
+    "device.consumption": (
+        "config_subentries.device.step.reconfigure.menu_options.consumption"
+    ),
+    "device.price": "config_subentries.device.step.price.title",
+    "consumption.energy": "config_subentries.device.step.consumption.menu_options.energy",
+    "consumption.power": "config_subentries.device.step.consumption.menu_options.power",
+    "consumption.estimate": (
+        "config_subentries.device.step.consumption.menu_options.estimate"
+    ),
 }
 
 

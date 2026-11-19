@@ -44,6 +44,8 @@
   "device.not_used": "Nicht verwendet",
   "device.ha_settings": "Geräteeingänge, Verbrauchsquelle und Preis werden in Home Assistant geändert.",
   "device.reconfigure": "In Home Assistant neu konfigurieren",
+  "consumption.energy": "Energiezähler",
+  "consumption.power": "Leistungssensor",
   "consumption.estimate": "Aus Durchschnittsleistung schätzen",
   "consumption.running": "{power} im Betrieb",
   "consumption.paused": "{power} in Pause",

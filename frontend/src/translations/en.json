@@ -44,6 +44,8 @@
   "device.not_used": "Not used",
   "device.ha_settings": "Device Inputs, consumption source and price are changed in Home Assistant.",
   "device.reconfigure": "Reconfigure in Home Assistant",
+  "consumption.energy": "Energy meter",
+  "consumption.power": "Power sensor",
   "consumption.estimate": "Estimate from average power",
   "consumption.running": "{power} running",
   "consumption.paused": "{power} paused",

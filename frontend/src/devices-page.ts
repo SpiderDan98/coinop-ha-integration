@@ -15,7 +15,26 @@ const input = (
   t: Localize,
 ) => (entity_id ? [entity_id, attribute].filter(Boolean).join(" · ") : t("device.not_used"));
 
-const watts = (power: number, format: Format) => format.quantity(power, "W");
+const consumptionDetails = (
+  { consumption }: Device["ha_settings"],
+  t: Localize,
+  format: Format,
+) => {
+  const running = (power: number | null) =>
+    power !== null && t("consumption.running", { power: format.quantity(power, "W") });
+  const details =
+    consumption.source === "estimate"
+      ? [
+          running(consumption.running_power),
+          consumption.paused_power !== null &&
+            t("consumption.paused", { power: format.quantity(consumption.paused_power, "W") }),
+        ]
+      : [
+          input(consumption, t),
+          consumption.source === "power" && running(consumption.running_power),
+        ];
+  return details.filter(Boolean).join(" · ");
+};
 
 @customElement("wattbill-devices-page")
 export class DevicesPage extends LitElement {
@@ -42,7 +61,6 @@ export class DevicesPage extends LitElement {
 
   private renderDevice({ name, ha_settings: ha }: Device, t: Localize) {
     const format = formatter(this.hass);
-    const { consumption } = ha;
     return html`<div class="card device">
       <h3>${name}</h3>
       <dl>
@@ -51,17 +69,9 @@ export class DevicesPage extends LitElement {
         <dt>${t("device.job")}</dt>
         <dd>${input(ha.job, t)}</dd>
         <dt>${t("device.consumption")}</dt>
-        <dd>
-          <div>${t(`consumption.${consumption.source}`)}</div>
-          <div class="muted small">
-            ${[
-              t("consumption.running", { power: watts(consumption.running_power, format) }),
-              consumption.paused_power !== null &&
-                t("consumption.paused", { power: watts(consumption.paused_power, format) }),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </div>
+        <dd class="consumption">
+          <div>${t(`consumption.${ha.consumption.source}`)}</div>
+          <div class="muted small">${consumptionDetails(ha, t, format)}</div>
         </dd>
         <dt>${t("device.price")}</dt>
         <dd>${t(`price.${ha.price.source}`, { price: format.unitPrice(ha.price.value) })}</dd>

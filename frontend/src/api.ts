@@ -43,7 +43,16 @@ export interface Device {
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
     job: { entity_id: string | null; attribute: string | null };
-    consumption: { source: "estimate"; running_power: number; paused_power: number | null };
+    consumption:
+      | { source: "estimate"; running_power: number; paused_power: number | null }
+      | { source: "energy"; entity_id: string; attribute: string | null }
+      | {
+          source: "power";
+          entity_id: string;
+          attribute: string | null;
+          /** Fills gaps in the power reports. */
+          running_power: number | null;
+        };
     price: { source: "fixed"; value: number };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
