@@ -1,0 +1,13 @@
+{
+  "drop": {
+    "cost": 0.3,
+    "electricity_cost": 0.3,
+    "material_cost": 0.0,
+    "other_cost": 0.0,
+    "material_grams": 0.0,
+    "energy_kwh": 1.08,
+    "runs": 1,
+    "running_hours": 9.0,
+    "flagged_runs": 1
+  }
+}

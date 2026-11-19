@@ -1,0 +1,99 @@
+[
+  {
+    "materials": [],
+    "tags": [],
+    "templates": []
+  },
+  {
+    "materials": [
+      {
+        "id": "material-1",
+        "name": "eSun PLA+ black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 19.99,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        },
+        "price_per_gram": 0.019989999999999997
+      },
+      {
+        "id": "material-2",
+        "name": "Standard Resin grey",
+        "form": "resin",
+        "type": "Standard resin",
+        "density": 1.1,
+        "vendor": null,
+        "colour": "#8a8a8a",
+        "diameter": null,
+        "default_for_type": false,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 29.99,
+          "pack_size": 1000.0,
+          "pack_unit": "ml"
+        },
+        "price_per_gram": 0.02726363636363636
+      },
+      {
+        "id": "material-3",
+        "name": "PLA red (old brand)",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": null,
+        "colour": null,
+        "diameter": 1.75,
+        "default_for_type": false,
+        "archived": true,
+        "price": {
+          "source": "fixed",
+          "pack_price": 15.99,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        },
+        "price_per_gram": 0.01599
+      }
+    ],
+    "tags": [
+      "Cosplay helmet",
+      "Gift",
+      "Spare parts"
+    ],
+    "templates": [
+      {
+        "id": "template-wear",
+        "label": "Wear Kobra",
+        "unit": "h",
+        "unit_price": 0.15,
+        "default_quantity": 1.0,
+        "basis": "running_hours"
+      },
+      {
+        "id": "template-inserts",
+        "label": "Threaded inserts",
+        "unit": "pcs",
+        "unit_price": 0.08,
+        "default_quantity": 8.0,
+        "basis": "entered"
+      },
+      {
+        "id": "template-packaging",
+        "label": "Packaging",
+        "unit": "",
+        "unit_price": 0.6,
+        "default_quantity": 1.0,
+        "basis": "entered"
+      }
+    ]
+  }
+]

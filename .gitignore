@@ -1,0 +1,16 @@
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+
+# Panel bundle, built from frontend/
+custom_components/wattbill/frontend/
+
+# Release asset, built by scripts/release.py
+dist/

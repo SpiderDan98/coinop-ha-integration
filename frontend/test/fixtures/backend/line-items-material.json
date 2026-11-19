@@ -1,0 +1,152 @@
+{
+  "run": {
+    "id": "helmet",
+    "device_id": "device-kobra",
+    "device_name": "Kobra",
+    "name": "Helmet",
+    "job_name": null,
+    "started": "2026-01-13T10:00:00+00:00",
+    "last_seen": null,
+    "ended": "2026-01-13T19:00:00+00:00",
+    "outcome": "failed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [
+      "fault"
+    ],
+    "part_count": 1,
+    "note": null,
+    "tags": [
+      "Cosplay helmet",
+      "Gift"
+    ],
+    "consumption": null,
+    "cost_source": null,
+    "prices": [],
+    "average_powers": [],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 1.08,
+        "unit": "kWh",
+        "unit_price": 0.27777777777777773,
+        "amount": 0.3,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-13T10:00:00+00:00",
+            "end": "2026-01-13T16:00:00+00:00",
+            "kwh": 0.6,
+            "unit_price": 0.3
+          },
+          {
+            "start": "2026-01-13T16:00:00+00:00",
+            "end": "2026-01-13T19:00:00+00:00",
+            "kwh": 0.48,
+            "unit_price": 0.25
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "helmet-filament",
+        "kind": "material",
+        "label": null,
+        "material_id": "petg-white",
+        "material": {
+          "name": "PETG White",
+          "type": "PETG",
+          "density": 1.27,
+          "diameter": 1.75,
+          "price_per_gram": 0.03
+        },
+        "measured": true,
+        "length": 30000.0,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 91.64123945291851,
+        "unit": "g",
+        "unit_price": 0.03,
+        "amount": 2.75,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      },
+      {
+        "id": "helmet-refund",
+        "kind": "other",
+        "label": "Refund for the failed print",
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 1.0,
+        "unit": "",
+        "unit_price": -2.0,
+        "amount": -2.0,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [
+      {
+        "id": "helmet-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-13T19:00:00+00:00",
+        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      }
+    ],
+    "cover_id": null,
+    "running_seconds": 32400,
+    "total": 1.05,
+    "cost_per_part": 1.05,
+    "cover": {
+      "id": "helmet-snapshot",
+      "kind": "snapshot",
+      "created": "2026-01-13T19:00:00+00:00",
+      "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+      "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+    },
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.3,
+      "material": 2.75,
+      "other": -2.0
+    }
+  }
+}

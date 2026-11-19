@@ -1,0 +1,505 @@
+[
+  {
+    "run": {
+      "id": "benchy",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": "Benchy",
+      "job_name": null,
+      "started": "2026-01-12T10:00:00+00:00",
+      "last_seen": null,
+      "ended": "2026-01-12T11:15:00+00:00",
+      "outcome": "completed",
+      "end_reconstructed": false,
+      "finalised": true,
+      "pauses": [],
+      "flags": [],
+      "part_count": 4,
+      "note": "Four on one plate",
+      "tags": [
+        "Gift"
+      ],
+      "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
+      "usage": null,
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 0.15,
+          "unit": "kWh",
+          "unit_price": 0.3,
+          "amount": 0.05,
+          "method": "estimated",
+          "segments": [
+            {
+              "start": "2026-01-12T10:00:00+00:00",
+              "end": "2026-01-12T11:15:00+00:00",
+              "kwh": 0.15,
+              "unit_price": 0.3
+            }
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
+        },
+        {
+          "id": "benchy-pla",
+          "kind": "material",
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 4191.0,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 12.5,
+          "unit": "g",
+          "unit_price": 0.025,
+          "amount": 0.31,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
+        },
+        {
+          "id": "benchy-wear",
+          "kind": "other",
+          "label": "Nozzle wear",
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 1,
+          "unit": "pcs",
+          "unit_price": 0.5,
+          "amount": 0.5,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
+        }
+      ],
+      "images": [
+        {
+          "id": "benchy-thumbnail",
+          "kind": "thumbnail",
+          "created": "2026-01-12T10:00:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+        },
+        {
+          "id": "benchy-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-12T11:15:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-snapshot",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
+        }
+      ],
+      "cover_id": null,
+      "running_seconds": 4500,
+      "total": 0.86,
+      "cost_per_part": 0.22,
+      "cover": {
+        "id": "benchy-thumbnail",
+        "kind": "thumbnail",
+        "created": "2026-01-12T10:00:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+      },
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "subtotals": {
+        "electricity": 0.05,
+        "material": 0.31,
+        "other": 0.5
+      }
+    }
+  },
+  {
+    "run": {
+      "id": "helmet",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": "Helmet",
+      "job_name": null,
+      "started": "2026-01-13T10:00:00+00:00",
+      "last_seen": null,
+      "ended": "2026-01-13T19:00:00+00:00",
+      "outcome": "failed",
+      "end_reconstructed": false,
+      "finalised": true,
+      "pauses": [],
+      "flags": [
+        "fault",
+        "material_missing"
+      ],
+      "part_count": 1,
+      "note": null,
+      "tags": [
+        "Cosplay helmet",
+        "Gift"
+      ],
+      "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
+      "usage": null,
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 1.08,
+          "unit": "kWh",
+          "unit_price": 0.27777777777777773,
+          "amount": 0.3,
+          "method": "estimated",
+          "segments": [
+            {
+              "start": "2026-01-13T10:00:00+00:00",
+              "end": "2026-01-13T16:00:00+00:00",
+              "kwh": 0.6,
+              "unit_price": 0.3
+            },
+            {
+              "start": "2026-01-13T16:00:00+00:00",
+              "end": "2026-01-13T19:00:00+00:00",
+              "kwh": 0.48,
+              "unit_price": 0.25
+            }
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
+        },
+        {
+          "id": "helmet-filament",
+          "kind": "material",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": true,
+          "length": 30000.0,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": null,
+          "unit": "g",
+          "unit_price": 0,
+          "amount": 0.0,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
+        }
+      ],
+      "images": [
+        {
+          "id": "helmet-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-13T19:00:00+00:00",
+          "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+          "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+        }
+      ],
+      "cover_id": null,
+      "running_seconds": 32400,
+      "total": 0.3,
+      "cost_per_part": 0.3,
+      "cover": {
+        "id": "helmet-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-13T19:00:00+00:00",
+        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      },
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "subtotals": {
+        "electricity": 0.3,
+        "material": 0.0,
+        "other": 0.0
+      }
+    }
+  },
+  {
+    "run": {
+      "id": "cancelled",
+      "device_id": "device-mini",
+      "device_name": "Mini",
+      "name": null,
+      "job_name": null,
+      "started": "2026-01-14T10:00:00+00:00",
+      "last_seen": null,
+      "ended": "2026-01-14T10:30:00+00:00",
+      "outcome": "cancelled",
+      "end_reconstructed": false,
+      "finalised": true,
+      "pauses": [],
+      "flags": [],
+      "part_count": 1,
+      "note": null,
+      "tags": [],
+      "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
+      "usage": null,
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 0.24,
+          "unit": "kWh",
+          "unit_price": 0.3,
+          "amount": 0.07,
+          "method": "estimated",
+          "segments": [
+            {
+              "start": "2026-01-14T10:00:00+00:00",
+              "end": "2026-01-14T10:30:00+00:00",
+              "kwh": 0.24,
+              "unit_price": 0.3
+            }
+          ],
+          "computed": null,
+          "locked": false,
+          "deletable": false
+        }
+      ],
+      "images": [],
+      "cover_id": null,
+      "running_seconds": 1800,
+      "total": 0.07,
+      "cost_per_part": 0.07,
+      "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "subtotals": {
+        "electricity": 0.07,
+        "material": 0.0,
+        "other": 0.0
+      }
+    }
+  },
+  {
+    "run": {
+      "id": "print-live",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": null,
+      "job_name": null,
+      "started": "2026-01-15T10:00:00+00:00",
+      "last_seen": "2026-01-15T10:45:00+00:00",
+      "ended": null,
+      "outcome": null,
+      "end_reconstructed": false,
+      "finalised": false,
+      "pauses": [],
+      "flags": [],
+      "part_count": 1,
+      "note": null,
+      "tags": [
+        "Batch 7"
+      ],
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120.0,
+        "paused_power": 8.0
+      },
+      "cost_source": {
+        "source": "fixed",
+        "value": 0.3
+      },
+      "prices": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          0.3
+        ]
+      ],
+      "average_powers": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          120.0,
+          8.0
+        ]
+      ],
+      "usage": {
+        "at": "2026-01-15T10:00:00+00:00",
+        "value": 1500.0,
+        "unit": "mm"
+      },
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "print-live-electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 0.09,
+          "unit": "kWh",
+          "unit_price": 0.3,
+          "amount": 0.03,
+          "method": "estimated",
+          "segments": [
+            {
+              "start": "2026-01-15T10:00:00+00:00",
+              "end": "2026-01-15T10:45:00+00:00",
+              "kwh": 0.09,
+              "unit_price": 0.3
+            }
+          ],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        },
+        {
+          "id": "print-live-material",
+          "kind": "material",
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 1500.0,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 4.473824288252715,
+          "unit": "g",
+          "unit_price": 0.025,
+          "amount": 0.11,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        },
+        {
+          "id": "print-live-wear",
+          "kind": "other",
+          "label": "Wear Kobra",
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": "template-wear",
+          "basis": "running_hours",
+          "quantity": 0.75,
+          "unit": "h",
+          "unit_price": 0.15,
+          "amount": 0.11,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        }
+      ],
+      "images": [],
+      "cover_id": null,
+      "running_seconds": 2700,
+      "total": 0.25,
+      "cost_per_part": 0.25,
+      "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "subtotals": {
+        "electricity": 0.03,
+        "material": 0.11,
+        "other": 0.11
+      }
+    }
+  }
+]

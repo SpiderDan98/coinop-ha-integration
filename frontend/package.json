@@ -1,0 +1,32 @@
+{
+  "name": "wattbill-panel",
+  "private": true,
+  "type": "module",
+  "description": "The WattBill sidebar panel, bundled into custom_components/wattbill/frontend/",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@mdi/js": "7.4.47",
+    "lit": "3.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "eslint-plugin-lit": "2.3.1",
+    "happy-dom": "21.0.4",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "5.1.1"
+  }
+}
