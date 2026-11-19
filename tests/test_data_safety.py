@@ -72,6 +72,38 @@ async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_i
     assert issue.translation_placeholders == {"stores": lost}
 
 
+@pytest.mark.parametrize(
+    ("store", "data"),
+    [
+        ("wattbill.runs", {"runs": [{"id": "benchy"}]}),
+        ("wattbill.live", {"runs": "benchy"}),
+        ("wattbill.catalog", {"materials": [{"id": "pla", "name": "PLA"}]}),
+        ("wattbill.device_settings", {"devices": []}),
+    ],
+)
+async def test_corrupt_data_stops_setup_without_writing_and_raises_a_repair_issue(
+    hass: HomeAssistant,
+    clock: Clock,
+    hass_storage: dict[str, Any],
+    store: str,
+    data: dict[str, Any],
+) -> None:
+    """Readable JSON that isn't WattBill's shape, e.g. after a bad manual edit."""
+    entry = await record_a_run(hass, clock)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    hass_storage[store]["data"] = data
+    before = wattbill_data(hass_storage)
+
+    assert not await set_up_again(hass, entry)
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert wattbill_data(hass_storage) == before
+    issue = ir.async_get(hass).async_get_issue("wattbill", "data_corrupt")
+    assert issue is not None
+    assert issue.severity is ir.IssueSeverity.CRITICAL
+    assert issue.translation_placeholders == {"store": store}
+
+
 async def lose_runs(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> ConfigEntry:

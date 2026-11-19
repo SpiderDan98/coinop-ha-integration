@@ -315,6 +315,9 @@
     },
     "data_too_new": {
       "message": "{store} wurde von einer neueren WattBill-Version geschrieben. Aktualisiere WattBill oder stelle ein Backup wieder her, das mit dieser Version erstellt wurde."
+    },
+    "data_corrupt": {
+      "message": "WattBills gespeicherte Daten in {store} sind beschädigt. WattBill wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird. Stelle ein Backup von vor der Beschädigung wieder her."
     }
   },
   "issues": {
@@ -339,6 +342,10 @@
           "restore": "Stelle unter Einstellungen > System > Backups ein Backup von vor dem Datenverlust wieder her. Dadurch kommen alle Daten von WattBill so zurück, wie sie damals waren. Bis dahin bleibt WattBill gestoppt."
         }
       }
+    },
+    "data_corrupt": {
+      "title": "WattBills gespeicherte Daten sind beschädigt",
+      "description": "WattBill konnte {store} lesen, aber der Inhalt ist nicht das, was WattBill schreibt, etwa nach einer Bearbeitung von Hand. WattBill wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle unter Einstellungen > System > Backups ein Backup von vor der Beschädigung wieder her oder lege eine aufbewahrte Kopie der Datei zurück. Bis dahin bleibt WattBill gestoppt."
     }
   }
 }

@@ -315,6 +315,9 @@
     },
     "data_too_new": {
       "message": "{store} was written by a newer version of WattBill. Update WattBill or restore a backup made with this version."
+    },
+    "data_corrupt": {
+      "message": "WattBill's stored data in {store} is corrupt. WattBill did not start so it cannot overwrite your history. Restore a backup made before the damage."
     }
   },
   "issues": {
@@ -339,6 +342,10 @@
           "restore": "Restore a backup from before the data went missing under Settings > System > Backups. Restoring brings back all of WattBill's data as it was then. Until then WattBill stays stopped."
         }
       }
+    },
+    "data_corrupt": {
+      "title": "WattBill's stored data is corrupt",
+      "description": "WattBill could read {store}, but its content is not what WattBill writes, e.g. after it was edited by hand. WattBill did not start so it cannot overwrite your history.\n\nRestore a backup made before the damage under Settings > System > Backups, or put back a copy of the file you kept. Until then WattBill stays stopped."
     }
   }
 }
