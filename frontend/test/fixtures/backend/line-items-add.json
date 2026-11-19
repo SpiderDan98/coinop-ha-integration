@@ -13,7 +13,8 @@
     "finalised": true,
     "pauses": [],
     "flags": [
-      "fault"
+      "fault",
+      "material_missing"
     ],
     "part_count": 1,
     "note": null,
@@ -57,6 +58,24 @@
         "computed": null,
         "locked": false,
         "deletable": false
+      },
+      {
+        "id": "helmet-filament",
+        "kind": "material",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": true,
+        "length": 30000.0,
+        "quantity": null,
+        "unit": "g",
+        "unit_price": 0,
+        "amount": 0.0,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
       },
       {
         "id": "helmet-refund",

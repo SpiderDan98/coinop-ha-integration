@@ -56,11 +56,17 @@
       {
         "id": "benchy-pla",
         "kind": "material",
-        "label": "PLA Basic Black",
-        "material_id": null,
-        "material": null,
-        "measured": false,
-        "length": null,
+        "label": null,
+        "material_id": "pla-black",
+        "material": {
+          "name": "PLA Basic Black",
+          "type": "PLA",
+          "density": 1.24,
+          "diameter": 1.75,
+          "price_per_gram": 0.025
+        },
+        "measured": true,
+        "length": 4191.0,
         "quantity": 12.5,
         "unit": "g",
         "unit_price": 0.025,

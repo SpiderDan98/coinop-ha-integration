@@ -53,11 +53,17 @@
         {
           "id": "benchy-pla",
           "kind": "material",
-          "label": "PLA Basic Black",
-          "material_id": null,
-          "material": null,
-          "measured": false,
-          "length": null,
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 4191.0,
           "quantity": 12.5,
           "unit": "g",
           "unit_price": 0.025,
@@ -135,7 +141,8 @@
       "finalised": true,
       "pauses": [],
       "flags": [
-        "fault"
+        "fault",
+        "material_missing"
       ],
       "part_count": 1,
       "note": null,
@@ -179,6 +186,24 @@
           "computed": null,
           "locked": false,
           "deletable": false
+        },
+        {
+          "id": "helmet-filament",
+          "kind": "material",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": true,
+          "length": 30000.0,
+          "quantity": null,
+          "unit": "g",
+          "unit_price": 0,
+          "amount": 0.0,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         }
       ],
       "images": [
@@ -311,7 +336,11 @@
           8.0
         ]
       ],
-      "usage": null,
+      "usage": {
+        "at": "2026-01-15T10:00:00+00:00",
+        "value": 1500.0,
+        "unit": "mm"
+      },
       "line_items": [
         {
           "id": "print-live-electricity",
@@ -337,16 +366,40 @@
           "computed": null,
           "locked": true,
           "deletable": false
+        },
+        {
+          "id": "print-live-material",
+          "kind": "material",
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 1500.0,
+          "quantity": 4.473824288252715,
+          "unit": "g",
+          "unit_price": 0.025,
+          "amount": 0.11,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": true,
+          "deletable": false
         }
       ],
       "images": [],
       "running_seconds": 2700,
-      "total": 0.03,
-      "cost_per_part": 0.03,
+      "total": 0.14,
+      "cost_per_part": 0.14,
       "cover": null,
       "subtotals": {
         "electricity": 0.03,
-        "material": 0.0,
+        "material": 0.11,
         "other": 0.0
       }
     }

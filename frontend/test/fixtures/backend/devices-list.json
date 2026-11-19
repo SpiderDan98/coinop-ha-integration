@@ -31,7 +31,11 @@
         "job": {
           "entity_id": "sensor.kobra_job",
           "attribute": null,
-          "material": null
+          "material": {
+            "entity_id": "sensor.kobra_filament_used",
+            "attribute": null,
+            "unit": "mm"
+          }
         },
         "images": {
           "thumbnail": null,
@@ -52,7 +56,7 @@
         "tags_for_new_runs": [
           "Batch 7"
         ],
-        "default_material": null
+        "default_material": "pla-black"
       }
     }
   ]
