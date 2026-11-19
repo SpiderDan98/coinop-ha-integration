@@ -187,5 +187,124 @@
         "flagged_runs": 0
       }
     ]
+  },
+  {
+    "group_by": [
+      "kind"
+    ],
+    "groups": [
+      {
+        "kind": "electricity",
+        "cost": 0.42,
+        "electricity_cost": 0.42,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 1.47,
+        "runs": 3,
+        "running_hours": 10.75,
+        "flagged_runs": 1
+      },
+      {
+        "kind": "material",
+        "cost": 0.31,
+        "electricity_cost": 0.0,
+        "material_cost": 0.31,
+        "other_cost": 0.0,
+        "material_grams": 12.5,
+        "energy_kwh": 0.0,
+        "runs": 2,
+        "running_hours": 10.25,
+        "flagged_runs": 1
+      },
+      {
+        "kind": "other",
+        "cost": 0.5,
+        "electricity_cost": 0.0,
+        "material_cost": 0.0,
+        "other_cost": 0.5,
+        "material_grams": 0.0,
+        "energy_kwh": 0.0,
+        "runs": 1,
+        "running_hours": 1.25,
+        "flagged_runs": 0
+      }
+    ]
+  },
+  {
+    "group_by": [
+      "device"
+    ],
+    "groups": [
+      {
+        "device_id": "device-kobra",
+        "device_name": "Kobra",
+        "cost": 1.16,
+        "electricity_cost": 0.35,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 1.23,
+        "runs": 2,
+        "running_hours": 10.25,
+        "flagged_runs": 1
+      },
+      {
+        "device_id": "device-mini",
+        "device_name": "Mini",
+        "cost": 0.07,
+        "electricity_cost": 0.07,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 0.24,
+        "runs": 1,
+        "running_hours": 0.5,
+        "flagged_runs": 0
+      }
+    ]
+  },
+  {
+    "group_by": [
+      "tag"
+    ],
+    "groups": [
+      {
+        "tag": "Cosplay helmet",
+        "cost": 0.3,
+        "electricity_cost": 0.3,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 1.08,
+        "runs": 1,
+        "running_hours": 9.0,
+        "flagged_runs": 1
+      },
+      {
+        "tag": "Gift",
+        "cost": 1.16,
+        "electricity_cost": 0.35,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 1.23,
+        "runs": 2,
+        "running_hours": 10.25,
+        "flagged_runs": 1
+      },
+      {
+        "tag": null,
+        "cost": 0.07,
+        "electricity_cost": 0.07,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 0.24,
+        "runs": 1,
+        "running_hours": 0.5,
+        "flagged_runs": 0
+      }
+    ]
   }
 ]
