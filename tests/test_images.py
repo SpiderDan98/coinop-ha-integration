@@ -542,3 +542,19 @@ async def test_files_no_run_refers_to_are_removed_at_startup(
         f"{image['id']}.tile.webp",
     }
     assert await thumbnail_colour(panel, http) == "red"
+
+
+async def test_a_thumbnail_picked_while_a_run_is_open_applies_to_it_at_once(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture("green"))
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+
+    await reconfigure(
+        hass, entry, subentry, {"next_step_id": "images"}, {"thumbnail": THUMBNAIL}
+    )
+
+    assert await thumbnail_colour(panel, http) == "green"

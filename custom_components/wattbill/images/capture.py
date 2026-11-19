@@ -74,7 +74,8 @@ class DeviceImages:
             self._retries.pop()()
 
     @callback
-    def async_run_started(self, run: Run) -> None:
+    def async_copy_thumbnail(self, run: Run) -> None:
+        """Copy what the Thumbnail input shows now to the open Run."""
         entity_id = self._config.thumbnail_entity_id
         if entity_id and _has_image(self._hass.states.get(entity_id)):
             self._hass.async_create_task(self._async_copy_thumbnail(run, entity_id))

@@ -59,7 +59,11 @@ class DeviceTracker:
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
         ]
         self._images.async_start()
+        run = self._book.open_run(self._config.device_id)
         self._apply(self._hass.states.get(self._config.status_entity_id))
+        # A Run still open after a restart or reconfigure gets the current Thumbnail.
+        if run is not None and self._book.open_run(self._config.device_id) is run:
+            self._images.async_copy_thumbnail(run)
 
     @callback
     def async_stop(self) -> None:
@@ -160,7 +164,7 @@ class DeviceTracker:
         )
         self._refresh(run, at)
         self._book.async_start(run)
-        self._images.async_run_started(run)
+        self._images.async_copy_thumbnail(run)
 
     async def async_end_run(self) -> None:
         """End the open Run now as Unknown, e.g. because its Device is removed."""
