@@ -31,6 +31,7 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
+from .profiles import detect
 from .schema import vol
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
@@ -121,6 +122,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         if user_input is not None:
             self._data["printer_device_id"] = user_input.get("device")
+            self._data |= detect(self.hass, self._data["printer_device_id"]) or {}
             return await self.async_step_name()
         return self.async_show_form(
             step_id="user",
