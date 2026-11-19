@@ -69,6 +69,20 @@ class RunBook:
         await self._store.async_save_live(self._unfinalised())
         self._announce(RunChange.ENDED, run)
 
+    async def async_rename_device(self, device_id: str, name: str) -> None:
+        """Keep every Run's Device name current, so removed Devices keep their last one."""
+        renamed = [
+            run
+            for run in self._runs.values()
+            if run.device_id == device_id and run.device_name != name
+        ]
+        for run in renamed:
+            run.device_name = name
+        if any(run.finalised for run in renamed):
+            await self._store.async_save_runs(r for r in self.runs() if r.finalised)
+        if not all(run.finalised for run in renamed):
+            await self.async_flush()
+
     async def async_flush(self) -> None:
         """Write pending live changes now, e.g. before unloading."""
         await self._store.async_save_live(self._unfinalised())

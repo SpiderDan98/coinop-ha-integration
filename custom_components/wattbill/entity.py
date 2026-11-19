@@ -1,11 +1,10 @@
 """Base for per-Device entities: one HA device per Device, refreshed on its Run changes."""
 
 from homeassistant.core import callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from .const import DOMAIN
 from .device_config import DeviceConfig
+from .ha_device import device_info
 from .models import Run
 from .run_book import RunBook, RunChange
 
@@ -18,9 +17,7 @@ class DeviceEntity(Entity):
         self._book = book
         self._device_id = device.device_id
         self._attr_unique_id = f"{device.device_id}_{key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.device_id)}, name=device.name
-        )
+        self._attr_device_info = device_info(device)
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(self._book.async_listen(self._on_book_change))
