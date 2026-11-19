@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Message } from "../src/hass";
 import { recorded, recordedBackend } from "./fake-hass";
 import { change, click, fill, mountPanel, query, queryAll, text } from "./render";
 
@@ -8,8 +7,6 @@ const ADD = "wattbill/line_items/add";
 const SETTINGS = "wattbill/devices/update_settings";
 const [started] = recorded.changes;
 
-const sent = (backend: { calls: Message[] }, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
 const picker = (row: HTMLElement) => query(row, "select[name=material_id]") as HTMLSelectElement;
 const options = (select: HTMLElement) => queryAll(select, "option").map(text);
@@ -40,7 +37,7 @@ describe("Material Line Items", () => {
 
     await change(panel, picker(filament), "material-1");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       {
         type: UPDATE,
         run_id: "helmet",
@@ -83,7 +80,7 @@ describe("Material Line Items", () => {
     await fill(panel, query(form, "select[name=unit]"), "ml");
     await click(panel, query(form, "button[type=submit]"));
 
-    expect(sent(backend, ADD)).toEqual([
+    expect(backend.sent(ADD)).toEqual([
       {
         type: ADD,
         run_id: "benchy",
@@ -113,7 +110,7 @@ describe("Default Material", () => {
     await fill(panel, select, "material-1");
     await fill(panel, query(panel, ".default-material select"), "");
 
-    expect(sent(backend, SETTINGS)).toEqual([
+    expect(backend.sent(SETTINGS)).toEqual([
       { type: SETTINGS, device_id: "device-kobra", settings: { default_material: "material-1" } },
       { type: SETTINGS, device_id: "device-kobra", settings: { default_material: null } },
     ]);

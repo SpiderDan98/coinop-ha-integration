@@ -93,6 +93,8 @@ async def test_reset_restores_the_computed_values(
         ({"amount": 0}, 0.2, 0, 0),
         ({"quantity": None, "amount": 0.4}, None, 1, 0.4),
         ({"quantity": 0, "amount": 0.4}, 0, 1, 0.4),
+        ({"quantity": 0}, 0, 1, 0),
+        ({"quantity": None}, None, 1, 0),
     ],
 )
 async def test_overrides_keep_amount_quantity_times_unit_price(

@@ -306,5 +306,143 @@
         "flagged_runs": 0
       }
     ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "benchy"
+    ],
+    "groups": [
+      {
+        "cost": 0.86,
+        "electricity_cost": 0.05,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 0.15,
+        "runs": 1,
+        "running_hours": 1.25,
+        "flagged_runs": 0
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "cancelled"
+    ],
+    "groups": [
+      {
+        "cost": 0.07,
+        "electricity_cost": 0.07,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 0.24,
+        "runs": 1,
+        "running_hours": 0.5,
+        "flagged_runs": 0
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "helmet"
+    ],
+    "groups": [
+      {
+        "cost": 0.3,
+        "electricity_cost": 0.3,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 1.08,
+        "runs": 1,
+        "running_hours": 9.0,
+        "flagged_runs": 1
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "benchy",
+      "cancelled"
+    ],
+    "groups": [
+      {
+        "cost": 0.93,
+        "electricity_cost": 0.12,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 0.39,
+        "runs": 2,
+        "running_hours": 1.75,
+        "flagged_runs": 0
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "benchy",
+      "helmet"
+    ],
+    "groups": [
+      {
+        "cost": 1.16,
+        "electricity_cost": 0.35,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 1.23,
+        "runs": 2,
+        "running_hours": 10.25,
+        "flagged_runs": 1
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "cancelled",
+      "helmet"
+    ],
+    "groups": [
+      {
+        "cost": 0.37,
+        "electricity_cost": 0.37,
+        "material_cost": 0.0,
+        "other_cost": 0.0,
+        "material_grams": 0.0,
+        "energy_kwh": 1.32,
+        "runs": 2,
+        "running_hours": 9.5,
+        "flagged_runs": 1
+      }
+    ]
+  },
+  {
+    "group_by": [],
+    "run_ids": [
+      "benchy",
+      "cancelled",
+      "helmet"
+    ],
+    "groups": [
+      {
+        "cost": 1.23,
+        "electricity_cost": 0.42,
+        "material_cost": 0.31,
+        "other_cost": 0.5,
+        "material_grams": 12.5,
+        "energy_kwh": 1.47,
+        "runs": 3,
+        "running_hours": 10.75,
+        "flagged_runs": 1
+      }
+    ]
   }
 ]

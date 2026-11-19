@@ -34,6 +34,7 @@ LIVE_SAVE_DELAY = timedelta(seconds=60)
 # Hub entry data: the Stores WattBill has written, so a missing one is noticed.
 CONF_STORES = "stores"
 ISSUE_DATA_MISSING = "data_missing"
+ISSUE_DATA_CORRUPT = "data_corrupt"
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,7 @@ class WattBillStores:
                 translation_placeholders=placeholders,
             )
         ir.async_delete_issue(self._hass, DOMAIN, ISSUE_DATA_MISSING)
+        ir.async_delete_issue(self._hass, DOMAIN, ISSUE_DATA_CORRUPT)
 
         data = {}
         for name, store in self._stores.items():
@@ -143,6 +145,32 @@ class WattBillStores:
                 entry, data={**entry.data, CONF_STORES: list(self._stores)}
             )
         return data
+
+    def parse[T](
+        self,
+        data: Mapping[str, dict[str, Any]],
+        name: str,
+        parse: Callable[[dict[str, Any]], T],
+    ) -> T:
+        """Read a Store's data; data of another shape stops setup with a repair issue."""
+        try:
+            return parse(data[name])
+        except (KeyError, TypeError, ValueError, AttributeError) as err:
+            placeholders = {"store": self._stores[name].key}
+            ir.async_create_issue(
+                self._hass,
+                DOMAIN,
+                ISSUE_DATA_CORRUPT,
+                is_fixable=False,
+                severity=ir.IssueSeverity.CRITICAL,
+                translation_key=ISSUE_DATA_CORRUPT,
+                translation_placeholders=placeholders,
+            )
+            raise ConfigEntryError(
+                translation_domain=DOMAIN,
+                translation_key=ISSUE_DATA_CORRUPT,
+                translation_placeholders=placeholders,
+            ) from err
 
     async def async_remove(self) -> None:
         """Delete every Store, its `.bak` copy and the file folder."""
@@ -163,25 +191,25 @@ def _payload(runs: Iterable[Run]) -> dict[str, Any]:
     return {"runs": [run.as_dict() for run in runs]}
 
 
+def _runs(data: dict[str, Any]) -> list[Run]:
+    return [Run.from_dict(run) for run in data["runs"]]
+
+
 class RunStore:
     """Ended Runs in the runs Store, open Runs in the live Store."""
 
     def __init__(self, stores: WattBillStores) -> None:
+        self._stores = stores
         self._runs = stores["runs"]
         self._live = stores["live"]
         self._live_due: datetime | None = None
 
-    @staticmethod
-    def runs(data: Mapping[str, dict[str, Any]]) -> list[Run]:
-        ended = [Run.from_dict(run) for run in data["runs"]["runs"]]
+    def runs(self, data: Mapping[str, dict[str, Any]]) -> list[Run]:
+        ended = self._stores.parse(data, "runs", _runs)
         ended_ids = {run.id for run in ended}
+        live = self._stores.parse(data, "live", _runs)
         # A crash between finalisation's two writes leaves a Run in both Stores.
-        live = [
-            Run.from_dict(run)
-            for run in data["live"]["runs"]
-            if run["id"] not in ended_ids
-        ]
-        return ended + live
+        return ended + [run for run in live if run.id not in ended_ids]
 
     def schedule_live_save(self, open_runs: Callable[[], Iterable[Run]]) -> None:
         """Save open Runs about a minute after the first unsaved change."""

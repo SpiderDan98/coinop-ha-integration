@@ -1,8 +1,8 @@
 // The Tags tab: each Tag with its Run count and total cost, renamed (or merged into
 // another by its name) and deleted here. The catalogue follows by subscription.
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { deleteTag, renameTag, type RunSummary } from "./api";
+import { deleteTag, getAggregates, renameTag, type RunSummary } from "./api";
 import { formatter } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
@@ -20,6 +20,20 @@ export class TagsPage extends LitElement {
   @state() private renaming?: { tag: string; name: string };
   @state() private confirming?: string;
   @state() private failed = false;
+  /** Each Tag's total cost as the backend sums it; undefined until read. */
+  @state() private costs?: Map<string | null | undefined, number>;
+  private request = 0;
+
+  protected override willUpdate(changed: PropertyValues<this>) {
+    if (changed.has("runs")) void this.load();
+  }
+
+  private async load() {
+    const request = ++this.request;
+    const groups = await getAggregates(this.hass, ["tag"]).catch(() => undefined);
+    if (request !== this.request) return;
+    this.costs = groups && new Map(groups.map((group) => [group.tag, group.cost]));
+  }
 
   override render() {
     const t = localize(this.hass);
@@ -50,13 +64,13 @@ export class TagsPage extends LitElement {
   private renderTag(tag: string, t: Localize) {
     const format = formatter(this.hass);
     const runs = this.runs.filter((run) => run.tags.includes(tag));
-    const total = runs.reduce((sum, run) => sum + run.total, 0);
+    const total = this.costs && (this.costs.get(tag) ?? 0);
     return html`<tr class="tag">
       <td>
         ${this.renaming?.tag === tag ? this.renderRename(tag, t) : html`<span class="tag-name">${tag}</span>`}
       </td>
       <td class="num">${runs.length}</td>
-      <td class="num">${format.money(total)}</td>
+      <td class="num">${total === undefined ? nothing : format.money(total)}</td>
       <td class="actions">${this.renderActions(tag, runs.length, t)}</td>
     </tr>`;
   }

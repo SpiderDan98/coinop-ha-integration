@@ -1,11 +1,8 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
 import asyncio
-from bisect import bisect_right
-from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from functools import partial
-from typing import Any
 
 from homeassistant.components.recorder import history
 from homeassistant.core import (
@@ -33,7 +30,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
 from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
 from .cost.slots import slot_material, slot_shares
-from .device_config import ConsumptionSource, DeviceConfig, Target
+from .device_config import DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
@@ -67,6 +64,14 @@ from .run_book import RunBook
 from .spoolman import Spoolman
 from .store import LIVE_SAVE_DELAY
 from .templates import add_templates, count_running_hours
+from .timelines import (
+    add_flag,
+    add_price,
+    add_reading,
+    has_final_report,
+    kwh,
+    meter_of,
+)
 
 LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
@@ -78,13 +83,6 @@ OUTCOMES = {
     Target.CANCELLED: Outcome.CANCELLED,
     Target.ENDED: Outcome.UNKNOWN,
 }
-
-
-def _meter(section: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
-    """The section's Energy or Power meter; None for an estimate."""
-    if section is None or section["source"] == ConsumptionSource.ESTIMATE:
-        return None
-    return section
 
 
 class DeviceTracker:
@@ -132,7 +130,7 @@ class DeviceTracker:
         if meters := {
             meter["entity_id"]
             for section in [*sections, self._config.consumption]
-            if (meter := _meter(section))
+            if (meter := meter_of(section))
         }:
             self._unsubscribe += [
                 async_track_state_change_event(self._hass, meters, self._on_meter),
@@ -180,7 +178,7 @@ class DeviceTracker:
             # A Run stored before it had a Cost Source followed this one from start.
             since = run.started if run.cost_source is None else now
             run.cost_source = price
-            self._add_price(run, since, self._current_price())
+            add_price(run, since, self._current_price())
         elif entity_id := self._config.price_entity_id:
             since = run.prices[-1][0] if run.prices else run.started
             for state in await self._async_history(entity_id, since, now):
@@ -203,7 +201,7 @@ class DeviceTracker:
 
     async def _async_catch_up(self, run: Run) -> None:
         """Add the meter reports missed while WattBill wasn't running."""
-        if not (meter := _meter(run.consumption)):
+        if not (meter := meter_of(run.consumption)):
             return
         entity_id = meter["entity_id"]
         now = dt_util.utcnow()
@@ -220,7 +218,7 @@ class DeviceTracker:
             ]
         )
         if now - watched > OUTAGE:
-            self._add_reading(run, watched, None)
+            add_reading(run, watched, None)
         if run.ended is None:
             self._refresh(run, now)
         self._book.async_update(run)
@@ -260,7 +258,7 @@ class DeviceTracker:
     ) -> None:
         state = event.data["new_state"]
         for run in self._unfinalised_runs():
-            meter = _meter(run.consumption)
+            meter = meter_of(run.consumption)
             if meter is None or meter["entity_id"] != event.data["entity_id"]:
                 continue
             self._record(run, state)
@@ -286,6 +284,11 @@ class DeviceTracker:
             self._refresh(run, run.ended or dt_util.utcnow())
             self._book.async_update(run)
 
+    def _next_started(self, run: Run, at: datetime) -> bool:
+        return any(
+            run.started < other.started <= at for other in self._unfinalised_runs()
+        )
+
     def _usage_state(self) -> State | None:
         usage = self._config.material
         return None if usage is None else self._hass.states.get(usage["entity_id"])
@@ -298,8 +301,9 @@ class DeviceTracker:
             return
         changed = input_time(state, usage["attribute"])
         late = run.ended is not None and changed > run.ended + FINAL_REPORT_WAIT
-        # A value from before the Run is still the previous job's.
-        if changed < run.started or late:
+        # A value from before the Run is still the previous job's, one from after
+        # the next Run's start already that job's.
+        if changed < run.started or late or self._next_started(run, changed):
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
 
@@ -383,24 +387,15 @@ class DeviceTracker:
     def _record_price(self, run: Run, state: State | None) -> None:
         """Add the price entity's report to the Run's price timeline."""
         if state is None:
-            self._add_price(run, dt_util.utcnow(), None)
+            add_price(run, dt_util.utcnow(), None)
         else:
-            self._add_price(run, self._price_time(state), self._price_of(state))
-
-    @staticmethod
-    def _add_price(run: Run, at: datetime, price: float | None) -> None:
-        prices = run.prices
-        index = bisect_right(prices, at, key=lambda entry: entry[0])
-        if index and prices[index - 1][0] == at:
-            prices[index - 1] = (at, price)
-        elif not index or prices[index - 1][1] != price:
-            prices.insert(index, (at, price))
+            add_price(run, self._price_time(state), self._price_of(state))
 
     @callback
     def _on_tick(self, now: datetime) -> None:
         if run := self._book.open_run(self._config.device_id):
             now = dt_util.utcnow()
-            if not self._status_lost:
+            if not self._status_lost and not run.paused:
                 run.last_seen = now
             self._refresh(run, now)
             self._book.async_update(run)
@@ -410,7 +405,7 @@ class DeviceTracker:
         value = input_value(state, attribute)
         run = self._book.open_run(self._config.device_id)
         if state is None or value is None:
-            if run is not None and not self._status_lost:
+            if run is not None and not self._status_lost and not run.paused:
                 run.last_seen = (
                     dt_util.utcnow() if state is None else state.last_changed
                 )
@@ -452,14 +447,15 @@ class DeviceTracker:
     def _continue(
         self, run: Run, target: Target, at: datetime, job_name: str | None
     ) -> None:
-        run.last_seen = max(run.last_seen or run.started, at)
+        if target is Target.RUNNING or not run.paused:
+            run.last_seen = max(run.last_seen or run.started, at)
         if target in (Target.PAUSED, Target.FAULT):
             if target is Target.FAULT and Flag.FAULT not in run.flags:
                 run.flags.append(Flag.FAULT)
-            if not run.pauses or run.pauses[-1].end is not None:
+            if not run.paused:
                 run.pauses.append(Pause(at))
         elif target is Target.RUNNING:
-            if run.pauses and run.pauses[-1].end is None:
+            if run.paused:
                 run.pauses[-1].end = at
             if run.job_name is None:
                 run.job_name = job_name
@@ -487,7 +483,7 @@ class DeviceTracker:
             cost_source=dict(self._config.price),
             tags=settings[TAGS_FOR_NEW_RUNS],
         )
-        if meter := _meter(run.consumption):
+        if meter := meter_of(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
         self._follow_average_power(run, at)
         self._record_usage(run, self._usage_state())
@@ -542,18 +538,18 @@ class DeviceTracker:
         """A past Run's price timeline from history, flagged where it has none."""
         assert run.ended is not None
         if (entity_id := self._config.price_entity_id) is None:
-            self._add_price(run, run.started, self._current_price())
+            add_price(run, run.started, self._current_price())
             return
         states = await recorded.async_states(
             self._hass, entity_id, run.started, run.ended
         )
         if not any(self._price_time(state) <= run.started for state in states):
-            self._add_price(run, run.started, None)
+            add_price(run, run.started, None)
         for state in states:
             self._record_price(run, state)
         if not covered or price_gap(run.started, run.ended, run.prices):
             # Without the recorder, the last price it knew may be outdated.
-            self._flag(run, Flag.PRICE_GAP)
+            add_flag(run, Flag.PRICE_GAP)
 
     async def _async_past_electricity(self, run: Run, covered: bool) -> LineItem:
         """From the meter's history if it covers the Run, else estimated from the
@@ -561,7 +557,7 @@ class DeviceTracker:
         """
         assert run.ended is not None
         start, end, prices = run.started, run.ended, run.prices
-        meter = _meter(run.consumption)
+        meter = meter_of(run.consumption)
         if covered and meter:
             states = await recorded.async_states(
                 self._hass, meter["entity_id"], start, end
@@ -575,7 +571,7 @@ class DeviceTracker:
                     ulid_now(),
                     start,
                     end,
-                    self._kwh(run),
+                    kwh(run),
                     prices,
                     ElectricityMethod.FROM_HISTORY,
                 )
@@ -597,19 +593,19 @@ class DeviceTracker:
     def _open_prices(self, run: Run, at: datetime) -> None:
         """The price at Run start; without one, the last valid price before it."""
         if (entity_id := self._config.price_entity_id) is None:
-            self._add_price(run, at, self._current_price())
+            add_price(run, at, self._current_price())
             return
         state = self._hass.states.get(entity_id)
         if self._price_of(state) is None and self._last_price:
-            self._add_price(run, *self._last_price)
+            add_price(run, *self._last_price)
         if state is None:
-            self._add_price(run, at, None)
+            add_price(run, at, None)
         else:
             self._record_price(run, state)
 
     @callback
     def async_end_run(self) -> asyncio.Future[None]:
-        """End the open Run now as Unknown ("End Run now", or its Device is removed).
+        """End the open Run now as Unknown ("End Run now").
 
         The result is done once the Run is finalised, which a metered Run awaits
         up to five minutes for.
@@ -620,12 +616,27 @@ class DeviceTracker:
         done.set_result(None)
         return done
 
+    async def async_remove(self) -> None:
+        """Its Device is removed: end the open Run as Unknown and finalise every
+        Run now with what it has, as no input will report for it any more."""
+        if run := self._book.open_run(self._config.device_id):
+            self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+        finalised = []
+        for run in self._unfinalised_runs():
+            finalised.append(
+                self._finalised.setdefault(run.id, self._hass.loop.create_future())
+            )
+            self._finish(run)
+        await asyncio.gather(*finalised)
+
     def _end(
         self, run: Run, at: datetime, outcome: Outcome, *, snapshot: bool = True
     ) -> asyncio.Future[None]:
         """End the Run now; the result is done once it is finalised."""
         run.ended = at
-        if run.pauses and run.pauses[-1].end is None:
+        # A Run closed when last seen running drops the pause it was lost in.
+        run.pauses = [pause for pause in run.pauses if pause.start < at]
+        if run.paused:
             run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
@@ -638,7 +649,7 @@ class DeviceTracker:
     def _awaits_report(self, run: Run) -> bool:
         """Whether the meter or the Material used input may still report the Run's end."""
         assert run.ended is not None
-        if _meter(run.consumption) and not self._has_final_report(run):
+        if meter_of(run.consumption) and not has_final_report(run):
             return True
         return self._config.material is not None and (
             run.usage is None or run.usage.at < run.ended
@@ -676,21 +687,26 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
-        if not read and self._uses_spoolman(run):
-            self._flag(run, Flag.SPOOLMAN_UNREACHABLE)
+        linked = self._spoolman_prices(run)
+        if not read and linked:
+            add_flag(run, Flag.SPOOLMAN_UNREACHABLE)
+        if any(price.last_read is None for price in linked):
+            add_flag(run, Flag.SPOOLMAN_NO_PRICE)
         run.readings = []
         run.prices = []
         run.loaded_slots = []
         await self._async_finalise(run)
         self._finishing.discard(run.id)
 
-    def _uses_spoolman(self, run: Run) -> bool:
-        return any(
-            isinstance(material.price, SpoolmanPrice)
+    def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
+        """The Cost Sources of the Run's Materials linked to Spoolman."""
+        return [
+            material.price
             for item in run.line_items
             if item.material_id
             and (material := self._catalog.material(item.material_id))
-        )
+            and isinstance(material.price, SpoolmanPrice)
+        ]
 
     def _settle_material(self, run: Run, *, measuring: bool = True) -> None:
         """Flag missing usage or Material; without a Material used input (or a
@@ -712,19 +728,19 @@ class DeviceTracker:
             run.line_items.append(item)
             items.append(item)
         if any(item.share is not None for item in items):
-            self._flag(run, Flag.ESTIMATED_SPLIT)
+            add_flag(run, Flag.ESTIMATED_SPLIT)
         if any(
             self._slot_fell_back(slot)
             for item in items
             if item.material_id is not None
             for slot in item.slots
         ):
-            self._flag(run, Flag.SLOT_FALLBACK)
+            add_flag(run, Flag.SLOT_FALLBACK)
         for item in items:
             if item.quantity is None and item.length is None:
-                self._flag(run, Flag.USAGE_MISSING)
+                add_flag(run, Flag.USAGE_MISSING)
             if item.material_id is None:
-                self._flag(run, Flag.MATERIAL_MISSING)
+                add_flag(run, Flag.MATERIAL_MISSING)
 
     async def _async_finalise(self, run: Run) -> None:
         await self._book.async_finalise(run)
@@ -738,81 +754,18 @@ class DeviceTracker:
             if run.device_id == self._config.device_id and not run.finalised
         ]
 
-    def _has_final_report(self, run: Run) -> bool:
-        return any(
-            value is not None and run.ended is not None and at >= run.ended
-            for at, value in run.readings
-        )
-
     def _record(self, run: Run, state: State | None) -> None:
         """Add the meter's report to the Run's readings and flag gaps and resets."""
-        meter = _meter(run.consumption)
+        meter = meter_of(run.consumption)
         assert meter is not None
         value = meter_reading(state, meter)
         if state is None:
-            self._add_reading(run, dt_util.utcnow(), None)
+            add_reading(run, dt_util.utcnow(), None)
         elif value is None:
-            self._add_reading(run, state.last_updated, None)
+            add_reading(run, state.last_updated, None)
         else:
-            self._add_reading(run, state.last_updated, value)
-            self._add_reading(run, state.last_reported, value)
-
-    def _add_reading(self, run: Run, at: datetime, value: float | None) -> None:
-        readings = run.readings
-        index = bisect_right(readings, at, key=lambda reading: reading[0])
-        if index and readings[index - 1][0] == at:
-            return
-        if index == len(readings) >= 2 and readings[-1][1] == readings[-2][1] == value:
-            readings[-1] = (at, value)
-            return
-        readings.insert(index, (at, value))
-        if run.ended is not None and at > run.ended:
-            # Only the stretch up to the end belongs to the Run.
-            at = run.ended
-        previous = next(
-            (
-                (time, reading)
-                for time, reading in reversed(readings[:index])
-                if reading is not None
-            ),
-            None,
-        )
-        if value is None:
-            if run.ended is None or at < run.ended:
-                self._flag(run, Flag.CONSUMPTION_GAP)
-        elif (
-            (meter := _meter(run.consumption))
-            and meter["source"] == ConsumptionSource.ENERGY
-            and previous is not None
-            and value < previous[1]
-            and (run.ended is None or previous[0] < run.ended)
-        ):
-            self._flag(run, Flag.METER_RESET)
-
-    @staticmethod
-    def _flag(run: Run, flag: Flag) -> None:
-        if flag not in run.flags:
-            run.flags.append(flag)
-
-    def _kwh(self, run: Run) -> Callable[[datetime, datetime], float]:
-        meter = _meter(run.consumption)
-        if meter and meter["source"] == ConsumptionSource.ENERGY:
-            return consumption.energy(run.readings)
-        return consumption.piecewise(
-            [
-                (
-                    since,
-                    consumption.power(run.readings, running)
-                    if meter
-                    else consumption.estimate(
-                        running or 0.0,
-                        running or 0.0 if paused is None else paused,
-                        run.pauses,
-                    ),
-                )
-                for since, running, paused in run.average_powers
-            ]
-        )
+            add_reading(run, state.last_updated, value)
+            add_reading(run, state.last_reported, value)
 
     def _slot_fell_back(self, slot: SlotReport) -> bool:
         return slot_material(slot, self._catalog.materials()) is None
@@ -846,10 +799,10 @@ class DeviceTracker:
             run.electricity.id if run.line_items else ulid_now(),
             run.started,
             until,
-            self._kwh(run),
+            kwh(run),
             run.prices,
             ElectricityMethod.MEASURED
-            if _meter(run.consumption)
+            if meter_of(run.consumption)
             else ElectricityMethod.ESTIMATED,
         )
         materials = self._measured_items(run, until) if self._config.material else []
@@ -864,4 +817,4 @@ class DeviceTracker:
         ]
         count_running_hours(run.line_items, run, until)
         if price_gap(run.started, until, run.prices):
-            self._flag(run, Flag.PRICE_GAP)
+            add_flag(run, Flag.PRICE_GAP)

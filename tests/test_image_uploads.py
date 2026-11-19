@@ -101,6 +101,21 @@ async def test_a_run_takes_up_to_ten_uploads(
     assert len(stored_files(files)) == 22
 
 
+async def test_the_run_tells_the_panel_what_it_takes(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    await open_run(hass)
+    run_id = (await only_run(panel))["id"]
+
+    result = await panel.call("wattbill/runs/get", run_id=run_id)
+
+    assert result["run"]["uploads"] == {
+        "limit": 10,
+        "types": ["image/jpeg", "image/png", "image/webp"],
+        "max_bytes": 20 * 1024 * 1024,
+    }
+
+
 async def test_a_photo_may_have_up_to_20_mb(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:

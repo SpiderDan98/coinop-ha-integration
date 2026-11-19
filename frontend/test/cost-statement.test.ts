@@ -1,12 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Message } from "../src/hass";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
 const CREATE = "wattbill/cost_statement/create";
 
-const sent = (backend: { calls: Message[] }, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const pick = (panel: Element, name: string) =>
   query(
     queryAll(panel, ".pick-tile").find((tile) => text(query(tile, ".strong")) === name) ?? panel,
@@ -67,7 +64,7 @@ describe("Cost Statement export", () => {
 
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)).toEqual([
+    expect(backend.sent(CREATE)).toEqual([
       {
         type: CREATE,
         run_ids: ["benchy", "helmet"],
@@ -100,7 +97,7 @@ describe("Cost Statement export", () => {
     expect(field(panel, "title").placeholder).toBe("Kostenaufstellung");
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)).toEqual([
+    expect(backend.sent(CREATE)).toEqual([
       {
         type: CREATE,
         run_ids: ["benchy", "helmet"],
@@ -125,7 +122,7 @@ describe("Cost Statement export", () => {
     await fill(panel, field(panel, "images"), "off");
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)[0]).toMatchObject({ detail: "detailed", images: false });
+    expect(backend.sent(CREATE)[0]).toMatchObject({ detail: "detailed", images: false });
   });
 
   it("refuses a negative or missing Markup", async () => {
@@ -161,7 +158,7 @@ describe("Cost Statement export", () => {
     await click(panel, query(panel, ".statement-dialog .cancel"));
 
     expect(queryAll(panel, ".statement-dialog")).toHaveLength(0);
-    expect(sent(backend, CREATE)).toEqual([]);
+    expect(backend.sent(CREATE)).toEqual([]);
   });
 
   it("is in German and German by default when Home Assistant is", async () => {
@@ -184,7 +181,7 @@ describe("Cost Statement title for one Tag", () => {
     expect(field(panel, "title").placeholder).toBe("Kostenaufstellung – Gift");
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)[0]).toMatchObject({ title: "Kostenaufstellung – Gift" });
+    expect(backend.sent(CREATE)[0]).toMatchObject({ title: "Kostenaufstellung – Gift" });
   });
 
   it("gives way to a typed title", async () => {
@@ -194,7 +191,7 @@ describe("Cost Statement title for one Tag", () => {
     await fill(panel, field(panel, "title"), "Fair 2026");
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)[0]).toMatchObject({ title: "Fair 2026" });
+    expect(backend.sent(CREATE)[0]).toMatchObject({ title: "Fair 2026" });
   });
 
   it("stays the plain default with two Tags, or a Tag and No tag", async () => {
@@ -208,7 +205,7 @@ describe("Cost Statement title for one Tag", () => {
     await fill(untagged, query(untagged, ".tag-filter input.no-tag"), "on");
     await click(untagged, query(untagged, ".basket .statement"));
 
-    expect(sent(backend, CREATE)[0]).toMatchObject({ title: null });
+    expect(backend.sent(CREATE)[0]).toMatchObject({ title: null });
     expect(field(untagged, "title").placeholder).toBe("Cost Statement");
   });
 });
@@ -239,7 +236,7 @@ describe("Remembered export options", () => {
     ).toEqual(["", "", "compact", "de", "7.5"]);
     expect(field(panel, "images").checked).toBe(false);
     await click(panel, query(panel, ".statement-dialog .download"));
-    expect(sent(backend, CREATE)[0]).toMatchObject({
+    expect(backend.sent(CREATE)[0]).toMatchObject({
       title: null,
       note: null,
       detail: "compact",
@@ -288,7 +285,7 @@ describe("Remembered export options", () => {
     expect(field(panel, "markup").value).toBe(String(recorded.statementDefaults.markup));
     await click(panel, query(panel, ".statement-dialog .download"));
 
-    expect(sent(backend, CREATE)).toHaveLength(1);
+    expect(backend.sent(CREATE)).toHaveLength(1);
     expect(downloads).toHaveLength(1);
   });
 });

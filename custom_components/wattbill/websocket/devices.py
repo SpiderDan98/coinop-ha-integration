@@ -16,7 +16,7 @@ from custom_components.wattbill.device_settings import (
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
-from .command import command
+from .command import command, found
 from .materials import pickable
 
 
@@ -61,10 +61,8 @@ async def _update_settings(
     Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
     the default Material must exist and not be archived.
     """
-    if msg["device_id"] not in wattbill.settings:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Device with this id"
-        )
+    device = msg["device_id"] if msg["device_id"] in wattbill.settings else None
+    if found(connection, msg, device, "Device") is None:
         return
     try:
         changes = wattbill.settings.validate(msg["settings"])
@@ -76,10 +74,11 @@ async def _update_settings(
     ):
         return
     templates = changes.get(AUTOMATIC_TEMPLATES, [])
-    if len(wattbill.catalog.find_templates(templates)) < len(templates):
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item Template with this id"
-        )
+    complete = len(wattbill.catalog.find_templates(templates)) == len(templates)
+    if (
+        found(connection, msg, templates if complete else None, "Line Item Template")
+        is None
+    ):
         return
     if TAGS_FOR_NEW_RUNS in changes:
         changes[TAGS_FOR_NEW_RUNS] = await wattbill.catalog.async_add_tags(

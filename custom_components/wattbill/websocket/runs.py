@@ -27,7 +27,7 @@ from custom_components.wattbill.cost.rounding import (
     rounded_sum,
 )
 from custom_components.wattbill.cost.running_time import running_time
-from custom_components.wattbill.images import image_info
+from custom_components.wattbill.images import image_info, upload_rules
 from custom_components.wattbill.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
@@ -35,7 +35,7 @@ from custom_components.wattbill.schema import vol
 from custom_components.wattbill.tags import tag_name
 from custom_components.wattbill.tracker import DeviceTracker
 
-from .command import command
+from .command import command, found
 
 # Outlives a reload of the hub entry, so open subscriptions keep receiving.
 SIGNAL_RUN_CHANGED = f"{DOMAIN}_run_changed"
@@ -89,6 +89,7 @@ def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         **_summary(run, now, decimals),
         "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
+        "uploads": upload_rules(),
         "subtotals": {
             kind: float(
                 rounded_sum(
@@ -145,15 +146,14 @@ def _subscribe(
     )
 
 
-def _find(
-    connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
+def find_run(
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+    run_id: str | None = None,
 ) -> Run | None:
-    """The Run `msg["run_id"]` names; answers `not_found` when there is none."""
-    if (run := wattbill.book.run(msg["run_id"])) is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Run with this id"
-        )
-    return run
+    """The Run `run_id` (else `msg["run_id"]`) names; answers `not_found` if none."""
+    return found(connection, msg, wattbill.book.run(run_id or msg["run_id"]), "Run")
 
 
 def _send_run(
@@ -174,7 +174,7 @@ def _get(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    if run := _find(connection, msg, wattbill):
+    if run := find_run(connection, msg, wattbill):
         _send_run(hass, connection, msg["id"], run)
 
 
@@ -212,7 +212,7 @@ async def _update(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return
     if not run.finalised and any(key in msg for key in _FINAL_FIELDS):
         connection.send_error(
@@ -256,11 +256,8 @@ async def _create(
     wattbill: WattBill,
 ) -> None:
     """A manual Run, e.g. for a print made while Home Assistant was down."""
-    tracker = _tracker(wattbill, msg["device_id"])
+    tracker = found(connection, msg, _tracker(wattbill, msg["device_id"]), "Device")
     if tracker is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Device with this id"
-        )
         return
     if not msg["started"] < msg["ended"] <= dt_util.utcnow():
         connection.send_error(
@@ -292,7 +289,7 @@ async def _clear_flag(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return
     if msg["flag"] in run.flags:
         run.flags.remove(msg["flag"])
@@ -319,7 +316,7 @@ def _end(
     wattbill: WattBill,
 ) -> None:
     """End Run now: the open Run ends as Unknown, finalised like any other end."""
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return
     tracker = _tracker(wattbill, run.device_id)
     if run.ended is not None or tracker is None:
@@ -335,19 +332,16 @@ def _deletable(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> list[Run] | None:
     """The Runs `msg["run_ids"]` names, if all exist and are final."""
-    runs = [wattbill.book.run(run_id) for run_id in msg["run_ids"]]
-    found = [run for run in runs if run is not None]
-    if len(found) < len(runs):
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Run with this id"
-        )
+    runs = [run for run_id in msg["run_ids"] if (run := wattbill.book.run(run_id))]
+    complete = runs if len(runs) == len(msg["run_ids"]) else None
+    if found(connection, msg, complete, "Run") is None:
         return None
-    if not all(run.finalised for run in found):
+    if not all(run.finalised for run in runs):
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "End the Run before deleting it"
         )
         return None
-    return found
+    return runs
 
 
 _DELETE_SCHEMA = {vol.Required("run_ids"): vol.All([str], vol.Unique())}

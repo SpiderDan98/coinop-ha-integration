@@ -93,6 +93,15 @@
     "total": 0.07,
     "cost_per_part": 0.07,
     "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
     "subtotals": {
       "electricity": 0.07,
       "material": 0.0,

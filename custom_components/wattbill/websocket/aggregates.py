@@ -20,6 +20,8 @@ from .command import command
         vol.Optional("group_by", default=[]): vol.All(
             [vol.In(DIMENSIONS)], vol.Unique()
         ),
+        vol.Optional("run_ids"): [str],
+        vol.Optional("material_ids"): [vol.Any(None, str)],
     }
 )
 def _get(
@@ -28,14 +30,23 @@ def _get(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """`{"groups": [...]}`: each group's values along `group_by`, then its totals."""
+    """`{"groups": [...]}`: each group's values along `group_by`, then its totals.
+
+    Only of the Runs in `run_ids` and the Line Items of the Materials in
+    `material_ids` (None for none), if given.
+    """
+    runs = wattbill.book.runs()
+    if "run_ids" in msg:
+        run_ids = set(msg["run_ids"])
+        runs = [run for run in runs if run.id in run_ids]
     groups = aggregate(
-        wattbill.book.runs(),
+        runs,
         msg["group_by"],
         dt_util.utcnow(),
         currency_decimals(hass.config.currency),
         dt_util.get_default_time_zone(),
         {material.id: material.name for material in wattbill.catalog.materials()},
+        material_ids=msg.get("material_ids"),
     )
     connection.send_result(msg["id"], {"groups": groups})
 

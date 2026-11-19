@@ -3,8 +3,6 @@ import type { Message } from "../src/hass";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
-const sent = (backend: ReturnType<typeof recordedBackend>, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const chips = (root: Element) => queryAll(root, ".tag-chip .tag-name").map(text);
 const button = (root: Element, label: string) => {
   const found = queryAll(root, "button").find((candidate) => text(candidate) === label);
@@ -77,7 +75,7 @@ describe("Tags tab", () => {
     expect(queryAll(panel, ".merge-hint")).toHaveLength(0);
     await click(panel, button(panel, "Save"));
 
-    expect(sent(backend, "wattbill/tags/rename")).toEqual([
+    expect(backend.sent("wattbill/tags/rename")).toEqual([
       { type: "wattbill/tags/rename", tag: "Gift", name: "Present" },
     ]);
     expect(queryAll(panel, "tr.tag input")).toHaveLength(0);
@@ -92,11 +90,11 @@ describe("Tags tab", () => {
       "Removes “Gift” from 2 Runs and from every Device's Tags for new Runs.",
     );
     await click(panel, button(panel, "Cancel"));
-    expect(sent(backend, "wattbill/tags/delete")).toEqual([]);
+    expect(backend.sent("wattbill/tags/delete")).toEqual([]);
 
     await click(panel, button(row(panel, "Gift"), "Delete"));
     await click(panel, button(panel, "Delete for good"));
-    expect(sent(backend, "wattbill/tags/delete")).toEqual([
+    expect(backend.sent("wattbill/tags/delete")).toEqual([
       { type: "wattbill/tags/delete", tag: "Gift" },
     ]);
   });
@@ -199,7 +197,7 @@ describe("Tags for new Runs", () => {
     await fill(panel, query(card, ".tag-input input"), "gif");
     await click(panel, button(card, "Gift"));
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       {
         type: UPDATE,
         device_id: "device-kobra",
@@ -242,7 +240,7 @@ describe("Tags on a Run", () => {
       "Create “s”",
     ]);
     await click(panel, button(panel, "Spare parts"));
-    expect(sent(backend, "wattbill/runs/update").at(-1)).toEqual({
+    expect(backend.sent("wattbill/runs/update").at(-1)).toEqual({
       type: "wattbill/runs/update",
       run_id: "benchy",
       tags: ["Gift", "Spare parts"],
@@ -263,7 +261,7 @@ describe("Tags on a Run", () => {
     await fill(panel, input, "gift");
     await press(panel, input, "Enter");
 
-    expect(sent(backend, "wattbill/runs/update").map((call) => call.tags)).toEqual([
+    expect(backend.sent("wattbill/runs/update").map((call) => call.tags)).toEqual([
       ["Batch 7", "Gift"],
       ["Batch 7", "Gift", "Spare parts"],
     ]);
@@ -276,7 +274,7 @@ describe("Tags on a Run", () => {
 
     await click(panel, query(panel, `.tag-chip button[aria-label="Remove Gift"]`));
 
-    expect(sent(backend, "wattbill/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
+    expect(backend.sent("wattbill/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
     expect(chips(panel)).toEqual(["Cosplay helmet"]);
   });
 });

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Message } from "../src/hass";
 import { recorded, recordedBackend } from "./fake-hass";
 import { change, click, mountPanel, query, queryAll, text } from "./render";
 
@@ -7,8 +6,6 @@ const UPDATE = "wattbill/line_items/update";
 const [started] = recorded.changes;
 const overridden = recorded.lineItemsUpdate.run;
 
-const sent = (backend: { calls: Message[] }, type: string) =>
-  backend.calls.filter((call) => call.type === type);
 const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
 const field = (row: HTMLElement, name: string) => query(row, `[name=${name}]`) as HTMLInputElement;
 const values = (row: HTMLElement) =>
@@ -36,7 +33,7 @@ describe("Line Items", () => {
 
     await change(panel, field(item(panel, "electricity"), "amount"), "0.1");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, run_id: "benchy", line_item_id: "electricity", amount: 0.1 },
     ]);
     const electricity = item(panel, "electricity");
@@ -58,7 +55,7 @@ describe("Line Items", () => {
 
     await click(panel, query(item(panel, "electricity"), "button.reset"));
 
-    expect(sent(backend, "wattbill/line_items/reset")).toEqual([
+    expect(backend.sent("wattbill/line_items/reset")).toEqual([
       { type: "wattbill/line_items/reset", run_id: "benchy", line_item_id: "electricity" },
     ]);
     expect(item(panel, "electricity").classList.contains("manual")).toBe(false);
@@ -74,7 +71,7 @@ describe("Line Items", () => {
     await change(panel, field(wear, "unit"), "h");
     await change(panel, field(wear, "quantity"), "");
 
-    expect(sent(backend, UPDATE)).toEqual([
+    expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, run_id: "benchy", line_item_id: "benchy-wear", label: "Hotend wear" },
       { type: UPDATE, run_id: "benchy", line_item_id: "benchy-wear", unit: "h" },
       { type: UPDATE, run_id: "benchy", line_item_id: "benchy-wear", quantity: null },
@@ -89,7 +86,7 @@ describe("Line Items", () => {
     const amount = field(item(panel, "electricity"), "amount");
 
     await change(panel, amount, "");
-    expect(sent(backend, UPDATE)).toEqual([]);
+    expect(backend.sent(UPDATE)).toEqual([]);
     expect(amount.value).toBe("0.05");
 
     await change(panel, amount, "-1");
@@ -117,7 +114,7 @@ describe("Line Items", () => {
 
     await click(panel, query(item(panel, "benchy-wear"), "button.delete"));
 
-    expect(sent(backend, "wattbill/line_items/delete")).toEqual([
+    expect(backend.sent("wattbill/line_items/delete")).toEqual([
       { type: "wattbill/line_items/delete", run_id: "benchy", line_item_id: "benchy-wear" },
     ]);
     expect(queryAll(panel, ".item")).toHaveLength(2);
@@ -135,7 +132,7 @@ describe("Line Items", () => {
     await change(panel, field(form, "unit_price"), "-2");
     await click(panel, query(form, "button[type=submit]"));
 
-    expect(sent(backend, "wattbill/line_items/add")).toEqual([
+    expect(backend.sent("wattbill/line_items/add")).toEqual([
       {
         type: "wattbill/line_items/add",
         run_id: "helmet",

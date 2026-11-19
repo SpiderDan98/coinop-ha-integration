@@ -2,8 +2,10 @@
 // subtotals and totals arrive rounded to the currency; the panel only formats them.
 import type { HomeAssistant, Message } from "./hass";
 
-export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
-export type Kind = "electricity" | "material" | "other";
+export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
+export const KINDS = ["electricity", "material", "other"] as const;
+export type Outcome = (typeof OUTCOMES)[number];
+export type Kind = (typeof KINDS)[number];
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
@@ -76,6 +78,8 @@ export interface RunDetail extends RunSummary {
   line_items: LineItem[];
   /** Thumbnail, Snapshot, then uploads by time. */
   images: RunImage[];
+  /** How many photos a Run takes, of which media types and how large. */
+  uploads: { limit: number; types: string[]; max_bytes: number };
   subtotals: Record<Kind, number>;
 }
 
@@ -161,13 +165,33 @@ export type Group = Totals &
     tag: string | null;
   }>;
 
-/** Only combinations that have Line Items; no Runs, no groups. */
-export const getAggregates = async (hass: HomeAssistant, groupBy: Dimension[]) =>
-  (await hass.callWS<{ groups: Group[] }>({ type: "wattbill/aggregates/get", group_by: groupBy }))
-    .groups;
+/** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some
+ * Runs and to the Line Items of some Materials (`null` for none). */
+export const getAggregates = async (
+  hass: HomeAssistant,
+  groupBy: Dimension[],
+  only: { run_ids?: string[]; material_ids?: (string | null)[] } = {},
+) =>
+  (
+    await hass.callWS<{ groups: Group[] }>({
+      type: "wattbill/aggregates/get",
+      group_by: groupBy,
+      ...only,
+    })
+  ).groups;
 
-export const KINDS: Kind[] = ["electricity", "material", "other"];
-export const OUTCOMES: Outcome[] = ["completed", "cancelled", "failed", "unknown"];
+/** `getAggregates` of every named grouping at once. */
+export async function getGroupings<const G extends Record<string, Dimension[]>>(
+  hass: HomeAssistant,
+  groupings: G,
+) {
+  const names = Object.keys(groupings) as (keyof G)[];
+  const groups = await Promise.all(names.map((name) => getAggregates(hass, groupings[name])));
+  return Object.fromEntries(names.map((name, index) => [name, groups[index]])) as Record<
+    keyof G,
+    Group[]
+  >;
+}
 
 /** All Runs first, then each change; resolves to the unsubscribe function. */
 export const subscribeRuns = (hass: HomeAssistant, onEvent: (event: RunsEvent) => void) =>
@@ -200,9 +224,6 @@ export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
 /** End Run now: the open Run ends as Unknown and is finalised. */
 export const endRun = (hass: HomeAssistant, runId: string) =>
   runResult(hass, { type: "wattbill/runs/end", run_id: runId });
-
-export const UPLOAD_LIMIT = 10;
-export const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Multipart, as the websocket caps messages; a refusal throws its `code`. */
 export const uploadImages = async (hass: HomeAssistant, runId: string, files: File[]) => {
@@ -412,10 +433,10 @@ export interface LineItemTemplate {
 
 export type TemplateFields = Omit<LineItemTemplate, "id">;
 
-/** Every catalogue in the first event; afterwards only the one that changed. */
 /** Tags are alphabetical; Runs and Devices name them. */
 export type Catalog = { materials: Material[]; tags: string[]; templates: LineItemTemplate[] };
 
+/** Every catalogue in the first event; afterwards only the one that changed. */
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
   hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });
 

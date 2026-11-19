@@ -42,13 +42,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         for subentry in entry.subentries.values()
         if subentry.subentry_type == SUBENTRY_DEVICE
     ]
-    settings = DeviceSettings(
-        stores["device_settings"],
-        data["device_settings"],
-        (device.device_id for device in devices),
+    settings = stores.parse(
+        data,
+        "device_settings",
+        lambda stored: DeviceSettings(
+            stores["device_settings"],
+            stored,
+            (device.device_id for device in devices),
+        ),
     )
     await settings.async_prune()
-    catalog = Catalog(stores["catalog"], data["catalog"], book.uses_material)
+    catalog = stores.parse(
+        data,
+        "catalog",
+        lambda stored: Catalog(stores["catalog"], stored, book.uses_material),
+    )
     spoolman = Spoolman(hass, entry.options.get(CONF_SPOOLMAN_URL), catalog)
     entry.runtime_data = WattBill(
         book=book,
@@ -104,5 +112,5 @@ async def _async_reload(hass: HomeAssistant, entry: WattBillConfigEntry) -> None
     runtime = entry.runtime_data
     for device, tracker in zip(runtime.devices, runtime.trackers, strict=True):
         if device.device_id not in entry.subentries:
-            await tracker.async_end_run()
+            await tracker.async_remove()
     await hass.config_entries.async_reload(entry.entry_id)

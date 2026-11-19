@@ -13,17 +13,13 @@ from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.tags import tag_name
 
-from .command import command
+from .command import command, found
 
 
 def _found(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> str | None:
-    if (tag := wattbill.catalog.tag(msg["tag"])) is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Tag with this name"
-        )
-    return tag
+    return found(connection, msg, wattbill.catalog.tag(msg["tag"]), "Tag", "name")
 
 
 @command(

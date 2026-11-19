@@ -54,10 +54,17 @@ describe("Run gallery", () => {
       { type: SUBSCRIBE },
       { type: CATALOG },
       { type: "wattbill/devices/list" },
-      ...[[], ["month"], ["month", "kind"], ["outcome"], ["kind", "material"]].map((group_by) => ({
+      ...[[], ["month"], ["month", "kind"], ["kind", "material"]].map((group_by) => ({
         type: "wattbill/aggregates/get",
         group_by,
       })),
+      // Failed + cancelled, then what the gallery shows.
+      { type: "wattbill/aggregates/get", group_by: [], run_ids: ["helmet", "cancelled"] },
+      {
+        type: "wattbill/aggregates/get",
+        group_by: [],
+        run_ids: ["cancelled", "helmet", "benchy"],
+      },
     ]);
   });
 

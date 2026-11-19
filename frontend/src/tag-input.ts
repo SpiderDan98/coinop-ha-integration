@@ -22,7 +22,6 @@ export const tagChip = (tag: string) =>
 export class TagInput extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) tags: string[] = [];
-  /** Every Tag there is, for suggestions. */
   @property({ attribute: false }) catalog: string[] = [];
   @property({ attribute: false }) label = "";
 

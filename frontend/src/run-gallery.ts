@@ -1,8 +1,5 @@
-// The Overview's image-first gallery of Runs: filters (combined with AND), one tile per
-// Run, and checkboxes to select final Runs. Filter and selection belong to the
-// Overview, which sets them from its tiles and charts too; the gallery reports changes
-// as `filter-changed` and `selection-changed` events.
-import { LitElement, css, html, nothing } from "lit";
+// Filter and selection belong to the Overview, which sets them from its tiles and charts too.
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { OUTCOMES, type Device, type RunSummary } from "./api";
@@ -10,19 +7,21 @@ import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-image";
+import { RunsTotal } from "./runs-total";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import { sortTags, tagChip } from "./tag-input";
 
 const SHOWN_TAGS = 2;
 
-/** `outcome` is an Outcome, "open" or "failed_cancelled"; Tags match any of `tags`,
- * or no Tag at all with `untagged`. */
+const OUTCOME_FILTERS = ["open", ...OUTCOMES, "failed_cancelled"] as const;
+
+/** Tags match any of `tags`, or no Tag at all with `untagged`. */
 export const NO_FILTER = {
   name: "",
   deviceId: "",
   month: "",
-  outcome: "",
+  outcome: "" as "" | (typeof OUTCOME_FILTERS)[number],
   flagged: false,
   tags: [] as string[],
   untagged: false,
@@ -64,6 +63,19 @@ export class RunGallery extends LitElement {
   @property({ type: Boolean, reflect: true }) narrow = false;
   @property({ attribute: false }) filter = NO_FILTER;
   @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
+
+  private readonly total = new RunsTotal(this);
+  private all: RunSummary[] = [];
+  private shown: RunSummary[] = [];
+
+  protected override willUpdate(changed: PropertyValues<this>) {
+    if (!changed.has("runs") && !changed.has("filter") && !changed.has("hass")) return;
+    const t = localize(this.hass);
+    const format = formatter(this.hass);
+    this.all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
+    this.shown = this.all.filter((run) => matches(run, this.filter, t, format));
+    this.total.load(this.hass, this.shown);
+  }
 
   private setFilter(changes: Partial<Filter>) {
     this.dispatchEvent(
@@ -111,13 +123,14 @@ export class RunGallery extends LitElement {
   override render() {
     const t = localize(this.hass);
     const format = formatter(this.hass);
-    const all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
-    const runs = all.filter((run) => matches(run, this.filter, t, format));
-    const total = runs.reduce((sum, run) => sum + run.total, 0);
+    const { all, shown: runs } = this;
+    const total = this.total.cost;
     return html`
       <div class="head">
         <h2>${t("runs.title")}</h2>
-        <span class="muted">${runs.length} · ${format.money(total)}</span>
+        <span class="muted"
+          >${runs.length}${total === undefined ? nothing : ` · ${format.money(total)}`}</span
+        >
       </div>
       ${all.length ? this.renderFilters(all, runs, t, format) : ""}
       ${
@@ -201,7 +214,6 @@ export class RunGallery extends LitElement {
       .filter(Boolean)
       .sort()
       .reverse();
-    const outcomes = ["open" as const, ...OUTCOMES];
     const value = (event: Event) => (event.target as HTMLInputElement | HTMLSelectElement).value;
     return html`<div class="filters row">
       <input
@@ -231,13 +243,15 @@ export class RunGallery extends LitElement {
       <select
         class="outcome-filter"
         aria-label=${t("runs.filter_outcome")}
-        @change=${(event: Event) => this.setFilter({ outcome: value(event) })}
+        @change=${(event: Event) => this.setFilter({ outcome: value(event) as Filter["outcome"] })}
       >
         <option value="">${t("runs.any_outcome")}</option>
-        ${outcomes.map(
-          (outcome) => html`<option value=${outcome}>${t(`outcome.${outcome}`)}</option>`,
+        ${OUTCOME_FILTERS.map(
+          (outcome) =>
+            html`<option value=${outcome}>
+              ${t(outcome === "failed_cancelled" ? "runs.failed_cancelled" : `outcome.${outcome}`)}
+            </option>`,
         )}
-        <option value="failed_cancelled">${t("runs.failed_cancelled")}</option>
       </select>
       ${this.renderTagFilter(runs, t)}
       <label class="flagged-filter">

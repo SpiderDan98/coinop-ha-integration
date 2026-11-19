@@ -7,7 +7,7 @@ and those groups overlap. A Run counts in the month it started in, in HA's time
 zone; open Runs count at their provisional values.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from datetime import datetime, tzinfo
 from itertools import product
 from typing import Any
@@ -89,16 +89,19 @@ def aggregate(
     decimals: int,
     zone: tzinfo,
     material_names: Mapping[str, str],
+    material_ids: Collection[str | None] | None = None,
 ) -> list[dict[str, Any]]:
     """One group per combination of `group_by` values that has Line Items.
 
     `material_names` names the catalogue's Materials; a Material deleted since
-    is named by the Line Item's copy of it. Groups come sorted by their values,
-    none last.
+    is named by the Line Item's copy of it. With `material_ids`, only Line Items
+    of those Materials count. Groups come sorted by their values, none last.
     """
     facts: dict[tuple[tuple[str, Any], ...], list[Fact]] = {}
     for run in runs:
         for item in run.line_items:
+            if material_ids is not None and item.material_id not in material_ids:
+                continue
             for parts in product(
                 *(
                     _keys(dimension, run, item, zone, material_names)

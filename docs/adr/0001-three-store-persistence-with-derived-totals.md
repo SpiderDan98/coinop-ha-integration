@@ -14,3 +14,11 @@ WattBill keeps its data in three Home Assistant Stores: `catalog` (Materials, Li
 - Home Assistant's `Store.async_delay_save` pushes the write back on every call, so the live Store keeps its first deadline itself; otherwise an open Run updated every minute would never be written.
 - Startup cost grows with the number of Runs (expected ~2,000 a year, summed in memory).
 - After a restore of recorder and WattBill data from different points in time, statistics jump once to the totals of the restored Runs.
+
+## Amendment: a fourth Store for Device settings
+
+WattBill's own per-Device settings (Tags for new Runs, automatic Line Item Templates, default Material) live in a fourth Store, `device_settings`, rather than in the catalog Store or the Device's subentry.
+
+- They belong to one Device, not to a global catalogue, and are dropped with it when the Device is removed; in the catalog Store each catalogue change would also rewrite them and the other way round.
+- The subentry holds what the Device flow configures, and every subentry change reloads the hub entry; settings changed from the panel must not restart every tracker.
+- Like every Store, it is registered in `store.SCHEMAS`, so the missing-data check, migrations and uninstall cover it.

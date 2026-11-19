@@ -34,10 +34,6 @@ CATALOGUES: dict[str, Callable[[Catalog], list[Any]]] = {
 }
 
 
-def _catalogue(catalog: Catalog, name: str) -> list[Any]:
-    return CATALOGUES[name](catalog)
-
-
 @callback
 def async_announce(hass: HomeAssistant, catalog: Catalog) -> CALLBACK_TYPE:
     """Forward the catalogue changes to every panel subscription."""
@@ -53,21 +49,22 @@ def _subscribe(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """First event: every catalogue (`{"materials": [...], "tags": [...]}`).
+    """First event: every catalogue (`{"materials": [...], "tags": [...],
+    "templates": [...]}`).
 
     Then each change: the changed catalogue alone.
     """
 
     @callback
     def forward(catalog: Catalog, name: str) -> None:
-        connection.send_event(msg["id"], {name: _catalogue(catalog, name)})
+        connection.send_event(msg["id"], {name: CATALOGUES[name](catalog)})
 
     connection.subscriptions[msg["id"]] = async_dispatcher_connect(
         hass, SIGNAL_CATALOG_CHANGED, forward
     )
     connection.send_result(msg["id"])
     connection.send_event(
-        msg["id"], {name: _catalogue(wattbill.catalog, name) for name in CATALOGUES}
+        msg["id"], {name: read(wattbill.catalog) for name, read in CATALOGUES.items()}
     )
 
 

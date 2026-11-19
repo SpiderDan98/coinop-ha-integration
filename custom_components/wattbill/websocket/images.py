@@ -13,8 +13,8 @@ from custom_components.wattbill.models import Run, RunImage
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
-from .command import command
-from .runs import _find, _send_run
+from .command import command, found
+from .runs import _send_run, find_run
 
 _IMAGE = {vol.Required("run_id"): str, vol.Required("image_id"): str}
 
@@ -23,14 +23,10 @@ def _find_image(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> tuple[Run, RunImage] | None:
     """The Run and image the message names; answers `not_found` if there is none."""
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return None
-    if (
-        image := next((i for i in run.images if i.id == msg["image_id"]), None)
-    ) is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No image with this id"
-        )
+    images = (i for i in run.images if i.id == msg["image_id"])
+    if (image := found(connection, msg, next(images, None), "image")) is None:
         return None
     return run, image
 

@@ -18,6 +18,7 @@ from .test_material_usage import (
     GRAMS_PER_METRE,
     add_measuring_device,
     material_items,
+    print_one_metre,
     set_usage,
 )
 from .test_runs import set_status, stored_runs
@@ -427,16 +428,6 @@ def linked_material(material_id: str, per_gram: float, **fields: Any) -> dict[st
     return stored_material(material_id, price=price, **fields)
 
 
-async def print_one_metre(hass: HomeAssistant, clock: Clock) -> None:
-    await set_status(hass, "printing")
-    await clock.advance(minutes=30)
-    await set_usage(hass, 1000)
-    await clock.advance(minutes=30)
-    await set_status(hass, "finished")
-    await clock.advance(minutes=1)
-    await set_usage(hass, 1000)
-
-
 async def test_a_run_end_reads_the_price_spoolman_has_then(
     hass: HomeAssistant,
     clock: Clock,
@@ -492,6 +483,32 @@ async def test_without_spoolman_the_last_price_read_applies_and_the_run_is_flagg
     [item] = material_items(run)
     assert item["unit_price"] == 0.025
     assert run["flags"] == ["spoolman_unreachable"]
+
+
+async def test_a_filament_spoolman_never_priced_flags_the_run(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Never a silent zero: the user has to enter the unit price."""
+    place_materials(
+        hass_storage,
+        stored_material(
+            "pla", price={"source": "spoolman", "filament_id": 7, "per_gram": None}
+        ),
+    )
+    serve_spoolman(aioclient_mock, filaments=[filament(7, price=None)])
+    entry = await add_measuring_device(hass, panel)
+    await set_options(hass, entry, spoolman_url=SPOOLMAN)
+
+    await print_one_metre(hass, clock)
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert item["unit_price"] == 0
+    assert run["flags"] == ["spoolman_no_price"]
 
 
 async def test_a_run_without_a_spoolman_material_ignores_spoolman(

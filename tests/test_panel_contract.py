@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from itertools import combinations
 from pathlib import Path
 from typing import Any
 
@@ -365,6 +366,14 @@ async def test_record_the_aggregates_of_overview_and_analysis(
         {"group_by": group_by}
         | await panel.call("wattbill/aggregates/get", group_by=group_by)
         for group_by in PANEL_GROUPINGS
+    ]
+    # The totals of each selection of Runs: gallery, basket, failed + cancelled.
+    ids = sorted(run["id"] for run in history())
+    answers += [
+        {"group_by": [], "run_ids": list(run_ids)}
+        | await panel.call("wattbill/aggregates/get", run_ids=list(run_ids))
+        for count in range(1, len(ids) + 1)
+        for run_ids in combinations(ids, count)
     ]
 
     assert_recorded("aggregates-get", answers)

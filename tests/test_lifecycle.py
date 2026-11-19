@@ -365,14 +365,18 @@ async def test_a_job_change_while_wattbill_was_stopped_closes_at_the_last_sighti
     assert value(hass, RUNS) == 2
 
 
-async def test_a_paused_print_with_another_job_closes_including_its_pause(
+async def test_a_paused_print_with_another_job_closes_when_last_seen_running(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
     await add_device(hass, entry, job=JOB, running_power=100, paused_power=10)
 
     await start_job(hass, "benchy.gcode")
-    await clock.advance(hours=1)
+    await clock.advance(minutes=30)
+    await set_status(hass, "paused")
+    await clock.advance(minutes=30)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
     await set_status(hass, "paused")
     await clock.advance(hours=1)
     await set_status(hass, STATE_UNAVAILABLE)
@@ -380,9 +384,9 @@ async def test_a_paused_print_with_another_job_closes_including_its_pause(
     await start_job(hass, "cube.gcode")
 
     [benchy] = stored_runs(hass_storage)
-    assert benchy["ended"] == at(hours=2)
-    assert benchy["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
-    assert kwh(benchy) == pytest.approx(0.11)
+    assert benchy["ended"] == at(minutes=90)
+    assert benchy["pauses"] == [{"start": at(minutes=30), "end": at(hours=1)}]
+    assert kwh(benchy) == pytest.approx(0.105)
 
 
 async def test_runs_have_no_minimum_duration(

@@ -8,7 +8,7 @@ are kept in `unknown` and written back unchanged.
 from dataclasses import dataclass, field, fields
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, overload
 
 
 class Outcome(StrEnum):
@@ -26,6 +26,7 @@ class Flag(StrEnum):
     USAGE_MISSING = "usage_missing"
     MATERIAL_MISSING = "material_missing"
     SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
+    SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
 
@@ -57,10 +58,18 @@ class ElectricityMethod(StrEnum):
     ENTERED = "entered"
 
 
+@overload
+def _time(value: str) -> datetime: ...
+@overload
+def _time(value: str | None) -> datetime | None: ...
 def _time(value: str | None) -> datetime | None:
     return None if value is None else datetime.fromisoformat(value)
 
 
+@overload
+def _iso(value: datetime) -> str: ...
+@overload
+def _iso(value: datetime | None) -> str | None: ...
 def _iso(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
@@ -82,8 +91,8 @@ class PriceSegment:
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
-            "start": self.start.isoformat(),
-            "end": self.end.isoformat(),
+            "start": _iso(self.start),
+            "end": _iso(self.end),
             "kwh": self.kwh,
             "unit_price": self.unit_price,
         }
@@ -91,8 +100,8 @@ class PriceSegment:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PriceSegment:
         return cls(
-            start=datetime.fromisoformat(data["start"]),
-            end=datetime.fromisoformat(data["end"]),
+            start=_time(data["start"]),
+            end=_time(data["end"]),
             kwh=data["kwh"],
             unit_price=data["unit_price"],
             unknown=unknown_fields(cls, data),
@@ -143,13 +152,11 @@ class Usage:
     unit: UsageUnit
 
     def as_dict(self) -> dict[str, Any]:
-        return {"at": self.at.isoformat(), "value": self.value, "unit": self.unit}
+        return {"at": _iso(self.at), "value": self.value, "unit": self.unit}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Usage:
-        return cls(
-            datetime.fromisoformat(data["at"]), data["value"], UsageUnit(data["unit"])
-        )
+        return cls(_time(data["at"]), data["value"], UsageUnit(data["unit"]))
 
 
 @dataclass(frozen=True)
@@ -177,7 +184,7 @@ class LoadedSlot:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "since": self.since.isoformat(),
+            "since": _iso(self.since),
             "slot": None if self.slot is None else self.slot.as_dict(),
         }
 
@@ -185,7 +192,7 @@ class LoadedSlot:
     def from_dict(cls, data: dict[str, Any]) -> LoadedSlot:
         slot = data["slot"]
         return cls(
-            datetime.fromisoformat(data["since"]),
+            _time(data["since"]),
             None if slot is None else SlotReport.from_dict(slot),
         )
 
@@ -263,18 +270,16 @@ class LineItem:
         """Take the user's quantity, unit price and/or amount.
 
         An amount back-computes the unit price; with an empty or zero quantity
-        the amount stands.
+        that amount stands.
         """
         if self.is_computed and self.computed is None:
             self.computed = self.values()
         for name, value in values.items():
             setattr(self, name, value)
-        if not self.quantity:
-            return
-        if "amount" in values:
+        if "amount" not in values:
+            self.amount = (self.quantity or 0.0) * self.unit_price
+        elif self.quantity:
             self.unit_price = self.amount / self.quantity
-        else:
-            self.amount = self.quantity * self.unit_price
 
     def recompute(self, quantity: float) -> None:
         """A new computed quantity at the computed unit price; overrides still count."""
@@ -368,7 +373,7 @@ class RunImage:
         return self.unknown | {
             "id": self.id,
             "kind": self.kind,
-            "created": self.created.isoformat(),
+            "created": _iso(self.created),
         }
 
     @classmethod
@@ -376,7 +381,7 @@ class RunImage:
         return cls(
             id=data["id"],
             kind=ImageKind(data["kind"]),
-            created=datetime.fromisoformat(data["created"]),
+            created=_time(data["created"]),
             unknown=unknown_fields(cls, data),
         )
 
@@ -395,7 +400,8 @@ class Run:
     are still awaited; frozen once finalised. `end_reconstructed` marks an end
     WattBill only learnt about after the Status input or WattBill itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
-    `last_seen` is the last time the Status input was seen during the open Run.
+    `last_seen` is the last time the Status input was seen running during the
+    open Run.
     `consumption` is the Device's consumption section when the Run started;
     `readings` are its meter's (time, kWh or W) reports, None while it had no
     value, kept until finalised. `cost_source` is the Device's price section the
@@ -439,6 +445,10 @@ class Run:
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
+    def paused(self) -> bool:
+        return bool(self.pauses) and self.pauses[-1].end is None
+
+    @property
     def electricity(self) -> LineItem:
         return next(i for i in self.line_items if i.kind is LineItemKind.ELECTRICITY)
 
@@ -470,14 +480,14 @@ class Run:
             "device_name": self.device_name,
             "name": self.name,
             "job_name": self.job_name,
-            "started": self.started.isoformat(),
+            "started": _iso(self.started),
             "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
             "outcome": self.outcome,
             "end_reconstructed": self.end_reconstructed,
             "finalised": self.finalised,
             "pauses": [
-                {"start": pause.start.isoformat(), "end": _iso(pause.end)}
+                {"start": _iso(pause.start), "end": _iso(pause.end)}
                 for pause in self.pauses
             ],
             "flags": list(self.flags),
@@ -485,11 +495,11 @@ class Run:
             "note": self.note,
             "tags": list(self.tags),
             "consumption": self.consumption,
-            "readings": [[at.isoformat(), value] for at, value in self.readings],
+            "readings": [[_iso(at), value] for at, value in self.readings],
             "cost_source": self.cost_source,
-            "prices": [[at.isoformat(), price] for at, price in self.prices],
+            "prices": [[_iso(at), price] for at, price in self.prices],
             "average_powers": [
-                [at.isoformat(), running, paused]
+                [_iso(at), running, paused]
                 for at, running, paused in self.average_powers
             ],
             "usage": None if self.usage is None else self.usage.as_dict(),
@@ -507,32 +517,23 @@ class Run:
             device_name=data["device_name"],
             name=data["name"],
             job_name=data.get("job_name"),
-            started=datetime.fromisoformat(data["started"]),
+            started=_time(data["started"]),
             last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),
             outcome=None if data["outcome"] is None else Outcome(data["outcome"]),
             end_reconstructed=data.get("end_reconstructed", False),
             finalised=data["finalised"],
-            pauses=[
-                Pause(datetime.fromisoformat(p["start"]), _time(p["end"]))
-                for p in data["pauses"]
-            ],
+            pauses=[Pause(_time(p["start"]), _time(p["end"])) for p in data["pauses"]],
             flags=list(data["flags"]),
             part_count=data["part_count"],
             note=data.get("note"),
             tags=list(data.get("tags", [])),
             consumption=data.get("consumption"),
-            readings=[
-                (datetime.fromisoformat(at), value)
-                for at, value in data.get("readings", [])
-            ],
+            readings=[(_time(at), value) for at, value in data.get("readings", [])],
             cost_source=data.get("cost_source"),
-            prices=[
-                (datetime.fromisoformat(at), price)
-                for at, price in data.get("prices", [])
-            ],
+            prices=[(_time(at), price) for at, price in data.get("prices", [])],
             average_powers=[
-                (datetime.fromisoformat(at), running, paused)
+                (_time(at), running, paused)
                 for at, running, paused in data.get("average_powers", [])
             ],
             usage=None

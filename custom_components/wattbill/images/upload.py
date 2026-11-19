@@ -8,10 +8,8 @@ from homeassistant.components.http import HomeAssistantView, require_admin
 from custom_components.wattbill.const import DOMAIN
 
 from .encode import InvalidImage
-from .library import UPLOAD_LIMIT, UploadLimit
+from .library import MAX_FILE_BYTES, UPLOAD_LIMIT, UploadLimit
 from .view import image_info, loaded_wattbill
-
-MAX_FILE_BYTES = 20 * 1024 * 1024
 
 
 class _BadRequest(Exception):

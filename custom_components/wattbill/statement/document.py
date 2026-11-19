@@ -277,7 +277,7 @@ def render(
     country: str | None,
     time_zone: tzinfo,
 ) -> bytes:
-    """`runs`: the ended Runs, ordered by start; `covers`: Cover Image files by Run id."""
+    """`runs`: the final Runs, ordered by start; `covers`: Cover Image files by Run id."""
     text = Text(options.language, currency, time_zone)
     pdf = _Document(text, "Letter" if country in LETTER_COUNTRIES else "A4")
     pdf.set_title(options.title or text("title"))

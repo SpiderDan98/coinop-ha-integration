@@ -1,5 +1,3 @@
-"""Config flow for the WattBill hub entry."""
-
 from typing import Any, override
 
 from homeassistant.config_entries import (

@@ -64,8 +64,9 @@ export const recorded = {
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/aggregates/get` over the snapshot's Runs (all in January 2026), for each
-   * grouping the Overview and Analysis ask for. */
-  aggregates: aggregatesGet as { group_by: Dimension[]; groups: Group[] }[],
+   * grouping the Overview and Analysis ask for, then ungrouped for each selection of them
+   * (`run_ids`, sorted). */
+  aggregates: aggregatesGet as { group_by: Dimension[]; run_ids?: string[]; groups: Group[] }[],
   /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
@@ -213,6 +214,11 @@ export class FakeBackend {
     };
   }
 
+  /** The messages of `type` the panel sent, in order. */
+  sent(type: string) {
+    return this.calls.filter((call) => call.type === type);
+  }
+
   /** Answer `callWS({type, ...})`; throw `new WsError(code)` to fail it. */
   reply(type: string, reply: Reply) {
     this.replies.set(type, reply);
@@ -273,10 +279,16 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
     })
     .reply("wattbill/devices/list", () => ({ devices: recorded.devices }))
     .reply("wattbill/cost_statement/defaults", () => recorded.statementDefaults)
-    .reply("wattbill/aggregates/get", (msg) => ({
-      groups: found(
-        recorded.aggregates.find((answer) => String(answer.group_by) === String(msg.group_by)),
-        `grouping ${String(msg.group_by)}`,
-      ).groups,
-    }));
+    .reply("wattbill/aggregates/get", (msg) => {
+      const runIds = (msg.run_ids as string[] | undefined)?.toSorted();
+      const asked = `${String(msg.group_by)} of ${String(runIds)}`;
+      return {
+        groups: found(
+          recorded.aggregates.find(
+            (answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked,
+          ),
+          `grouping ${asked}`,
+        ).groups,
+      };
+    });
 }
