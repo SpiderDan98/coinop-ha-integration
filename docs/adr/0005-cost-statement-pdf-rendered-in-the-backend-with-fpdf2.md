@@ -7,7 +7,7 @@ The Cost Statement is laid out in Python with fpdf2 (`requirements: ["fpdf2==2.9
 - fpdf2 is a pure-Python wheel. Its only dependencies are Pillow, which Home Assistant ships, and fontTools, which has musllinux wheels, so it installs on HA OS. reportlab would work just as well; WeasyPrint needs system libraries an integration can't install; borb is AGPL.
 - Its tables repeat their headings on a page break, and it embeds TTF fonts as subsets, so umlauts and € work. fpdf2's built-in fonts are Latin-1 and can't print €.
 - One renderer in the backend reads the same rounded amounts as the websocket API. A client-side library (jsPDF, pdfmake) would add 140–760 KB to the panel and need its own fonts and authenticated image fetches (#45). `window.print()` does nothing in the Android Companion app.
-- A signed path is how Home Assistant's own frontend downloads backups. A plain link sends no auth header, and the Companion app hands `https:` downloads to the system download manager.
+- A signed path is how Home Assistant's own frontend downloads backups. A plain link sends no auth header. The panel clicks the link the way HA's `fileDownload` does (`download` and `target="_blank"`): the Android Companion app hands `https:` downloads to the system download manager, which fetches the path again; the iOS app downloads it (iOS 17+) or opens it in the browser. The signed path therefore stays valid for several fetches, not one.
 - Backend tests can read the PDF's text (pypdf, test-only) and assert on what the recipient sees.
 
 ## Consequences
