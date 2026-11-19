@@ -63,9 +63,13 @@ async def start_add_device(
 
 
 async def configure(hass: HomeAssistant, result: Any, user_input: Any) -> Any:
-    return await hass.config_entries.subentries.async_configure(
+    result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], user_input
     )
+    if result["type"] is FlowResultType.CREATE_ENTRY:
+        # A new Device reloads the hub entry; a test must not end halfway through.
+        await hass.async_block_till_done()
+    return result
 
 
 async def walk_to_mapping(
