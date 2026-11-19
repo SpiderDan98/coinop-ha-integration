@@ -186,7 +186,9 @@ describe("Tags for new Runs", () => {
   const UPDATE = "wattbill/devices/update_settings";
 
   it("are set per Device and saved at once", async () => {
-    const backend = recordedBackend().reply(UPDATE, (msg) => ({ settings: msg.settings }));
+    const backend = recordedBackend().reply(UPDATE, (msg) => ({
+      settings: { ...recorded.devices[0]?.settings, ...(msg.settings as object) },
+    }));
     const panel = await mountPanel(backend, { path: "/devices" });
     const card = query(panel, ".device");
     expect(text(query(card, ".new-run-tags"))).toBe(
