@@ -16,6 +16,10 @@ _Avoid_: Category, device class
 A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
 _Avoid_: Sensor mapping, source
 
+**Slot**:
+A place on a Device that holds one Material at a time, such as one bay of a multi-material unit.
+_Avoid_: Gate, bay, tray
+
 **Integration Profile**:
 The known Device Inputs of a specific printer integration, used to fill in a Device's Device Inputs automatically.
 _Avoid_: Preset, adapter, template
@@ -41,7 +45,7 @@ A saved Line Item that can be added to any Run again.
 _Avoid_: Preset, Vorlage
 
 **Cost Source**:
-Where a Line Item's unit price comes from, either a fixed value or a live value read from Home Assistant.
+Where a Line Item's unit price comes from: a fixed value, or a live value read from Home Assistant or Spoolman.
 _Avoid_: Price provider, input
 
 **Cost Statement**:
@@ -49,5 +53,5 @@ A document that lists selected Runs with their Line Items and a total; explicitl
 _Avoid_: Invoice, bill, Rechnung, quote
 
 **Material**:
-A consumable a Device uses up during a Run, priced per unit and per type (e.g. PLA filament, standard resin).
+A consumable a Device uses up during a Run, bought at one price, such as "PLA" or "eSun PLA+ black"; as broad or as specific as the user keeps it.
 _Avoid_: Filament (as the generic term), consumable
