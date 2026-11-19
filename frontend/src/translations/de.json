@@ -251,5 +251,22 @@
   "basket.delete": "Löschen",
   "basket.clear": "Leeren",
   "basket.delete_failed": "Die ausgewählten Läufe konnten nicht gelöscht werden.",
-  "delete.title_many": "{count} Läufe löschen?"
+  "delete.title_many": "{count} Läufe löschen?",
+  "tab.analysis": "Analyse",
+  "analysis.by_kind": "Nach Art",
+  "analysis.kind": "Art",
+  "analysis.cost": "Kosten",
+  "analysis.share": "Anteil",
+  "analysis.by_device": "Nach Gerät",
+  "analysis.energy": "Energie",
+  "analysis.by_month": "Nach Monat",
+  "analysis.month": "Monat",
+  "analysis.month_hint": "Ein Lauf zählt im Monat seines Starts.",
+  "analysis.by_material": "Nach Material",
+  "analysis.used": "Verbraucht",
+  "analysis.per_kg": "Pro kg",
+  "analysis.by_outcome": "Nach Ausgang",
+  "analysis.by_tag": "Nach Tag",
+  "analysis.tag_overlap": "Überlappend: Ein Lauf zählt in jedem seiner Tags, daher ergeben die Zeilen zusammen mehr als die Gesamtsumme.",
+  "analysis.intro": "Summen über alle Geräte. Laufende Läufe zählen mit ihren vorläufigen Werten."
 }

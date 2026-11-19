@@ -251,5 +251,22 @@
   "basket.delete": "Delete",
   "basket.clear": "Clear",
   "basket.delete_failed": "The selected Runs could not be deleted.",
-  "delete.title_many": "Delete {count} Runs?"
+  "delete.title_many": "Delete {count} Runs?",
+  "tab.analysis": "Analysis",
+  "analysis.by_kind": "By kind",
+  "analysis.kind": "Kind",
+  "analysis.cost": "Cost",
+  "analysis.share": "Share",
+  "analysis.by_device": "By Device",
+  "analysis.energy": "Energy",
+  "analysis.by_month": "By month",
+  "analysis.month": "Month",
+  "analysis.month_hint": "A Run counts in the month it started.",
+  "analysis.by_material": "By Material",
+  "analysis.used": "Used",
+  "analysis.per_kg": "Per kg",
+  "analysis.by_outcome": "By Outcome",
+  "analysis.by_tag": "By Tag",
+  "analysis.tag_overlap": "Overlapping: a Run counts in each of its Tags, so the rows add up to more than the total.",
+  "analysis.intro": "Totals across all Devices. Open Runs count at their provisional values."
 }
