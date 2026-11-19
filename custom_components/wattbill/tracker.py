@@ -31,6 +31,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading
+from .device_settings import TAGS_FOR_NEW_RUNS, DeviceSettings
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
@@ -56,11 +57,16 @@ def _meter(section: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
 
 class DeviceTracker:
     def __init__(
-        self, hass: HomeAssistant, book: RunBook, config: DeviceConfig
+        self,
+        hass: HomeAssistant,
+        book: RunBook,
+        config: DeviceConfig,
+        settings: DeviceSettings,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
+        self._settings = settings
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
@@ -243,6 +249,7 @@ class DeviceTracker:
             last_seen=at,
             line_items=[],
             consumption=dict(self._config.consumption),
+            tags=self._settings.get(self._config.device_id)[TAGS_FOR_NEW_RUNS],
         )
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))

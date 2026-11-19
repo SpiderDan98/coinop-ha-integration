@@ -45,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         catalog=Catalog(stores["catalog"], data["catalog"], book.uses_material),
         devices=devices,
         settings=settings,
-        trackers=[DeviceTracker(hass, book, device) for device in devices],
+        trackers=[DeviceTracker(hass, book, device, settings) for device in devices],
     )
     for device in devices:
         ha_device.async_register(hass, entry, device)

@@ -25,6 +25,9 @@
         "flags": [],
         "part_count": 1,
         "note": null,
+        "tags": [
+          "Gift"
+        ],
         "consumption": {
           "source": "estimate",
           "running_power": 120,
@@ -75,6 +78,7 @@
         "flags": [],
         "part_count": 1,
         "note": null,
+        "tags": [],
         "consumption": {
           "source": "estimate",
           "running_power": 120,

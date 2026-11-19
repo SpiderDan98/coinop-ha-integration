@@ -16,6 +16,9 @@
       "flags": [],
       "part_count": 4,
       "note": "Four on one plate",
+      "tags": [
+        "Gift"
+      ],
       "consumption": null,
       "line_items": [
         {
@@ -91,6 +94,10 @@
       ],
       "part_count": 1,
       "note": null,
+      "tags": [
+        "Cosplay helmet",
+        "Gift"
+      ],
       "consumption": null,
       "line_items": [
         {
@@ -146,6 +153,7 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "tags": [],
       "consumption": null,
       "line_items": [
         {
@@ -195,6 +203,9 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "tags": [
+        "Batch 7"
+      ],
       "consumption": {
         "source": "estimate",
         "running_power": 120.0,

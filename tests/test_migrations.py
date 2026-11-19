@@ -67,6 +67,8 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
         {key: value for key, value in m.items() if key != "price_per_gram"}
         for m in listed
     ] == current["catalog"]["materials"]
+    await panel.subscribe("wattbill/catalog/subscribe")
+    assert (await panel.event())["tags"] == current["catalog"]["tags"]
     for key, file in files.items():
         if file["version"] < hass_storage[key]["version"]:
             assert hass_storage[f"{key}.bak"]["data"] == file["data"]
