@@ -2,6 +2,7 @@
   "title": "Kostenaufstellung",
   "created": "Erstellt am {date}",
   "period": "Zeitraum {start} – {end}",
+  "period_day": "Zeitraum {day}",
   "running_time": "Laufzeit {duration}",
   "part_one": "1 Teil",
   "parts": "{count} Teile",

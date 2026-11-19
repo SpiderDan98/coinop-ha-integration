@@ -1,7 +1,8 @@
 """The Cost Statement: a PDF of selected ended Runs, downloaded through a signed path."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from typing import Any
 
@@ -9,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pypdf import PdfReader
 import pytest
+from pytest_homeassistant_custom_component.common import MockUser
 
 from .clock import CLOCK_START, Clock
 from .devices import add_hub
@@ -61,16 +63,16 @@ async def export(panel: PanelClient, browser: HttpClient, **options: Any) -> Sta
     return Statement(filename.strip('"'), *read(body))
 
 
-def benchy(**fields: Any) -> dict[str, Any]:
+def benchy(started: datetime = BENCHY, **fields: Any) -> dict[str, Any]:
     return (
         stored_run(
             "benchy",
             name="Benchy",
-            started=BENCHY,
+            started=started,
             hours=2,
             part_count=2,
             line_items=[
-                electricity(0.4, 0.25, BENCHY, BENCHY + timedelta(hours=2)),
+                electricity(0.4, 0.25, started, started + timedelta(hours=2)),
                 line_item(
                     "material",
                     0.505,
@@ -245,3 +247,270 @@ async def test_markup_cannot_be_negative(
         "wattbill/cost_statement/create", run_ids=["benchy"], markup=-5
     )
     assert error["code"] == "invalid_format"
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_a_compact_statement_has_one_row_per_run(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(
+        panel, browser, run_ids=["benchy", "helmet"], detail="compact"
+    )
+
+    assert statement.lines[3:-1] == [
+        "Run Device Start Parts Per part Total",
+        "Benchy Kobra Jan 12, 2026 2 €0.56 €1.11",
+        "Helmet (Failed) Kobra Jan 13, 2026 1 -€0.80 -€0.80",
+        "Subtotal €0.31",
+        "Total €0.31",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_title_and_note_head_the_statement_and_name_the_file(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(
+        panel,
+        browser,
+        run_ids=["benchy"],
+        title="Gifts for Ünal",
+        note="Printed for the school fair.",
+    )
+
+    assert statement.filename == "gifts-for-unal-2026-01-15.pdf"
+    assert statement.lines[:4] == [
+        "Gifts for Ünal",
+        "Created Jan 15, 2026",
+        "Period Jan 12, 2026",
+        "Printed for the school fair.",
+    ]
+
+
+async def test_a_german_statement_on_letter_paper_in_dollars(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency, hass.config.country = "USD", "US"
+    place_runs(hass_storage, benchy(), helmet())
+    await add_hub(hass)
+
+    statement = await export(
+        panel, browser, run_ids=["benchy", "helmet"], language="de", markup=7.5
+    )
+
+    assert statement.filename == "kostenaufstellung-2026-01-15.pdf"
+    assert statement.paper == (216, 279)
+    assert statement.lines[:3] == [
+        "Kostenaufstellung",
+        "Erstellt am 15.01.2026",
+        "Zeitraum 12.01.2026 – 13.01.2026",  # noqa: RUF001
+    ]
+    text = "\n".join(statement.lines)
+    for expected in [
+        "Kobra · 12.01.2026 · Laufzeit 2 Std. 0 Min. · 2 Teile · 0,56 $ pro Teil",
+        "Posten Menge Stückpreis Betrag",
+        "Strom 0,4 kWh 0,25 $ 0,10 $",
+        "PLA Black 20,2 g 0,025 $ 0,51 $",
+        "Summe Lauf 1,11 $",
+        "Ausgang: Fehlgeschlagen",
+        "Zwischensumme 0,31 $",
+        "Aufschlag 7,5 % 0,02 $",
+        "Gesamtsumme 0,33 $",
+    ]:
+        assert expected in text
+    assert statement.lines[-1] == (
+        "Dies ist eine Kostenaufstellung, keine Rechnung. Seite 1 von 1"
+    )
+
+
+async def test_the_language_defaults_to_home_assistants_and_a4_outside_us_and_canada(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.language, hass.config.country = "de", "AT"
+    place_runs(hass_storage, benchy())
+    await add_hub(hass)
+
+    statement = await export(panel, browser, run_ids=["benchy"])
+
+    assert statement.lines[0] == "Kostenaufstellung"
+    assert statement.paper == (210, 297)
+
+
+async def test_internal_details_stay_off_the_statement(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency = "EUR"
+    place_runs(
+        hass_storage,
+        benchy(
+            note="Customer never paid the last one",
+            tags=["Gift"],
+            flags=["fault"],
+            pauses=[
+                {
+                    "start": (BENCHY + timedelta(minutes=30)).isoformat(),
+                    "end": (BENCHY + timedelta(minutes=50)).isoformat(),
+                }
+            ],
+        ),
+    )
+    await add_hub(hass)
+    run = await panel.call(
+        "wattbill/line_items/update",
+        run_id="benchy",
+        line_item_id="electricity",
+        amount=0.15,
+    )
+    assert run["run"]["line_items"][0]["computed"]["amount"] == 0.1
+
+    statement = await export(panel, browser, run_ids=["benchy"])
+
+    text = "\n".join(statement.lines)
+    assert "Electricity 0.4 kWh €0.375 €0.15" in text
+    assert "Running time 1 h 40 min" in text
+    for internal in ["Customer", "Gift", "fault", "Fault", "0.10", "↺", "Pause"]:
+        assert internal not in text
+
+
+async def test_every_page_has_the_footer_and_sections_stay_together(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency = "EUR"
+    place_runs(
+        hass_storage,
+        *(
+            benchy(id=f"run-{n:02}", name=f"Print {n:02}", started=BENCHY + n * DAY)
+            for n in range(20)
+        ),
+    )
+    await add_hub(hass)
+
+    statement = await export(panel, browser, run_ids=[f"run-{n:02}" for n in range(20)])
+
+    count = len(statement.pages)
+    assert count > 2
+    assert [page.splitlines()[-1] for page in statement.pages] == [
+        f"This is a cost statement, not an invoice. Page {n} of {count}"
+        for n in range(1, count + 1)
+    ]
+    for n in range(20):
+        [page] = [page for page in statement.pages if f"Print {n:02}" in page]
+        section = page[page.index(f"Print {n:02}") :]
+        assert "Run total €1.11" in section, f"Print {n:02} breaks across pages"
+
+
+async def test_a_run_longer_than_a_page_breaks_with_its_table_headings_repeated(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency = "EUR"
+    items = [
+        line_item("other", 0.25, id=f"part-{n}", label=f"Part {n:02}")
+        for n in range(80)
+    ]
+    place_runs(
+        hass_storage,
+        benchy(),
+        helmet(line_items=[*helmet()["line_items"], *items]),
+    )
+    await add_hub(hass)
+
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"])
+
+    pages = statement.pages
+    assert len(pages) == 3
+    assert "Benchy" in pages[0]
+    assert "Helmet" in pages[0]
+    assert all("Line Item Quantity Unit price Amount" in page for page in pages[1:])
+    assert "Run total €19.20" in pages[2]
+    assert "Subtotal €20.31" in pages[2]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_the_pdf_shows_the_runs_as_they_are_at_download(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    result = await panel.call(
+        "wattbill/cost_statement/create", run_ids=["benchy", "helmet"]
+    )
+    await panel.call("wattbill/runs/update", run_id="benchy", name="Benchy v2")
+    await panel.call("wattbill/runs/delete", run_ids=["helmet"])
+
+    status, _, body = await browser.download(result["path"])
+
+    assert status == 200
+    text = "\n".join(read(body)[0])
+    assert "Benchy v2" in text
+    assert "Helmet" not in text
+    assert "Total €1.11" in text
+
+
+async def test_only_ended_runs_can_be_exported(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, benchy(), stored_run("live", ended=False))
+    await add_hub(hass)
+
+    open_run = await panel.error(
+        "wattbill/cost_statement/create", run_ids=["benchy", "live"]
+    )
+    missing = await panel.error(
+        "wattbill/cost_statement/create", run_ids=["benchy", "gone"]
+    )
+    empty = await panel.error("wattbill/cost_statement/create", run_ids=[])
+
+    assert [open_run["code"], missing["code"], empty["code"]] == [
+        "not_allowed",
+        "not_found",
+        "invalid_format",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_only_admins_export(
+    clock: Clock,
+    connect_panel: Callable[[MockUser], PanelClient],
+    hass_read_only_user: MockUser,
+    connect_http: Callable[[MockUser], HttpClient],
+    panel: PanelClient,
+) -> None:
+    user = connect_panel(hass_read_only_user)
+    error = await user.error("wattbill/cost_statement/create", run_ids=["benchy"])
+    assert error["code"] == "unauthorized"
+
+    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+    status, _ = await connect_http(hass_read_only_user).get(result["path"])
+    assert status == 401
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_the_download_needs_its_signature_and_expires(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+    unsigned = result["path"].split("?")[0]
+
+    assert (await browser.get(unsigned))[0] == 401
+    await clock.advance(minutes=4)
+    assert (await browser.get(result["path"]))[0] == 200
+    await clock.advance(minutes=2)
+    assert (await browser.get(result["path"]))[0] == 401

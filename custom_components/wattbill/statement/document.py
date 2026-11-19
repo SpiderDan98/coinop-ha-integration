@@ -62,9 +62,11 @@ class _Document(FPDF):
 
     def keep_together(self, draw: Callable[[], None]) -> None:
         """On one page unless it is longer than a page; then it breaks."""
+        top, page = self.y, self.page
         with self.offset_rendering() as trial:
             draw()
-        if trial.page_break_triggered and self.y > self.t_margin + 1:
+            height = trial.y - top + (trial.page - page) * self.eph
+        if top + height > self.page_break_trigger >= self.t_margin + height:
             self.add_page()
         draw()
 
@@ -132,7 +134,12 @@ def _header(pdf: _Document, runs: list[Run], options: Options, now: datetime) ->
     pdf.line_of_text(text("created", date=text.date(now)), 9, grey=True)
     start = text.date(runs[0].started)
     end = text.date(max(run.ended or run.started for run in runs))
-    pdf.line_of_text(text("period", start=start, end=end), 9, grey=True)
+    period = (
+        text("period_day", day=start)
+        if start == end
+        else text("period", start=start, end=end)
+    )
+    pdf.line_of_text(period, 9, grey=True)
     if options.note:
         pdf.ln(3)
         pdf.line_of_text(options.note, 10)

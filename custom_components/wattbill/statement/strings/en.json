@@ -2,6 +2,7 @@
   "title": "Cost Statement",
   "created": "Created {date}",
   "period": "Period {start} – {end}",
+  "period_day": "Period {day}",
   "running_time": "Running time {duration}",
   "part_one": "1 part",
   "parts": "{count} parts",
