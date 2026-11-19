@@ -132,6 +132,15 @@
       "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
       "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
     },
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
     "subtotals": {
       "electricity": 0.05,
       "material": 0.31,

@@ -23,7 +23,19 @@ VARIANTS = {"full": ".webp", "tile": ".tile.webp"}
 # A Run has at most one of these; a new one replaces it.
 SINGLE_KINDS = frozenset({ImageKind.THUMBNAIL, ImageKind.SNAPSHOT})
 UPLOAD_LIMIT = 10
-UPLOAD_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
+# Pillow's format name -> the media type the panel's file picker accepts.
+UPLOAD_TYPES = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
+UPLOAD_FORMATS = frozenset(UPLOAD_TYPES)
+MAX_FILE_BYTES = 20 * 1024 * 1024
+
+
+def upload_rules() -> dict[str, object]:
+    """What the panel tells the user and its file picker accepts."""
+    return {
+        "limit": UPLOAD_LIMIT,
+        "types": list(UPLOAD_TYPES.values()),
+        "max_bytes": MAX_FILE_BYTES,
+    }
 
 
 class UploadLimit(Exception):

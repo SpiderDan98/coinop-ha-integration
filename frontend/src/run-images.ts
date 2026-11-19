@@ -2,16 +2,7 @@
 // and the photo upload. Hands each Run the backend returns to the page as `run-changed`.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import {
-  UPLOAD_LIMIT,
-  UPLOAD_TYPES,
-  deleteImage,
-  getRun,
-  setCover,
-  uploadImages,
-  type RunDetail,
-  type RunImage,
-} from "./api";
+import { deleteImage, getRun, setCover, uploadImages, type RunDetail, type RunImage } from "./api";
 import type { HomeAssistant } from "./hass";
 import { isKey, localize } from "./localize";
 import "./run-image";
@@ -60,7 +51,9 @@ export class RunImages extends LitElement {
   override render() {
     const t = localize(this.hass);
     const run = this.run;
-    const full = run.images.filter((image) => image.kind === "upload").length >= UPLOAD_LIMIT;
+    const { limit, types, max_bytes } = run.uploads;
+    const rules = { limit, size: Math.floor(max_bytes / 1024 / 1024) };
+    const full = run.images.filter((image) => image.kind === "upload").length >= limit;
     const errorKey = `images.error.${this.error}`;
     return html`
       <wattbill-run-image
@@ -80,16 +73,16 @@ export class RunImages extends LitElement {
         <input
           type="file"
           multiple
-          accept=${UPLOAD_TYPES.join(",")}
+          accept=${types.join(",")}
           ?disabled=${full || this.busy}
           @change=${this.onFiles}
         />
       </label>
-      <p class="muted small">${t("images.limit", { limit: UPLOAD_LIMIT })}</p>
+      <p class="muted small">${t("images.limit", rules)}</p>
       ${
         this.error
           ? html`<p class="images-error small">
-              ${t(isKey(errorKey) ? errorKey : "images.error.failed", { limit: UPLOAD_LIMIT })}
+              ${t(isKey(errorKey) ? errorKey : "images.error.failed", rules)}
             </p>`
           : nothing
       }

@@ -133,6 +133,15 @@
         "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
         "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
       },
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
       "subtotals": {
         "electricity": 0.05,
         "material": 0.31,
@@ -249,6 +258,15 @@
         "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
         "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
       },
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
       "subtotals": {
         "electricity": 0.3,
         "material": 0.0,
@@ -317,6 +335,15 @@
       "total": 0.07,
       "cost_per_part": 0.07,
       "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
       "subtotals": {
         "electricity": 0.07,
         "material": 0.0,
@@ -459,6 +486,15 @@
       "total": 0.25,
       "cost_per_part": 0.25,
       "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
       "subtotals": {
         "electricity": 0.03,
         "material": 0.11,

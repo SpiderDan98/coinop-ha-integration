@@ -27,7 +27,7 @@ from custom_components.wattbill.cost.rounding import (
     rounded_sum,
 )
 from custom_components.wattbill.cost.running_time import running_time
-from custom_components.wattbill.images import image_info
+from custom_components.wattbill.images import image_info, upload_rules
 from custom_components.wattbill.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
@@ -89,6 +89,7 @@ def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         **_summary(run, now, decimals),
         "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
+        "uploads": upload_rules(),
         "subtotals": {
             kind: float(
                 rounded_sum(

@@ -78,6 +78,8 @@ export interface RunDetail extends RunSummary {
   line_items: LineItem[];
   /** Thumbnail, Snapshot, then uploads by time. */
   images: RunImage[];
+  /** How many photos a Run takes, of which media types and how large. */
+  uploads: { limit: number; types: string[]; max_bytes: number };
   subtotals: Record<Kind, number>;
 }
 
@@ -222,9 +224,6 @@ export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
 /** End Run now: the open Run ends as Unknown and is finalised. */
 export const endRun = (hass: HomeAssistant, runId: string) =>
   runResult(hass, { type: "wattbill/runs/end", run_id: runId });
-
-export const UPLOAD_LIMIT = 10;
-export const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /** Multipart, as the websocket caps messages; a refusal throws its `code`. */
 export const uploadImages = async (hass: HomeAssistant, runId: string, files: File[]) => {
