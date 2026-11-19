@@ -29,6 +29,27 @@ METER_UNITS = {
     ConsumptionSource.ENERGY: (EnergyConverter, UnitOfEnergy.KILO_WATT_HOUR),
     ConsumptionSource.POWER: (PowerConverter, UnitOfPower.WATT),
 }
+# Price units name the currency by its code or one of these symbols.
+CURRENCY_SYMBOLS = {
+    "EUR": {"€"},
+    "USD": {"$"},
+    "AUD": {"$", "A$"},
+    "CAD": {"$", "C$"},
+    "NZD": {"$", "NZ$"},
+    "GBP": {"£"},
+    "JPY": {"¥"},
+    "CHF": {"Fr.", "Fr"},
+    "SEK": {"kr"},
+    "NOK": {"kr"},
+    "DKK": {"kr"},
+    "PLN": {"zł"},
+    "CZK": {"Kč"},
+    "INR": {"₹"},
+}
+# Sub-units worth a hundredth of the currency: cent, penny, Rappen, öre, grosz.
+SUB_UNITS = frozenset(
+    {"ct", "c", "¢", "cent", "cents", "p", "rp", "öre", "øre", "ore", "gr"}
+)
 
 
 def input_value(state: State | None, attribute: str | None) -> str | None:
@@ -89,24 +110,64 @@ def unit_scale(source: ConsumptionSource, unit: str | None) -> float | None:
     return converter.get_unit_ratio(canonical, unit)
 
 
-def meter_reading(state: State | None, meter: Mapping[str, Any]) -> float | None:
-    """The meter's current reading in kWh or W, or None while it has none."""
-    value = input_value(state, meter["attribute"])
-    if state is None or value is None:
+def price_scale(unit: str | None, currency: str) -> float | None:
+    """Factor from a price in `unit` to `currency`/kWh; None if not recognised."""
+    if unit is None or unit.count("/") != 1:
+        return None
+    money, energy = (part.strip() for part in unit.split("/"))
+    if energy not in EnergyConverter.VALID_UNITS:
+        return None
+    if money.upper() == currency.upper() or money in CURRENCY_SYMBOLS.get(
+        currency.upper(), set()
+    ):
+        scale = 1.0
+    elif money.lower() in SUB_UNITS:
+        scale = 0.01
+    else:
+        return None
+    return scale * EnergyConverter.get_unit_ratio(energy, UnitOfEnergy.KILO_WATT_HOUR)
+
+
+def _number(state: State | None, attribute: str | None) -> float | None:
+    value = input_value(state, attribute)
+    if value is None:
         return None
     try:
         number = float(value)
     except ValueError:
         return None
-    reported_unit = (
-        state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
-        if meter["attribute"] is None
-        else None
+    return number if math.isfinite(number) else None
+
+
+def _reported_unit(state: State, attribute: str | None) -> str | None:
+    """An attribute has no unit of its own; the state's unit is the entity's."""
+    return None if attribute else state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+
+
+def price_reading(
+    state: State | None, price: Mapping[str, Any], currency: str
+) -> float | None:
+    """The price entity's current price in `currency`/kWh, or None while it has none."""
+    number = _number(state, price["attribute"])
+    if state is None or number is None:
+        return None
+    scale = (
+        price_scale(_reported_unit(state, price["attribute"]), currency)
+        or price_scale(price["unit"], currency)
+        or price["factor"]
     )
+    return None if scale is None else number * scale
+
+
+def meter_reading(state: State | None, meter: Mapping[str, Any]) -> float | None:
+    """The meter's current reading in kWh or W, or None while it has none."""
+    number = _number(state, meter["attribute"])
+    if state is None or number is None:
+        return None
     source = ConsumptionSource(meter["source"])
     scale = (
-        unit_scale(source, reported_unit)
+        unit_scale(source, _reported_unit(state, meter["attribute"]))
         or unit_scale(source, meter["unit"])
         or meter["factor"]
     )
-    return None if scale is None or not math.isfinite(number) else number * scale
+    return None if scale is None else number * scale

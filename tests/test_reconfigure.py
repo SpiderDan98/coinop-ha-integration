@@ -22,6 +22,8 @@ from .test_device_flow import suggested
 from .test_persistence import live_runs
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
+FIXED = ({"next_step_id": "price"}, {"next_step_id": "fixed_price"})
+
 
 async def test_reconfigure_is_a_menu_of_the_devices_sections(
     hass: HomeAssistant,
@@ -71,6 +73,8 @@ async def test_each_section_is_pre_filled_and_returns_to_the_menu(
     assert result["step_id"] == "reconfigure"
 
     result = await configure(hass, result, {"next_step_id": "price"})
+    assert result["type"] is FlowResultType.MENU
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
     assert suggested(result, "price") == 0.31
     result = await configure(hass, result, {"price": 0.31})
     assert result["step_id"] == "reconfigure"
@@ -93,6 +97,7 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
         {"next_step_id": "estimate"},
         {"running_power": 90, "paused_power": 10},
         {"next_step_id": "price"},
+        {"next_step_id": "fixed_price"},
         {"price": 0.5},
     )
 
@@ -117,6 +122,7 @@ async def test_leaving_without_save_changes_nothing(hass: HomeAssistant) -> None
     menu = await start_reconfigure(hass, entry, subentry)
 
     result = await configure(hass, menu, {"next_step_id": "price"})
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
     await configure(hass, result, {"price": 0.5})
 
     assert entry.subentries[subentry.subentry_id].data["price"]["value"] == 0.30
@@ -131,7 +137,7 @@ async def test_an_open_run_survives_save_and_continues_at_the_new_price(
     await clock.advance(hours=1)
     [open_run] = live_runs(hass_storage)
 
-    await reconfigure(hass, entry, subentry, {"next_step_id": "price"}, {"price": 2})
+    await reconfigure(hass, entry, subentry, *FIXED, {"price": 2})
     await clock.advance(minutes=1)
     before = value(hass, TOTAL_COST)
     await clock.advance(hours=1)
@@ -254,7 +260,7 @@ async def test_ended_runs_never_change(
     await set_status(hass, "finished")
     ended = deepcopy(stored_runs(hass_storage))
 
-    await reconfigure(hass, entry, subentry, {"next_step_id": "price"}, {"price": 5})
+    await reconfigure(hass, entry, subentry, *FIXED, {"price": 5})
     await clock.advance(hours=1)
 
     assert stored_runs(hass_storage) == ended
