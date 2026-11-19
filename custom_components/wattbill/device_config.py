@@ -30,6 +30,8 @@ class DeviceConfig:
     status_entity_id: str
     status_attribute: str | None
     mapping: Mapping[str, Target]
+    job_entity_id: str | None
+    job_attribute: str | None
     running_power: float
     paused_power: float | None
     price: float
@@ -37,6 +39,7 @@ class DeviceConfig:
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
         data: Mapping[str, Any] = subentry.data
+        job = data.get("job", {})
         return cls(
             device_id=subentry.subentry_id,
             name=subentry.title,
@@ -47,6 +50,8 @@ class DeviceConfig:
                 for target, values in data["mapping"].items()
                 for value in values
             },
+            job_entity_id=job.get("entity_id"),
+            job_attribute=job.get("attribute"),
             running_power=data["consumption"]["running_power"],
             paused_power=data["consumption"]["paused_power"],
             price=data["price"]["value"],

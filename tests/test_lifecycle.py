@@ -232,3 +232,143 @@ async def test_an_open_run_whose_print_goes_on_continues_after_a_restart(
     assert run["started"] == at()
     assert run["ended"] == at(hours=3)
     assert run["end_reconstructed"] is False
+
+
+JOB = "sensor.kobra_job"
+
+
+async def start_job(hass: HomeAssistant, job: str) -> None:
+    hass.states.async_set(JOB, job)
+    await set_status(hass, "printing")
+
+
+async def test_a_run_is_named_after_its_job(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB)
+
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["name"] == "benchy.gcode"
+
+
+async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(
+        hass,
+        entry,
+        status=PRINT_EVENT,
+        mapping=EVENTS,
+        job=PRINT_EVENT,
+        job_attribute="filename",
+    )
+
+    await fire(hass, "started", at(), filename="benchy.gcode")
+    await clock.advance(minutes=30)
+    await fire(hass, "finished", at(minutes=30), filename="benchy.gcode")
+
+    [run] = stored_runs(hass_storage)
+    assert run["name"] == "benchy.gcode"
+
+
+async def test_a_print_resumed_with_the_same_job_continues_its_run(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100)
+
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+    hass.states.async_set(JOB, STATE_UNAVAILABLE)
+    await set_status(hass, STATE_UNAVAILABLE)
+    await clock.advance(hours=1)
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["started"] == at()
+    assert run["ended"] == at(hours=3)
+    assert run["outcome"] == "completed"
+    assert kwh(run) == pytest.approx(0.3)
+
+
+async def test_a_print_with_another_job_closes_the_old_run_and_opens_a_new_one(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100)
+
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, STATE_UNAVAILABLE)
+    await clock.advance(hours=1)
+    await start_job(hass, "cube.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    benchy, cube = stored_runs(hass_storage)
+    assert benchy | {"quantity": kwh(benchy)} == benchy | {
+        "name": "benchy.gcode",
+        "started": at(),
+        "ended": at(hours=1),
+        "outcome": "unknown",
+        "end_reconstructed": True,
+        "quantity": pytest.approx(0.1),
+    }
+    assert cube | {"quantity": kwh(cube)} == cube | {
+        "name": "cube.gcode",
+        "started": at(hours=2),
+        "ended": at(hours=3),
+        "outcome": "completed",
+        "quantity": pytest.approx(0.1),
+    }
+    assert value(hass, RUNS) == 2
+
+
+async def test_a_job_change_while_wattbill_was_stopped_closes_at_the_last_sighting(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100)
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+
+    await stop_wattbill(hass, entry)
+    await set_status(hass, STATE_UNAVAILABLE)
+    await clock.advance(hours=1)
+    await start_job(hass, "cube.gcode")
+    await clock.advance(hours=1)
+    await start_wattbill(hass, entry)
+
+    [benchy] = stored_runs(hass_storage)
+    assert benchy["ended"] == at(hours=1)
+    assert benchy["outcome"] == "unknown"
+    assert kwh(benchy) == pytest.approx(0.1)
+    assert value(hass, RUNS) == 2
+
+
+async def test_a_paused_print_with_another_job_closes_including_its_pause(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100, paused_power=10)
+
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, "paused")
+    await clock.advance(hours=1)
+    await set_status(hass, STATE_UNAVAILABLE)
+    await clock.advance(hours=1)
+    await start_job(hass, "cube.gcode")
+
+    [benchy] = stored_runs(hass_storage)
+    assert benchy["ended"] == at(hours=2)
+    assert benchy["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
+    assert kwh(benchy) == pytest.approx(0.11)

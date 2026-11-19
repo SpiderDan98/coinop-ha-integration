@@ -50,6 +50,18 @@
             "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn der Drucker nur „druckt / druckt nicht“ meldet."
           }
         },
+        "job": {
+          "title": "Druckauftrag",
+          "description": "Wähle optional die Entität, die den Namen des aktuellen Druckauftrags meldet. Ein Lauf wird nach seinem Auftrag benannt, und ein Druck, der mit demselben Auftragsnamen wieder startet, z. B. nach einem Stromausfall, setzt denselben Lauf fort.",
+          "data": {
+            "entity_id": "Auftragsname-Entität (optional)",
+            "attribute": "Attribut (optional)"
+          },
+          "data_description": {
+            "entity_id": "Ohne Auftragsnamen setzt ein Druck, der bei offenem Lauf wieder startet, immer diesen Lauf fort.",
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Druckereignis-Entität."
+          }
+        },
         "consumption": {
           "title": "Stromverbrauch",
           "description": "Wie soll WattBill den Strom bestimmen, den ein Lauf verbraucht?",

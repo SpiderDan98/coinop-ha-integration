@@ -50,6 +50,18 @@
             "ended": "Ends the Run with Outcome Unknown, e.g. when the printer only reports printing / not printing."
           }
         },
+        "job": {
+          "title": "Print job",
+          "description": "Optionally pick the entity that reports the name of the current print job. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
+          "data": {
+            "entity_id": "Job name entity (optional)",
+            "attribute": "Attribute (optional)"
+          },
+          "data_description": {
+            "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
+            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity."
+          }
+        },
         "consumption": {
           "title": "Electricity consumption",
           "description": "How should WattBill determine the electricity a Run uses?",

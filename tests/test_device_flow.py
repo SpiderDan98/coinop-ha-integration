@@ -1,4 +1,4 @@
-"""Add Device: name, Status entity, Status mapping, consumption estimate, price."""
+"""Add Device: name, Status entity, Status mapping, job, consumption estimate, price."""
 
 from typing import Any
 
@@ -132,6 +132,16 @@ async def test_one_ending_value_is_enough(hass: HomeAssistant) -> None:
     result = await walk_to_mapping(hass, entry)
 
     result = await configure(hass, result, {"running": ["on"], "ended": ["off"]})
+
+    assert result["step_id"] == "job"
+
+
+async def test_the_job_name_is_optional(hass: HomeAssistant) -> None:
+    entry = await add_hub(hass)
+    result = await walk_to_mapping(hass, entry)
+    result = await configure(hass, result, MAPPING)
+
+    result = await configure(hass, result, {})
 
     assert result["type"] is FlowResultType.MENU
 

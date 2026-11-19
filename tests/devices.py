@@ -65,6 +65,8 @@ async def add_device(
     status: str = STATUS,
     attribute: str | None = None,
     mapping: dict[str, list[str]] = MAPPING,
+    job: str | None = None,
+    job_attribute: str | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
     price: float = 0.30,
@@ -74,6 +76,11 @@ async def add_device(
         hass, entry, name=name, status=status, attribute=attribute
     )
     result = await configure(hass, result, mapping)
+    assert result["step_id"] == "job", result.get("errors")
+    job_input = ({"entity_id": job} if job else {}) | (
+        {"attribute": job_attribute} if job_attribute else {}
+    )
+    result = await configure(hass, result, job_input)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": "estimate"})
     estimate = {"running_power": running_power}
