@@ -17,6 +17,10 @@ class Outcome(StrEnum):
     UNKNOWN = "unknown"
 
 
+class Flag(StrEnum):
+    FAULT = "fault"
+
+
 class LineItemKind(StrEnum):
     ELECTRICITY = "electricity"
     MATERIAL = "material"
@@ -124,7 +128,10 @@ class Run:
     """One working cycle of a Device.
 
     Open while `ended` is None; ended but not `finalised` while its last values
-    are still awaited; frozen once finalised.
+    are still awaited; frozen once finalised. `end_reconstructed` marks an end
+    WattBill only learnt about after the Status input or WattBill itself was away.
+    `job_name` is the job the Device reported, kept apart from the editable name;
+    `last_seen` is the last time the Status input was seen during the open Run.
     """
 
     id: str
@@ -133,8 +140,11 @@ class Run:
     started: datetime
     line_items: list[LineItem]
     name: str | None = None
+    job_name: str | None = None
+    last_seen: datetime | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
+    end_reconstructed: bool = False
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
@@ -150,9 +160,12 @@ class Run:
             "device_id": self.device_id,
             "device_name": self.device_name,
             "name": self.name,
+            "job_name": self.job_name,
             "started": self.started.isoformat(),
+            "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
             "outcome": self.outcome,
+            "end_reconstructed": self.end_reconstructed,
             "finalised": self.finalised,
             "pauses": [
                 {"start": pause.start.isoformat(), "end": _iso(pause.end)}
@@ -170,9 +183,12 @@ class Run:
             device_id=data["device_id"],
             device_name=data["device_name"],
             name=data["name"],
+            job_name=data.get("job_name"),
             started=datetime.fromisoformat(data["started"]),
+            last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),
             outcome=None if data["outcome"] is None else Outcome(data["outcome"]),
+            end_reconstructed=data.get("end_reconstructed", False),
             finalised=data["finalised"],
             pauses=[
                 Pause(datetime.fromisoformat(p["start"]), _time(p["end"]))
