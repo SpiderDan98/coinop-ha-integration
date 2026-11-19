@@ -17,6 +17,7 @@ from custom_components.wattbill.statement import (
 )
 
 from .command import command
+from .runs import find_run
 
 
 @command({vol.Required("type"): "wattbill/cost_statement/defaults"})
@@ -53,10 +54,7 @@ def _create(
 ) -> None:
     """`{"path": ...}`: the signed path the browser downloads the PDF from."""
     for run_id in msg["run_ids"]:
-        if (run := wattbill.book.run(run_id)) is None:
-            connection.send_error(
-                msg["id"], websocket_api.ERR_NOT_FOUND, "No Run with this id"
-            )
+        if (run := find_run(connection, msg, wattbill, run_id)) is None:
             return
         if not run.finalised:
             connection.send_error(

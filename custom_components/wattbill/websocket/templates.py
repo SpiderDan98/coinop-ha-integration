@@ -15,7 +15,7 @@ from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.templates import LineItemTemplate
 
-from .command import command
+from .command import command, found
 from .line_items import _number
 
 FIELDS = {
@@ -29,15 +29,11 @@ _DEFAULTS = {"unit": "", "default_quantity": 1}
 _TEMPLATE_ID = vol.Required("template_id")
 
 
-def _found(
+def find_template(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> LineItemTemplate | None:
     template = wattbill.catalog.template(msg["template_id"])
-    if template is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item Template with this id"
-        )
-    return template
+    return found(connection, msg, template, "Line Item Template")
 
 
 @command(
@@ -78,7 +74,7 @@ async def _update(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    if template := _found(connection, msg, wattbill):
+    if template := find_template(connection, msg, wattbill):
         updated = await wattbill.catalog.async_update_template(
             template, msg["template"]
         )
@@ -93,7 +89,7 @@ async def _delete(
     wattbill: WattBill,
 ) -> None:
     """Also leaves every Device's automatic templates; Runs keep their copies."""
-    if template := _found(connection, msg, wattbill):
+    if template := find_template(connection, msg, wattbill):
         await wattbill.catalog.async_delete_template(template)
         await wattbill.settings.async_drop_template(template.id)
         connection.send_result(msg["id"], {})

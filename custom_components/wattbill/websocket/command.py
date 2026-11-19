@@ -17,6 +17,21 @@ type Handler = Callable[
 ]
 
 
+def found[T](
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    value: T | None,
+    thing: str,
+    by: str = "id",
+) -> T | None:
+    """`value`; when it is None, the command answers `not_found` for `thing`."""
+    if value is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, f"No {thing} with this {by}"
+        )
+    return value
+
+
 def command(
     schema: dict[Any, Any],
 ) -> Callable[[Handler], websocket_api.const.WebSocketCommandHandler]:

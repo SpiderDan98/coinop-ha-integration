@@ -18,7 +18,7 @@ from custom_components.wattbill.materials import (
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
-from .command import command
+from .command import command, found
 from .spoolman import spoolman_call
 
 _TEXT = vol.All(str, vol.Strip, vol.Length(min=1))
@@ -54,12 +54,9 @@ def material_dict(material: Material) -> dict[str, Any]:
 def _found(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> Material | None:
-    material = wattbill.catalog.material(msg["material_id"])
-    if material is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Material with this id"
-        )
-    return material
+    return found(
+        connection, msg, wattbill.catalog.material(msg["material_id"]), "Material"
+    )
 
 
 def pickable(
@@ -69,12 +66,10 @@ def pickable(
     material_id: str,
 ) -> Material | None:
     """The Material if it can be picked (it exists and isn't archived); else answers the error."""
-    material = wattbill.catalog.material(material_id)
-    if material is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Material with this id"
-        )
-    elif material.archived:
+    material = found(
+        connection, msg, wattbill.catalog.material(material_id), "Material"
+    )
+    if material is not None and material.archived:
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "This Material is archived"
         )

@@ -23,9 +23,9 @@ from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.templates import template_fields
 
-from .command import command
+from .command import command, found
 from .materials import pickable
-from .runs import _find, _send_run, _text
+from .runs import _send_run, _text, find_run
 
 
 def _number(value: Any) -> float:
@@ -47,13 +47,10 @@ def _find_item(
     unlocked: bool = True,
 ) -> tuple[Run, LineItem] | None:
     """The Run and the (unlocked) Line Item the message names; answers the error if not."""
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return None
-    item = next((i for i in run.line_items if i.id == msg["line_item_id"]), None)
-    if item is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item with this id"
-        )
+    items = (i for i in run.line_items if i.id == msg["line_item_id"])
+    if (item := found(connection, msg, next(items, None), "Line Item")) is None:
         return None
     if unlocked and run.locked(item):
         connection.send_error(
@@ -175,7 +172,7 @@ async def _add(
     A Material Line Item names its Material and counts g (the default) or ml,
     priced at the Material's current price; an Other one defaults to 1 piece.
     """
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return
     if msg["kind"] is LineItemKind.MATERIAL:
         unit = msg.get("unit", GRAM)
@@ -224,12 +221,10 @@ async def _add_template(
     wattbill: WattBill,
 ) -> None:
     """A copy of the template; `quantity` replaces an entered default quantity."""
-    if (run := _find(connection, msg, wattbill)) is None:
+    if (run := find_run(connection, msg, wattbill)) is None:
         return
-    if (template := wattbill.catalog.template(msg["template_id"])) is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item Template with this id"
-        )
+    template = wattbill.catalog.template(msg["template_id"])
+    if (template := found(connection, msg, template, "Line Item Template")) is None:
         return
     run.line_items.append(
         template.line_item(run, dt_util.utcnow(), msg.get("quantity"))
