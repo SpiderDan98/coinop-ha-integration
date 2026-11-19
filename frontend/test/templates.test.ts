@@ -56,9 +56,7 @@ describe("Line Item Templates tab", () => {
     const inserts = row(panel, "template-inserts");
     expect(field(inserts, "default_quantity").value).toBe("8");
     expect(text(query(inserts, ".automatic"))).toBe("–");
-    expect(text(panel)).toContain(
-      "Adding a template copies its values into the Run. Editing or deleting a template never changes past Runs.",
-    );
+    expect(text(panel)).toContain("Changes apply to future Runs only.");
   });
 
   it("saves each field as it is changed", async () => {

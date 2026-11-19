@@ -3,9 +3,14 @@ import { html } from "lit";
 import type { Device, Group, RunSummary, Totals } from "./api";
 import "./dialog";
 import type { Format } from "./format";
-import type { Localize } from "./localize";
+import { isKey, type Localize } from "./localize";
 
 export const runName = (run: RunSummary, t: Localize) => run.name ?? t("run.untitled");
+
+export const flagLabel = (flag: string, t: Localize) => {
+  const key = `flag.${flag}`;
+  return isKey(key) ? t(key) : flag;
+};
 
 export const outcomeChip = (run: RunSummary, t: Localize) => {
   const outcome = run.ended === null ? "open" : (run.outcome ?? "unknown");

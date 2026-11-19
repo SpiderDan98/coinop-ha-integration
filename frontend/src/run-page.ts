@@ -35,9 +35,9 @@ import {
 } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
-import { isKey, localize, type Localize } from "./localize";
+import { localize, type Localize } from "./localize";
 import "./run-images";
-import { deleteDialog, deviceName, outcomeChip, runName } from "./run-parts";
+import { deleteDialog, deviceName, flagLabel, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import "./tag-input";
 
@@ -87,11 +87,6 @@ const splitHint = (items: LineItem[], t: Localize, format: Format) => {
         : nothing
     }
   </p>`;
-};
-
-const flagLabel = (flag: string, t: Localize) => {
-  const key = `flag.${flag}`;
-  return isKey(key) ? t(key) : flag;
 };
 
 /** What each field shows, as its input's value. */
@@ -460,7 +455,11 @@ export class RunPage extends LitElement {
                 </div>
                 ${
                   items.length
-                    ? items.map((item) => this.renderItem(item, t, format))
+                    ? html`<div class="item-head muted small" aria-hidden="true">
+                          <span></span><span>${t("item.quantity")}</span
+                          ><span>${t("item.unit_price")}</span><span>${t("item.amount")}</span>
+                        </div>
+                        ${items.map((item) => this.renderItem(item, t, format))}`
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
                 ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
@@ -584,7 +583,9 @@ export class RunPage extends LitElement {
             ? this.renderMaterialPicker(item, t)
             : entered
               ? html`<input name="label" aria-label=${t("item.label")} .value=${shown.label} />`
-              : html`<div>${item.label ?? t(`kind.${item.kind}`)}</div>`
+              : item.label
+                ? html`<div>${item.label}</div>`
+                : nothing
         }
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
         ${item.slots.map(
@@ -627,7 +628,12 @@ export class RunPage extends LitElement {
             : html`<span class="unit muted small">${item.unit}</span>`
         }
       </div>
-      ${number("unit_price")} ${number("amount")}
+      <div class="quantity">
+        ${number("unit_price")}<span class="unit per muted small"
+          >${`${format.currencySymbol}/${item.unit || "–"}`}</span
+        >
+      </div>
+      ${number("amount")}
       <div class="actions">
         ${
           locked
@@ -997,9 +1003,10 @@ export class RunPage extends LitElement {
       .kind > p {
         margin: 6px 0 0;
       }
-      .item {
+      .item,
+      .item-head {
         display: grid;
-        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 108px;
+        grid-template-columns: minmax(120px, 1fr) 140px 140px 96px 108px;
         gap: 6px;
         align-items: start;
         padding: 6px 4px;
@@ -1014,11 +1021,19 @@ export class RunPage extends LitElement {
         box-shadow: inset 3px 0 var(--wattbill-manual);
         padding-left: 10px;
       }
-      :host([narrow]) .item {
+      :host([narrow]) :is(.item, .item-head) {
         grid-template-columns: 1fr 1fr 1fr 108px;
       }
       :host([narrow]) .item .label {
         grid-column: 1 / -1;
+      }
+      .item-head {
+        padding-block: 2px 0;
+        text-align: right;
+      }
+      :host([narrow]) .item-head > :first-child,
+      :host([narrow]) .unit.per {
+        display: none;
       }
       .item .label > div:first-child {
         padding-top: 6px;

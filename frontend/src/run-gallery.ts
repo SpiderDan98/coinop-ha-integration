@@ -8,7 +8,7 @@ import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-image";
 import { RunsTotal } from "./runs-total";
-import { deviceName, outcomeChip, runName } from "./run-parts";
+import { deviceName, flagLabel, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import { sortTags, tagChip } from "./tag-input";
 
@@ -168,7 +168,15 @@ export class RunGallery extends LitElement {
       <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
         <div class="image">
           <wattbill-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></wattbill-run-image>
-          ${run.flags.length ? html`<span class="tile-flags">⚑ ${run.flags.length}</span>` : nothing}
+          ${
+            run.flags.length
+              ? html`<span
+                  class="tile-flags"
+                  title=${run.flags.map((flag) => flagLabel(flag, t)).join("\n")}
+                  >⚑ ${run.flags.length}</span
+                >`
+              : nothing
+          }
         </div>
         <div class="body">
           <div class="strong ellipsis">${runName(run, t)}</div>

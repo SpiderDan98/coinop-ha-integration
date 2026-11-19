@@ -242,7 +242,7 @@ describe("Runs of removed Devices", () => {
     const panel = await mountPanel(recordedBackend());
 
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Mini (removed) · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
+      "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
     );
     await click(panel, queryAll(panel, ".tile")[0]);
     expect(text(query(panel, ".runbar"))).toContain("Mini (removed)");
@@ -256,7 +256,7 @@ describe("Runs of removed Devices", () => {
     await filterBy(panel, "device-mini");
 
     expect(tiles(panel)).toEqual([
-      "No image Untitled Run Mini (removed) · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
+      "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
     ]);
     expect(text(query(panel, ".head"))).toContain("1 · €0.07");
     await filterBy(panel, "device-kobra");

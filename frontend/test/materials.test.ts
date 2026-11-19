@@ -47,19 +47,19 @@ describe("Materials tab", () => {
     expect(text(query(panel, "h2"))).toBe("Materials");
   });
 
-  it("lists the catalogue with each Material's price per gram, archived ones apart", async () => {
+  it("lists the catalogue with each Material's price per kg, archived ones apart", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/materials" });
 
     expect(rows(panel)).toEqual([
-      "eSun PLA+ black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €19.99 / 1,000 g €0.02 / g Edit Archive Delete",
-      "Standard Resin grey Resin · Standard resin 1.1 g/cm³ €29.99 / 1,000 ml €0.0273 / g Edit Archive Delete",
+      "eSun PLA+ black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €19.99 / 1,000 g €19.99 / kg Edit Archive Delete",
+      "Standard Resin grey Resin · Standard resin 1.1 g/cm³ €29.99 / 1,000 ml €27.26 / kg Edit Archive Delete",
     ]);
     expect(
       queryAll(panel, ".active ha-icon-button.star").map((star) => star.hasAttribute("selected")),
     ).toEqual([true, false]);
     expect(text(query(panel, ".archived summary"))).toBe("Archived (1)");
     expect(rows(panel, ".archived tr.material")).toEqual([
-      "PLA red (old brand) Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €15.99 / 1,000 g €0.016 / g Restore Delete",
+      "PLA red (old brand) Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €15.99 / 1,000 g €15.99 / kg Restore Delete",
     ]);
   });
 
@@ -287,7 +287,7 @@ describe("Materials tab", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/materials" });
 
     expect(rows(panel)[1]).toBe(
-      "Standard Resin grey Harz · Standard resin 1,1 g/cm³ 29,99 € / 1.000 ml 0,0273 € / g Bearbeiten Archivieren Löschen",
+      "Standard Resin grey Harz · Standard resin 1,1 g/cm³ 29,99 € / 1.000 ml 27,26 € / kg Bearbeiten Archivieren Löschen",
     );
   });
 });

@@ -16,7 +16,9 @@ describe("Line Items", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
     const electricity = item(panel, "electricity");
-    expect(text(electricity)).toContain("Electricity Estimated from average power");
+    expect(text(query(electricity, ".label"))).toBe("Estimated from average power");
+    expect(text(query(electricity, ".unit.per"))).toBe("€/kWh");
+    expect(text(query(panel, ".item-head"))).toBe("Quantity Unit price Amount");
     expect(values(electricity)).toEqual(["0.15", "0.3", "0.05"]);
     expect(queryAll(electricity, "[name=label]")).toHaveLength(0);
     const wear = item(panel, "benchy-wear");
@@ -168,7 +170,10 @@ describe("Line Items", () => {
       path: "/run/benchy",
     });
 
-    expect(text(item(panel, "electricity"))).toContain("Strom");
+    expect(text(query(item(panel, "electricity"), ".label"))).toBe(
+      "Aus der Durchschnittsleistung geschätzt",
+    );
+    expect(text(query(panel, ".item-head"))).toBe("Menge Stückpreis Betrag");
     expect(field(item(panel, "benchy-wear"), "label").value).toBe("Nozzle wear");
     expect(text(query(panel, "ha-button.add-other"))).toBe("Sonstigen Posten hinzufügen");
   });

@@ -229,7 +229,7 @@ export class MaterialsPage extends LitElement {
           ${
             filament.price_per_gram === null
               ? html`<span class="muted">${t("spoolman.no_price")}</span>`
-              : `${format.unitPrice(filament.price_per_gram)} / g`
+              : `${format.money(filament.price_per_gram * 1000)} / kg`
           }
         </td>
         <td class="actions">
@@ -259,7 +259,7 @@ export class MaterialsPage extends LitElement {
                     <tr>
                       <th>${t("spoolman.filament")}</th>
                       <th>${t("materials.type")}</th>
-                      <th class="num">${t("materials.price_per_gram")}</th>
+                      <th class="num">${t("materials.price_per_kg")}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -282,8 +282,8 @@ export class MaterialsPage extends LitElement {
           <th>${t("materials.form_type")}</th>
           <th>${t("materials.properties")}</th>
           <th>${t("materials.pack")}</th>
-          <th class="num">${t("materials.price_per_gram")}</th>
-          <th class="star-head">${t("materials.default")}</th>
+          <th class="num">${t("materials.price_per_kg")}</th>
+          <th class="star-head">${t("materials.default_for_type")}</th>
           <th></th>
         </tr>
       </thead>
@@ -318,7 +318,7 @@ export class MaterialsPage extends LitElement {
                     : t("materials.from_spoolman")
                 }
               </td>
-              <td class="num">${format.unitPrice(material.price_per_gram)} / g</td>
+              <td class="num">${format.money(material.price_per_gram * 1000)} / kg</td>
               <td>
                 ${
                   material.archived

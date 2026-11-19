@@ -88,7 +88,7 @@ export class RunImages extends LitElement {
         ?disabled=${full || this.busy}
         @change=${this.onFiles}
       />
-      <p class="muted small">${t("images.limit", rules)}</p>
+      ${full ? html`<p class="muted small">${t("images.limit", rules)}</p>` : nothing}
       ${
         this.error
           ? html`<p class="images-error small">

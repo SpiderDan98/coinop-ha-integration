@@ -45,8 +45,8 @@ describe("Spoolman in the Materials tab", () => {
 
     expect(text(query(panel, ".spoolman h3"))).toBe("Spoolman Filaments");
     expect(filamentRows(panel)).toEqual([
-      "eSun PLA+ black PLA €0.02 / g Linked to PLA black",
-      "Prusament PETG Galaxy Black PETG €0.03 / g Create Material",
+      "eSun PLA+ black PLA €20.00 / kg Linked to PLA black",
+      "Prusament PETG Galaxy Black PETG €29.99 / kg Create Material",
       "eSun TPU clear TPU No price in Spoolman Create Material",
     ]);
   });
@@ -67,7 +67,7 @@ describe("Spoolman in the Materials tab", () => {
     const panel = await mountPanel(spoolmanBackend(), { path: "/materials" });
 
     expect(text(row(panel, "tr.material", "PLA black"))).toBe(
-      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm From Spoolman €0.02 / g Edit Archive Delete",
+      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm From Spoolman €20.00 / kg Edit Archive Delete",
     );
   });
 
@@ -160,8 +160,8 @@ describe("Spoolman in the Materials tab", () => {
 
     expect(text(query(panel, ".spoolman h3"))).toBe("Spoolman-Filamente");
     expect(filamentRows(panel)).toEqual([
-      "eSun PLA+ black PLA 0,02 € / g Verknüpft mit PLA black",
-      "Prusament PETG Galaxy Black PETG 0,03 € / g Material erstellen",
+      "eSun PLA+ black PLA 20,00 € / kg Verknüpft mit PLA black",
+      "Prusament PETG Galaxy Black PETG 29,99 € / kg Material erstellen",
       "eSun TPU clear TPU Kein Preis in Spoolman Material erstellen",
     ]);
   });

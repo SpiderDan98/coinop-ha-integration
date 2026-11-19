@@ -157,7 +157,7 @@ export class AnalysisPage extends LitElement {
       rows: device.map((group) => [
         deviceName(group, this.devices, t),
         group.runs,
-        format.quantity(group.running_hours, "h"),
+        format.duration(group.running_hours * 3600),
         format.quantity(group.energy_kwh, "kWh"),
         format.money(group.cost),
       ]),
@@ -181,7 +181,6 @@ export class AnalysisPage extends LitElement {
           ...KINDS.map((kind) => format.money(group[`${kind}_cost`])),
           format.money(group.cost),
         ]),
-      hint: t("analysis.month_hint"),
       empty: t("analysis.empty"),
     });
   }
@@ -269,9 +268,6 @@ export class AnalysisPage extends LitElement {
       }
       .overlapping {
         border-style: dashed;
-      }
-      .overlapping .hint {
-        color: var(--warning-color, #ffa600);
       }
       table {
         width: 100%;

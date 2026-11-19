@@ -157,7 +157,7 @@ describe("Overview", () => {
     await settle(panel);
 
     expect(text(query(panel, ".running"))).toBe(
-      "Running now Untitled Run Kobra · 0 h 45 min €0.25 Provisional, updates live",
+      "Running now Untitled Run Kobra · 45 min €0.25 Provisional, updates live",
     );
     expect(query(panel, ".running a").getAttribute("href")).toBe("/wattbill/run/print-live");
     expect(backend.sent(AGGREGATES).length).toBeGreaterThan(loaded);

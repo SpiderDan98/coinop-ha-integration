@@ -259,12 +259,15 @@ async def test_a_run_is_named_after_its_job(
     entry = await add_hub(hass)
     await add_device(hass, entry, job=JOB)
 
-    await start_job(hass, "benchy.gcode")
+    await start_job(hass, "Gear_Set_PETG.gcode.3mf")
     await clock.advance(minutes=30)
     await set_status(hass, "finished")
 
     [run] = stored_runs(hass_storage)
-    assert run["name"] == "benchy.gcode"
+    assert (run["name"], run["job_name"]) == (
+        "Gear Set PETG",
+        "Gear_Set_PETG.gcode.3mf",
+    )
 
 
 async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(
@@ -285,7 +288,7 @@ async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(
     await fire(hass, "finished", at(minutes=30), filename="benchy.gcode")
 
     [run] = stored_runs(hass_storage)
-    assert run["name"] == "benchy.gcode"
+    assert run["name"] == "benchy"
 
 
 async def test_a_print_resumed_with_the_same_job_continues_its_run(
@@ -326,7 +329,7 @@ async def test_a_print_with_another_job_closes_the_old_run_and_opens_a_new_one(
 
     benchy, cube = stored_runs(hass_storage)
     assert benchy | {"quantity": kwh(benchy)} == benchy | {
-        "name": "benchy.gcode",
+        "name": "benchy",
         "started": at(),
         "ended": at(hours=1),
         "outcome": "unknown",
@@ -334,7 +337,7 @@ async def test_a_print_with_another_job_closes_the_old_run_and_opens_a_new_one(
         "quantity": pytest.approx(0.1),
     }
     assert cube | {"quantity": kwh(cube)} == cube | {
-        "name": "cube.gcode",
+        "name": "cube",
         "started": at(hours=2),
         "ended": at(hours=3),
         "outcome": "completed",
