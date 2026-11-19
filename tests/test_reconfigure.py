@@ -40,6 +40,7 @@ async def test_reconfigure_is_a_menu_of_the_devices_sections(
     assert result["menu_options"] == [
         "status",
         "job",
+        "images",
         "consumption",
         "price",
         "save",

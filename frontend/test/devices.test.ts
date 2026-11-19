@@ -34,6 +34,8 @@ describe("Devices tab", () => {
       "Kobra " +
         "Print status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
+        "Thumbnail Not used " +
+        "Camera Not used " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
         "Electricity price €0.30 per kWh " +
         "Device Inputs, consumption source and price are changed in Home Assistant. " +
@@ -66,9 +68,41 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Print status event.kobra_print · event_type " +
         "Print job Not used " +
+        "Thumbnail Not used " +
+        "Camera Not used " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
     );
+  });
+
+  it("names the Thumbnail and Camera and whether a Snapshot is taken", async () => {
+    const [kobra] = recorded.devices;
+    const images = { thumbnail: "image.kobra_preview", camera: "camera.kobra" };
+    const withImages = (snapshot: boolean) =>
+      recordedBackend().reply(LIST, () => ({
+        devices: [
+          { ...kobra, ha_settings: { ...kobra.ha_settings, images: { ...images, snapshot } } },
+        ],
+      }));
+
+    const on = await mountPanel(withImages(true), { path: "/devices" });
+    expect(text(query(on, ".device dl"))).toContain(
+      "Thumbnail image.kobra_preview Camera camera.kobra Snapshot when a Run ends Consumption",
+    );
+    on.remove();
+    const off = await mountPanel(withImages(false), { path: "/devices" });
+    expect(text(query(off, ".device dl"))).toContain("Camera camera.kobra No Snapshot Consumption");
+  });
+
+  it("shows no images for a Device added before they existed", async () => {
+    const [kobra] = recorded.devices;
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [{ ...kobra, ha_settings: { ...kobra.ha_settings, images: undefined } }],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device dl"))).toContain("Thumbnail Not used Camera Not used");
   });
 
   it("names the price entity of a dynamic tariff", async () => {
@@ -161,6 +195,8 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Druckstatus sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
+        "Vorschaubild Nicht verwendet " +
+        "Kamera Nicht verwendet " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +
         "Strompreis 0,30 € pro kWh",
     );
@@ -191,8 +227,8 @@ describe("Runs of removed Devices", () => {
     expect(text(query(panel, ".head"))).toContain("1 · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
-      "No image ⚑ 1 Helmet Kobra",
-      "No image Benchy Kobra",
+      "⚑ 1 Helmet Kobra",
+      "Benchy Kobra",
     ]);
     await filterBy(panel, "");
     expect(tiles(panel)).toHaveLength(3);

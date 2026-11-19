@@ -10,6 +10,7 @@ from .catalog import Catalog
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .device_settings import DeviceSettings
+from .images import DeviceImages, ImageLibrary, RunImageView
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
 from .store import RunStore, WattBillStores
@@ -21,6 +22,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket.async_setup(hass)
+    hass.http.register_view(RunImageView())
     return True
 
 
@@ -29,6 +31,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     data = await stores.async_load(entry)
     store = RunStore(stores)
     book = RunBook(store, store.runs(data))
+    images = ImageLibrary(hass, book)
+    await images.async_remove_orphans()
     devices = [
         DeviceConfig.from_subentry(subentry)
         for subentry in entry.subentries.values()
@@ -43,10 +47,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     entry.runtime_data = WattBill(
         book=book,
         catalog=Catalog(stores["catalog"], data["catalog"], book.uses_material),
+        images=images,
         devices=devices,
         settings=settings,
-        trackers=[DeviceTracker(hass, book, device) for device in devices],
+        trackers=[
+            DeviceTracker(hass, book, device, DeviceImages(hass, book, images, device))
+            for device in devices
+        ],
     )
+    entry.async_on_unload(images.async_follow_deletions())
     for device in devices:
         ha_device.async_register(hass, entry, device)
         await book.async_rename_device(device.device_id, device.name)
@@ -64,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> bool:
+    entry.runtime_data.images.async_close()
     for tracker in entry.runtime_data.trackers:
         tracker.async_stop()
     await entry.runtime_data.book.async_flush()

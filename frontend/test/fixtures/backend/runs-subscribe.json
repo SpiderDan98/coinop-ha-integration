@@ -14,7 +14,14 @@
         "total": 0.86,
         "part_count": 4,
         "cost_per_part": 0.22,
-        "flags": []
+        "flags": [],
+        "cover": {
+          "id": "benchy-thumbnail",
+          "kind": "thumbnail",
+          "created": "2026-01-12T10:00:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+        }
       },
       {
         "id": "helmet",
@@ -31,7 +38,14 @@
         "cost_per_part": 0.3,
         "flags": [
           "fault"
-        ]
+        ],
+        "cover": {
+          "id": "helmet-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-13T19:00:00+00:00",
+          "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+          "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+        }
       },
       {
         "id": "cancelled",
@@ -46,7 +60,8 @@
         "total": 0.07,
         "part_count": 1,
         "cost_per_part": 0.07,
-        "flags": []
+        "flags": [],
+        "cover": null
       }
     ]
   },
@@ -65,7 +80,8 @@
       "total": 0.0,
       "part_count": 1,
       "cost_per_part": 0.0,
-      "flags": []
+      "flags": [],
+      "cover": null
     }
   },
   {
@@ -83,7 +99,8 @@
       "total": 0.03,
       "part_count": 1,
       "cost_per_part": 0.03,
-      "flags": []
+      "flags": [],
+      "cover": null
     }
   },
   {
@@ -101,7 +118,8 @@
       "total": 0.03,
       "part_count": 1,
       "cost_per_part": 0.03,
-      "flags": []
+      "flags": [],
+      "cover": null
     }
   }
 ]
