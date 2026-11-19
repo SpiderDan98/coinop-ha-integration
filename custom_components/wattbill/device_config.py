@@ -27,6 +27,7 @@ ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 class DeviceConfig:
     device_id: str
     name: str
+    printer_device_id: str | None
     status_entity_id: str
     status_attribute: str | None
     mapping: Mapping[str, Target]
@@ -40,6 +41,7 @@ class DeviceConfig:
         return cls(
             device_id=subentry.subentry_id,
             name=subentry.title,
+            printer_device_id=data["printer_device_id"],
             status_entity_id=data["status"]["entity_id"],
             status_attribute=data["status"]["attribute"],
             mapping={

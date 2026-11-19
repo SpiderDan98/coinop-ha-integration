@@ -7,11 +7,10 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
 from .device_config import DeviceConfig
+from .ha_device import device_info
 from .models import Run
 from .run_book import RunBook, RunChange
 from .runtime import WattBillConfigEntry
@@ -59,9 +58,7 @@ class TotalSensor(SensorEntity):
         self._book = book
         self._device_id = device.device_id
         self._attr_unique_id = f"{device.device_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.device_id)}, name=device.name
-        )
+        self._attr_device_info = device_info(device)
         if description.device_class is SensorDeviceClass.MONETARY:
             self._attr_native_unit_of_measurement = hass.config.currency
 

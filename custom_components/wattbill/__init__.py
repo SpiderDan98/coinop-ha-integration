@@ -3,6 +3,7 @@
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from . import ha_device
 from .const import SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .run_book import RunBook
@@ -26,6 +27,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         devices=devices,
         trackers=[DeviceTracker(hass, book, device) for device in devices],
     )
+    for device in devices:
+        ha_device.async_register(hass, entry, device)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     for tracker in entry.runtime_data.trackers:
         tracker.async_start()
