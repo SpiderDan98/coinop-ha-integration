@@ -30,6 +30,11 @@ class ElectricityMethod(StrEnum):
     ENTERED = "entered"
 
 
+class Flag(StrEnum):
+    CONSUMPTION_GAP = "consumption_gap"
+    METER_RESET = "meter_reset"
+
+
 def _time(value: str | None) -> datetime | None:
     return None if value is None else datetime.fromisoformat(value)
 
@@ -124,7 +129,8 @@ class Run:
     """One working cycle of a Device.
 
     Open while `ended` is None; ended but not `finalised` while its last values
-    are still awaited; frozen once finalised.
+    are still awaited; frozen once finalised. `readings` are the meter's
+    (time, kWh or W) reports, None while it had no value; kept until finalised.
     """
 
     id: str
@@ -138,6 +144,7 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
+    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
 
     @property
     def electricity(self) -> LineItem:
@@ -158,6 +165,7 @@ class Run:
                 for pause in self.pauses
             ],
             "flags": list(self.flags),
+            "readings": [[at.isoformat(), value] for at, value in self.readings],
             "line_items": [item.as_dict() for item in self.line_items],
         }
 
@@ -177,5 +185,10 @@ class Run:
                 for p in data["pauses"]
             ],
             flags=list(data["flags"]),
+            readings=[
+                (datetime.fromisoformat(at), value)
+                # Minor version 1 had no readings.
+                for at, value in data.get("readings", [])
+            ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
         )
