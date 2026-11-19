@@ -53,7 +53,8 @@ def _subscribe(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """First event: every catalogue (`{"materials": [...], "tags": [...]}`).
+    """First event: every catalogue (`{"materials": [...], "tags": [...],
+    "templates": [...]}`).
 
     Then each change: the changed catalogue alone.
     """

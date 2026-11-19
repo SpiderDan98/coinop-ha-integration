@@ -434,10 +434,10 @@ export interface LineItemTemplate {
 
 export type TemplateFields = Omit<LineItemTemplate, "id">;
 
-/** Every catalogue in the first event; afterwards only the one that changed. */
 /** Tags are alphabetical; Runs and Devices name them. */
 export type Catalog = { materials: Material[]; tags: string[]; templates: LineItemTemplate[] };
 
+/** Every catalogue in the first event; afterwards only the one that changed. */
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
   hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });
 
