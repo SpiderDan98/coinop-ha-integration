@@ -15,13 +15,14 @@
 - `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
 - `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
+- `device_settings.py`: a Device's panel settings (WattBill's own per-Device settings, set in the Devices tab), kept in the `device_settings` Store. A new setting is one entry in `FIELDS` (default and the schema a new value must pass); it then appears in `wattbill/devices/list` and can be changed with `wattbill/devices/update_settings`. Settings of removed Devices are dropped at setup.
 - `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
 - `repairs.py`: the fix flow for missing data (restore guidance or a deliberate fresh start). `backup.py`: writes pending delayed saves before a backup.
 - `ha_device.py`: WattBill's own HA device per Device (registered at setup, linked to the printer's HA device), its `device_info`, and renames from the HA device page. Removing a Device ends its open Run as Unknown in `__init__.py` before the reload; `Run.device_name` always holds the Device's current name.
 - `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
 - `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts.
 - `panel.py`: registers the admin-only panel while the hub entry is loaded and serves the bundle at a URL that changes with its content.
-- `websocket/`: the panel's backend API, one module per area (`runs.py`, ...). See [Websocket commands](#websocket-commands).
+- `websocket/`: the panel's backend API, one module per area (`runs.py`, `devices.py`, ...). See [Websocket commands](#websocket-commands).
 
 ### Panel modules
 

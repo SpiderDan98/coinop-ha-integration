@@ -36,6 +36,8 @@ class DeviceConfig:
     running_power: float
     paused_power: float | None
     price: float
+    # The subentry data as the flow wrote it: the Device's HA-side settings.
+    flow_data: Mapping[str, Any]
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
@@ -57,6 +59,7 @@ class DeviceConfig:
             running_power=data["consumption"]["running_power"],
             paused_power=data["consumption"]["paused_power"],
             price=data["price"]["value"],
+            flow_data=data,
         )
 
     def target(self, value: str) -> Target:

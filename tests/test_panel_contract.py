@@ -86,7 +86,14 @@ async def test_record_the_runs_the_panel_shows(
     hass.states.async_set(STATUS, "idle")
     await panel.subscribe("wattbill/runs/subscribe")
     events = [await panel.event()]
-    subentry = await add_device(hass, entry, running_power=120, price=0.30)
+    subentry = await add_device(
+        hass,
+        entry,
+        job="sensor.kobra_job",
+        running_power=120,
+        paused_power=8,
+        price=0.30,
+    )
     hass.states.async_set(STATUS, "printing")
     await hass.async_block_till_done()
     events.append(await panel.event())
@@ -110,3 +117,6 @@ async def test_record_the_runs_the_panel_shows(
     ]
     assert_recorded("runs-subscribe", stable_ids(events, ids))
     assert_recorded("runs-get", stable_ids(details, ids))
+    # Mini's Runs stay in the history after it was removed.
+    devices = await panel.call("wattbill/devices/list")
+    assert_recorded("devices-list", stable_ids(devices, ids))

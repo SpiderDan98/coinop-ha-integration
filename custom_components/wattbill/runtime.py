@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from homeassistant.config_entries import ConfigEntry
 
 from .device_config import DeviceConfig
+from .device_settings import DeviceSettings
 from .run_book import RunBook
 from .tracker import DeviceTracker
 
@@ -13,6 +14,7 @@ from .tracker import DeviceTracker
 class WattBill:
     book: RunBook
     devices: list[DeviceConfig]
+    settings: DeviceSettings
     trackers: list[DeviceTracker]
 
 
