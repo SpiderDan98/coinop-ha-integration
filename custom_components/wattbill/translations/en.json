@@ -108,6 +108,9 @@
       "running_time": {
         "name": "Running time"
       },
+      "current_run_cost": {
+        "name": "Current Run cost"
+      },
       "runs": {
         "name": "Runs"
       }

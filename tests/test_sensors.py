@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
-from homeassistant.core import HomeAssistant
+from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT, STATE_UNKNOWN
+from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import entity_registry as er
 import pytest
 
@@ -14,6 +14,13 @@ from .devices import add_device, add_hub
 from .test_runs import set_status, stored_runs, value
 
 RUNNING_TIME = "sensor.kobra_running_time"
+CURRENT = "sensor.kobra_current_run_cost"
+
+
+def state_of(hass: HomeAssistant, entity_id: str) -> State:
+    state = hass.states.get(entity_id)
+    assert state is not None, entity_id
+    return state
 
 
 @pytest.mark.parametrize(
@@ -123,3 +130,32 @@ async def test_running_time_excludes_pauses(
     await hass.async_block_till_done()
 
     assert value(hass, RUNNING_TIME) == pytest.approx(1.25)
+
+
+async def test_current_run_cost_follows_the_open_run(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    hass.config.currency = "EUR"
+    entry = await add_hub(hass)
+    await add_device(hass, entry, running_power=100, price=1)
+    assert state_of(hass, CURRENT).state == STATE_UNKNOWN
+
+    await set_status(hass, "printing")
+    started = clock.now()
+    await clock.advance(minutes=90)
+
+    current = state_of(hass, CURRENT)
+    assert float(current.state) == pytest.approx(0.15)
+    assert current.attributes == {
+        "name": None,
+        "start": started,
+        "running_hours": pytest.approx(1.5),
+        "device_class": "monetary",
+        ATTR_UNIT_OF_MEASUREMENT: "EUR",
+        "friendly_name": "Kobra Current Run cost",
+    }
+
+    await set_status(hass, "finished")
+    current = state_of(hass, CURRENT)
+    assert current.state == STATE_UNKNOWN
+    assert "start" not in current.attributes

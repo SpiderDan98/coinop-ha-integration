@@ -108,6 +108,9 @@
       "running_time": {
         "name": "Laufzeit"
       },
+      "current_run_cost": {
+        "name": "Kosten aktueller Lauf"
+      },
       "runs": {
         "name": "Läufe"
       }

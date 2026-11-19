@@ -1,4 +1,6 @@
-"""Per-Device total sensors, summed over every Run of the Device."""
+"""Per-Device sensors: totals over every Run, the current and the last Run."""
+
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -7,14 +9,14 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .cost.totals import run_totals
 from .device_config import DeviceConfig
-from .models import Run
-from .run_book import RunBook, RunChange
+from .entity import DeviceEntity
+from .run_book import RunBook
 from .runtime import WattBillConfigEntry
 
 
@@ -63,6 +65,12 @@ TOTALS = (
         entity_registry_enabled_default=False,
     ),
 )
+CURRENT_RUN_COST = SensorEntityDescription(
+    key="current_run_cost",
+    translation_key="current_run_cost",
+    device_class=SensorDeviceClass.MONETARY,
+    suggested_display_precision=2,
+)
 
 
 async def async_setup_entry(
@@ -73,15 +81,18 @@ async def async_setup_entry(
     book = entry.runtime_data.book
     for device in entry.runtime_data.devices:
         async_add_entities(
-            [TotalSensor(hass, book, device, description) for description in TOTALS],
+            [
+                *(
+                    TotalSensor(hass, book, device, description)
+                    for description in TOTALS
+                ),
+                CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
+            ],
             config_subentry_id=device.device_id,
         )
 
 
-class TotalSensor(SensorEntity):
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-
+class DeviceSensor(DeviceEntity, SensorEntity):
     def __init__(
         self,
         hass: HomeAssistant,
@@ -89,16 +100,13 @@ class TotalSensor(SensorEntity):
         device: DeviceConfig,
         description: SensorEntityDescription,
     ) -> None:
+        super().__init__(book, device, description.key)
         self.entity_description = description
-        self._book = book
-        self._device_id = device.device_id
-        self._attr_unique_id = f"{device.device_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, device.device_id)}, name=device.name
-        )
         if description.device_class is SensorDeviceClass.MONETARY:
             self._attr_native_unit_of_measurement = hass.config.currency
 
+
+class TotalSensor(DeviceSensor):
     @property
     def native_value(self) -> float:
         value: float = getattr(
@@ -106,10 +114,20 @@ class TotalSensor(SensorEntity):
         )
         return value
 
-    async def async_added_to_hass(self) -> None:
-        self.async_on_remove(self._book.async_listen(self._on_run_change))
 
-    @callback
-    def _on_run_change(self, change: RunChange, run: Run) -> None:
-        if run.device_id == self._device_id:
-            self.async_write_ha_state()
+class CurrentRunCostSensor(DeviceSensor):
+    @property
+    def native_value(self) -> float | None:
+        run = self._book.open_run(self._device_id)
+        return None if run is None else run_totals(run, dt_util.utcnow()).cost
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        run = self._book.open_run(self._device_id)
+        if run is None:
+            return None
+        return {
+            "name": run.name,
+            "start": run.started,
+            "running_hours": run_totals(run, dt_util.utcnow()).running_hours,
+        }
