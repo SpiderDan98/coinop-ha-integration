@@ -123,8 +123,8 @@ class LineItem:
         """WattBill computes its values, live while the Run is open."""
         return (
             self.kind is LineItemKind.ELECTRICITY
-            or self.basis is QuantityBasis.RUNNING_HOURS
-        )
+            and self.method is not ElectricityMethod.ENTERED
+        ) or self.basis is QuantityBasis.RUNNING_HOURS
 
     @property
     def negative_prices(self) -> bool:

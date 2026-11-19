@@ -93,7 +93,7 @@ async def _update(
     if (found := _find_item(connection, msg, wattbill)) is None:
         return
     run, item = found
-    if "unit" in msg and item.is_computed:
+    if "unit" in msg and (item.is_computed or item.kind is LineItemKind.ELECTRICITY):
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "WattBill sets this unit"
         )

@@ -34,7 +34,7 @@ from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading, price_reading
 from .device_settings import AUTOMATIC_TEMPLATES, TAGS_FOR_NEW_RUNS, DeviceSettings
 from .images import DeviceImages
-from .models import ElectricityMethod, Flag, Outcome, Pause, Run
+from .models import ElectricityMethod, Flag, LineItem, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
 from .templates import add_templates, count_running_hours
@@ -364,6 +364,67 @@ class DeviceTracker:
         )
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
+
+    async def async_create_run(
+        self,
+        started: datetime,
+        ended: datetime,
+        outcome: Outcome,
+        name: str | None,
+        tags: list[str] | None,
+    ) -> Run:
+        """A Run made by hand, final at once: no Snapshot, no `started` or `ended`.
+
+        Without `tags` it gets the Device's Tags for new Runs.
+        """
+        settings = self._settings.get(self._config.device_id)
+        run = Run(
+            id=ulid_now(),
+            device_id=self._config.device_id,
+            device_name=self._config.name,
+            name=name,
+            started=started,
+            ended=ended,
+            outcome=outcome,
+            finalised=True,
+            line_items=[],
+            consumption=dict(self._config.consumption),
+            cost_source=dict(self._config.price),
+            tags=settings[TAGS_FOR_NEW_RUNS] if tags is None else tags,
+        )
+        prices = [(started, self._current_price())]
+        item = self._manual_electricity(run, prices)
+        run.line_items = [item]
+        add_templates(
+            run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), ended
+        )
+        await self._book.async_add(run)
+        return run
+
+    def _manual_electricity(
+        self, run: Run, prices: list[tuple[datetime, float | None]]
+    ) -> LineItem:
+        """Estimated from the average running power, else left for the user to enter."""
+        assert run.ended is not None
+        if (running := self._config.consumption.get("running_power")) is not None:
+            return electricity_line_item(
+                ulid_now(),
+                run.started,
+                run.ended,
+                consumption.estimate(running, running, []),
+                prices,
+                ElectricityMethod.ESTIMATED,
+            )
+        item = electricity_line_item(
+            ulid_now(),
+            run.started,
+            run.ended,
+            lambda start, end: 0.0,
+            prices,
+            ElectricityMethod.ENTERED,
+        )
+        item.quantity, item.segments = None, []
+        return item
 
     def _open_prices(self, run: Run, at: datetime) -> None:
         """The price at Run start; without one, the last valid price before it."""
