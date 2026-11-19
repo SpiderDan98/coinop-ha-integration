@@ -1,0 +1,159 @@
+{
+  "run": {
+    "id": "keychain",
+    "device_id": "device-kobra",
+    "device_name": "Kobra",
+    "name": null,
+    "job_name": null,
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T11:00:00+00:00",
+    "ended": "2026-01-15T11:00:00+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [
+      "estimated_split"
+    ],
+    "part_count": 1,
+    "note": null,
+    "tags": [],
+    "consumption": {
+      "source": "estimate",
+      "running_power": 120.0,
+      "paused_power": null
+    },
+    "cost_source": {
+      "source": "fixed",
+      "value": 0.3
+    },
+    "prices": [],
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        120.0,
+        null
+      ]
+    ],
+    "usage": {
+      "at": "2026-01-15T11:00:00+00:00",
+      "value": 4000.0,
+      "unit": "mm"
+    },
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "keychain-electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 0.12,
+        "unit": "kWh",
+        "unit_price": 0.3,
+        "amount": 0.04,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T11:00:00+00:00",
+            "kwh": 0.12,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "keychain-pla",
+        "kind": "material",
+        "label": null,
+        "material_id": "pla-black",
+        "material": {
+          "name": "PLA Basic Black",
+          "type": "PLA",
+          "density": 1.24,
+          "diameter": 1.75,
+          "price_per_gram": 0.025
+        },
+        "measured": true,
+        "length": 3000.0,
+        "slots": [
+          {
+            "number": 1,
+            "type": "PLA",
+            "colour": "#1a1a1a"
+          }
+        ],
+        "share": 0.75,
+        "template_id": null,
+        "basis": null,
+        "quantity": 8.94764857650543,
+        "unit": "g",
+        "unit_price": 0.025,
+        "amount": 0.22,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      },
+      {
+        "id": "keychain-petg",
+        "kind": "material",
+        "label": null,
+        "material_id": "petg-white",
+        "material": {
+          "name": "PETG White",
+          "type": "PETG",
+          "density": 1.27,
+          "diameter": 1.75,
+          "price_per_gram": 0.03
+        },
+        "measured": true,
+        "length": 1000.0,
+        "slots": [
+          {
+            "number": 2,
+            "type": "PETG",
+            "colour": "#ffffff"
+          }
+        ],
+        "share": 0.25,
+        "template_id": null,
+        "basis": null,
+        "quantity": 4.0,
+        "unit": "g",
+        "unit_price": 0.03,
+        "amount": 0.12,
+        "method": null,
+        "segments": [],
+        "computed": {
+          "quantity": 3.05470798176395,
+          "unit_price": 0.03,
+          "amount": 0.09
+        },
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "running_seconds": 3600,
+    "total": 0.38,
+    "cost_per_part": 0.38,
+    "cover": null,
+    "subtotals": {
+      "electricity": 0.04,
+      "material": 0.34,
+      "other": 0.0
+    }
+  }
+}

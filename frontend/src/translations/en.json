@@ -251,5 +251,14 @@
   "basket.delete": "Delete",
   "basket.clear": "Clear",
   "basket.delete_failed": "The selected Runs could not be deleted.",
-  "delete.title_many": "Delete {count} Runs?"
+  "delete.title_many": "Delete {count} Runs?",
+  "flag.estimated_split": "The material was split across Slots by running time: check the quantities",
+  "flag.slot_fallback": "A Slot matched no Material: the default Material was charged",
+  "evidence.slot": "Slot {number}: {type}",
+  "evidence.share": "≈ {share} of the measured total",
+  "split.measured": "Estimated split of {measured} measured.",
+  "split.difference": "The split Line Items add up to {total} ({difference}).",
+  "device.slots": "Slots",
+  "device.slot_colour": "Colour from {attribute}",
+  "device.loaded_slot": "Loaded slot {entity}"
 }

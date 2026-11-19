@@ -207,3 +207,35 @@ def usage_reading(
         return None
     factor, unit = scale
     return number * factor, unit
+
+
+def slot_number(value: str, count: int) -> int | None:
+    """The Loaded slot input's Slot number; None for any value outside 1…count."""
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    return int(number) if number.is_integer() and 1 <= number <= count else None
+
+
+def slot_colour(value: Any) -> str | None:
+    """A Slot's reported colour as #rrggbb, from hex text or an RGB list."""
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        try:
+            parts = [int(part) for part in value[:3]]
+        except TypeError, ValueError:
+            return None
+        if not all(0 <= part <= 255 for part in parts):
+            return None
+        return "#" + "".join(f"{part:02x}" for part in parts)
+    if not isinstance(value, str):
+        return None
+    digits = value.strip().removeprefix("#")
+    if len(digits) == 8:
+        # RRGGBBAA: the alpha says nothing about the Material.
+        digits = digits[:6]
+    try:
+        int(digits, 16)
+    except ValueError:
+        return None
+    return f"#{digits.lower()}" if len(digits) == 6 else None

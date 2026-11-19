@@ -80,13 +80,19 @@
             "entity_id": "Job name entity (optional)",
             "attribute": "Attribute (optional)",
             "material_entity_id": "Material used entity (optional)",
-            "material_attribute": "Material used attribute (optional)"
+            "material_attribute": "Material used attribute (optional)",
+            "slots": "Slot entities (optional)",
+            "colour_attribute": "Slot colour attribute (optional)",
+            "loaded_slot": "Loaded slot entity (optional)"
           },
           "data_description": {
             "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
             "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity.",
             "material_entity_id": "The printer's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
-            "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor."
+            "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor.",
+            "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material loaded in it (e.g. PLA) as its state.",
+            "colour_attribute": "The attribute of the Slot entities that carries the Material's colour as a hex code, e.g. color_hex.",
+            "loaded_slot": "Reports the number of the Slot printing right now; any other value means no Slot. Each Slot loaded during a Run is matched to a Material by type and colour."
           }
         },
         "material_unit": {

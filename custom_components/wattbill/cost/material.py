@@ -1,5 +1,7 @@
 """Material Line Items: measured usage in grams, priced from a Material's price per gram."""
 
+from collections.abc import Callable
+from dataclasses import replace
 import math
 
 from custom_components.wattbill.materials import Material
@@ -7,6 +9,7 @@ from custom_components.wattbill.models import (
     LineItem,
     LineItemKind,
     MaterialCopy,
+    SlotReport,
     Usage,
     UsageUnit,
 )
@@ -50,6 +53,8 @@ def material_line_item(
     *,
     measured: bool = True,
     unit: str = GRAM,
+    slots: list[SlotReport] | None = None,
+    share: float | None = None,
 ) -> LineItem:
     """The Material Line Item for a measured total, in grams.
 
@@ -72,7 +77,39 @@ def material_line_item(
         material=None if material is None else copy(material),
         measured=measured,
         length=length,
+        slots=slots or [],
+        share=share,
     )
+
+
+def slot_line_items(
+    usage: Usage | None,
+    shares: dict[SlotReport, float],
+    material_of: Callable[[SlotReport], Material | None],
+    item_id: Callable[[str | None], str],
+) -> list[LineItem]:
+    """One measured Line Item per Material the loaded Slots held.
+
+    With several, each gets the share of the measured total its Slots had;
+    `item_id` names the Line Item of a Material id.
+    """
+    groups: dict[str | None, tuple[Material | None, list[SlotReport], float]] = {}
+    for slot, share in shares.items():
+        material = material_of(slot)
+        key = None if material is None else material.id
+        _, slots, total = groups.get(key, (material, [], 0.0))
+        groups[key] = (material, [*slots, slot], total + share)
+    split = len(groups) > 1
+    return [
+        material_line_item(
+            item_id(key),
+            replace(usage, value=usage.value * share) if usage and split else usage,
+            material,
+            slots=slots,
+            share=share if split else None,
+        )
+        for key, (material, slots, share) in groups.items()
+    ]
 
 
 def change_material(item: LineItem, material: Material) -> None:

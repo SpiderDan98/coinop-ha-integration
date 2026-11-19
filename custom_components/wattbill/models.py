@@ -26,6 +26,8 @@ class Flag(StrEnum):
     USAGE_MISSING = "usage_missing"
     MATERIAL_MISSING = "material_missing"
     SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
+    ESTIMATED_SPLIT = "estimated_split"
+    SLOT_FALLBACK = "slot_fallback"
 
 
 class UsageUnit(StrEnum):
@@ -150,6 +152,44 @@ class Usage:
         )
 
 
+@dataclass(frozen=True)
+class SlotReport:
+    """A Slot as its entity reported it while loaded: Material type and colour."""
+
+    number: int
+    type: str
+    colour: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"number": self.number, "type": self.type, "colour": self.colour}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SlotReport:
+        return cls(data["number"], data["type"], data["colour"])
+
+
+@dataclass
+class LoadedSlot:
+    """From `since` on, the Slot the Device printed from; None for no Slot."""
+
+    since: datetime
+    slot: SlotReport | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "since": self.since.isoformat(),
+            "slot": None if self.slot is None else self.slot.as_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> LoadedSlot:
+        slot = data["slot"]
+        return cls(
+            datetime.fromisoformat(data["since"]),
+            None if slot is None else SlotReport.from_dict(slot),
+        )
+
+
 VALUES = ("quantity", "unit_price", "amount")
 
 
@@ -161,7 +201,9 @@ class LineItem:
     output language. Material Line Items reference their Material by
     `material_id`, which keeps it from being deleted, and keep a copy of it in
     `material`; their unit is g or ml. A `measured` one follows the Material used
-    input, whose length (mm) it keeps. A Line Item copied from a Line Item
+    input, whose length (mm) it keeps, and the Slots it was attributed through
+    (`slots`); split across several Materials, `share` is its estimated share of
+    the measured total. A Line Item copied from a Line Item
     Template keeps only `template_id` as its origin and the template's `basis`;
     with running hours WattBill computes its quantity. Quantity, unit price and
     amount are what counts; once the user overrides a computed one, `computed`
@@ -179,6 +221,8 @@ class LineItem:
     material: MaterialCopy | None = None
     measured: bool = False
     length: float | None = None
+    slots: list[SlotReport] = field(default_factory=list)
+    share: float | None = None
     template_id: str | None = None
     basis: QuantityBasis | None = None
     method: ElectricityMethod | None = None
@@ -261,6 +305,8 @@ class LineItem:
             "material": None if self.material is None else self.material.as_dict(),
             "measured": self.measured,
             "length": self.length,
+            "slots": [slot.as_dict() for slot in self.slots],
+            "share": self.share,
             "template_id": self.template_id,
             "basis": self.basis,
             "quantity": self.quantity,
@@ -284,6 +330,8 @@ class LineItem:
             else MaterialCopy.from_dict(material),
             measured=data.get("measured", False),
             length=data.get("length"),
+            slots=[SlotReport.from_dict(slot) for slot in data.get("slots", [])],
+            share=data.get("share"),
             template_id=data.get("template_id"),
             basis=None if data.get("basis") is None else QuantityBasis(data["basis"]),
             quantity=data["quantity"],
@@ -355,6 +403,8 @@ class Run:
     price entity had no value, kept until finalised. `average_powers` are the
     (since, running W, paused W) the Run's consumption model used. `usage` is what
     the Material used input last reported during the Run: its measured total.
+    `loaded_slots` is the timeline of the Slot it printed from, kept until
+    finalised.
     `cover_id` is the image the user picked as Cover Image.
     """
 
@@ -384,6 +434,7 @@ class Run:
     )
     images: list[RunImage] = field(default_factory=list)
     usage: Usage | None = None
+    loaded_slots: list[LoadedSlot] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -442,6 +493,7 @@ class Run:
                 for at, running, paused in self.average_powers
             ],
             "usage": None if self.usage is None else self.usage.as_dict(),
+            "loaded_slots": [loaded.as_dict() for loaded in self.loaded_slots],
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
             "cover_id": self.cover_id,
@@ -486,6 +538,9 @@ class Run:
             usage=None
             if (usage := data.get("usage")) is None
             else Usage.from_dict(usage),
+            loaded_slots=[
+                LoadedSlot.from_dict(loaded) for loaded in data.get("loaded_slots", [])
+            ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             cover_id=data.get("cover_id"),

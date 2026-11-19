@@ -50,6 +50,7 @@
           ]
         ],
         "usage": null,
+        "loaded_slots": [],
         "line_items": [
           {
             "id": "01KF0000000000000000000I03",
@@ -59,6 +60,8 @@
             "material": null,
             "measured": false,
             "length": null,
+            "slots": [],
+            "share": null,
             "template_id": null,
             "basis": null,
             "quantity": 0.06,
