@@ -39,6 +39,8 @@ class DeviceConfig:
     mapping: Mapping[str, Target]
     job_entity_id: str | None
     job_attribute: str | None
+    # The Material used input: entity_id, attribute and unit.
+    material: Mapping[str, Any] | None
     thumbnail_entity_id: str | None
     camera_entity_id: str | None
     snapshot: bool
@@ -67,6 +69,7 @@ class DeviceConfig:
             },
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
+            material=job.get("material"),
             thumbnail_entity_id=images.get("thumbnail"),
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),

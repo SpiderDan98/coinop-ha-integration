@@ -235,7 +235,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 return await self._job_done()
             if usage["attribute"]:
                 return await self.async_step_material_unit()
-            usage["unit"] = entity_unit(self.hass, material)
+            usage["unit"] = entity_unit(self.hass, usage["entity_id"])
             if usage_scale(usage["unit"]):
                 return await self._job_done()
             errors["material_entity_id"] = "not_length_or_mass"

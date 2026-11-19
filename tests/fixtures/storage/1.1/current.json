@@ -45,12 +45,20 @@
           null
         ]
       ],
+      "usage": {
+        "at": "2026-01-10T10:31:00+00:00",
+        "value": 4000.0,
+        "unit": "mm"
+      },
       "line_items": [
         {
           "id": "01KF0000000000000000000I01",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "quantity": 0.2833333333333333,
           "unit": "kWh",
           "unit_price": 0.31176470588235294,
@@ -70,6 +78,28 @@
               "unit_price": 0.35714285714285715
             }
           ],
+          "computed": null
+        },
+        {
+          "id": "01KF0000000000000000000I02",
+          "kind": "material",
+          "label": null,
+          "material_id": "01KF0000000000000000000M01",
+          "material": {
+            "name": "eSun PLA+ black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.01999
+          },
+          "measured": true,
+          "length": 4000.0,
+          "quantity": 11.9302,
+          "unit": "g",
+          "unit_price": 0.01999,
+          "amount": 0.238484698,
+          "method": null,
+          "segments": [],
           "computed": null
         }
       ],
@@ -110,12 +140,16 @@
           null
         ]
       ],
+      "usage": null,
       "line_items": [
         {
           "id": "01KF0000000000000000000I02",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "quantity": 0.04,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -181,12 +215,16 @@
           null
         ]
       ],
+      "usage": null,
       "line_items": [
         {
           "id": "01KF0000000000000000000I03",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "quantity": 0.06,
           "unit": "kWh",
           "unit_price": 0.3,

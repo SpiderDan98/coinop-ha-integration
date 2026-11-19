@@ -27,13 +27,30 @@ from homeassistant.helpers.recorder import get_instance
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
+from .catalog import Catalog
 from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
+from .cost.material import GRAM, MILLILITRE, material_line_item
 from .device_config import ConsumptionSource, DeviceConfig, Target
-from .device_inputs import input_time, input_value, meter_reading, price_reading
-from .device_settings import TAGS_FOR_NEW_RUNS, DeviceSettings
+from .device_inputs import (
+    input_time,
+    input_value,
+    meter_reading,
+    price_reading,
+    usage_reading,
+)
+from .device_settings import DEFAULT_MATERIAL, TAGS_FOR_NEW_RUNS, DeviceSettings
 from .images import DeviceImages
-from .models import ElectricityMethod, Flag, Outcome, Pause, Run
+from .materials import Material, MaterialForm
+from .models import (
+    ElectricityMethod,
+    Flag,
+    LineItemKind,
+    Outcome,
+    Pause,
+    Run,
+    Usage,
+)
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
 
@@ -64,12 +81,14 @@ class DeviceTracker:
         config: DeviceConfig,
         settings: DeviceSettings,
         images: DeviceImages,
+        catalog: Catalog,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
         self._settings = settings
         self._images = images
+        self._catalog = catalog
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
@@ -102,9 +121,19 @@ class DeviceTracker:
                 async_track_state_change_event(self._hass, meters, self._on_meter),
                 async_track_state_report_event(self._hass, meters, self._on_meter),
             ]
+        if usage := self._config.material:
+            self._unsubscribe += [
+                async_track_state_change_event(
+                    self._hass, usage["entity_id"], self._on_usage
+                ),
+                async_track_state_report_event(
+                    self._hass, usage["entity_id"], self._on_usage
+                ),
+            ]
         if run := self._book.open_run(self._config.device_id):
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
+            self._record_usage(run, self._usage_state())
             await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
@@ -213,10 +242,48 @@ class DeviceTracker:
             self._record(run, state)
             if run.ended is None:
                 self._refresh(run, dt_util.utcnow())
-            elif self._has_final_report(run):
+            elif not self._awaits_report(run):
                 self._finish(run)
                 continue
             self._book.async_update(run)
+
+    @callback
+    def _on_usage(
+        self, event: Event[EventStateChangedData] | Event[EventStateReportedData]
+    ) -> None:
+        for run in self._unfinalised_runs():
+            if run.ended is not None and run.id not in self._final_waits:
+                # Already being finalised.
+                continue
+            self._record_usage(run, event.data["new_state"])
+            if run.ended is not None and not self._awaits_report(run):
+                self._finish(run)
+                continue
+            self._refresh(run, run.ended or dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _usage_state(self) -> State | None:
+        usage = self._config.material
+        return None if usage is None else self._hass.states.get(usage["entity_id"])
+
+    def _record_usage(self, run: Run, state: State | None) -> None:
+        """Keep the Material used input's report if it is valid and the Run's own."""
+        if (usage := self._config.material) is None or state is None:
+            return
+        if (reading := usage_reading(state, usage)) is None:
+            return
+        changed = input_time(state, usage["attribute"])
+        late = run.ended is not None and changed > run.ended + FINAL_REPORT_WAIT
+        # A value from before the Run is still the previous job's.
+        if changed < run.started or late:
+            return
+        run.usage = Usage(max(changed, state.last_reported), *reading)
+
+    def _material(self) -> Material | None:
+        """The Material a Run of this Device is charged for."""
+        material_id = self._settings.get(self._config.device_id)[DEFAULT_MATERIAL]
+        material = self._catalog.material(material_id) if material_id else None
+        return None if material is None or material.archived else material
 
     @callback
     def _on_price(self, event: Event[EventStateChangedData]) -> None:
@@ -352,6 +419,7 @@ class DeviceTracker:
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
         self._follow_average_power(run, at)
+        self._record_usage(run, self._usage_state())
         self._open_prices(run, at)
         self._refresh(run, at)
         self._book.async_start(run)
@@ -394,15 +462,24 @@ class DeviceTracker:
         self._refresh(run, at)
         if snapshot:
             self._images.async_run_ended(run)
-        if _meter(run.consumption):
+        if self._awaits_report(run):
             self._book.async_update(run)
         return self._await_final_report(run)
 
+    def _awaits_report(self, run: Run) -> bool:
+        """Whether the meter or the Material used input may still report the Run's end."""
+        assert run.ended is not None
+        if _meter(run.consumption) and not self._has_final_report(run):
+            return True
+        return self._config.material is not None and (
+            run.usage is None or run.usage.at < run.ended
+        )
+
     def _await_final_report(self, run: Run) -> asyncio.Future[None]:
-        """Freeze the Run at the meter's next report, at the latest after the wait."""
+        """Freeze the Run at the inputs' next reports, at the latest after the wait."""
         finalised = self._finalised.setdefault(run.id, self._hass.loop.create_future())
         assert run.ended is not None
-        if not _meter(run.consumption) or self._has_final_report(run):
+        if not self._awaits_report(run):
             self._finish(run)
             return finalised
 
@@ -422,9 +499,34 @@ class DeviceTracker:
             cancel()
         assert run.ended is not None
         self._refresh(run, run.ended)
+        self._settle_material(run)
         run.readings = []
         run.prices = []
         self._hass.async_create_task(self._async_finalise(run))
+
+    def _settle_material(self, run: Run) -> None:
+        """Flag missing usage or Material; without a Material used input, add a
+        Material Line Item to fill in unless the user already added one."""
+        items = [i for i in run.line_items if i.measured]
+        if self._config.material is None and not any(
+            i.kind is LineItemKind.MATERIAL for i in run.line_items
+        ):
+            material = self._material()
+            resin = material is not None and material.form is MaterialForm.RESIN
+            item = material_line_item(
+                ulid_now(),
+                None,
+                material,
+                measured=False,
+                unit=MILLILITRE if resin else GRAM,
+            )
+            run.line_items.append(item)
+            items.append(item)
+        for item in items:
+            if item.quantity is None and item.length is None:
+                self._flag(run, Flag.USAGE_MISSING)
+            if item.material_id is None:
+                self._flag(run, Flag.MATERIAL_MISSING)
 
     async def _async_finalise(self, run: Run) -> None:
         await self._book.async_finalise(run)
@@ -526,6 +628,26 @@ class DeviceTracker:
             if _meter(run.consumption)
             else ElectricityMethod.ESTIMATED,
         )
-        run.line_items = [item] + [i for i in run.line_items if i.kind is not item.kind]
+        measured = [i for i in run.line_items if i.measured]
+        materials = (
+            [
+                material_line_item(
+                    measured[0].id if measured else ulid_now(),
+                    run.usage,
+                    self._material(),
+                )
+            ]
+            if self._config.material
+            else []
+        )
+        run.line_items = [
+            item,
+            *materials,
+            *(
+                i
+                for i in run.line_items
+                if i.kind is not LineItemKind.ELECTRICITY and not i.measured
+            ),
+        ]
         if price_gap(run.started, until, run.prices):
             self._flag(run, Flag.PRICE_GAP)

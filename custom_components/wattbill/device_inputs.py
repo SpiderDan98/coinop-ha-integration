@@ -191,3 +191,19 @@ def meter_reading(state: State | None, meter: Mapping[str, Any]) -> float | None
         or meter["factor"]
     )
     return None if scale is None else number * scale
+
+
+def usage_reading(
+    state: State | None, usage: Mapping[str, Any]
+) -> tuple[float, UsageUnit] | None:
+    """The Material used input's report in mm or g; None unless it is above 0."""
+    number = _number(state, usage["attribute"])
+    if state is None or number is None or number <= 0:
+        return None
+    scale = usage_scale(_reported_unit(state, usage["attribute"])) or usage_scale(
+        usage["unit"]
+    )
+    if scale is None:
+        return None
+    factor, unit = scale
+    return number * factor, unit

@@ -203,7 +203,7 @@ async def test_last_run_cost_shows_the_last_ended_run(
         "end": ended,
         "part_count": 1,
         "cost_per_part": pytest.approx(0.2),
-        "has_flags": False,
+        "has_flags": True,
     }
 
 
@@ -259,11 +259,13 @@ async def test_flagged_runs_counts_runs_with_uncleared_flags(
     await add_device(hass, entry)
     await print_runs(hass, clock, [1, 1, 1])
     flagged = state_of(hass, FLAGGED)
-    assert flagged.state == "0"
+    # Each Run lacks its material usage.
+    assert flagged.state == "3"
     assert "state_class" not in flagged.attributes
 
     def flag(runs: list[dict[str, Any]]) -> None:
         runs[0]["flags"] = ["price_gap", "fault"]
+        runs[1]["flags"] = []
         runs[2]["flags"] = ["fault"]
 
     await restart_with(hass, entry, hass_storage, flag)

@@ -43,11 +43,7 @@ def run_totals(run: Run, now: datetime) -> Totals:
         electricity_cost=_amount(run, LineItemKind.ELECTRICITY),
         material_cost=_amount(run, LineItemKind.MATERIAL),
         other_cost=_amount(run, LineItemKind.OTHER),
-        material_grams=sum(
-            item.quantity or 0.0
-            for item in run.line_items
-            if item.kind is LineItemKind.MATERIAL
-        ),
+        material_grams=sum(item.grams for item in run.line_items),
         energy_kwh=run.electricity.quantity or 0.0,
         runs=1,
         running_hours=running_time(run, now).total_seconds() / 3600,

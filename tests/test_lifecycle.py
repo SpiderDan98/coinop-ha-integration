@@ -10,7 +10,14 @@ import pytest
 
 from .clock import CLOCK_START, Clock
 from .devices import MAPPING, add_device, add_hub
-from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
+from .test_runs import (
+    NO_MATERIAL,
+    RUNS,
+    TOTAL_COST,
+    set_status,
+    stored_runs,
+    value,
+)
 from .test_sensors import FLAGGED, RUNNING_TIME, enable
 
 WITH_FAULT = MAPPING | {"fault": ["error"]}
@@ -86,7 +93,7 @@ async def test_a_fault_flags_the_run_and_pauses_it(
 
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == "completed"
-    assert run["flags"] == ["fault"]
+    assert run["flags"] == ["fault", *NO_MATERIAL]
     assert run["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
     assert kwh(run) == pytest.approx(0.2)
     assert value(hass, FLAGGED) == 1
@@ -114,7 +121,7 @@ async def test_the_outcome_after_a_fault(
 
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == outcome
-    assert run["flags"] == ["fault"]
+    assert run["flags"] == ["fault", *NO_MATERIAL]
     assert run["pauses"] == [{"start": at(minutes=30), "end": at(minutes=35)}]
 
 

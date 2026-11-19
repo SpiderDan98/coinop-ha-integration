@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .devices import STATUS, add_device, add_hub
 from .stored import line_item, place_runs, stored_run
+from .test_runs import NO_MATERIAL
 from .websocket import PanelClient
 
 
@@ -44,7 +45,7 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
         "total": 0.07,
         "part_count": 1,
         "cost_per_part": 0.07,
-        "flags": [],
+        "flags": NO_MATERIAL,
         "tags": [],
         "cover": None,
     }

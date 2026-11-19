@@ -49,12 +49,16 @@
             null
           ]
         ],
+        "usage": null,
         "line_items": [
           {
             "id": "01KF0000000000000000000I03",
             "kind": "electricity",
             "label": null,
             "material_id": null,
+            "material": null,
+            "measured": false,
+            "length": null,
             "quantity": 0.06,
             "unit": "kWh",
             "unit_price": 0.3,

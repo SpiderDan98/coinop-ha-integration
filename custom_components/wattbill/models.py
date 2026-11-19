@@ -89,6 +89,59 @@ class PriceSegment:
         )
 
 
+@dataclass
+class MaterialCopy:
+    """Evidence on a Material Line Item: its Material as it was when priced."""
+
+    name: str
+    type: str
+    density: float
+    diameter: float | None
+    price_per_gram: float
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def as_dict(self) -> dict[str, Any]:
+        return self.unknown | {
+            "name": self.name,
+            "type": self.type,
+            "density": self.density,
+            "diameter": self.diameter,
+            "price_per_gram": self.price_per_gram,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MaterialCopy:
+        return cls(
+            name=data["name"],
+            type=data["type"],
+            density=data["density"],
+            diameter=data["diameter"],
+            price_per_gram=data["price_per_gram"],
+            unknown=unknown_fields(cls, data),
+        )
+
+
+@dataclass
+class Usage:
+    """The Material used input's last valid report during a Run, in mm or g.
+
+    `at` is when it was last reported, which may be after the Run ended.
+    """
+
+    at: datetime
+    value: float
+    unit: UsageUnit
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"at": self.at.isoformat(), "value": self.value, "unit": self.unit}
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Usage:
+        return cls(
+            datetime.fromisoformat(data["at"]), data["value"], UsageUnit(data["unit"])
+        )
+
+
 VALUES = ("quantity", "unit_price", "amount")
 
 
@@ -98,9 +151,11 @@ class LineItem:
 
     Computed Line Items keep `label` None and are labelled by their kind in the
     output language. Material Line Items reference their Material by
-    `material_id`, which keeps it from being deleted. Quantity, unit price and
-    amount are what counts; once the user overrides a computed one, `computed`
-    keeps what WattBill computed.
+    `material_id`, which keeps it from being deleted, and keep a copy of it in
+    `material`; their unit is g or ml. A `measured` one follows the Material used
+    input, whose length (mm) it keeps. Quantity, unit price and amount are what
+    counts; once the user overrides a computed one, `computed` keeps what
+    WattBill computed.
     """
 
     id: str
@@ -111,6 +166,9 @@ class LineItem:
     amount: float
     label: str | None = None
     material_id: str | None = None
+    material: MaterialCopy | None = None
+    measured: bool = False
+    length: float | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
@@ -119,7 +177,16 @@ class LineItem:
     @property
     def is_computed(self) -> bool:
         """WattBill computes its values, live while the Run is open."""
-        return self.kind is LineItemKind.ELECTRICITY
+        return self.kind is LineItemKind.ELECTRICITY or self.measured
+
+    @property
+    def grams(self) -> float:
+        """How much Material it counts for; millilitres weigh their density."""
+        if self.kind is not LineItemKind.MATERIAL or not self.quantity:
+            return 0.0
+        if self.unit == "ml" and self.material is not None:
+            return self.quantity * self.material.density
+        return self.quantity
 
     @property
     def negative_prices(self) -> bool:
@@ -158,6 +225,9 @@ class LineItem:
             "kind": self.kind,
             "label": self.label,
             "material_id": self.material_id,
+            "material": None if self.material is None else self.material.as_dict(),
+            "measured": self.measured,
+            "length": self.length,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -174,6 +244,11 @@ class LineItem:
             kind=LineItemKind(data["kind"]),
             label=data["label"],
             material_id=data.get("material_id"),
+            material=None
+            if (material := data.get("material")) is None
+            else MaterialCopy.from_dict(material),
+            measured=data.get("measured", False),
+            length=data.get("length"),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],
@@ -241,7 +316,8 @@ class Run:
     value, kept until finalised. `cost_source` is the Device's price section the
     Run follows; `prices` its (since, price per kWh) timeline, None while the
     price entity had no value, kept until finalised. `average_powers` are the
-    (since, running W, paused W) the Run's consumption model used.
+    (since, running W, paused W) the Run's consumption model used. `usage` is what
+    the Material used input last reported during the Run: its measured total.
     """
 
     id: str
@@ -269,6 +345,7 @@ class Run:
         default_factory=list
     )
     images: list[RunImage] = field(default_factory=list)
+    usage: Usage | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -323,6 +400,7 @@ class Run:
                 [at.isoformat(), running, paused]
                 for at, running, paused in self.average_powers
             ],
+            "usage": None if self.usage is None else self.usage.as_dict(),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
         }
@@ -363,6 +441,9 @@ class Run:
                 (datetime.fromisoformat(at), running, paused)
                 for at, running, paused in data.get("average_powers", [])
             ],
+            usage=None
+            if (usage := data.get("usage")) is None
+            else Usage.from_dict(usage),
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             unknown=unknown_fields(cls, data),

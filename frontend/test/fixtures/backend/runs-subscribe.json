@@ -132,7 +132,10 @@
       "total": 0.03,
       "part_count": 1,
       "cost_per_part": 0.03,
-      "flags": [],
+      "flags": [
+        "usage_missing",
+        "material_missing"
+      ],
       "tags": [
         "Batch 7"
       ],

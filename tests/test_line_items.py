@@ -17,7 +17,8 @@ OTHER_COST = "sensor.kobra_other_cost"
 
 
 async def printed(hass: HomeAssistant, clock: Clock, panel: PanelClient) -> Any:
-    """One final 2 h Run at 100 W and 1 EUR/kWh: 0.2 kWh for 0.20 EUR."""
+    """One final 2 h Run at 100 W and 1 EUR/kWh: 0.2 kWh for 0.20 EUR, followed by
+    the Material Line Item to fill in."""
     entry = await add_hub(hass)
     await add_device(hass, entry, running_power=100, price=1)
     await print_runs(hass, clock, [2])
@@ -29,7 +30,7 @@ async def test_overriding_the_amount_back_computes_the_unit_price(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     run = await printed(hass, clock, panel)
-    [item] = run["line_items"]
+    [item, _material] = run["line_items"]
 
     result = await panel.call(
         "wattbill/line_items/update",
@@ -38,7 +39,7 @@ async def test_overriding_the_amount_back_computes_the_unit_price(
         amount=0.5,
     )
 
-    [corrected] = result["run"]["line_items"]
+    [corrected, _material] = result["run"]["line_items"]
     assert corrected["quantity"] == pytest.approx(0.2)
     assert corrected["unit_price"] == pytest.approx(2.5)
     assert corrected["amount"] == 0.5
@@ -70,14 +71,14 @@ async def test_reset_restores_the_computed_values(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     run = await printed(hass, clock, panel)
-    [computed] = run["line_items"]
+    [computed, _material] = run["line_items"]
     await update(panel, run, quantity=0.5)
 
     result = await panel.call(
         "wattbill/line_items/reset", run_id=run["id"], line_item_id=computed["id"]
     )
 
-    assert result["run"]["line_items"] == [computed]
+    assert result["run"]["line_items"][0] == computed
     assert computed["computed"] is None
     assert value(hass, TOTAL_COST) == pytest.approx(0.2)
     [stored] = stored_runs(hass_storage)
@@ -106,7 +107,7 @@ async def test_overrides_keep_amount_quantity_times_unit_price(
     """Electricity goes down to 0; without a quantity the amount stands."""
     run = await printed(hass, clock, panel)
 
-    [item] = await update(panel, run, **values)
+    [item, _material] = await update(panel, run, **values)
 
     assert (item["quantity"], item["unit_price"], item["amount"]) == (
         pytest.approx(quantity),
@@ -123,7 +124,7 @@ async def test_electricity_has_no_negative_values(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, values: dict[str, Any]
 ) -> None:
     run = await printed(hass, clock, panel)
-    [item] = run["line_items"]
+    [item, _material] = run["line_items"]
 
     error = await panel.error(
         "wattbill/line_items/update",
@@ -265,7 +266,7 @@ async def test_labels_and_units_entered_by_hand_are_kept_verbatim(
         label="Hotend wear",
         unit="Std.",
     )
-    [electricity, renamed] = result["run"]["line_items"]
+    [electricity, _material, renamed] = result["run"]["line_items"]
     assert (renamed["label"], renamed["unit"]) == ("Hotend wear", "Std.")
     assert electricity["label"] is None
 
@@ -275,7 +276,7 @@ async def test_labels_and_units_entered_by_hand_are_kept_verbatim(
         line_item_id=wear["id"],
         label="",
     )
-    assert result["run"]["line_items"][1]["label"] is None
+    assert result["run"]["line_items"][2]["label"] is None
     error = await panel.error(
         "wattbill/line_items/update",
         run_id=run["id"],
@@ -296,7 +297,7 @@ async def test_overrides_survive_a_restart_and_tell_open_panels(
     await watcher.subscribe("wattbill/runs/subscribe")
     await watcher.event()
 
-    [overridden] = await update(panel, run, amount=0.5)
+    [overridden, _material] = await update(panel, run, amount=0.5)
 
     event = await watcher.event()
     assert (event["change"], event["run"]["total"]) == ("updated", 0.5)
@@ -305,7 +306,7 @@ async def test_overrides_survive_a_restart_and_tell_open_panels(
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     restarted = await panel.call("wattbill/runs/get", run_id=run["id"])
-    assert restarted["run"]["line_items"] == [overridden]
+    assert restarted["run"]["line_items"][0] == overridden
     assert value(hass, TOTAL_COST) == pytest.approx(0.5)
 
 
@@ -315,7 +316,7 @@ async def test_an_overridden_value_keeps_the_first_computed_one(
     run = await printed(hass, clock, panel)
 
     await update(panel, run, quantity=0.5)
-    [item] = await update(panel, run, unit_price=2)
+    [item, _material] = await update(panel, run, unit_price=2)
 
     assert (item["quantity"], item["unit_price"], item["amount"]) == (0.5, 2, 1)
     assert item["computed"] == {
