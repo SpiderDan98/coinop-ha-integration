@@ -114,6 +114,9 @@
       "last_run_cost": {
         "name": "Kosten letzter Lauf"
       },
+      "flagged_runs": {
+        "name": "Läufe mit Hinweisen"
+      },
       "runs": {
         "name": "Läufe"
       }

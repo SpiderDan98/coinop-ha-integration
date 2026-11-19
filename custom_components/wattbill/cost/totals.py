@@ -9,7 +9,7 @@ from custom_components.wattbill.models import LineItemKind, Run
 
 @dataclass(frozen=True)
 class Totals:
-    """What a Run (or a sum of Runs) contributes to its Device's total sensors."""
+    """What a Run (or a sum of Runs) contributes to its Device's summed sensors."""
 
     cost: float = 0.0
     electricity_cost: float = 0.0
@@ -19,6 +19,7 @@ class Totals:
     energy_kwh: float = 0.0
     runs: int = 0
     running_hours: float = 0.0
+    flagged_runs: int = 0
 
     def __add__(self, other: Totals) -> Totals:
         return Totals(
@@ -50,6 +51,7 @@ def run_totals(run: Run, now: datetime) -> Totals:
         energy_kwh=run.electricity.quantity or 0.0,
         runs=1,
         running_hours=running_time(run, now).total_seconds() / 3600,
+        flagged_runs=1 if run.flags else 0,
     )
 
 

@@ -17,6 +17,7 @@ from .test_runs import set_status, stored_runs, value
 RUNNING_TIME = "sensor.kobra_running_time"
 CURRENT = "sensor.kobra_current_run_cost"
 LAST = "sensor.kobra_last_run_cost"
+FLAGGED = "sensor.kobra_flagged_runs"
 
 
 def state_of(hass: HomeAssistant, entity_id: str) -> State:
@@ -248,3 +249,27 @@ async def test_last_run_cost_follows_stored_changes(
     assert float(state_of(hass, LAST).state) == pytest.approx(0.1)
     assert value(hass, "sensor.kobra_total_cost") == pytest.approx(0.1)
     assert value(hass, "sensor.kobra_runs") == 1
+
+
+async def test_flagged_runs_counts_runs_with_uncleared_flags(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+    await print_runs(hass, clock, [1, 1, 1])
+    flagged = state_of(hass, FLAGGED)
+    assert flagged.state == "0"
+    assert "state_class" not in flagged.attributes
+
+    def flag(runs: list[dict[str, Any]]) -> None:
+        runs[0]["flags"] = ["price_gap", "fault"]
+        runs[2]["flags"] = ["fault"]
+
+    await restart_with(hass, entry, hass_storage, flag)
+    assert value(hass, FLAGGED) == 2
+
+    def clear(runs: list[dict[str, Any]]) -> None:
+        runs[0]["flags"] = []
+
+    await restart_with(hass, entry, hass_storage, clear)
+    assert value(hass, FLAGGED) == 1

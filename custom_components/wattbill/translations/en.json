@@ -114,6 +114,9 @@
       "last_run_cost": {
         "name": "Last Run cost"
       },
+      "flagged_runs": {
+        "name": "Flagged Runs"
+      },
       "runs": {
         "name": "Runs"
       }

@@ -65,6 +65,7 @@ TOTALS = (
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
     ),
+    SensorEntityDescription(key="flagged_runs", translation_key="flagged_runs"),
 )
 CURRENT_RUN_COST = SensorEntityDescription(
     key="current_run_cost",
