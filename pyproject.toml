@@ -43,7 +43,7 @@ combine-as-imports = true
 [tool.mypy]
 python_version = "3.14"
 strict = true
-files = ["custom_components", "tests"]
+files = ["custom_components", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
 module = ["pytest_homeassistant_custom_component.*"]
