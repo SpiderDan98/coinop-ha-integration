@@ -1,10 +1,18 @@
 // The WattBill sidebar panel. HA sets `hass`, `narrow`, `route` and `panel`; the
-// panel keeps one Runs subscription open while it is shown and routes by `route.path`.
+// panel keeps the Runs and the catalogue subscription open while it is shown and
+// routes by `route.path`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { subscribeRuns, type RunSummary, type RunsEvent } from "./api";
+import {
+  subscribeCatalog,
+  subscribeRuns,
+  type Catalog,
+  type RunSummary,
+  type RunsEvent,
+} from "./api";
 import { followLink, type HomeAssistant, type PanelInfo, type PanelRoute } from "./hass";
 import { localize } from "./localize";
+import "./materials-page";
 import "./run-gallery";
 import "./run-page";
 import { runName } from "./run-parts";
@@ -12,11 +20,14 @@ import { shared } from "./styles";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
+// Toolbar tabs, each at `/<tab>`.
+const TABS = ["materials"] as const;
+
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
-  return section === "run" && id
-    ? { name: "run" as const, runId: decodeURIComponent(id) }
-    : { name: "overview" as const };
+  if (section === "run" && id) return { name: "run" as const, runId: decodeURIComponent(id) };
+  const tab = TABS.find((candidate) => candidate === section);
+  return tab ? { name: tab } : { name: "overview" as const };
 };
 
 @customElement("wattbill-panel")
@@ -29,7 +40,10 @@ export class WattbillPanel extends LitElement {
   /** Undefined until the first snapshot arrives. */
   @state() private runs?: Map<string, RunSummary>;
   @state() private failed = false;
-  private unsubscribe?: Promise<() => Promise<void>>;
+  /** Undefined until the first catalogue event arrives. */
+  @state() private catalog?: Catalog;
+  @state() private catalogFailed = false;
+  private unsubscribe?: Promise<() => Promise<void>>[];
 
   override connectedCallback() {
     super.connectedCallback();
@@ -38,7 +52,7 @@ export class WattbillPanel extends LitElement {
 
   override disconnectedCallback() {
     super.disconnectedCallback();
-    void this.unsubscribe?.then((unsubscribe) => unsubscribe());
+    for (const unsubscribe of this.unsubscribe ?? []) void unsubscribe.then((stop) => stop());
     this.unsubscribe = undefined;
   }
 
@@ -59,11 +73,19 @@ export class WattbillPanel extends LitElement {
   }
 
   private subscribe() {
-    this.failed = false;
-    this.unsubscribe = subscribeRuns(this.hass, (event) => this.apply(event)).catch(() => {
-      this.failed = true;
-      return async () => {};
-    });
+    this.failed = this.catalogFailed = false;
+    this.unsubscribe = [
+      subscribeRuns(this.hass, (event) => this.apply(event)).catch(() => {
+        this.failed = true;
+        return async () => {};
+      }),
+      subscribeCatalog(this.hass, (event) => {
+        this.catalog = { ...this.catalog, ...event } as Catalog;
+      }).catch(() => {
+        this.catalogFailed = true;
+        return async () => {};
+      }),
+    ];
   }
 
   private apply(event: RunsEvent) {
@@ -97,37 +119,58 @@ export class WattbillPanel extends LitElement {
         }
         <nav class="title">
           ${
-            current.name === "overview"
-              ? "WattBill"
-              : html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a
+            current.name === "run"
+              ? html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a
                   ><span class="muted"> › </span
                   ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`
+              : current.name === "overview"
+                ? "WattBill"
+                : html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>`
           }
         </nav>
+        <nav class="tabs">
+          ${TABS.map(
+            (tab) =>
+              html`<a
+                class="tab ${current.name === tab ? "on" : ""}"
+                href="${this.route.prefix}/${tab}"
+                @click=${followLink}
+                >${t(`tab.${tab}`)}</a
+              >`,
+          )}
+        </nav>
       </header>
-      <main>
-        ${
-          this.failed
-            ? html`<p class="muted">${t("runs.error")}</p>`
-            : !this.runs
-              ? html`<p class="muted">${t("runs.loading")}</p>`
-              : current.name === "run"
-                ? html`<wattbill-run-page
-                    .hass=${this.hass}
-                    .runId=${current.runId}
-                    .summary=${run}
-                    .basePath=${this.route.prefix}
-                    ?narrow=${this.narrow}
-                  ></wattbill-run-page>`
-                : html`<wattbill-run-gallery
-                    .hass=${this.hass}
-                    .runs=${[...this.runs.values()]}
-                    .basePath=${this.route.prefix}
-                    ?narrow=${this.narrow}
-                  ></wattbill-run-gallery>`
-        }
-      </main>
+      <main>${this.renderPage(current, run)}</main>
     `;
+  }
+
+  private renderPage(current: ReturnType<typeof page>, run?: RunSummary) {
+    const t = localize(this.hass);
+    if (current.name === "materials") {
+      return this.catalogFailed
+        ? html`<p class="muted">${t("catalog.error")}</p>`
+        : html`<wattbill-materials-page
+            .hass=${this.hass}
+            .materials=${this.catalog?.materials}
+            ?narrow=${this.narrow}
+          ></wattbill-materials-page>`;
+    }
+    if (this.failed) return html`<p class="muted">${t("runs.error")}</p>`;
+    if (!this.runs) return html`<p class="muted">${t("runs.loading")}</p>`;
+    return current.name === "run"
+      ? html`<wattbill-run-page
+          .hass=${this.hass}
+          .runId=${current.runId}
+          .summary=${run}
+          .basePath=${this.route.prefix}
+          ?narrow=${this.narrow}
+        ></wattbill-run-page>`
+      : html`<wattbill-run-gallery
+          .hass=${this.hass}
+          .runs=${[...this.runs.values()]}
+          .basePath=${this.route.prefix}
+          ?narrow=${this.narrow}
+        ></wattbill-run-gallery>`;
   }
 
   private toggleMenu() {
@@ -161,6 +204,25 @@ export class WattbillPanel extends LitElement {
         gap: 6px;
         min-width: 0;
         white-space: nowrap;
+      }
+      .tabs {
+        display: flex;
+        align-self: stretch;
+        margin-left: auto;
+        overflow-x: auto;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        color: inherit;
+        opacity: 0.75;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      .tab.on {
+        opacity: 1;
+        border-bottom-color: currentColor;
       }
       .menu {
         border: 0;

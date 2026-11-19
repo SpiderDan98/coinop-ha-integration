@@ -27,9 +27,9 @@
 
 ### Panel modules
 
-- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription and routes by `route.path` (`""` gallery, `/run/<id>` Run page).
+- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs and the catalogue subscription and routes by `route.path` (`""` gallery, `/run/<id>` Run page, `/<tab>` for each toolbar tab in `TABS`). A new tab is one entry in `TABS`, a `tab.<name>` string and its view in `renderPage`.
 - `src/api.ts`: the websocket commands and the shapes they return. `src/hass.ts`: the part of `hass` the panel uses, plus `navigate` / `followLink` for in-app links.
-- `src/run-gallery.ts`, `src/run-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
+- `src/run-gallery.ts`, `src/run-page.ts`, `src/materials-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
 - `src/localize.ts` with `src/translations/{en,de}.json` (flat keys): panel strings, chosen by `hass.language`, falling back to English. `src/format.ts`: money, dates and durations.
 
 ## Setup
@@ -90,7 +90,7 @@ npm test                 # vitest, in happy-dom
 npx vitest run -t "Run page"
 ```
 
-- Tests mount `<wattbill-panel>` the way HA does (`mountPanel(backend, { path, narrow })` in `test/render.ts`) and assert on rendered text (`text`, `query`, `queryAll` pierce shadow roots) and on the messages the panel sent (`backend.calls`).
+- Tests mount `<wattbill-panel>` the way HA does (`mountPanel(backend, { path, narrow })` in `test/render.ts`) and assert on rendered text (`text`, `query`, `queryAll` pierce shadow roots; `click` and `fill` act like the user) and on the messages the panel sent (`backend.calls`).
 - `test/fake-hass.ts` is the fake `hass`: `recordedBackend()` answers with recorded backend responses; `.reply(type, msg => result)` answers `callWS` (throw `new WsError(code)` to fail), `.subscription(type, msg => initialEvents)` accepts a subscription, `.push(type, event)` sends an event, `.update({...})` hands over a new `hass` like HA does.
 - The recorded responses under `frontend/test/fixtures/backend/` are written by `tests/test_panel_contract.py` from the real backend, and that test fails when the backend's answers change. Re-record after an intended change and commit the JSON:
 
