@@ -406,7 +406,7 @@ class DeviceTracker:
     def _on_tick(self, now: datetime) -> None:
         if run := self._book.open_run(self._config.device_id):
             now = dt_util.utcnow()
-            if not self._status_lost:
+            if not self._status_lost and not run.paused:
                 run.last_seen = now
             self._refresh(run, now)
             self._book.async_update(run)
@@ -416,7 +416,7 @@ class DeviceTracker:
         value = input_value(state, attribute)
         run = self._book.open_run(self._config.device_id)
         if state is None or value is None:
-            if run is not None and not self._status_lost:
+            if run is not None and not self._status_lost and not run.paused:
                 run.last_seen = (
                     dt_util.utcnow() if state is None else state.last_changed
                 )
@@ -458,14 +458,15 @@ class DeviceTracker:
     def _continue(
         self, run: Run, target: Target, at: datetime, job_name: str | None
     ) -> None:
-        run.last_seen = max(run.last_seen or run.started, at)
+        if target is Target.RUNNING or not run.paused:
+            run.last_seen = max(run.last_seen or run.started, at)
         if target in (Target.PAUSED, Target.FAULT):
             if target is Target.FAULT and Flag.FAULT not in run.flags:
                 run.flags.append(Flag.FAULT)
-            if not run.pauses or run.pauses[-1].end is not None:
+            if not run.paused:
                 run.pauses.append(Pause(at))
         elif target is Target.RUNNING:
-            if run.pauses and run.pauses[-1].end is None:
+            if run.paused:
                 run.pauses[-1].end = at
             if run.job_name is None:
                 run.job_name = job_name
@@ -644,7 +645,9 @@ class DeviceTracker:
     ) -> asyncio.Future[None]:
         """End the Run now; the result is done once it is finalised."""
         run.ended = at
-        if run.pauses and run.pauses[-1].end is None:
+        # A Run closed when last seen running drops the pause it was lost in.
+        run.pauses = [pause for pause in run.pauses if pause.start < at]
+        if run.paused:
             run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)

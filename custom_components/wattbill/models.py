@@ -393,7 +393,8 @@ class Run:
     are still awaited; frozen once finalised. `end_reconstructed` marks an end
     WattBill only learnt about after the Status input or WattBill itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
-    `last_seen` is the last time the Status input was seen during the open Run.
+    `last_seen` is the last time the Status input was seen running during the
+    open Run.
     `consumption` is the Device's consumption section when the Run started;
     `readings` are its meter's (time, kWh or W) reports, None while it had no
     value, kept until finalised. `cost_source` is the Device's price section the
@@ -435,6 +436,10 @@ class Run:
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    @property
+    def paused(self) -> bool:
+        return bool(self.pauses) and self.pauses[-1].end is None
 
     @property
     def electricity(self) -> LineItem:
