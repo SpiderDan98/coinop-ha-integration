@@ -81,7 +81,8 @@
       "error": {
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
-        "value_mapped_twice": "Each value can be mapped to one target only."
+        "value_mapped_twice": "Each value can be mapped to one target only.",
+        "status_already_used": "Another Device already uses this entity as its print status. Each print would be recorded twice."
       }
     }
   },

@@ -81,7 +81,8 @@
       "error": {
         "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
-        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden."
+        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
+        "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Druckstatus. Jeder Druck würde doppelt erfasst."
       }
     }
   },

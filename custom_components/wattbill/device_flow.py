@@ -13,6 +13,7 @@ from homeassistant.helpers.selector import (
     TextSelector,
 )
 
+from .const import SUBENTRY_DEVICE
 from .device_config import ENDING_TARGETS, Target
 from .device_inputs import offered_values
 from .schema import vol
@@ -61,20 +62,33 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_status(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._data["status"] = {
-                "entity_id": user_input["entity_id"],
-                "attribute": user_input.get("attribute") or None,
+            if self._status_used_elsewhere(user_input["entity_id"]):
+                errors["entity_id"] = "status_already_used"
+            else:
+                self._data["status"] = {
+                    "entity_id": user_input["entity_id"],
+                    "attribute": user_input.get("attribute") or None,
+                }
+                return await self.async_step_mapping()
+        schema = vol.Schema(
+            {
+                vol.Required("entity_id"): EntitySelector(),
+                vol.Optional("attribute"): TextSelector(),
             }
-            return await self.async_step_mapping()
+        )
         return self.async_show_form(
             step_id="status",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("entity_id"): EntitySelector(),
-                    vol.Optional("attribute"): TextSelector(),
-                }
-            ),
+            data_schema=self.add_suggested_values_to_schema(schema, user_input),
+            errors=errors,
+        )
+
+    def _status_used_elsewhere(self, entity_id: str) -> bool:
+        return any(
+            subentry.data["status"]["entity_id"] == entity_id
+            for subentry in self._get_entry().subentries.values()
+            if subentry.subentry_type == SUBENTRY_DEVICE
         )
 
     async def async_step_mapping(

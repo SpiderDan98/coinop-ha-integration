@@ -7,7 +7,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 
-from .devices import MAPPING, STATUS, add_device, add_hub, configure, walk_to_mapping
+from .devices import (
+    MAPPING,
+    STATUS,
+    add_device,
+    add_hub,
+    configure,
+    start_add_device,
+    walk_to_mapping,
+)
 
 
 def offered(result: Any, target: str = "running") -> list[str]:
@@ -144,3 +152,18 @@ async def test_a_value_mapped_to_two_targets_is_refused(hass: HomeAssistant) -> 
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "value_mapped_twice"}
+
+
+async def test_a_status_entity_used_by_another_device_is_refused(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, name="Kobra")
+    result = await configure(
+        hass, await start_add_device(hass, entry), {"name": "Kobra again"}
+    )
+
+    result = await configure(hass, result, {"entity_id": STATUS})
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"entity_id": "status_already_used"}
