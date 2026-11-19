@@ -8,15 +8,10 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
 from .clock import CLOCK_START, Clock
-from .devices import STATUS, add_device, add_hub
+from .devices import add_device, add_hub
 from .stored import line_item, place_runs, stored_run
-from .test_runs import NO_MATERIAL
+from .test_runs import NO_MATERIAL, set_status
 from .websocket import PanelClient
-
-
-async def set_status(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(STATUS, status)
-    await hass.async_block_till_done()
 
 
 async def test_the_list_shows_what_a_gallery_tile_needs(

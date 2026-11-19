@@ -19,6 +19,7 @@ from .test_material_usage import (
     PETG_GRAMS_PER_METRE,
     add_measuring_device,
     material_items,
+    print_one_metre,
     set_usage,
 )
 from .test_runs import set_status, stored_runs, value
@@ -120,13 +121,6 @@ async def test_a_loaded_slot_is_matched_by_type_and_colour(
     assert item["quantity"] == pytest.approx(GRAMS_PER_METRE)
     assert evidence(item) == [(2, "pla", "#ff0000")]
     assert run["flags"] == []
-
-
-async def print_one_metre(hass: HomeAssistant, clock: Clock) -> None:
-    await set_status(hass, "printing")
-    await clock.advance(hours=1)
-    await set_usage(hass, 1000)
-    await set_status(hass, "finished")
 
 
 async def test_a_type_without_its_colour_takes_the_types_default_material(

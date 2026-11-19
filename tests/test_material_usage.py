@@ -29,6 +29,14 @@ async def set_usage(hass: HomeAssistant, used: float | str, unit: str = "mm") ->
     await hass.async_block_till_done()
 
 
+async def print_one_metre(hass: HomeAssistant, clock: Clock) -> None:
+    """An hour's print that used 1 m, reported as it ends."""
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+
 async def add_measuring_device(
     hass: HomeAssistant,
     panel: PanelClient,

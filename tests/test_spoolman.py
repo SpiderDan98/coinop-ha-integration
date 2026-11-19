@@ -18,6 +18,7 @@ from .test_material_usage import (
     GRAMS_PER_METRE,
     add_measuring_device,
     material_items,
+    print_one_metre,
     set_usage,
 )
 from .test_runs import set_status, stored_runs
@@ -425,16 +426,6 @@ def linked_material(material_id: str, per_gram: float, **fields: Any) -> dict[st
     """A Material linked to Filament 7, last read at `per_gram`."""
     price = {"source": "spoolman", "filament_id": 7, "per_gram": per_gram}
     return stored_material(material_id, price=price, **fields)
-
-
-async def print_one_metre(hass: HomeAssistant, clock: Clock) -> None:
-    await set_status(hass, "printing")
-    await clock.advance(minutes=30)
-    await set_usage(hass, 1000)
-    await clock.advance(minutes=30)
-    await set_status(hass, "finished")
-    await clock.advance(minutes=1)
-    await set_usage(hass, 1000)
 
 
 async def test_a_run_end_reads_the_price_spoolman_has_then(
