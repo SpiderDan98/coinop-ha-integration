@@ -20,6 +20,12 @@ class Target(StrEnum):
     IGNORED = "ignored"
 
 
+class ConsumptionSource(StrEnum):
+    ENERGY = "energy"
+    POWER = "power"
+    ESTIMATE = "estimate"
+
+
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 
 
@@ -36,9 +42,12 @@ class DeviceConfig:
     thumbnail_entity_id: str | None
     camera_entity_id: str | None
     snapshot: bool
-    running_power: float
-    paused_power: float | None
-    price: float
+    # The consumption section as Add Device wrote it.
+    consumption: Mapping[str, Any]
+    # The price section: a fixed value or a price entity.
+    price: Mapping[str, Any]
+    # The subentry data as the flow wrote it: the Device's HA-side settings.
+    flow_data: Mapping[str, Any]
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
@@ -61,10 +70,15 @@ class DeviceConfig:
             thumbnail_entity_id=images.get("thumbnail"),
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),
-            running_power=data["consumption"]["running_power"],
-            paused_power=data["consumption"]["paused_power"],
-            price=data["price"]["value"],
+            consumption=data["consumption"],
+            price=data["price"],
+            flow_data=data,
         )
+
+    @property
+    def price_entity_id(self) -> str | None:
+        entity_id: str | None = self.price.get("entity_id")
+        return entity_id
 
     def target(self, value: str) -> Target:
         return self.mapping.get(value, Target.IGNORED)

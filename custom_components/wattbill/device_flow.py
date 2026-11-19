@@ -23,9 +23,18 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import SUBENTRY_DEVICE
-from .device_config import ENDING_TARGETS, Target
-from .device_inputs import offered_values
+from .device_config import ENDING_TARGETS, ConsumptionSource, Target
+from .device_inputs import entity_unit, offered_values, price_scale, unit_scale
 from .schema import vol
+
+# Offered when a meter attribute is picked, which has no unit of its own.
+ATTRIBUTE_UNITS = {
+    ConsumptionSource.ENERGY: ["Wh", "kWh", "MWh"],
+    ConsumptionSource.POWER: ["W", "kW"],
+}
+FACTOR = NumberSelector(
+    NumberSelectorConfig(min=0, step="any", mode=NumberSelectorMode.BOX)
+)
 
 
 def _watts(minimum: float) -> NumberSelector:
@@ -60,6 +69,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._name = ""
+        # The consumption or price section while its unit is still being asked for.
+        self._meter: dict[str, Any] = {}
+        self._price: dict[str, Any] = {}
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
         """Each section's first step, in Add Device order."""
@@ -251,7 +263,115 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_consumption(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        return self.async_show_menu(step_id="consumption", menu_options=["estimate"])
+        return self.async_show_menu(
+            step_id="consumption", menu_options=[s.value for s in ConsumptionSource]
+        )
+
+    async def async_step_energy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_meter_step(ConsumptionSource.ENERGY, user_input)
+
+    async def async_step_power(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_meter_step(ConsumptionSource.POWER, user_input)
+
+    async def async_step_energy_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_unit_step(ConsumptionSource.ENERGY, user_input)
+
+    async def async_step_power_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_unit_step(ConsumptionSource.POWER, user_input)
+
+    async def _async_meter_step(
+        self, source: ConsumptionSource, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._meter = {
+                "source": source.value,
+                "entity_id": user_input["entity_id"],
+                "attribute": user_input.get("attribute") or None,
+                "unit": None,
+                "factor": None,
+            }
+            if source is ConsumptionSource.POWER:
+                self._meter["running_power"] = user_input.get("running_power")
+            if self._meter["attribute"]:
+                return await (
+                    self.async_step_energy_unit()
+                    if source is ConsumptionSource.ENERGY
+                    else self.async_step_power_unit()
+                )
+            self._meter["unit"] = entity_unit(self.hass, self._meter["entity_id"])
+            if self._understood(
+                self._meter, unit_scale(source, self._meter["unit"]), user_input
+            ):
+                return await self._meter_done()
+            errors["entity_id"] = "unknown_unit"
+        schema: dict[Any, Any] = {
+            vol.Required("entity_id"): EntitySelector(),
+            vol.Optional("attribute"): TextSelector(),
+        }
+        if source is ConsumptionSource.POWER:
+            schema[vol.Optional("running_power")] = _watts(1)
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id=source.value,
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_meter(source)
+            ),
+            errors=errors,
+        )
+
+    async def _async_unit_step(
+        self, source: ConsumptionSource, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._meter["unit"] = user_input["unit"]
+            if self._understood(
+                self._meter, unit_scale(source, self._meter["unit"]), user_input
+            ):
+                return await self._meter_done()
+            errors["unit"] = "unknown_unit"
+        schema: dict[Any, Any] = {
+            vol.Required("unit"): SelectSelector(
+                SelectSelectorConfig(options=ATTRIBUTE_UNITS[source], custom_value=True)
+            )
+        }
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id=f"{source}_unit",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_meter(source)
+            ),
+            errors=errors,
+        )
+
+    def _stored_meter(self, source: ConsumptionSource) -> dict[str, Any] | None:
+        stored: dict[str, Any] | None = self._data.get("consumption")
+        return stored if stored and stored["source"] == source else None
+
+    @staticmethod
+    def _understood(
+        section: dict[str, Any], scale: float | None, user_input: dict[str, Any]
+    ) -> bool:
+        """A recognised unit, or else a conversion factor the user entered."""
+        if scale is not None:
+            return True
+        section["factor"] = user_input.get("factor") or None
+        return section["factor"] is not None
+
+    async def _meter_done(self) -> SubentryFlowResult:
+        self._data["consumption"] = self._meter
+        return await self._section_done("consumption")
 
     async def async_step_estimate(
         self, user_input: dict[str, Any] | None = None
@@ -280,6 +400,13 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_price(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        return self.async_show_menu(
+            step_id="price", menu_options=["fixed_price", "price_entity"]
+        )
+
+    async def async_step_fixed_price(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
         if user_input is not None:
             self._data["price"] = {"source": "fixed", "value": user_input["price"]}
             return await self._section_done("price")
@@ -296,11 +423,94 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 )
             }
         )
-        stored = self._data.get("price")
+        stored = self._stored_price("fixed")
         return self.async_show_form(
-            step_id="price",
+            step_id="fixed_price",
             data_schema=self.add_suggested_values_to_schema(
                 schema, {"price": stored["value"]} if stored else None
             ),
             description_placeholders={"currency": currency},
         )
+
+    async def async_step_price_entity(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        currency = self.hass.config.currency
+        if user_input is not None:
+            self._price = {
+                "source": "entity",
+                "entity_id": user_input["entity_id"],
+                "attribute": user_input.get("attribute") or None,
+                "unit": None,
+                "factor": None,
+            }
+            if self._price["attribute"]:
+                return await self.async_step_price_unit()
+            self._price["unit"] = entity_unit(self.hass, self._price["entity_id"])
+            if self._understood(
+                self._price, price_scale(self._price["unit"], currency), user_input
+            ):
+                return await self._price_done()
+            errors["entity_id"] = "unknown_unit"
+        schema: dict[Any, Any] = {
+            vol.Required("entity_id"): EntitySelector(),
+            vol.Optional("attribute"): TextSelector(),
+        }
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id="price_entity",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_price("entity")
+            ),
+            errors=errors,
+            description_placeholders={"currency": currency},
+        )
+
+    async def async_step_price_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        currency = self.hass.config.currency
+        if user_input is not None:
+            self._price["unit"] = user_input["unit"]
+            if self._understood(
+                self._price, price_scale(self._price["unit"], currency), user_input
+            ):
+                return await self._price_done()
+            errors["unit"] = "unknown_unit"
+        units = [f"{currency}/kWh", "ct/kWh", f"{currency}/MWh"]
+        schema: dict[Any, Any] = {
+            vol.Required("unit"): SelectSelector(
+                SelectSelectorConfig(options=units, custom_value=True)
+            )
+        }
+        if errors:
+            schema[vol.Optional("factor")] = FACTOR
+        return self.async_show_form(
+            step_id="price_unit",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or self._stored_price("entity")
+            ),
+            errors=errors,
+            description_placeholders={"currency": currency},
+        )
+
+    async def _price_done(self) -> SubentryFlowResult:
+        self._data["price"] = self._price
+        return await self._section_done("price")
+
+    def _stored_price(self, source: str) -> dict[str, Any] | None:
+        """The Device's price, or for a new Device the last-added Device's one."""
+        stored: dict[str, Any] | None = self._data.get("price")
+        if stored is None and self.source != SOURCE_RECONFIGURE:
+            stored = next(
+                (
+                    subentry.data["price"]
+                    for subentry in reversed([*self._get_entry().subentries.values()])
+                    if subentry.subentry_type == SUBENTRY_DEVICE
+                ),
+                None,
+            )
+        return stored if stored and stored["source"] == source else None

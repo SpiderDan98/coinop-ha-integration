@@ -20,6 +20,7 @@ class RunChange(StrEnum):
     STARTED = "started"
     UPDATED = "updated"
     ENDED = "ended"
+    DELETED = "deleted"
 
 
 class RunBook:
@@ -34,7 +35,7 @@ class RunBook:
     def runs(self) -> list[Run]:
         return list(self._runs.values())
 
-    def get(self, run_id: str) -> Run | None:
+    def run(self, run_id: str) -> Run | None:
         return self._runs.get(run_id)
 
     def open_run(self, device_id: str) -> Run | None:
@@ -45,6 +46,13 @@ class RunBook:
                 if run.device_id == device_id and run.ended is None
             ),
             None,
+        )
+
+    def uses_material(self, material_id: str) -> bool:
+        return any(
+            item.material_id == material_id
+            for run in self._runs.values()
+            for item in run.line_items
         )
 
     def totals(self, device_id: str) -> Totals:
@@ -72,13 +80,20 @@ class RunBook:
         await self._store.async_save_live(self._unfinalised())
         self._announce(RunChange.ENDED, run)
 
-    async def async_edit(self, run: Run) -> None:
-        """Record a change to a Run in either state, e.g. a new image."""
-        if run.finalised:
-            await self._store.async_save_runs(r for r in self.runs() if r.finalised)
-            self._announce(RunChange.UPDATED, run)
-        else:
-            self._changed(RunChange.UPDATED, run)
+    async def async_correct(self, run: Run) -> None:
+        """Save a change outside the lifecycle (a correction, an image); announces UPDATED."""
+        await self._save(run)
+        self._announce(RunChange.UPDATED, run)
+
+    async def async_delete(self, runs: list[Run]) -> None:
+        """Remove Runs for good; listeners hear DELETED, e.g. to delete their files."""
+        for run in runs:
+            del self._runs[run.id]
+        await self._store.async_save_runs(r for r in self.runs() if r.finalised)
+        if not all(run.finalised for run in runs):
+            await self.async_flush()
+        for run in runs:
+            self._announce(RunChange.DELETED, run)
 
     async def async_rename_device(self, device_id: str, name: str) -> None:
         """Keep every Run's Device name current, so removed Devices keep their last one."""
@@ -97,6 +112,12 @@ class RunBook:
     async def async_flush(self) -> None:
         """Write pending live changes now, e.g. before unloading."""
         await self._store.async_save_live(self._unfinalised())
+
+    async def _save(self, run: Run) -> None:
+        if run.finalised:
+            await self._store.async_save_runs(r for r in self.runs() if r.finalised)
+        else:
+            await self.async_flush()
 
     def _unfinalised(self) -> list[Run]:
         return [run for run in self._runs.values() if not run.finalised]

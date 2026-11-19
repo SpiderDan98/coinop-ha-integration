@@ -28,13 +28,43 @@ export function formatter(hass: HomeAssistant) {
     timeStyle: "short",
     timeZone,
   });
+  const timeOfDay = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
+  const wallClockParts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  });
+  /** "YYYY-MM-DDTHH:mm" as a clock in HA's time zone shows `time`. */
+  const wallClock = (time: number) => {
+    const parts = Object.fromEntries(
+      wallClockParts.formatToParts(time).map(({ type, value }) => [type, value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+  };
+  const zoneOffset = (time: number) => Date.parse(`${wallClock(time)}Z`) - (time - (time % 60000));
   return {
+    /** A `datetime-local` input's value, in HA's time zone. */
+    toInput: (iso: string) => wallClock(Date.parse(iso)),
+    /** The ISO time a `datetime-local` value means in HA's time zone, if it is one. */
+    fromInput: (value: string) => {
+      const asUtc = Date.parse(`${value}Z`);
+      if (Number.isNaN(asUtc)) return undefined;
+      // Twice, since the offset at the first guess may differ across a DST change.
+      const guess = asUtc - zoneOffset(asUtc);
+      return new Date(asUtc - zoneOffset(guess)).toISOString();
+    },
     money: (amount: number) => currency.format(amount),
     unitPrice: (price: number) => unitPrice.format(price),
     quantity: (quantity: number, unit: string) =>
       `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
+    timeRange: (start: string, end: string) =>
+      timeOfDay.formatRange(new Date(start), new Date(end)),
     duration: (seconds: number) => {
       const minutes = Math.round(seconds / 60);
       return t("duration", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });

@@ -6,29 +6,33 @@
 - `tests/`: backend tests, run inside a real Home Assistant test instance.
 - `frontend/`: the sidebar panel (TypeScript + Lit). It builds into `custom_components/wattbill/frontend/wattbill-panel.js`, which is gitignored and built by CI.
 - `scripts/test_ha.py`: runs the tests against the minimum, stable or beta Home Assistant release.
+- `scripts/release.py`: builds the release asset `wattbill.zip` from a version tag (see [Release](#release)).
 - `GLOSSARY.md`: domain terms; use them in code, tests and docs. Decisions go in `docs/adr/`.
 
 ### Backend modules
 
-- `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `images`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
-- `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`).
-- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
-- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
-- `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step. `async_edit(run)` records a change to a Run outside its lifecycle (open or finalised), e.g. a new image.
-- `images/`: Run images. `library.py` (`ImageLibrary`) stores an image on its Run (`async_add`: re-encoded by `encode.py`, a new Thumbnail or Snapshot replaces the old one), keeps the files under `files_path(hass)/images/<run id>/`, deletes a Run's files once it leaves the RunBook and removes files no Run refers to at startup. `capture.py` (`DeviceImages`, one per Device, driven by its tracker) copies the Thumbnail while a Run is open and takes the Snapshot at its end. `view.py` serves the images to admins only (`image_info` gives the panel their URLs; the Run stores metadata only).
+- `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `images`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry, including meter readings converted to kWh or W (`meter_reading`, units via HA's unit converters, else the user's conversion factor) and prices converted to `<currency>/kWh` (`price_reading`; `price_scale` understands the currency's code or symbol and sub-units like ct ÷ 100, per Wh/kWh/MWh).
+- `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`). A Run keeps the consumption section it started with (`Run.consumption`, so a source change applies from the next Run) and, until finalised, its meter's `readings`.
+- `materials.py`: `Material`, free of HA types, with its built-in types (form and density for pre-filling) and its Cost Source (`PRICE_SOURCES`: each source gives a `per_gram(density)` price; only `fixed` so far).
+- `catalog.py`: `Catalog`, the global catalogues (Materials so far) in the `catalog` Store. Every change is saved at once and announced by catalogue name (`async_listen`). Deleting a Material a Run's Line Item references (`LineItem.material_id`) archives it instead.
+- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments: estimate, energy meter interpolated between readings, power sensor by the left rule; `piecewise` switches models when the average power changed), `electricity.py` (price segments from a price timeline whose gaps take the last valid price, and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
+- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; meter readings with gap and reset Flags; live refresh every minute and on each price report, finalisation). The open Run keeps its price timeline (`Run.prices`, cleared at finalisation) and the average powers it used (`Run.average_powers`); a Device's new price or average power is appended from the moment the tracker starts with it (`_async_follow_device`), so it never recomputes what came before. A metered Run waits up to five minutes after its end for the meter's next report; `_end` returns a future done once the Run is finalised. On start, `async_start` fills each unfinalised metered Run's missed reports from recorder history before applying the Status input.
+- `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step. User corrections go through `async_correct` (announced as `updated`, so `ended` never refires) and deletions through `async_delete` (announced as `deleted`; a listener on `RunChange.DELETED` is the place to remove a Run's files). `async_correct` also records a new image.
+- `images/`: Run images. `library.py` (`ImageLibrary`) stores an image on its Run (`async_add`: re-encoded by `encode.py`, a new Thumbnail or Snapshot replaces the old one), keeps the files under `files_path(hass)/images/<run id>/`, deletes a Run's files when it is deleted and removes files no Run refers to at startup. `capture.py` (`DeviceImages`, one per Device, driven by its tracker) copies the Thumbnail while a Run is open and takes the Snapshot when it ends. `view.py` serves the images to admins only (`image_info` gives the panel their URLs; the Run stores metadata only).
+- `device_settings.py`: a Device's panel settings (WattBill's own per-Device settings, set in the Devices tab), kept in the `device_settings` Store. A new setting is one entry in `FIELDS` (default and the schema a new value must pass); it then appears in `wattbill/devices/list` and can be changed with `wattbill/devices/update_settings`. Settings of removed Devices are dropped at setup.
 - `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
 - `repairs.py`: the fix flow for missing data (restore guidance or a deliberate fresh start). `backup.py`: writes pending delayed saves before a backup.
 - `ha_device.py`: WattBill's own HA device per Device (registered at setup, linked to the printer's HA device), its `device_info`, and renames from the HA device page. Removing a Device ends its open Run as Unknown in `__init__.py` before the reload; `Run.device_name` always holds the Device's current name.
 - `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
 - `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts.
 - `panel.py`: registers the admin-only panel while the hub entry is loaded and serves the bundle at a URL that changes with its content.
-- `websocket/`: the panel's backend API, one module per area (`runs.py`, ...). See [Websocket commands](#websocket-commands).
+- `websocket/`: the panel's backend API, one module per area (`runs.py`, `devices.py`, `materials.py`, `catalog.py`, ...). See [Websocket commands](#websocket-commands).
 
 ### Panel modules
 
-- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription and routes by `route.path` (`""` gallery, `/run/<id>` Run page).
+- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs and the catalogue subscription, loads the Devices (again when the Devices tab opens or a Run of an unlisted Device changes) and routes by `route.path` (`""` gallery, `/run/<id>` Run page, `/<tab>` for each toolbar tab in `TABS`; a new tab is one entry there, a `tab.<name>` string and its view in `renderPage`). A Run whose `device_id` is not among the loaded Devices belongs to a removed Device (`deviceName` in `run-parts.ts`).
 - `src/api.ts`: the websocket commands and the shapes they return. `src/hass.ts`: the part of `hass` the panel uses, plus `navigate` / `followLink` for in-app links.
-- `src/run-gallery.ts`, `src/run-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/run-image.ts`: one Run image, fetched with `hass.fetchWithAuth` (the image views need authentication, which `<img src>` can't send) and shown from a blob URL, or the placeholder. `src/styles.ts`: shared styles on HA's theme variables.
+- `src/run-gallery.ts`, `src/run-page.ts`, `src/devices-page.ts`, `src/materials-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/run-image.ts`: one Run image, fetched with `hass.fetchWithAuth` (the image views need authentication, which `<img src>` can't send) and shown from a blob URL, or the placeholder. `src/styles.ts`: shared styles on HA's theme variables.
 - `src/localize.ts` with `src/translations/{en,de}.json` (flat keys): panel strings, chosen by `hass.language`, falling back to English. `src/format.ts`: money, dates and durations.
 
 ## Setup
@@ -77,10 +81,10 @@ uv run scripts/test_ha.py minimum -q    # also: stable, beta (each in its own .v
   `Clock` and `CLOCK_START` come from `tests/clock.py`.
 
 - Schema changes: a minor bump only adds fields (read with a default); a major bump adds a migration to the Store's `Schema` and a folder to `tests/fixtures/storage/` for the version just released (see `tests/test_migrations.py`).
-- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
-- `tests/stored.py` places Runs in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`).
+- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`); `add_device(source="energy" | "power", meter={...})` picks a measured source, `walk_to_consumption` stops at its menu; `add_device(price={"entity_id": ...})` picks a price entity, `walk_to_price` stops at the price menu. `tests/test_dynamic_price.py` has `set_price` and `segments`. `tests/test_measured.py` has `set_meter`, `set_power` and `add_metered_device`. Tests that need recorder history override `mock_recorder_before_hass` in their own module (see `tests/test_recorder_history.py`), so the recorder only runs there. Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
+- `tests/stored.py` places Runs and Materials in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`, `place_materials(hass_storage, stored_material("id", ...))`).
 - Images: `tests/images.py` has a fake Thumbnail image entity (`add_thumbnail`, then `.show(picture("green"))`) and a fake camera (`add_camera(hass, *answers)`, `.requests`), `picture(...)` to make images with metadata, and `colour` / `opened` to read stored ones. Fetch from WattBill's HTTP views with the `http` fixture (`await http.content(url)`; `connect_http(user)` for others). Use the `files` fixture in tests that store images: it gives the test its own config directory and returns WattBill's file folder.
-- Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()`. It connects on first use, so set WattBill up first.
+- Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()` (events pushed before a command's result are kept for `event()`). It connects on first use, so set WattBill up first.
 
 ### Panel tests
 
@@ -90,7 +94,7 @@ npm test                 # vitest, in happy-dom
 npx vitest run -t "Run page"
 ```
 
-- Tests mount `<wattbill-panel>` the way HA does (`mountPanel(backend, { path, narrow })` in `test/render.ts`) and assert on rendered text (`text`, `query`, `queryAll` pierce shadow roots) and on the messages the panel sent (`backend.calls`).
+- Tests mount `<wattbill-panel>` the way HA does (`mountPanel(backend, { path, narrow })` in `test/render.ts`) and assert on rendered text (`text`, `query`, `queryAll` pierce shadow roots; `click` and `fill` act like the user) and on the messages the panel sent (`backend.calls`).
 - `test/fake-hass.ts` is the fake `hass`: `recordedBackend()` answers with recorded backend responses; `.reply(type, msg => result)` answers `callWS` (throw `new WsError(code)` to fail), `.subscription(type, msg => initialEvents)` accepts a subscription, `.push(type, event)` sends an event, `.update({...})` hands over a new `hass` like HA does, `.file(path)` serves an image to `fetchWithAuth` (`recordedBackend()` serves every recorded image; anything else answers 404) and `.fetches` lists what was fetched.
 - The recorded responses under `frontend/test/fixtures/backend/` are written by `tests/test_panel_contract.py` from the real backend, and that test fails when the backend's answers change. Re-record after an intended change and commit the JSON:
 
@@ -118,6 +122,16 @@ npm run typecheck
 
 `.github/workflows/ci.yaml` runs on every push, pull request and nightly: hassfest, HACS validation, lint and type check, the panel's lint, type check, tests and build, and the backend tests against the minimum, stable and beta HA releases.
 
+## Release
+
+The committed `manifest.json` keeps the placeholder version `0.0.0`; a release gets its version only from its tag.
+
+1. Push a tag with the version, without a `v` prefix: `1.2.0`, or `1.2.0b1` / `1.2.0rc1` for a pre-release (releases before 1.0 are pre-releases).
+2. `.github/workflows/release.yaml` builds the panel, runs `scripts/release.py` (which fails for any other tag) to zip `custom_components/wattbill/` with the tag as the manifest's version, and creates a **draft** release with `wattbill.zip` and generated notes, marked as a pre-release for `b` / `rc` tags.
+3. Edit the notes (they become the release notes users see in Home Assistant; mention any raise of the minimum HA version) and publish the release. HACS and the Marketplace only offer published releases.
+
+To check an asset locally: build the panel, then `uv run scripts/release.py 1.2.0b1 custom_components/wattbill dist`.
+
 ## Conventions
 
 - Everything in the repository is written in English.
@@ -130,4 +144,7 @@ npm run typecheck
 - Named `wattbill/<area>/<verb>` (`wattbill/runs/list`, `wattbill/runs/get`, ...), defined in `websocket/<area>.py` and listed in its `COMMANDS`; `websocket/__init__.py` registers every module's `COMMANDS`.
 - Build each with `@command({vol.Required("type"): "wattbill/...", ...})` from `websocket/command.py`: it makes the command admin-only, answers `not_loaded` while the hub entry isn't loaded, and passes the loaded `WattBill` (sync or async handler).
 - Results are objects (`{"runs": [...]}`, `{"run": {...}}`), never bare lists. Missing things answer `not_found`. Amounts are sent rounded with `cost/rounding.py`; the panel never adds amounts up itself.
-- Subscriptions send their full state as the first event, then one event per change. Run changes reach them through the `SIGNAL_RUN_CHANGED` dispatcher signal, so a subscription survives reloads of the hub entry. Every `RunBook` change (`RunChange`) is forwarded as `{"change": ..., "run": summary}`; the panel already handles `"deleted"`.
+- Subscriptions send their full state as the first event, then one event per change. Run changes reach them through the `SIGNAL_RUN_CHANGED` dispatcher signal, so a subscription survives reloads of the hub entry. Every `RunBook` change (`RunChange`) is forwarded as `{"change": ..., "run": summary}`, including `"deleted"`.
+- Commands that change a Run answer with the Run in full (`{"run": ...}`), like `get`. Deleting is previewed: `delete_preview` and `delete` both answer `{"drop": ...}`, what the sensor totals lose.
+- `wattbill/catalog/subscribe` sends every catalogue first (`{"materials": [...]}`), then, after each change, the whole changed catalogue (`{"materials": [...]}`) through `SIGNAL_CATALOG_CHANGED`. A new catalogue adds its entry to `CATALOGUES` in `websocket/catalog.py` and announces its name from `Catalog`; the panel keeps one catalogue subscription and merges each event into what it has.
+- Fields of a catalogue entry travel nested (`{"type": "wattbill/materials/create", "material": {...}}`), since a Material's `type` would clash with the command's.

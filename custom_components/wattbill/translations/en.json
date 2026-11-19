@@ -102,7 +102,59 @@
           "title": "Electricity consumption",
           "description": "How should WattBill determine the electricity a Run uses?",
           "menu_options": {
+            "energy": "Energy meter",
+            "power": "Power sensor",
             "estimate": "Estimate from average power"
+          }
+        },
+        "energy": {
+          "title": "Energy meter",
+          "description": "Pick the entity that counts the printer's energy, e.g. the energy sensor of a power-measuring plug. It does not need to be available now.",
+          "data": {
+            "entity_id": "Energy entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each reading by this to get kWh."
+          }
+        },
+        "power": {
+          "title": "Power sensor",
+          "description": "Pick the entity that reports the printer's power draw. WattBill integrates it over time. It does not need to be available now.",
+          "data": {
+            "entity_id": "Power entity",
+            "attribute": "Attribute (optional)",
+            "running_power": "Average running power (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "running_power": "Fills gaps while the sensor reports nothing. Leave empty to hold its last value.",
+            "factor": "Multiply each reading by this to get W."
+          }
+        },
+        "energy_unit": {
+          "title": "Unit of the energy attribute",
+          "description": "In which unit does the attribute count energy?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get kWh."
+          }
+        },
+        "power_unit": {
+          "title": "Unit of the power attribute",
+          "description": "In which unit does the attribute report power?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get W."
           }
         },
         "estimate": {
@@ -118,11 +170,43 @@
         },
         "price": {
           "title": "Electricity price",
+          "description": "Do you pay a fixed price per kWh, or does an entity report the current price, e.g. for a dynamic tariff?",
+          "menu_options": {
+            "fixed_price": "Fixed price",
+            "price_entity": "Price entity"
+          }
+        },
+        "fixed_price": {
+          "title": "Fixed electricity price",
           "data": {
             "price": "Price per kWh"
           },
           "data_description": {
             "price": "What you pay per kWh, in {currency}."
+          }
+        },
+        "price_entity": {
+          "title": "Price entity",
+          "description": "Pick the entity that reports the current price per kWh or MWh, in {currency} or a sub-unit like ct. Each kWh of a Run is charged at the price that applied when it was used. It does not need to be available now.",
+          "data": {
+            "entity_id": "Price entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each price by this to get {currency}/kWh."
+          }
+        },
+        "price_unit": {
+          "title": "Unit of the price attribute",
+          "description": "In which unit does the attribute report the price?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each price by this to get {currency}/kWh."
           }
         }
       },
@@ -130,6 +214,7 @@
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
+        "unknown_unit": "WattBill does not recognise this unit. Enter a conversion factor, or pick another entity.",
         "status_already_used": "Another Device already uses this entity as its print status. Each print would be recorded twice."
       },
       "abort": {

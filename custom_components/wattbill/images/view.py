@@ -47,7 +47,7 @@ class RunImageView(HomeAssistantView):
         if not entries or variant not in VARIANTS:
             raise web.HTTPNotFound
         wattbill = cast("WattBillConfigEntry", entries[0]).runtime_data
-        run = wattbill.book.get(run_id)
+        run = wattbill.book.run(run_id)
         image = next((i for i in run.images if i.id == image_id), None) if run else None
         if run is None or image is None:
             raise web.HTTPNotFound

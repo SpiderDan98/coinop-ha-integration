@@ -16,6 +16,9 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.wattbill.const import DOMAIN
 
 STATUS = "sensor.kobra_status"
+ENERGY = "sensor.kobra_plug_energy"
+POWER = "sensor.kobra_plug_power"
+PRICE = "sensor.electricity_price"
 MAPPING = {
     "running": ["printing"],
     "paused": ["paused"],
@@ -86,6 +89,20 @@ async def walk_to_mapping(
     return result
 
 
+async def walk_to_consumption(
+    hass: HomeAssistant, entry: ConfigEntry, *, status: str = STATUS
+) -> Any:
+    result = await configure(
+        hass, await walk_to_mapping(hass, entry, status=status), MAPPING
+    )
+    assert result["step_id"] == "job", result.get("errors")
+    result = await configure(hass, result, {})
+    assert result["step_id"] == "images", result.get("errors")
+    result = await configure(hass, result, {})
+    assert result["type"] is FlowResultType.MENU, result.get("errors")
+    return result
+
+
 async def add_device(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -95,6 +112,8 @@ async def add_device(
     status: str = STATUS,
     attribute: str | None = None,
     mapping: dict[str, list[str]] = MAPPING,
+    source: str = "estimate",
+    meter: dict[str, Any] | None = None,
     job: str | None = None,
     job_attribute: str | None = None,
     thumbnail: str | None = None,
@@ -102,9 +121,13 @@ async def add_device(
     snapshot: bool | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
-    price: float = 0.30,
+    price: float | dict[str, Any] = 0.30,
 ) -> ConfigSubentry:
-    """Walk Add Device to the end; returns the new Device once the entry reloaded."""
+    """Walk Add Device to the end; returns the new Device once the entry reloaded.
+
+    `source` picks the consumption source; Energy and Power take `meter` as input.
+    A fixed `price` is a number; a dict is the price entity step's input.
+    """
     result = await walk_to_mapping(
         hass, entry, name=name, printer=printer, status=status, attribute=attribute
     )
@@ -126,18 +149,44 @@ async def add_device(
     }
     result = await configure(hass, result, images)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": "estimate"})
-    estimate = {"running_power": running_power}
-    if paused_power is not None:
-        estimate["paused_power"] = paused_power
-    result = await configure(hass, result, estimate)
-    assert result["step_id"] == "price"
-    result = await configure(hass, result, {"price": price})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+    result = await configure(hass, result, {"next_step_id": source})
+    if source == "estimate":
+        estimate = {"running_power": running_power}
+        if paused_power is not None:
+            estimate["paused_power"] = paused_power
+        result = await configure(hass, result, estimate)
+    else:
+        result = await configure(hass, result, meter)
+    assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, price_choice(price))
+    result = await configure(hass, result, price_input(price))
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+def price_choice(price: float | dict[str, Any]) -> dict[str, str]:
+    """The price menu's choice for a fixed `price` or a price entity's input."""
+    return {
+        "next_step_id": "price_entity" if isinstance(price, dict) else "fixed_price"
+    }
+
+
+def price_input(price: float | dict[str, Any]) -> dict[str, Any]:
+    return price if isinstance(price, dict) else {"price": price}
+
+
+async def walk_to_price(
+    hass: HomeAssistant, entry: ConfigEntry, *, status: str = STATUS
+) -> Any:
+    """Walk Add Device with an estimate to the price menu."""
+    result = await walk_to_consumption(hass, entry, status=status)
+    result = await configure(hass, result, {"next_step_id": "estimate"})
+    result = await configure(hass, result, {"running_power": 100})
+    assert result["step_id"] == "price", result.get("errors")
+    return result
 
 
 async def start_reconfigure(

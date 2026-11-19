@@ -74,3 +74,20 @@ export async function click(panel: Element, element: HTMLElement) {
   element.click();
   await settle(panel);
 }
+
+/** What the user does to a field: enter a value, then leave it. */
+export async function change(panel: Element, element: HTMLElement, value: string) {
+  (element as HTMLInputElement).value = value;
+  element.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  await settle(panel);
+}
+
+/** Type into an input or pick an option, the way a user changes a field. */
+export async function fill(panel: Element, field: HTMLElement, value: string) {
+  const control = field as HTMLInputElement;
+  if (control.type === "checkbox") control.checked = value === "on";
+  else control.value = value;
+  control.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  control.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  await settle(panel);
+}

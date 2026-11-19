@@ -43,12 +43,12 @@ class ImageLibrary:
         """
         image = RunImage(ulid_now(), kind, dt_util.utcnow())
         await self._hass.async_add_executor_job(self._write, run, image, data)
-        if self._closed or self._book.get(run.id) is not run:
+        if self._closed or self._book.run(run.id) is not run:
             await self._hass.async_add_executor_job(self._delete, run, [image])
             return None
         replaced = [i for i in run.images if kind in SINGLE_KINDS and i.kind is kind]
         run.images = [i for i in run.images if i not in replaced] + [image]
-        await self._book.async_edit(run)
+        await self._book.async_correct(run)
         await self._hass.async_add_executor_job(self._delete, run, replaced)
         return image
 
@@ -63,7 +63,7 @@ class ImageLibrary:
 
         @callback
         def on_change(change: RunChange, run: Run) -> None:
-            if self._book.get(run.id) is None:
+            if change is RunChange.DELETED:
                 self._hass.async_add_executor_job(
                     shutil.rmtree, self._root / run.id, True
                 )

@@ -7,6 +7,9 @@ const LANGUAGES: Record<string, Partial<typeof en>> = { en, de };
 
 export type Key = keyof typeof en;
 
+/** For keys built from backend values (e.g. Flag types) the panel may not know yet. */
+export const isKey = (key: string): key is Key => key in en;
+
 /** `hass.language` may carry a region ("de-CH"); translations are per language. */
 export const panelLanguage = (hass: HomeAssistant) => {
   const base = hass.language.split("-")[0];

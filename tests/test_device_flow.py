@@ -8,15 +8,22 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 
 from .devices import (
+    ENERGY,
     MAPPING,
+    POWER,
     STATUS,
     add_device,
     add_hub,
     add_printer,
     configure,
     start_add_device,
+    walk_to_consumption,
     walk_to_mapping,
 )
+
+
+def fields(result: Any) -> list[str]:
+    return [str(key) for key in result["data_schema"].schema]
 
 
 def offered(result: Any, target: str = "running") -> list[str]:
@@ -163,6 +170,96 @@ async def test_a_value_mapped_to_two_targets_is_refused(hass: HomeAssistant) -> 
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "value_mapped_twice"}
+
+
+async def test_the_consumption_source_is_energy_power_or_estimate(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+
+    result = await walk_to_consumption(hass, entry)
+
+    assert result["menu_options"] == ["energy", "power", "estimate"]
+    result = await configure(hass, result, {"next_step_id": "energy"})
+    assert fields(result) == ["entity_id", "attribute"]
+
+
+async def test_the_meter_unit_comes_from_the_entity_registry(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    meter = entity_registry.async_get_or_create(
+        "sensor", "plug", "energy", unit_of_measurement="Wh"
+    )
+    hass.states.async_set(meter.entity_id, STATE_UNAVAILABLE)
+    entry = await add_hub(hass)
+
+    result = await walk_to_consumption(hass, entry)
+    result = await configure(hass, result, {"next_step_id": "energy"})
+    result = await configure(hass, result, {"entity_id": meter.entity_id})
+
+    assert result["step_id"] == "price"
+
+
+async def test_a_power_sensor_takes_an_optional_average_power_for_gaps(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(POWER, "0", {"unit_of_measurement": "kW"})
+    entry = await add_hub(hass)
+
+    result = await walk_to_consumption(hass, entry)
+    result = await configure(hass, result, {"next_step_id": "power"})
+    assert fields(result) == ["entity_id", "attribute", "running_power"]
+    result = await configure(hass, result, {"entity_id": POWER})
+
+    assert result["step_id"] == "price"
+
+
+async def test_a_meter_without_a_recognisable_unit_needs_a_conversion_factor(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(ENERGY, "12", {"unit_of_measurement": "pulses"})
+    entry = await add_hub(hass)
+    result = await walk_to_consumption(hass, entry)
+    result = await configure(hass, result, {"next_step_id": "energy"})
+
+    result = await configure(hass, result, {"entity_id": ENERGY})
+    assert result["errors"] == {"entity_id": "unknown_unit"}
+    assert fields(result) == ["entity_id", "attribute", "factor"]
+    result = await configure(hass, result, {"entity_id": ENERGY, "factor": 0.001})
+
+    assert result["step_id"] == "price"
+
+
+async def test_a_power_sensor_must_report_power_not_energy(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(POWER, "12", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    result = await walk_to_consumption(hass, entry)
+    result = await configure(hass, result, {"next_step_id": "power"})
+
+    result = await configure(hass, result, {"entity_id": POWER})
+
+    assert result["errors"] == {"entity_id": "unknown_unit"}
+
+
+async def test_a_meter_attribute_asks_for_its_unit(hass: HomeAssistant) -> None:
+    hass.states.async_set("switch.kobra_plug", "on", {"total_energy": 3.2})
+    entry = await add_hub(hass)
+    result = await walk_to_consumption(hass, entry)
+    result = await configure(hass, result, {"next_step_id": "energy"})
+
+    result = await configure(
+        hass, result, {"entity_id": "switch.kobra_plug", "attribute": "total_energy"}
+    )
+    assert result["step_id"] == "energy_unit"
+    assert offered(result, "unit")[:3] == ["Wh", "kWh", "MWh"]
+    result = await configure(hass, result, {"unit": "pulses"})
+    assert result["errors"] == {"unit": "unknown_unit"}
+    assert fields(result) == ["unit", "factor"]
+    result = await configure(hass, result, {"unit": "kWh"})
+
+    assert result["step_id"] == "price"
 
 
 def suggested(result: Any, field: str) -> Any:

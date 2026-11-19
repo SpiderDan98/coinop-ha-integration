@@ -1,0 +1,53 @@
+{
+  "devices": [
+    {
+      "id": "device-kobra",
+      "name": "Kobra",
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.kobra_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "printing"
+          ],
+          "paused": [
+            "paused"
+          ],
+          "finished": [
+            "finished"
+          ],
+          "cancelled": [
+            "cancelled"
+          ],
+          "ended": [
+            "idle"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "job": {
+          "entity_id": "sensor.kobra_job",
+          "attribute": null
+        },
+        "images": {
+          "thumbnail": null,
+          "camera": null,
+          "snapshot": false
+        },
+        "consumption": {
+          "source": "estimate",
+          "running_power": 120.0,
+          "paused_power": 8.0
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {}
+    }
+  ]
+}

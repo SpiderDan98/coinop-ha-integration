@@ -12,6 +12,9 @@
         "finalised": true,
         "running_seconds": 4500,
         "total": 0.86,
+        "part_count": 4,
+        "cost_per_part": 0.22,
+        "flags": [],
         "cover": {
           "id": "benchy-thumbnail",
           "kind": "thumbnail",
@@ -31,6 +34,11 @@
         "finalised": true,
         "running_seconds": 32400,
         "total": 0.3,
+        "part_count": 1,
+        "cost_per_part": 0.3,
+        "flags": [
+          "fault"
+        ],
         "cover": {
           "id": "helmet-snapshot",
           "kind": "snapshot",
@@ -50,6 +58,9 @@
         "finalised": true,
         "running_seconds": 1800,
         "total": 0.07,
+        "part_count": 1,
+        "cost_per_part": 0.07,
+        "flags": [],
         "cover": null
       }
     ]
@@ -67,6 +78,9 @@
       "finalised": false,
       "running_seconds": 0,
       "total": 0.0,
+      "part_count": 1,
+      "cost_per_part": 0.0,
+      "flags": [],
       "cover": null
     }
   },
@@ -83,6 +97,9 @@
       "finalised": false,
       "running_seconds": 2700,
       "total": 0.03,
+      "part_count": 1,
+      "cost_per_part": 0.03,
+      "flags": [],
       "cover": null
     }
   },
@@ -99,6 +116,9 @@
       "finalised": true,
       "running_seconds": 2700,
       "total": 0.03,
+      "part_count": 1,
+      "cost_per_part": 0.03,
+      "flags": [],
       "cover": null
     }
   }
