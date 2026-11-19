@@ -12,6 +12,14 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 The kind of Device (3D printer, washing machine, …), which determines which Line Items a Run gets by default.
 _Avoid_: Category, device class
 
+**Device Input**:
+A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
+_Avoid_: Sensor mapping, source
+
+**Integration Profile**:
+The known Device Inputs of a specific printer integration, used to fill in a Device's Device Inputs automatically.
+_Avoid_: Preset, adapter, template
+
 **Run**:
 One completed working cycle of a Device, such as a single print job, together with its costs.
 _Avoid_: Job, session, cycle, print
