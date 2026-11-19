@@ -85,6 +85,37 @@ export const shared = css`
     opacity: 0.5;
     cursor: default;
   }
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  .dialog {
+    width: min(480px, 100%);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dialog p {
+    margin: 0;
+  }
+  .dialog dl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 16px;
+    margin: 0;
+  }
+  .dialog dd {
+    margin: 0;
+  }
+  .end {
+    justify-content: flex-end;
+  }
   .no-image {
     display: grid;
     place-items: center;
