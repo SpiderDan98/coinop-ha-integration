@@ -11,6 +11,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .clock import Clock
 from .devices import add_device, add_hub
@@ -146,6 +147,29 @@ async def test_a_first_setup_starts_with_empty_stores(
     assert entry.state is ConfigEntryState.LOADED
     assert value(hass, RUNS) == 0
     assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
+
+
+@pytest.mark.parametrize("store", ["wattbill.runs", "wattbill.live"])
+async def test_data_from_a_newer_major_version_stops_setup_without_writing(
+    hass: HomeAssistant, hass_storage: dict[str, Any], store: str
+) -> None:
+    hass_storage[store] = {
+        "version": 2,
+        "minor_version": 1,
+        "key": store,
+        "data": {"runs": [], "written_by": "a newer WattBill"},
+    }
+    before = wattbill_data(hass_storage)
+    entry = MockConfigEntry(domain="wattbill", title="WattBill")
+    entry.add_to_hass(hass)
+
+    assert not await set_up_again(hass, entry)
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.reason is not None
+    assert store in entry.reason
+    assert entry.data == {}
+    assert wattbill_data(hass_storage) == before
 
 
 async def test_removing_the_hub_deletes_all_stored_data(
