@@ -5,7 +5,28 @@ import { click, mountPanel, query, queryAll, settle, text } from "./render";
 const SUBSCRIBE = "wattbill/runs/subscribe";
 const GET = "wattbill/runs/get";
 const [started, updated, ended] = recorded.changes;
-const cards = (panel: Element) => queryAll(panel, ".kind").map(text);
+/** A Line Item row as a receipt line: "label evidence quantity unit × unit price = amount". */
+const receiptLine = (item: HTMLElement) => {
+  const shown = (selector: string) => {
+    const element = query(item, selector);
+    return element instanceof HTMLInputElement ? element.value : text(element);
+  };
+  return [
+    shown(".label > :first-child"),
+    ...queryAll(item, ".evidence").map(text),
+    shown("[name=quantity]"),
+    shown(".unit"),
+    "×",
+    shown("[name=unit_price]"),
+    "=",
+    shown("[name=amount]"),
+  ].join(" ");
+};
+const cards = (panel: Element) =>
+  queryAll(panel, ".kind").map((card) => [
+    text(query(card, ".between")),
+    ...queryAll(card, ".item").map(receiptLine),
+  ]);
 const endedField = (panel: Element) => query(panel, "input[name=ended]") as HTMLInputElement;
 
 describe("Run page", () => {
@@ -26,9 +47,9 @@ describe("Run page", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
     expect(cards(panel)).toEqual([
-      "Electricity €0.05 Electricity Estimated from average power 0.15 kWh × €0.30 €0.05",
-      "Material €0.31 PLA Basic Black 12.5 g × €0.025 €0.31",
-      "Other €0.50 Nozzle wear 1 pcs × €0.50 €0.50",
+      ["Electricity €0.05", "Electricity Estimated from average power 0.15 kWh × 0.3 = 0.05"],
+      ["Material €0.31", "PLA Basic Black 12.5 g × 0.025 = 0.31"],
+      ["Other €0.50", "Nozzle wear 1 pcs × 0.5 = 0.50"],
     ]);
     expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (4) €0.22");
   });
@@ -46,10 +67,16 @@ describe("Run page", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/helmet" });
 
     expect(cards(panel)).toEqual([
-      "Electricity €0.30 Electricity Estimated from average power · 2 price segments 1.08 kWh × €0.2778 €0.30",
-      "Material €0.00 None",
-      "Other €0.00 None",
+      [
+        "Electricity €0.30",
+        "Electricity Estimated from average power · 2 price segments 1.08 kWh × 0.2778 = 0.30",
+      ],
+      ["Material €0.00"],
+      ["Other €0.00"],
     ]);
+    const [, material, other] = queryAll(panel, ".kind").map(text);
+    expect(material).toBe("Material €0.00 None");
+    expect(other).toBe("Other €0.00 None + Add Other Line Item");
   });
 
   it("leads back to all Runs", async () => {
@@ -103,9 +130,10 @@ describe("Run page", () => {
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/run/benchy" });
 
-    expect(cards(panel)[0]).toBe(
-      "Strom 0,05 € Strom Aus der Durchschnittsleistung geschätzt 0,15 kWh × 0,30 € 0,05 €",
-    );
+    expect(cards(panel)[0]).toEqual([
+      "Strom 0,05 €",
+      "Strom Aus der Durchschnittsleistung geschätzt 0.15 kWh × 0.3 = 0.05",
+    ]);
     expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
   });
 

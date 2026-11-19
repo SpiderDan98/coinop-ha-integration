@@ -4,6 +4,8 @@
 import type { HomeAssistant, Message } from "../src/hass";
 import type { Device, Drop, RunChange, RunDetail, RunSummary } from "../src/api";
 import devicesList from "./fixtures/backend/devices-list.json";
+import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -23,6 +25,10 @@ export const recorded = {
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
+  /** `wattbill/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
+  lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
+  /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
+  lineItemsAdd: lineItemsAdd as { run: RunDetail },
   /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
   summary: (id: string) =>
