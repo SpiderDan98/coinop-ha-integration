@@ -8,5 +8,91 @@
     "abort": {
       "single_instance_allowed": "WattBill ist bereits eingerichtet. Füge weitere Drucker als Geräte zum bestehenden Eintrag hinzu."
     }
+  },
+  "config_subentries": {
+    "device": {
+      "entry_type": "Gerät",
+      "initiate_flow": {
+        "user": "Gerät hinzufügen"
+      },
+      "step": {
+        "user": {
+          "title": "Gerät hinzufügen",
+          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst.",
+          "data": {
+            "name": "Name"
+          }
+        },
+        "status": {
+          "title": "Druckstatus",
+          "description": "Wähle die Entität, die den Status des Druckers meldet. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Status-Entität",
+            "attribute": "Attribut (optional)"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen."
+          }
+        },
+        "mapping": {
+          "title": "Status-Zuordnung",
+          "description": "Ordne jedem Statuswert zu, was er für einen Lauf bedeutet. Ein Lauf beginnt beim ersten Wert für Läuft und endet beim ersten Wert für Fertig, Abgebrochen oder Beendet. Nicht angebotene Werte kannst du eintippen.",
+          "data": {
+            "running": "Läuft",
+            "paused": "Pausiert",
+            "finished": "Fertig",
+            "cancelled": "Abgebrochen",
+            "ended": "Beendet (Ausgang unbekannt)",
+            "fault": "Störung",
+            "ignored": "Ignoriert"
+          },
+          "data_description": {
+            "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn der Drucker nur „druckt / druckt nicht“ meldet."
+          }
+        },
+        "consumption": {
+          "title": "Stromverbrauch",
+          "description": "Wie soll WattBill den Strom bestimmen, den ein Lauf verbraucht?",
+          "menu_options": {
+            "estimate": "Aus Durchschnittsleistung schätzen"
+          }
+        },
+        "estimate": {
+          "title": "Aus Durchschnittsleistung schätzen",
+          "data": {
+            "running_power": "Durchschnittliche Leistung im Betrieb",
+            "paused_power": "Leistung in Pause (optional)"
+          },
+          "data_description": {
+            "running_power": "Die durchschnittliche Leistung über einen ganzen Druck, typisch 80–150 W für einen FDM-Tischdrucker mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt weit über dem echten Durchschnitt.",
+            "paused_power": "Leistung während einer Pause. Leer lassen, um die Betriebsleistung zu verwenden."
+          }
+        },
+        "price": {
+          "title": "Strompreis",
+          "data": {
+            "price": "Preis pro kWh"
+          },
+          "data_description": {
+            "price": "Was du pro kWh zahlst, in {currency}."
+          }
+        }
+      },
+      "error": {
+        "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
+        "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
+        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total_cost": {
+        "name": "Gesamtkosten"
+      },
+      "runs": {
+        "name": "Läufe"
+      }
+    }
   }
 }

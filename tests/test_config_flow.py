@@ -1,6 +1,6 @@
 """Adding WattBill: a confirmation-only hub flow, allowed once per installation."""
 
-from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
+from homeassistant.config_entries import SOURCE_USER, ConfigEntryState, FlowType
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -24,6 +24,22 @@ async def test_confirmation_creates_the_hub_entry(hass: HomeAssistant) -> None:
     assert entry.title == "WattBill"
     assert entry.data == {}
     assert entry.state is ConfigEntryState.LOADED
+
+
+async def test_confirmation_chains_into_add_device(hass: HomeAssistant) -> None:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+
+    flow_type, flow_id = result["next_flow"]
+    assert flow_type is FlowType.CONFIG_SUBENTRIES_FLOW
+    [entry] = hass.config_entries.async_entries(DOMAIN)
+    [flow] = hass.config_entries.subentries.async_progress()
+    assert flow["flow_id"] == flow_id
+    assert flow["handler"] == (entry.entry_id, "device")
+    assert flow["step_id"] == "user"
 
 
 async def test_second_hub_is_refused(hass: HomeAssistant) -> None:

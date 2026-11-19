@@ -2,3 +2,5 @@
 
 DOMAIN = "wattbill"
 NAME = "WattBill"
+
+SUBENTRY_DEVICE = "device"

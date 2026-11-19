@@ -50,3 +50,17 @@ async def test_hub_flow_texts_load_in_home_assistant(
     prefix = f"component.{DOMAIN}.config"
     assert translations[f"{prefix}.step.user.description"]
     assert translations[f"{prefix}.abort.single_instance_allowed"]
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+async def test_add_device_texts_load_in_home_assistant(
+    hass: HomeAssistant, language: str
+) -> None:
+    translations = await async_get_translations(
+        hass, language, "config_subentries", [DOMAIN]
+    )
+
+    prefix = f"component.{DOMAIN}.config_subentries.device"
+    assert translations[f"{prefix}.initiate_flow.user"]
+    assert translations[f"{prefix}.step.estimate.data_description.running_power"]
+    assert translations[f"{prefix}.error.no_ending_value"]
