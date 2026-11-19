@@ -9,6 +9,7 @@ from . import ha_device, panel, websocket
 from .catalog import Catalog
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
+from .device_settings import DeviceSettings
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
 from .store import RunStore, WattBillStores
@@ -33,10 +34,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         for subentry in entry.subentries.values()
         if subentry.subentry_type == SUBENTRY_DEVICE
     ]
+    settings = DeviceSettings(
+        stores["device_settings"],
+        data["device_settings"],
+        (device.device_id for device in devices),
+    )
+    await settings.async_prune()
     entry.runtime_data = WattBill(
         book=book,
         catalog=Catalog(stores["catalog"], data["catalog"], book.uses_material),
         devices=devices,
+        settings=settings,
         trackers=[DeviceTracker(hass, book, device) for device in devices],
     )
     for device in devices:
@@ -49,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     )
     await panel.async_register(hass, entry)
     for tracker in entry.runtime_data.trackers:
-        tracker.async_start()
+        await tracker.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     entry.async_on_unload(ha_device.async_track_renames(hass, entry))
     return True

@@ -40,7 +40,7 @@ describe("Materials tab", () => {
   it("opens from the toolbar", async () => {
     const panel = await mountPanel(recordedBackend());
 
-    await click(panel, query(panel, "a.tab"));
+    await click(panel, query(panel, `a.tab[href$="/materials"]`));
 
     expect(location.pathname).toBe("/wattbill/materials");
     expect(text(query(panel, "a.tab.on"))).toBe("Materials");

@@ -6,7 +6,7 @@ Each area module lists its handlers in `COMMANDS`, built with `command.command`.
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
-from . import catalog, materials, runs
+from . import catalog, devices, materials, runs
 from .catalog import async_announce as async_announce_catalog
 from .runs import async_announce
 
@@ -15,6 +15,6 @@ __all__ = ["async_announce", "async_announce_catalog", "async_setup"]
 
 @callback
 def async_setup(hass: HomeAssistant) -> None:
-    for module in (runs, materials, catalog):
+    for module in (runs, devices, materials, catalog):
         for handler in module.COMMANDS:
             websocket_api.async_register_command(hass, handler)

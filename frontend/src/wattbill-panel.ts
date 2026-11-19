@@ -1,17 +1,20 @@
 // The WattBill sidebar panel. HA sets `hass`, `narrow`, `route` and `panel`; the
-// panel keeps the Runs and the catalogue subscription open while it is shown and
-// routes by `route.path`.
+// panel keeps the Runs and the catalogue subscription open while it is shown, loads
+// the Devices, and routes by `route.path`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
+  listDevices,
   subscribeCatalog,
   subscribeRuns,
   type Catalog,
+  type Device,
   type RunSummary,
   type RunsEvent,
 } from "./api";
 import { followLink, type HomeAssistant, type PanelInfo, type PanelRoute } from "./hass";
 import { localize } from "./localize";
+import "./devices-page";
 import "./materials-page";
 import "./run-gallery";
 import "./run-page";
@@ -20,13 +23,12 @@ import { shared } from "./styles";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
-// Toolbar tabs, each at `/<tab>`.
-const TABS = ["materials"] as const;
+const TABS = ["materials", "devices"] as const;
 
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
   if (section === "run" && id) return { name: "run" as const, runId: decodeURIComponent(id) };
-  const tab = TABS.find((candidate) => candidate === section);
+  const tab = TABS.find((name) => name === section);
   return tab ? { name: tab } : { name: "overview" as const };
 };
 
@@ -43,7 +45,10 @@ export class WattbillPanel extends LitElement {
   /** Undefined until the first catalogue event arrives. */
   @state() private catalog?: Catalog;
   @state() private catalogFailed = false;
+  /** Undefined until loaded, null if loading failed. */
+  @state() private devices?: Device[] | null;
   private unsubscribe?: Promise<() => Promise<void>>[];
+  private devicesRequest = 0;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -70,6 +75,8 @@ export class WattbillPanel extends LitElement {
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("hass") && !this.unsubscribe && this.isConnected) this.subscribe();
+    // Devices change in HA's own settings, so the tab reads them afresh.
+    else if (changed.get("route") && page(this.route).name === "devices") void this.loadDevices();
   }
 
   private subscribe() {
@@ -86,6 +93,13 @@ export class WattbillPanel extends LitElement {
         return async () => {};
       }),
     ];
+    void this.loadDevices();
+  }
+
+  private async loadDevices() {
+    const request = ++this.devicesRequest;
+    const devices = await listDevices(this.hass).catch(() => null);
+    if (request === this.devicesRequest) this.devices = devices;
   }
 
   private apply(event: RunsEvent) {
@@ -97,6 +111,9 @@ export class WattbillPanel extends LitElement {
     if (event.change === "deleted") runs.delete(event.run.id);
     else runs.set(event.run.id, event.run);
     this.runs = runs;
+    // A Device added or removed since the Devices were loaded.
+    if (this.devices && !this.devices.some((device) => device.id === event.run.device_id))
+      void this.loadDevices();
   }
 
   override render() {
@@ -119,13 +136,14 @@ export class WattbillPanel extends LitElement {
         }
         <nav class="title">
           ${
-            current.name === "run"
-              ? html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a
-                  ><span class="muted"> › </span
-                  ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`
-              : current.name === "overview"
-                ? "WattBill"
-                : html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>`
+            current.name === "overview"
+              ? "WattBill"
+              : html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>${
+                    current.name === "run"
+                      ? html`<span class="muted"> › </span
+                          ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`
+                      : nothing
+                  }`
           }
         </nav>
         <nav class="tabs">
@@ -144,7 +162,7 @@ export class WattbillPanel extends LitElement {
     `;
   }
 
-  private renderPage(current: ReturnType<typeof page>, run?: RunSummary) {
+  private renderPage(current: ReturnType<typeof page>, run: RunSummary | undefined) {
     const t = localize(this.hass);
     if (current.name === "materials") {
       return this.catalogFailed
@@ -155,19 +173,29 @@ export class WattbillPanel extends LitElement {
             ?narrow=${this.narrow}
           ></wattbill-materials-page>`;
     }
+    if (current.name === "devices") {
+      return html`<wattbill-devices-page
+        .hass=${this.hass}
+        .devices=${this.devices}
+        ?narrow=${this.narrow}
+      ></wattbill-devices-page>`;
+    }
     if (this.failed) return html`<p class="muted">${t("runs.error")}</p>`;
     if (!this.runs) return html`<p class="muted">${t("runs.loading")}</p>`;
+    const devices = this.devices ?? undefined;
     return current.name === "run"
       ? html`<wattbill-run-page
           .hass=${this.hass}
           .runId=${current.runId}
           .summary=${run}
+          .devices=${devices}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-page>`
       : html`<wattbill-run-gallery
           .hass=${this.hass}
           .runs=${[...this.runs.values()]}
+          .devices=${devices}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-gallery>`;
@@ -198,13 +226,6 @@ export class WattbillPanel extends LitElement {
         background: var(--app-header-background-color, var(--primary-background-color, #fafafa));
         color: var(--app-header-text-color, var(--primary-text-color));
       }
-      .title {
-        font-size: 20px;
-        display: flex;
-        gap: 6px;
-        min-width: 0;
-        white-space: nowrap;
-      }
       .tabs {
         display: flex;
         align-self: stretch;
@@ -215,14 +236,20 @@ export class WattbillPanel extends LitElement {
         display: flex;
         align-items: center;
         padding: 0 14px;
-        color: inherit;
-        opacity: 0.75;
-        border-bottom: 2px solid transparent;
         white-space: nowrap;
+        color: var(--secondary-text-color);
+        border-bottom: 2px solid transparent;
       }
       .tab.on {
-        opacity: 1;
-        border-bottom-color: currentColor;
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+      }
+      .title {
+        font-size: 20px;
+        display: flex;
+        gap: 6px;
+        min-width: 0;
+        white-space: nowrap;
       }
       .menu {
         border: 0;

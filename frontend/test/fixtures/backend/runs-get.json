@@ -15,6 +15,7 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -85,6 +86,7 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -137,6 +139,7 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -183,6 +186,11 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120.0,
+        "paused_power": 8.0
+      },
       "line_items": [
         {
           "id": "print-live-electricity",

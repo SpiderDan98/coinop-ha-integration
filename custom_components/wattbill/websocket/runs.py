@@ -57,8 +57,10 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
 
 
 def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
+    # Meter readings are long on an open Run and of no use to the panel.
+    stored = {key: value for key, value in run.as_dict().items() if key != "readings"}
     return {
-        **run.as_dict(),
+        **stored,
         **_summary(run, now, decimals),
         "line_items": [
             item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
