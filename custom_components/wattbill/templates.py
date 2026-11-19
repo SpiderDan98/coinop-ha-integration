@@ -70,6 +70,21 @@ class LineItemTemplate:
         )
 
 
+def template_fields(item: LineItem) -> dict[str, Any]:
+    """A template's fields from the Line Item's current values.
+
+    Without a quantity the amount stands, so it becomes the price of one.
+    """
+    flat = not item.quantity
+    return {
+        "label": item.label,
+        "unit": item.unit,
+        "unit_price": item.amount if flat else item.unit_price,
+        "default_quantity": 1 if flat else item.quantity,
+        "basis": item.basis or QuantityBasis.ENTERED,
+    }
+
+
 def count_running_hours(items: Iterable[LineItem], run: Run, until: datetime) -> None:
     """Set the running-hours quantities to the Run's running time up to `until`."""
     hours = running_time(run, until).total_seconds() / 3600

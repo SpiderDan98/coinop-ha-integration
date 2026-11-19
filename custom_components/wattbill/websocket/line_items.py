@@ -1,6 +1,7 @@
-"""Line Items of a Run for the panel: override, reset, add and delete.
+"""Line Items of a Run for the panel: override, reset, add, delete, save as template.
 
-Every command answers with the Run in full, as `wattbill/runs/get` does.
+Every command answers with the Run in full, as `wattbill/runs/get` does, except
+saving as a template, which answers with the new template.
 """
 
 import math
@@ -14,6 +15,7 @@ from homeassistant.util.ulid import ulid_now
 from custom_components.wattbill.models import VALUES, LineItem, LineItemKind, Run
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
+from custom_components.wattbill.templates import template_fields
 
 from .command import command
 from .runs import _find, _send_run, _text
@@ -31,9 +33,13 @@ _PRICES = {vol.Optional("unit_price"): _number, vol.Optional("amount"): _number}
 
 
 def _find_item(
-    connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+    *,
+    unlocked: bool = True,
 ) -> tuple[Run, LineItem] | None:
-    """The Run and the unlocked Line Item the message names; answers the error if not."""
+    """The Run and the (unlocked) Line Item the message names; answers the error if not."""
     if (run := _find(connection, msg, wattbill)) is None:
         return None
     item = next((i for i in run.line_items if i.id == msg["line_item_id"]), None)
@@ -42,7 +48,7 @@ def _find_item(
             msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item with this id"
         )
         return None
-    if run.locked(item):
+    if unlocked and run.locked(item):
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "Live until the Run is final"
         )
@@ -189,6 +195,37 @@ async def _add_template(
     _send_run(hass, connection, msg["id"], run)
 
 
+@command(
+    {
+        vol.Required("type"): "wattbill/line_items/save_as_template",
+        **_ITEM,
+        vol.Optional("label"): str,
+    }
+)
+async def _save_as_template(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+) -> None:
+    """A new template from the Line Item's current values, under `label` if given.
+
+    Computed Line Items have no label of their own, so they need one.
+    """
+    if (found := _find_item(connection, msg, wattbill, unlocked=False)) is None:
+        return
+    _, item = found
+    if (label := _text(msg.get("label")) or item.label) is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_INVALID_FORMAT, "A template needs a label"
+        )
+        return
+    template = await wattbill.catalog.async_create_template(
+        template_fields(item) | {"label": label}
+    )
+    connection.send_result(msg["id"], {"template": template.as_dict()})
+
+
 @command({vol.Required("type"): "wattbill/line_items/delete", **_ITEM})
 async def _delete(
     hass: HomeAssistant,
@@ -209,4 +246,4 @@ async def _delete(
     _send_run(hass, connection, msg["id"], run)
 
 
-COMMANDS = (_update, _reset, _add, _add_template, _delete)
+COMMANDS = (_update, _reset, _add, _add_template, _save_as_template, _delete)

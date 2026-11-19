@@ -9,7 +9,7 @@ import pytest
 from .clock import Clock
 from .devices import add_hub
 from .stored import place_runs, stored_run
-from .test_line_items import OTHER_COST, open_run, printed
+from .test_line_items import OTHER_COST, add_other, open_run, printed
 from .test_persistence import restart
 from .test_runs import set_status, value
 from .websocket import PanelClient
@@ -215,6 +215,90 @@ async def test_running_hours_update_live_and_freeze_at_run_end(
         False,
     )
     assert value(hass, OTHER_COST) == pytest.approx(0.15)
+
+
+async def save(panel: PanelClient, run: Any, item: Any, **fields: Any) -> Any:
+    result = await panel.call(
+        "wattbill/line_items/save_as_template",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        **fields,
+    )
+    return {key: value for key, value in result["template"].items() if key != "id"}
+
+
+async def test_any_line_item_is_saved_as_a_template_with_its_current_values(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run = await printed(hass, clock, panel)
+    [electricity] = run["line_items"]
+    labour = await add_other(
+        panel, run, label="Labour", quantity=0.5, unit="h", unit_price=15
+    )
+    await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=labour["id"],
+        quantity=0.75,
+    )
+    flat = await add_other(panel, run, label="Packaging", quantity=None, amount=0.5)
+    wear = await add_template(panel, run["id"], await create(panel, **WEAR))
+
+    saved = [
+        await save(panel, run, labour),
+        await save(panel, run, flat),
+        await save(panel, run, wear),
+        await save(panel, run, electricity, label="Electricity"),
+    ]
+
+    assert saved == [
+        {
+            "label": "Labour",
+            "unit": "h",
+            "unit_price": 15,
+            "default_quantity": 0.75,
+            "basis": "entered",
+        },
+        {
+            "label": "Packaging",
+            "unit": "",
+            "unit_price": 0.5,
+            "default_quantity": 1,
+            "basis": "entered",
+        },
+        WEAR | {"default_quantity": pytest.approx(2)},
+        {
+            "label": "Electricity",
+            "unit": "kWh",
+            "unit_price": 1,
+            "default_quantity": pytest.approx(0.2),
+            "basis": "entered",
+        },
+    ]
+    assert len(catalogue(hass_storage)) == 5
+
+
+async def test_a_line_item_without_a_label_needs_one_to_be_saved(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    run = await printed(hass, clock, panel)
+    [electricity] = run["line_items"]
+
+    errors = [
+        await panel.error(
+            "wattbill/line_items/save_as_template",
+            run_id=run["id"],
+            line_item_id=electricity["id"],
+            **fields,
+        )
+        for fields in ({}, {"label": " "})
+    ]
+    missing = await panel.error(
+        "wattbill/line_items/save_as_template", run_id=run["id"], line_item_id="nope"
+    )
+
+    assert [error["code"] for error in errors] == ["invalid_format"] * 2
+    assert missing["code"] == "not_found"
 
 
 async def test_a_template_is_added_only_to_runs_and_from_templates_that_exist(
