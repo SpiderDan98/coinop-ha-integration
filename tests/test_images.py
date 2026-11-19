@@ -1,10 +1,13 @@
 """Run images: the Thumbnail and the Snapshot, stored re-encoded and served privately."""
 
+from collections.abc import Callable
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 import pytest
+from pytest_homeassistant_custom_component.common import MockUser
 
 from .clock import Clock
 from .devices import add_device, add_hub, configure, reconfigure, start_reconfigure
@@ -19,8 +22,8 @@ from .images import (
     picture,
 )
 from .test_device_flow import suggested
-from .test_lifecycle import JOB, start_job, start_wattbill, stop_wattbill
-from .test_runs import set_status
+from .test_lifecycle import JOB, at, start_job, start_wattbill, stop_wattbill
+from .test_runs import set_status, stored_runs
 from .websocket import PanelClient
 
 
@@ -381,3 +384,161 @@ async def test_no_snapshot_for_a_run_closed_by_the_next_job(
 
     assert len((await panel.call("wattbill/runs/list"))["runs"]) == 2
     assert camera.requests == 0
+
+
+async def only_run(panel: PanelClient) -> dict[str, Any]:
+    summary: dict[str, Any]
+    [summary] = (await panel.call("wattbill/runs/list"))["runs"]
+    return summary
+
+
+async def test_the_cover_image_is_the_thumbnail_before_the_snapshot(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture("red"))
+    await add_camera(hass, picture("blue"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL, camera=CAMERA)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    cover = (await only_run(panel))["cover"]
+
+    assert [i["kind"] for i in await run_images(panel)] == ["thumbnail", "snapshot"]
+    assert cover["kind"] == "thumbnail"
+    assert colour(await http.content(cover["tile_url"])) == "red"
+
+
+async def test_without_a_thumbnail_the_snapshot_is_the_cover_image(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    await add_camera(hass, picture("blue"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, camera=CAMERA)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    assert (await only_run(panel))["cover"]["kind"] == "snapshot"
+
+
+async def test_a_run_without_images_has_no_cover_image_and_no_flag(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    await add_camera(hass)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL, camera=CAMERA)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=1)
+
+    run = await only_run(panel)
+    assert run["cover"] is None
+    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    assert detail["flags"] == []
+
+
+async def test_images_are_served_to_admins_only(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    panel: PanelClient,
+    connect_http: Callable[[MockUser], HttpClient],
+    hass_read_only_user: MockUser,
+) -> None:
+    await add_thumbnail(hass, picture())
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    [image] = await run_images(panel)
+
+    status, _ = await connect_http(hass_read_only_user).get(image["url"])
+
+    assert status == HTTPStatus.UNAUTHORIZED
+
+
+async def test_unknown_images_are_not_found(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture())
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    [image] = await run_images(panel)
+    run_id = (await only_run(panel))["id"]
+
+    for url in (
+        f"/api/wattbill/runs/{run_id}/images/unknown",
+        f"/api/wattbill/runs/unknown/images/{image['id']}",
+        f"{image['url']}/huge",
+    ):
+        assert (await http.get(url))[0] == HTTPStatus.NOT_FOUND, url
+    traversal = f"/api/wattbill/runs/{run_id}/images/..%2F..%2Fconfiguration.yaml"
+    assert (await http.get(traversal))[0] >= HTTPStatus.BAD_REQUEST
+
+
+async def test_runs_keep_only_image_metadata_never_a_url(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    hass_storage: dict[str, Any],
+) -> None:
+    await add_thumbnail(hass, picture())
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    [image] = run["images"]
+    assert image == {"id": image["id"], "kind": "thumbnail", "created": at()}
+
+
+async def test_images_outlive_a_restart(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture("green"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    await stop_wattbill(hass, entry)
+    await start_wattbill(hass, entry)
+
+    assert await thumbnail_colour(panel, http) == "green"
+
+
+async def test_files_no_run_refers_to_are_removed_at_startup(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    hass_storage: dict[str, Any],
+    panel: PanelClient,
+    http: HttpClient,
+) -> None:
+    await add_thumbnail(hass, picture())
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    for _ in range(2):
+        await set_status(hass, "printing")
+        await clock.advance(hours=1)
+        await set_status(hass, "finished")
+    await stop_wattbill(hass, entry)
+    kept, _dropped = stored_runs(hass_storage)
+    hass_storage["wattbill.runs"]["data"]["runs"] = [kept]
+    [image] = kept["images"]
+    leftover = files / "images" / kept["id"] / "01KF000000000000000LEFTOVER.webp"
+    leftover.write_bytes(b"webp")
+
+    await start_wattbill(hass, entry)
+
+    assert {path.name for path in stored_files(files)} == {
+        f"{image['id']}.webp",
+        f"{image['id']}.tile.webp",
+    }
+    assert await thumbnail_colour(panel, http) == "red"
