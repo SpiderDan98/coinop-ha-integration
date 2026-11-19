@@ -263,18 +263,16 @@ class LineItem:
         """Take the user's quantity, unit price and/or amount.
 
         An amount back-computes the unit price; with an empty or zero quantity
-        the amount stands.
+        that amount stands.
         """
         if self.is_computed and self.computed is None:
             self.computed = self.values()
         for name, value in values.items():
             setattr(self, name, value)
-        if not self.quantity:
-            return
-        if "amount" in values:
+        if "amount" not in values:
+            self.amount = (self.quantity or 0.0) * self.unit_price
+        elif self.quantity:
             self.unit_price = self.amount / self.quantity
-        else:
-            self.amount = self.quantity * self.unit_price
 
     def recompute(self, quantity: float) -> None:
         """A new computed quantity at the computed unit price; overrides still count."""
