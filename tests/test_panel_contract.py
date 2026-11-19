@@ -1,7 +1,7 @@
 """Records what the panel receives, as canned responses for the panel's own tests."""
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -16,6 +16,10 @@ from .websocket import PanelClient
 DAY = timedelta(days=1)
 
 
+def image(image_id: str, kind: str, created: datetime) -> dict[str, Any]:
+    return {"id": image_id, "kind": kind, "created": created.isoformat()}
+
+
 def history() -> list[dict[str, Any]]:
     benchy_start = CLOCK_START - 3 * DAY
     helmet_start = CLOCK_START - 2 * DAY
@@ -28,6 +32,10 @@ def history() -> list[dict[str, Any]]:
             part_count=4,
             note="Four on one plate",
             tags=["Gift"],
+            images=[
+                image("benchy-thumbnail", "thumbnail", benchy_start),
+                image("benchy-snapshot", "snapshot", benchy_start + DAY / 19.2),
+            ],
             line_items=[
                 electricity(0.15, 0.30, benchy_start, benchy_start + DAY / 19.2),
                 line_item(
@@ -50,6 +58,7 @@ def history() -> list[dict[str, Any]]:
             outcome="failed",
             flags=["fault"],
             tags=["Cosplay helmet", "Gift"],
+            images=[image("helmet-snapshot", "snapshot", helmet_start + DAY * 9 / 24)],
             line_items=[
                 electricity(0.6, 0.30, helmet_start, helmet_start + DAY / 4)
                 | {

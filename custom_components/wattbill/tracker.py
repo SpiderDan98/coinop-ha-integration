@@ -32,6 +32,7 @@ from .cost.electricity import electricity_line_item, price_gap
 from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading, price_reading
 from .device_settings import TAGS_FOR_NEW_RUNS, DeviceSettings
+from .images import DeviceImages
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
@@ -62,11 +63,13 @@ class DeviceTracker:
         book: RunBook,
         config: DeviceConfig,
         settings: DeviceSettings,
+        images: DeviceImages,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
         self._settings = settings
+        self._images = images
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
@@ -105,7 +108,12 @@ class DeviceTracker:
             await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
+        self._images.async_start()
+        open_run = self._book.open_run(self._config.device_id)
         self._apply(self._hass.states.get(self._config.status_entity_id))
+        # A Run still open after a restart or reconfigure gets the current Thumbnail.
+        if open_run and self._book.open_run(self._config.device_id) is open_run:
+            self._images.async_copy_thumbnail(open_run)
 
     async def _async_follow_device(self, run: Run) -> None:
         """Apply the Device's price and average power to the open Run from now on.
@@ -187,6 +195,7 @@ class DeviceTracker:
             self._unsubscribe.pop()()
         while self._final_waits:
             self._final_waits.popitem()[1]()
+        self._images.async_stop()
 
     @callback
     def _on_status(self, event: Event[EventStateChangedData]) -> None:
@@ -285,7 +294,10 @@ class DeviceTracker:
             and job_name != run.job_name
         ):
             run.end_reconstructed = True
-            self._end(run, run.last_seen or run.started, Outcome.UNKNOWN)
+            # The camera already shows the next print.
+            self._end(
+                run, run.last_seen or run.started, Outcome.UNKNOWN, snapshot=False
+            )
             run = None
         if run is None:
             if target is Target.RUNNING:
@@ -343,6 +355,7 @@ class DeviceTracker:
         self._open_prices(run, at)
         self._refresh(run, at)
         self._book.async_start(run)
+        self._images.async_copy_thumbnail(run)
 
     def _open_prices(self, run: Run, at: datetime) -> None:
         """The price at Run start; without one, the last valid price before it."""
@@ -370,13 +383,17 @@ class DeviceTracker:
         done.set_result(None)
         return done
 
-    def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Future[None]:
+    def _end(
+        self, run: Run, at: datetime, outcome: Outcome, *, snapshot: bool = True
+    ) -> asyncio.Future[None]:
         """End the Run now; the result is done once it is finalised."""
         run.ended = at
         if run.pauses and run.pauses[-1].end is None:
             run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
+        if snapshot:
+            self._images.async_run_ended(run)
         if _meter(run.consumption):
             self._book.async_update(run)
         return self._await_final_report(run)

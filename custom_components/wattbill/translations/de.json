@@ -23,6 +23,7 @@
           "menu_options": {
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
+            "images": "Bilder",
             "consumption": "Verbrauchsquelle",
             "price": "Strompreis",
             "save": "Speichern"
@@ -82,6 +83,19 @@
           "data_description": {
             "entity_id": "Ohne Auftragsnamen setzt ein Druck, der bei offenem Lauf wieder startet, immer diesen Lauf fort.",
             "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Druckereignis-Entität."
+          }
+        },
+        "images": {
+          "title": "Bilder",
+          "description": "Wähle optional, woher die Bilder eines Laufs kommen. Das Vorschaubild wird kopiert, solange der Lauf offen ist; das Kamerabild nimmt die Kamera am Ende des Laufs auf. Bilder werden verkleinert und ohne Metadaten gespeichert.",
+          "data": {
+            "thumbnail": "Vorschaubild-Entität (optional)",
+            "camera": "Kamera (optional)",
+            "snapshot": "Kamerabild am Ende eines Laufs aufnehmen"
+          },
+          "data_description": {
+            "thumbnail": "Die Bild-Entität der Drucker-Integration, die das gedruckte Modell zeigt.",
+            "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
           }
         },
         "consumption": {

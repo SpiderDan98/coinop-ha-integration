@@ -82,7 +82,7 @@ class RunBook:
         self._announce(RunChange.ENDED, run)
 
     async def async_correct(self, run: Run) -> None:
-        """Save the user's correction of a Run; it announces UPDATED, never ENDED."""
+        """Save a change outside the lifecycle (a correction, an image); announces UPDATED."""
         await self._save(run)
         self._announce(RunChange.UPDATED, run)
 

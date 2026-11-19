@@ -6,6 +6,15 @@ export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
 export type Kind = "electricity" | "material" | "other";
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 
+/** Fetched with `hass.fetchWithAuth`: the image views need authentication. */
+export interface RunImage {
+  id: string;
+  kind: "thumbnail" | "snapshot" | "upload";
+  created: string;
+  url: string;
+  tile_url: string;
+}
+
 export interface RunSummary {
   id: string;
   device_id: string;
@@ -23,6 +32,7 @@ export interface RunSummary {
   flags: string[];
   /** Alphabetical. */
   tags: string[];
+  cover: RunImage | null;
 }
 
 export interface LineItem {
@@ -41,6 +51,8 @@ export interface RunDetail extends RunSummary {
   job_name: string | null;
   note: string | null;
   line_items: LineItem[];
+  /** Thumbnail, Snapshot, then uploads by time. */
+  images: RunImage[];
   subtotals: Record<Kind, number>;
 }
 
@@ -51,6 +63,8 @@ export interface Device {
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
     job: { entity_id: string | null; attribute: string | null };
+    /** Missing for Devices added before images existed. */
+    images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
       | { source: "estimate"; running_power: number; paused_power: number | null }
       | { source: "energy"; entity_id: string; attribute: string | null }

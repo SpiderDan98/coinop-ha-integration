@@ -49,6 +49,7 @@ async def test_each_device_lists_its_ha_side_settings(
                     "ignored": [],
                 },
                 "job": {"entity_id": "sensor.kobra_job", "attribute": None},
+                "images": {"thumbnail": None, "camera": None, "snapshot": False},
                 "consumption": {
                     "source": "estimate",
                     "running_power": 120,

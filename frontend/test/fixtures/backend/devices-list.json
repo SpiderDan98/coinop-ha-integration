@@ -32,6 +32,11 @@
           "entity_id": "sensor.kobra_job",
           "attribute": null
         },
+        "images": {
+          "thumbnail": null,
+          "camera": null,
+          "snapshot": false
+        },
         "consumption": {
           "source": "estimate",
           "running_power": 120.0,

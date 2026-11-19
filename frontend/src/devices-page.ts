@@ -87,6 +87,19 @@ export class DevicesPage extends LitElement {
         <dd>${input(ha.status, t)}</dd>
         <dt>${t("device.job")}</dt>
         <dd>${input(ha.job, t)}</dd>
+        <dt>${t("device.thumbnail")}</dt>
+        <dd>${ha.images?.thumbnail ?? t("device.not_used")}</dd>
+        <dt>${t("device.camera")}</dt>
+        <dd>
+          ${
+            ha.images?.camera
+              ? html`<div>${ha.images.camera}</div>
+                  <div class="muted small">
+                    ${t(ha.images.snapshot ? "device.snapshot_on" : "device.snapshot_off")}
+                  </div>`
+              : t("device.not_used")
+          }
+        </dd>
         <dt>${t("device.consumption")}</dt>
         <dd class="consumption">
           <div>${t(`consumption.${ha.consumption.source}`)}</div>
