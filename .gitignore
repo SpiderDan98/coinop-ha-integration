@@ -8,3 +8,6 @@ __pycache__/
 .coverage
 htmlcov/
 node_modules/
+
+# Panel bundle, built from frontend/
+custom_components/wattbill/frontend/

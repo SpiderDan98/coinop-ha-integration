@@ -2,9 +2,11 @@
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 
-from . import ha_device
-from .const import SUBENTRY_DEVICE
+from . import ha_device, panel, websocket
+from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
@@ -12,6 +14,12 @@ from .store import RunStore, WattBillStores
 from .tracker import DeviceTracker
 
 PLATFORMS = [Platform.EVENT, Platform.SENSOR]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    websocket.async_setup(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> bool:
@@ -33,6 +41,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         ha_device.async_register(hass, entry, device)
         await book.async_rename_device(device.device_id, device.name)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(websocket.async_announce(hass, book))
+    await panel.async_register(hass, entry)
     for tracker in entry.runtime_data.trackers:
         tracker.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))

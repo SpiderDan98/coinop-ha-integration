@@ -1,9 +1,11 @@
 {
   "domain": "wattbill",
   "name": "WattBill",
+  "after_dependencies": ["frontend", "panel_custom"],
   "categories": ["energy.meters_monitoring", "computers_network.printers"],
   "codeowners": ["@SpiderDan98"],
   "config_flow": true,
+  "dependencies": ["http", "websocket_api"],
   "documentation": "https://github.com/SpiderDan98/wattbill-ha-integration",
   "integration_type": "hub",
   "iot_class": "calculated",
