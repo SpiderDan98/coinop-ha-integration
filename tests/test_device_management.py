@@ -8,7 +8,8 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
 from .clock import Clock
-from .devices import add_device, add_hub, add_printer
+from .devices import ENERGY, add_device, add_hub, add_printer
+from .test_measured import electricity, set_meter
 from .test_persistence import live_runs, restart
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
@@ -103,6 +104,50 @@ async def test_removing_a_device_ends_its_open_run_as_unknown(
     assert run["outcome"] == "unknown"
     assert run["ended"] == clock.now().isoformat()
     assert run["line_items"][0]["amount"] == pytest.approx(0.1)
+    assert live_runs(hass_storage) == []
+
+
+async def add_metered(hass: HomeAssistant) -> tuple[ConfigEntry, ConfigSubentry]:
+    await set_meter(hass, 10.0)
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, source="energy", meter={"entity_id": ENERGY})
+    return entry, kobra
+
+
+async def test_removing_a_device_finalises_a_run_waiting_for_its_final_report(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry, kobra = await add_metered(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.3)
+    await clock.advance(minutes=1)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=1)
+
+    await remove(hass, entry, kobra)
+
+    [run] = stored_runs(hass_storage)
+    assert (run["outcome"], run["finalised"]) == ("completed", True)
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
+    assert live_runs(hass_storage) == []
+
+
+async def test_removing_a_device_does_not_wait_for_the_meters_final_report(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry, kobra = await add_metered(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.3)
+    await clock.advance(minutes=1)
+
+    await remove(hass, entry, kobra)
+
+    [run] = stored_runs(hass_storage)
+    assert (run["outcome"], run["finalised"]) == ("unknown", True)
+    assert run["ended"] == clock.now().isoformat()
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
     assert live_runs(hass_storage) == []
 
 
