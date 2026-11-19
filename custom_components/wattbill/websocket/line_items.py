@@ -10,11 +10,18 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 from homeassistant.util.ulid import ulid_now
 
+from custom_components.wattbill.cost.material import (
+    GRAM,
+    MILLILITRE,
+    change_material,
+    material_line_item,
+)
 from custom_components.wattbill.models import VALUES, LineItem, LineItemKind, Run
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
 from .command import command
+from .materials import pickable
 from .runs import _find, _send_run, _text
 
 
@@ -75,6 +82,7 @@ def _allowed(
         vol.Optional("unit"): str,
         vol.Optional("quantity"): _QUANTITY,
         **_PRICES,
+        vol.Optional("material_id"): str,
     }
 )
 async def _update(
@@ -83,17 +91,25 @@ async def _update(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
+    """A new Material re-prices the Line Item first (`change_material`)."""
     if (found := _find_item(connection, msg, wattbill)) is None:
         return
     run, item = found
-    if "unit" in msg and item.is_computed:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_ALLOWED, "WattBill sets this unit"
-        )
-        return
+    material_item = item.kind is LineItemKind.MATERIAL
+    for field, refused, message in (
+        ("unit", item.is_computed or material_item, "WattBill sets this unit"),
+        ("material_id", not material_item, "Only Material Line Items have one"),
+    ):
+        if field in msg and refused:
+            connection.send_error(msg["id"], websocket_api.ERR_NOT_ALLOWED, message)
+            return
     values = {name: msg[name] for name in VALUES if name in msg}
     if not _allowed(connection, msg, item, values):
         return
+    if "material_id" in msg:
+        if not (material := pickable(connection, msg, wattbill, msg["material_id"])):
+            return
+        change_material(item, material)
     if "label" in msg:
         item.label = _text(msg["label"])
     if "unit" in msg:
@@ -125,11 +141,15 @@ async def _reset(
     {
         vol.Required("type"): "wattbill/line_items/add",
         vol.Required("run_id"): str,
-        vol.Required("kind"): vol.All(vol.Coerce(LineItemKind), LineItemKind.OTHER),
+        vol.Required("kind"): vol.All(
+            vol.Coerce(LineItemKind),
+            vol.In([LineItemKind.OTHER, LineItemKind.MATERIAL]),
+        ),
         vol.Optional("label"): vol.Any(None, str),
-        vol.Optional("unit", default=""): str,
-        vol.Optional("quantity", default=1): _QUANTITY,
+        vol.Optional("unit"): str,
+        vol.Optional("quantity"): _QUANTITY,
         **_PRICES,
+        vol.Optional("material_id"): str,
     }
 )
 async def _add(
@@ -138,18 +158,36 @@ async def _add(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """A Line Item entered by hand; it is added to an open Run too."""
+    """A Line Item entered by hand; it is added to an open Run too.
+
+    A Material Line Item names its Material and counts g (the default) or ml,
+    priced at the Material's current price; an Other one defaults to 1 piece.
+    """
     if (run := _find(connection, msg, wattbill)) is None:
         return
-    item = LineItem(
-        id=ulid_now(),
-        kind=msg["kind"],
-        label=_text(msg.get("label")),
-        quantity=None,
-        unit=msg["unit"].strip(),
-        unit_price=0.0,
-        amount=0.0,
-    )
+    if msg["kind"] is LineItemKind.MATERIAL:
+        unit = msg.get("unit", GRAM)
+        if "material_id" not in msg or unit not in (GRAM, MILLILITRE):
+            connection.send_error(
+                msg["id"],
+                websocket_api.ERR_INVALID_FORMAT,
+                "A Material Line Item names its Material and counts g or ml",
+            )
+            return
+        if not (material := pickable(connection, msg, wattbill, msg["material_id"])):
+            return
+        item = material_line_item(ulid_now(), None, material, measured=False, unit=unit)
+        item.label = _text(msg.get("label"))
+    else:
+        item = LineItem(
+            id=ulid_now(),
+            kind=msg["kind"],
+            label=_text(msg.get("label")),
+            quantity=1,
+            unit=msg.get("unit", "").strip(),
+            unit_price=0.0,
+            amount=0.0,
+        )
     values = {name: msg[name] for name in VALUES if name in msg}
     if not _allowed(connection, msg, item, values):
         return

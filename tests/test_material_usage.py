@@ -352,3 +352,199 @@ async def test_without_a_default_material_the_measurement_is_kept_at_price_0(
         "amount": 0,
     }
     assert detail["flags"] == ["material_missing"]
+
+
+PETG = stored_material(
+    "petg",
+    name="PETG",
+    type="PETG",
+    density=1.27,
+    price={"source": "fixed", "pack_price": 30, "pack_size": 1000, "pack_unit": "g"},
+)
+# 1 m of 1.75 mm PETG at 1.27 g/cm³.
+PETG_GRAMS_PER_METRE = 3.05471
+
+
+async def measured_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """A final Run that used 1 m of the default PLA; the Run and its Material Line Item."""
+    place_materials(hass_storage, stored_material("pla"), PETG, RESIN)
+    await add_measuring_device(hass, panel)
+    await set_status(hass, "printing")
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=5)
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [item] = material_items(detail)
+    return detail, item
+
+
+async def pick(panel: PanelClient, run: Any, item: Any, material_id: str) -> Any:
+    """Change the Line Item's Material; the Line Item as the Run now has it."""
+    result = await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        material_id=material_id,
+    )
+    return next(i for i in result["run"]["line_items"] if i["id"] == item["id"])
+
+
+async def test_changing_the_material_reprices_and_reweighs_the_stored_length(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run, item = await measured_run(hass, clock, panel, hass_storage)
+
+    changed = await pick(panel, run, item, "petg")
+
+    assert changed["material_id"] == "petg"
+    assert changed["material"]["name"] == "PETG"
+    assert changed["quantity"] == pytest.approx(PETG_GRAMS_PER_METRE)
+    assert changed["unit_price"] == pytest.approx(0.03)
+    assert changed["amount"] == pytest.approx(PETG_GRAMS_PER_METRE * 0.03, abs=0.005)
+    assert changed["computed"] is None
+    assert value(hass, MATERIAL_USED) == pytest.approx(PETG_GRAMS_PER_METRE)
+    assert value(hass, MATERIAL_COST) == pytest.approx(PETG_GRAMS_PER_METRE * 0.03)
+
+
+async def test_an_overridden_quantity_survives_a_change_of_material(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run, item = await measured_run(hass, clock, panel, hass_storage)
+    await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        quantity=5,
+    )
+
+    changed = await pick(panel, run, item, "petg")
+
+    assert (changed["quantity"], changed["unit_price"]) == (5, pytest.approx(0.03))
+    assert changed["amount"] == 0.15
+    assert changed["computed"]["quantity"] == pytest.approx(PETG_GRAMS_PER_METRE)
+    reset = await panel.call(
+        "wattbill/line_items/reset", run_id=run["id"], line_item_id=item["id"]
+    )
+    [back] = material_items(reset["run"])
+    assert back["quantity"] == pytest.approx(PETG_GRAMS_PER_METRE)
+
+
+async def test_material_line_items_are_added_and_deleted_while_the_run_is_open(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, RESIN)
+    await add_measuring_device(hass, panel, default=None, material=None)
+    await set_status(hass, "printing")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+
+    result = await panel.call(
+        "wattbill/line_items/add",
+        run_id=run["id"],
+        kind="material",
+        material_id="resin",
+        quantity=25,
+        unit="ml",
+    )
+
+    [added] = material_items(result["run"])
+    assert {
+        key: added[key]
+        for key in ("label", "quantity", "unit", "unit_price", "amount", "locked")
+    } == {
+        "label": None,
+        "quantity": 25,
+        "unit": "ml",
+        "unit_price": pytest.approx(0.03),
+        "amount": 0.75,
+        "locked": False,
+    }
+    assert added["material"]["name"] == "RESIN"
+    assert value(hass, MATERIAL_USED) == pytest.approx(27.5)
+    result = await panel.call(
+        "wattbill/line_items/delete", run_id=run["id"], line_item_id=added["id"]
+    )
+    assert material_items(result["run"]) == []
+    assert value(hass, MATERIAL_USED) == 0
+
+
+async def test_a_material_line_item_added_during_the_run_needs_no_other(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, RESIN)
+    await add_measuring_device(hass, panel, default="resin", material=None)
+    await set_status(hass, "printing")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    await panel.call(
+        "wattbill/line_items/add",
+        run_id=run["id"],
+        kind="material",
+        material_id="resin",
+        quantity=25,
+        unit="ml",
+    )
+
+    await set_status(hass, "finished")
+
+    [stored] = stored_runs(hass_storage)
+    assert [item["quantity"] for item in material_items(stored)] == [25]
+    assert stored["flags"] == []
+
+
+@pytest.mark.parametrize(
+    ("fields", "code"),
+    [
+        ({}, "invalid_format"),
+        ({"material_id": "nope"}, "not_found"),
+        ({"material_id": "old"}, "not_allowed"),
+        ({"material_id": "pla", "unit": "pcs"}, "invalid_format"),
+    ],
+)
+async def test_a_material_line_item_needs_a_current_material_and_g_or_ml(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    fields: dict[str, Any],
+    code: str,
+) -> None:
+    place_materials(
+        hass_storage, stored_material("pla"), stored_material("old", archived=True)
+    )
+    await add_measuring_device(hass, panel)
+    await set_status(hass, "printing")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+
+    error = await panel.error(
+        "wattbill/line_items/add", run_id=run["id"], kind="material", **fields
+    )
+
+    assert error["code"] == code
+
+
+async def test_only_material_line_items_change_their_material(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run, item = await measured_run(hass, clock, panel, hass_storage)
+    electricity = run["line_items"][0]
+
+    for line_item_id, material_id, code in (
+        (electricity["id"], "pla", "not_allowed"),
+        (item["id"], "nope", "not_found"),
+    ):
+        error = await panel.error(
+            "wattbill/line_items/update",
+            run_id=run["id"],
+            line_item_id=line_item_id,
+            material_id=material_id,
+        )
+        assert error["code"] == code, material_id
+    error = await panel.error(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        unit="ml",
+    )
+    assert error["code"] == "not_allowed"
