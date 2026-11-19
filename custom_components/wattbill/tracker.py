@@ -30,13 +30,16 @@ from homeassistant.util.ulid import ulid_now
 from .catalog import Catalog
 from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
-from .cost.material import GRAM, MILLILITRE, material_line_item
+from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
+from .cost.slots import slot_material, slot_shares
 from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
     meter_reading,
     price_reading,
+    slot_colour,
+    slot_number,
     usage_reading,
 )
 from .device_settings import (
@@ -50,10 +53,13 @@ from .materials import Material, MaterialForm
 from .models import (
     ElectricityMethod,
     Flag,
+    LineItem,
     LineItemKind,
+    LoadedSlot,
     Outcome,
     Pause,
     Run,
+    SlotReport,
     Usage,
 )
 from .run_book import RunBook
@@ -136,7 +142,14 @@ class DeviceTracker:
                     self._hass, usage["entity_id"], self._on_usage
                 ),
             ]
+        if loaded_slot := self._config.loaded_slot_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(
+                    self._hass, [loaded_slot, *self._config.slots], self._on_slot
+                )
+            )
         if run := self._book.open_run(self._config.device_id):
+            self._record_slot(run, dt_util.utcnow())
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
@@ -285,6 +298,46 @@ class DeviceTracker:
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
 
+    @callback
+    def _on_slot(self, event: Event[EventStateChangedData]) -> None:
+        if (run := self._book.open_run(self._config.device_id)) and self._record_slot(
+            run, dt_util.utcnow()
+        ):
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _record_slot(self, run: Run, at: datetime) -> bool:
+        """Note a change of the loaded Slot or its report; whether there was one.
+
+        While the Loaded slot input or the loaded Slot's entity has no value, the
+        last report stands; the first one known counts from the Run's start.
+        """
+        if (entity_id := self._config.loaded_slot_entity_id) is None:
+            return False
+        value = input_value(self._hass.states.get(entity_id), None)
+        if value is None:
+            return False
+        slot: SlotReport | None = None
+        slots = self._config.slots
+        if number := slot_number(value, len(slots)):
+            state = self._hass.states.get(slots[number - 1])
+            if (material_type := input_value(state, None)) is None:
+                return False
+            assert state is not None
+            colour = self._config.colour_attribute
+            slot = SlotReport(
+                number,
+                material_type,
+                slot_colour(state.attributes.get(colour)) if colour else None,
+            )
+        loaded = run.loaded_slots
+        if loaded and loaded[-1].slot == slot:
+            return False
+        loaded.append(
+            LoadedSlot(max(at, loaded[-1].since) if loaded else run.started, slot)
+        )
+        return True
+
     def _material(self) -> Material | None:
         """The Material a Run of this Device is charged for."""
         material_id = self._settings.get(self._config.device_id)[DEFAULT_MATERIAL]
@@ -427,6 +480,7 @@ class DeviceTracker:
             self._record(run, self._hass.states.get(meter["entity_id"]))
         self._follow_average_power(run, at)
         self._record_usage(run, self._usage_state())
+        self._record_slot(run, at)
         self._open_prices(run, at)
         self._refresh(run, at)
         add_templates(
@@ -512,6 +566,7 @@ class DeviceTracker:
         self._settle_material(run)
         run.readings = []
         run.prices = []
+        run.loaded_slots = []
         self._hass.async_create_task(self._async_finalise(run))
 
     def _settle_material(self, run: Run) -> None:
@@ -532,6 +587,15 @@ class DeviceTracker:
             )
             run.line_items.append(item)
             items.append(item)
+        if any(item.share is not None for item in items):
+            self._flag(run, Flag.ESTIMATED_SPLIT)
+        if any(
+            self._slot_fell_back(slot)
+            for item in items
+            if item.material_id is not None
+            for slot in item.slots
+        ):
+            self._flag(run, Flag.SLOT_FALLBACK)
         for item in items:
             if item.quantity is None and item.length is None:
                 self._flag(run, Flag.USAGE_MISSING)
@@ -626,6 +690,32 @@ class DeviceTracker:
             ]
         )
 
+    def _slot_fell_back(self, slot: SlotReport) -> bool:
+        return slot_material(slot, self._catalog.materials()) is None
+
+    def _measured_items(self, run: Run, until: datetime) -> list[LineItem]:
+        """The measured total attributed through the loaded Slots, else to the default."""
+        ids = {i.material_id: i.id for i in run.line_items if i.measured}
+        spare = list(ids.values())
+
+        def item_id(material_id: str | None) -> str:
+            # A Line Item keeps its id while its Material stays.
+            if (found := ids.get(material_id)) in spare:
+                spare.remove(found)
+                return found
+            return spare.pop(0) if spare else ulid_now()
+
+        shares = slot_shares(run.loaded_slots, run.pauses, until)
+        if not shares:
+            return [material_line_item(item_id(None), run.usage, self._material())]
+        materials = self._catalog.materials()
+        return slot_line_items(
+            run.usage,
+            shares,
+            lambda slot: slot_material(slot, materials) or self._material(),
+            item_id,
+        )
+
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
         item = electricity_line_item(
@@ -638,18 +728,7 @@ class DeviceTracker:
             if _meter(run.consumption)
             else ElectricityMethod.ESTIMATED,
         )
-        measured = [i for i in run.line_items if i.measured]
-        materials = (
-            [
-                material_line_item(
-                    measured[0].id if measured else ulid_now(),
-                    run.usage,
-                    self._material(),
-                )
-            ]
-            if self._config.material
-            else []
-        )
+        materials = self._measured_items(run, until) if self._config.material else []
         run.line_items = [
             item,
             *materials,

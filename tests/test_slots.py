@@ -1,12 +1,57 @@
 """Slot attribution: a multi-material unit's loaded Slots pick the Materials a Run used."""
 
-from homeassistant.core import HomeAssistant
+from typing import Any
 
+from homeassistant.core import HomeAssistant
+import pytest
+
+from .clock import Clock
 from .devices import add_device, add_hub, configure, start_reconfigure
+from .stored import place_materials, stored_material
 from .test_device_flow import suggested
+from .test_material_usage import (
+    GRAMS_PER_METRE,
+    add_measuring_device,
+    material_items,
+    set_usage,
+)
+from .test_runs import set_status, stored_runs
+from .websocket import PanelClient
 
 SLOTS = [f"sensor.ace_slot_{number}" for number in range(1, 5)]
 LOADED = "sensor.ace_loaded_slot"
+RED_PLA = stored_material("red-pla", name="Red PLA", colour="#ff0000")
+
+
+async def load(hass: HomeAssistant, number: int | str) -> None:
+    hass.states.async_set(LOADED, str(number))
+    await hass.async_block_till_done()
+
+
+async def fill(
+    hass: HomeAssistant, number: int, material_type: str, colour: Any = None
+) -> None:
+    """Put a spool into the Slot, as the integration reports it."""
+    hass.states.async_set(SLOTS[number - 1], material_type, {"color_hex": colour})
+    await hass.async_block_till_done()
+
+
+async def add_ace_device(
+    hass: HomeAssistant, panel: PanelClient, *, default: str | None = "pla"
+) -> None:
+    """A measuring Device with a four-Slot unit whose colour attribute is color_hex."""
+    await add_measuring_device(
+        hass,
+        panel,
+        default=default,
+        slots=SLOTS,
+        colour_attribute="color_hex",
+        loaded_slot=LOADED,
+    )
+
+
+def evidence(item: dict[str, Any]) -> list[tuple[int, str | None, str | None]]:
+    return [(slot["number"], slot["type"], slot["colour"]) for slot in item["slots"]]
 
 
 async def test_the_slots_are_stored_in_order_with_the_job(hass: HomeAssistant) -> None:
@@ -46,3 +91,111 @@ async def test_reconfigure_offers_the_slots_as_stored(hass: HomeAssistant) -> No
     await configure(hass, result, {"next_step_id": "save"})
     job = entry.subentries[device.subentry_id].data["job"]
     assert (job["slots"], job["colour_attribute"]) == (SLOTS[:2], None)
+
+
+async def test_a_loaded_slot_is_matched_by_type_and_colour(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"), RED_PLA)
+    await fill(hass, 1, "PETG", "#000000")
+    await fill(hass, 2, "pla", "#FF0000")
+    await load(hass, 2)
+    await add_ace_device(hass, panel)
+
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert item["material_id"] == "red-pla"
+    assert item["quantity"] == pytest.approx(GRAMS_PER_METRE)
+    assert evidence(item) == [(2, "pla", "#ff0000")]
+    assert run["flags"] == []
+
+
+async def print_one_metre(hass: HomeAssistant, clock: Clock) -> None:
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_usage(hass, 1000)
+    await set_status(hass, "finished")
+
+
+async def test_a_type_without_its_colour_takes_the_types_default_material(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(
+        hass_storage,
+        stored_material("pla"),
+        RED_PLA,
+        stored_material("any-petg", type="PETG", density=1.27, default_for_type=True),
+    )
+    await fill(hass, 1, "PETG ", "#123456")
+    await load(hass, 1)
+    await add_ace_device(hass, panel)
+
+    await print_one_metre(hass, clock)
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert item["material_id"] == "any-petg"
+    assert run["flags"] == []
+
+
+async def test_an_unmatched_slot_falls_back_to_the_default_material_with_a_flag(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(
+        hass_storage,
+        stored_material("pla"),
+        stored_material("old-tpu", type="TPU", default_for_type=True, archived=True),
+    )
+    await fill(hass, 3, "TPU", [0, 0, 255])
+    await load(hass, 3)
+    await add_ace_device(hass, panel)
+
+    await print_one_metre(hass, clock)
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert item["material_id"] == "pla"
+    assert evidence(item) == [(3, "TPU", "#0000ff")]
+    assert run["flags"] == ["slot_fallback"]
+
+
+async def test_without_a_match_or_default_the_material_is_missing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await fill(hass, 1, "ASA")
+    await load(hass, 1)
+    await add_ace_device(hass, panel, default=None)
+
+    await print_one_metre(hass, clock)
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert (item["material_id"], item["quantity"], item["length"]) == (None, None, 1000)
+    assert evidence(item) == [(1, "ASA", None)]
+    assert run["flags"] == ["material_missing"]
+
+
+@pytest.mark.parametrize("loaded", ["0", "5", "-1", "none"])
+async def test_a_loaded_slot_outside_the_slots_is_no_slot(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    loaded: str,
+) -> None:
+    place_materials(hass_storage, stored_material("pla"), RED_PLA)
+    await fill(hass, 1, "PLA", "#ff0000")
+    await load(hass, loaded)
+    await add_ace_device(hass, panel)
+
+    await print_one_metre(hass, clock)
+
+    [run] = stored_runs(hass_storage)
+    [item] = material_items(run)
+    assert (item["material_id"], item["slots"]) == ("pla", [])
+    assert run["flags"] == []
