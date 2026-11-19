@@ -9,6 +9,8 @@ test = [
     "pytest-homeassistant-custom-component==0.13.375",
     "fpdf2==2.9.0",
     "Pillow==12.3.0",
+    # Reads the Cost Statement PDF's text.
+    "pypdf==6.21.4",
     # The camera integration's requirement, for the fake camera.
     "PyTurboJPEG==1.8.3",
 ]

@@ -1,0 +1,44 @@
+{
+  "title": "Cost Statement",
+  "created": "Created {date}",
+  "period": "Period {start} – {end}",
+  "running_time": "Running time {duration}",
+  "part_one": "1 part",
+  "parts": "{count} parts",
+  "per_part": "{amount} per part",
+  "outcome": "Outcome: {outcome}",
+  "untitled": "Untitled Run",
+  "with_outcome": "{name} ({outcome})",
+  "column": {
+    "line_item": "Line Item",
+    "quantity": "Quantity",
+    "unit_price": "Unit price",
+    "amount": "Amount",
+    "run": "Run",
+    "device": "Device",
+    "started": "Start",
+    "part_count": "Parts",
+    "cost_per_part": "Per part",
+    "total": "Total"
+  },
+  "run_total": "Run total",
+  "subtotal": "Subtotal",
+  "markup": "Markup {percent}%",
+  "total": "Total",
+  "footer": "This is a cost statement, not an invoice.",
+  "page": "Page {page} of {pages}",
+  "kind": {
+    "electricity": "Electricity",
+    "material": "Material",
+    "other": "Other"
+  },
+  "outcome_name": {
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "failed": "Failed",
+    "unknown": "Unknown"
+  },
+  "duration": "{hours} h {minutes} min",
+  "date": "{month} {day}, {year}",
+  "months": "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec"
+}
