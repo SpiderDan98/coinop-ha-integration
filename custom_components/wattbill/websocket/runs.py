@@ -21,7 +21,7 @@ from custom_components.wattbill.cost.rounding import (
     round_amount,
     rounded_sum,
 )
-from custom_components.wattbill.cost.running import running_time
+from custom_components.wattbill.cost.running_time import running_time
 from custom_components.wattbill.models import LineItemKind, Run
 from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill

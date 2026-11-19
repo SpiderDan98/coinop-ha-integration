@@ -61,6 +61,7 @@ def stored_run(
         "finalised": ended,
         "pauses": [],
         "flags": [],
+        "part_count": 1,
         "line_items": [electricity(0.24, 0.30, started, end)],
     } | fields
 

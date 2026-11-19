@@ -1,5 +1,6 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
+import asyncio
 from datetime import datetime, timedelta
 
 from homeassistant.core import (
@@ -20,8 +21,8 @@ from homeassistant.util.ulid import ulid_now
 from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import DeviceConfig, Target
-from .device_inputs import input_value
-from .models import ElectricityMethod, Outcome, Run
+from .device_inputs import input_time, input_value
+from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 
 LIVE_INTERVAL = timedelta(minutes=1)
@@ -40,6 +41,8 @@ class DeviceTracker:
         self._book = book
         self._config = config
         self._unsubscribe: list[CALLBACK_TYPE] = []
+        # Until WattBill has seen the Status input, it may have missed the end.
+        self._status_lost = True
 
     @callback
     def async_start(self) -> None:
@@ -63,41 +66,102 @@ class DeviceTracker:
     @callback
     def _on_tick(self, now: datetime) -> None:
         if run := self._book.open_run(self._config.device_id):
-            self._refresh(run, dt_util.utcnow())
+            now = dt_util.utcnow()
+            if not self._status_lost:
+                run.last_seen = now
+            self._refresh(run, now)
             self._book.async_update(run)
 
     def _apply(self, state: State | None) -> None:
-        value = input_value(state, self._config.status_attribute)
-        if state is None or value is None:
-            return
-        at = (
-            state.last_changed
-            if self._config.status_attribute is None
-            else state.last_updated
-        )
-        target = self._config.target(value)
+        attribute = self._config.status_attribute
+        value = input_value(state, attribute)
         run = self._book.open_run(self._config.device_id)
-        if target is Target.RUNNING and run is None:
-            self._open(at)
-        elif target in OUTCOMES and run is not None:
-            self._end(run, at, OUTCOMES[target])
+        if state is None or value is None:
+            if run is not None and not self._status_lost:
+                run.last_seen = (
+                    dt_util.utcnow() if state is None else state.last_changed
+                )
+                self._book.async_update(run)
+            self._status_lost = True
+            return
+        returned, self._status_lost = self._status_lost, False
+        at = input_time(state, attribute)
+        if run is not None and at < run.started:
+            # E.g. a Status entity picked during the Run still shows an older end.
+            return
+        target = self._config.target(value)
+        job_name = self._job_name()
+        if (
+            run is not None
+            and target is Target.RUNNING
+            and None not in (job_name, run.job_name)
+            and job_name != run.job_name
+        ):
+            run.end_reconstructed = True
+            self._end(run, run.last_seen or run.started, Outcome.UNKNOWN)
+            run = None
+        if run is None:
+            if target is Target.RUNNING:
+                self._open(at, job_name)
+            return
+        if target in OUTCOMES:
+            outcome = OUTCOMES[target]
+            if outcome is Outcome.CANCELLED and Flag.FAULT in run.flags:
+                outcome = Outcome.FAILED
+            run.end_reconstructed = returned
+            self._end(run, at, outcome)
+        else:
+            self._continue(run, target, at, job_name)
 
-    def _open(self, at: datetime) -> None:
+    def _continue(
+        self, run: Run, target: Target, at: datetime, job_name: str | None
+    ) -> None:
+        run.last_seen = max(run.last_seen or run.started, at)
+        if target in (Target.PAUSED, Target.FAULT):
+            if target is Target.FAULT and Flag.FAULT not in run.flags:
+                run.flags.append(Flag.FAULT)
+            if not run.pauses or run.pauses[-1].end is not None:
+                run.pauses.append(Pause(at))
+        elif target is Target.RUNNING:
+            if run.pauses and run.pauses[-1].end is None:
+                run.pauses[-1].end = at
+            if run.job_name is None:
+                run.job_name = job_name
+                run.name = run.name or job_name
+        self._book.async_update(run)
+
+    def _job_name(self) -> str | None:
+        if (entity_id := self._config.job_entity_id) is None:
+            return None
+        state = self._hass.states.get(entity_id)
+        return input_value(state, self._config.job_attribute) or None
+
+    def _open(self, at: datetime, job_name: str | None) -> None:
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
             device_name=self._config.name,
+            name=job_name,
+            job_name=job_name,
             started=at,
+            last_seen=at,
             line_items=[],
         )
         self._refresh(run, at)
         self._book.async_start(run)
 
-    def _end(self, run: Run, at: datetime, outcome: Outcome) -> None:
+    async def async_end_run(self) -> None:
+        """End the open Run now as Unknown, e.g. because its Device is removed."""
+        if run := self._book.open_run(self._config.device_id):
+            await self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+
+    def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Task[None]:
         run.ended = at
+        if run.pauses and run.pauses[-1].end is None:
+            run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
-        self._hass.async_create_task(self._book.async_finalise(run))
+        return self._hass.async_create_task(self._book.async_finalise(run))
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""

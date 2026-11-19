@@ -10,6 +10,9 @@ import pytest
 
 from custom_components.wattbill.const import DOMAIN
 
+from .clock import Clock
+from .devices import add_device, add_hub
+
 TRANSLATIONS = Path(__file__).parents[1] / "custom_components" / DOMAIN / "translations"
 
 
@@ -64,3 +67,21 @@ async def test_add_device_texts_load_in_home_assistant(
     assert translations[f"{prefix}.initiate_flow.user"]
     assert translations[f"{prefix}.step.estimate.data_description.running_power"]
     assert translations[f"{prefix}.error.no_ending_value"]
+
+
+async def test_entities_are_named_in_the_configured_language(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    hass.config.language = "de"
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+
+    names = {
+        state.entity_id: state.name
+        for state in hass.states.async_all()
+        if state.entity_id.startswith(("sensor.kobra", "event.kobra"))
+    }
+    assert names["sensor.kobra_gesamtkosten"] == "Kobra Gesamtkosten"
+    assert names["sensor.kobra_kosten_letzter_lauf"] == "Kobra Kosten letzter Lauf"
+    assert names["event.kobra_lauf"] == "Kobra Lauf"
+    assert all(name.startswith("Kobra ") for name in names.values())

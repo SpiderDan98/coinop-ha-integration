@@ -10,13 +10,16 @@
 
 ### Backend modules
 
-- `config_flow.py`: the hub entry; `device_flow.py`: the Add Device subentry flow, one step per section of the Device's data (`status`, `mapping`, `consumption`, `price`). `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
+- `config_flow.py`: the hub entry; `device_flow.py`: the Device subentry flow, one step per part of the Device's data (`printer_device_id`, `status`, `mapping`, `job`, `consumption`, `price`). Steps are grouped into sections (`DeviceSubentryFlow._sections`): Add Device walks them in order, reconfigure offers them as a menu and returns to it after each; a new section is one entry there plus its menu label. `device_config.py` reads that data into a `DeviceConfig`; `device_inputs.py` reads Device Inputs from HA states and the entity registry.
 - `models.py`: `Run` and `LineItem`, free of HA types, with the JSON shape the Stores keep (`as_dict` / `from_dict`).
-- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `totals.py` (per-Device totals advanced by deltas).
-- `tracker.py`: the Run engine for one Device (Status input → open / end Run, live refresh every minute, finalisation).
+- `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
+- `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
-- `store.py`: the `runs` and `live` Stores. `sensor.py`: per-Device entities.
-- `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts. `cost/running.py`: running time without pauses.
+- `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
+- `repairs.py`: the fix flow for missing data (restore guidance or a deliberate fresh start). `backup.py`: writes pending delayed saves before a backup.
+- `ha_device.py`: WattBill's own HA device per Device (registered at setup, linked to the printer's HA device), its `device_info`, and renames from the HA device page. Removing a Device ends its open Run as Unknown in `__init__.py` before the reload; `Run.device_name` always holds the Device's current name.
+- `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
+- `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts.
 - `panel.py`: registers the admin-only panel while the hub entry is loaded and serves the bundle at a URL that changes with its content.
 - `websocket/`: the panel's backend API, one module per area (`runs.py`, ...). See [Websocket commands](#websocket-commands).
 
@@ -72,7 +75,8 @@ uv run scripts/test_ha.py minimum -q    # also: stable, beta (each in its own .v
 
   `Clock` and `CLOCK_START` come from `tests/clock.py`.
 
-- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
+- Schema changes: a minor bump only adds fields (read with a default); a major bump adds a migration to the Store's `Schema` and a folder to `tests/fixtures/storage/` for the version just released (see `tests/test_migrations.py`).
+- `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
 - `tests/stored.py` places Runs in the Stores before setup (`place_runs(hass_storage, stored_run("id", ...))`).
 - Websocket commands go through the `panel` fixture (an admin's connection; `connect_panel(hass_read_only_user)` for others): `await panel.call("wattbill/runs/get", run_id=...)`, `await panel.error(...)`, `await panel.subscribe(...)` then `await panel.event()`. It connects on first use, so set WattBill up first.
 

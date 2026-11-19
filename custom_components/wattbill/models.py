@@ -1,10 +1,11 @@
 """Runs and Line Items: the records WattBill keeps, free of Home Assistant types.
 
 `as_dict` / `from_dict` give the JSON shape used by the Stores (and their
-migrations); values are stored unrounded.
+migrations); values are stored unrounded. Fields a newer minor version added
+are kept in `unknown` and written back unchanged.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -15,6 +16,10 @@ class Outcome(StrEnum):
     CANCELLED = "cancelled"
     FAILED = "failed"
     UNKNOWN = "unknown"
+
+
+class Flag(StrEnum):
+    FAULT = "fault"
 
 
 class LineItemKind(StrEnum):
@@ -38,6 +43,11 @@ def _iso(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
+def _unknown(cls: type, data: dict[str, Any]) -> dict[str, Any]:
+    known = {f.name for f in fields(cls)}
+    return {key: value for key, value in data.items() if key not in known}
+
+
 @dataclass
 class PriceSegment:
     """Evidence on the Electricity Line Item: energy used while one price applied."""
@@ -46,9 +56,10 @@ class PriceSegment:
     end: datetime
     kwh: float
     unit_price: float
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        return self.unknown | {
             "start": self.start.isoformat(),
             "end": self.end.isoformat(),
             "kwh": self.kwh,
@@ -62,6 +73,7 @@ class PriceSegment:
             end=datetime.fromisoformat(data["end"]),
             kwh=data["kwh"],
             unit_price=data["unit_price"],
+            unknown=_unknown(cls, data),
         )
 
 
@@ -82,9 +94,10 @@ class LineItem:
     label: str | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        return self.unknown | {
             "id": self.id,
             "kind": self.kind,
             "label": self.label,
@@ -110,6 +123,7 @@ class LineItem:
             if data["method"] is None
             else ElectricityMethod(data["method"]),
             segments=[PriceSegment.from_dict(s) for s in data["segments"]],
+            unknown=_unknown(cls, data),
         )
 
 
@@ -124,7 +138,10 @@ class Run:
     """One working cycle of a Device.
 
     Open while `ended` is None; ended but not `finalised` while its last values
-    are still awaited; frozen once finalised.
+    are still awaited; frozen once finalised. `end_reconstructed` marks an end
+    WattBill only learnt about after the Status input or WattBill itself was away.
+    `job_name` is the job the Device reported, kept apart from the editable name;
+    `last_seen` is the last time the Status input was seen during the open Run.
     """
 
     id: str
@@ -133,31 +150,40 @@ class Run:
     started: datetime
     line_items: list[LineItem]
     name: str | None = None
+    job_name: str | None = None
+    last_seen: datetime | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
+    end_reconstructed: bool = False
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
+    part_count: int = 1
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
     def electricity(self) -> LineItem:
         return next(i for i in self.line_items if i.kind is LineItemKind.ELECTRICITY)
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        return self.unknown | {
             "id": self.id,
             "device_id": self.device_id,
             "device_name": self.device_name,
             "name": self.name,
+            "job_name": self.job_name,
             "started": self.started.isoformat(),
+            "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
             "outcome": self.outcome,
+            "end_reconstructed": self.end_reconstructed,
             "finalised": self.finalised,
             "pauses": [
                 {"start": pause.start.isoformat(), "end": _iso(pause.end)}
                 for pause in self.pauses
             ],
             "flags": list(self.flags),
+            "part_count": self.part_count,
             "line_items": [item.as_dict() for item in self.line_items],
         }
 
@@ -168,14 +194,19 @@ class Run:
             device_id=data["device_id"],
             device_name=data["device_name"],
             name=data["name"],
+            job_name=data.get("job_name"),
             started=datetime.fromisoformat(data["started"]),
+            last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),
             outcome=None if data["outcome"] is None else Outcome(data["outcome"]),
+            end_reconstructed=data.get("end_reconstructed", False),
             finalised=data["finalised"],
             pauses=[
                 Pause(datetime.fromisoformat(p["start"]), _time(p["end"]))
                 for p in data["pauses"]
             ],
             flags=list(data["flags"]),
+            part_count=data["part_count"],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
+            unknown=_unknown(cls, data),
         )

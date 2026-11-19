@@ -16,6 +16,9 @@ LANGUAGES = sorted(path.stem for path in PANEL.glob("*.json"))
 SHARED_TERMS = {
     "runs.title": "entity.sensor.runs.name",
     "run.device": "config_subentries.device.entry_type",
+    "run.running_time": "entity.sensor.running_time.name",
+    "run.started": "entity.event.run.state_attributes.event_type.state.started",
+    "run.ended": "entity.event.run.state_attributes.event_type.state.ended",
 }
 
 
