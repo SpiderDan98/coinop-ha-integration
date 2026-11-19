@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .devices import add_device, add_hub
 from .stored import line_item, place_runs, stored_run
+from .test_measured import add_metered_device, set_meter
 from .test_run_event import record_events
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 from .test_sensors import CURRENT, FLAGGED, LAST, print_runs, restart_with, state_of
@@ -212,9 +213,10 @@ async def test_end_run_now_ends_the_open_run_as_unknown_once(
     result = await panel.call("wattbill/runs/end", run_id=run["id"])
     await hass.async_block_till_done()
 
-    ended = result["run"]
-    assert (ended["outcome"], ended["finalised"]) == ("unknown", True)
-    assert ended["ended"] == clock.now().isoformat()
+    assert result["run"]["outcome"] == "unknown"
+    assert result["run"]["ended"] == clock.now().isoformat()
+    ended = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    assert ended["finalised"] is True
     assert ended["total"] == 0.3
     assert [event["event_type"] for event in fired] == ["started", "ended"]
     assert fired[-1]["outcome"] == "unknown"
@@ -226,6 +228,27 @@ async def test_end_run_now_ends_the_open_run_as_unknown_once(
     assert len(fired) == 2
     error = await panel.error("wattbill/runs/end", run_id=run["id"])
     assert error["code"] == "not_allowed"
+
+
+async def test_end_run_now_answers_before_a_metered_run_is_final(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_meter(hass, 10.0)
+    await add_metered_device(hass)
+    fired = record_events(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.3)
+    await clock.advance(minutes=1)
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+
+    result = await panel.call("wattbill/runs/end", run_id=run["id"])
+
+    assert (result["run"]["outcome"], result["run"]["finalised"]) == ("unknown", False)
+    await clock.advance(minutes=5)
+    ended = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    assert ended["finalised"] is True
+    assert [event["event_type"] for event in fired] == ["started", "ended"]
 
 
 async def test_deleting_a_run_says_and_lowers_what_the_totals_lose(

@@ -16,6 +16,7 @@
       "flags": [],
       "part_count": 4,
       "note": "Four on one plate",
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -87,6 +88,7 @@
       ],
       "part_count": 1,
       "note": null,
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -140,6 +142,7 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "consumption": null,
       "line_items": [
         {
           "id": "electricity",
@@ -187,6 +190,11 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120.0,
+        "paused_power": 8.0
+      },
       "line_items": [
         {
           "id": "print-live-electricity",

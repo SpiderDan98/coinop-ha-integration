@@ -46,7 +46,9 @@ async def set_up_again(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return result
 
 
-@pytest.mark.parametrize("lost", ["wattbill.runs", "wattbill.live"])
+@pytest.mark.parametrize(
+    "lost", ["wattbill.runs", "wattbill.live", "wattbill.device_settings"]
+)
 async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_issue(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], lost: str
 ) -> None:
@@ -149,7 +151,9 @@ async def test_a_first_setup_starts_with_empty_stores(
     assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
 
 
-@pytest.mark.parametrize("store", ["wattbill.runs", "wattbill.live"])
+@pytest.mark.parametrize(
+    "store", ["wattbill.runs", "wattbill.live", "wattbill.device_settings"]
+)
 async def test_data_from_a_newer_major_version_stops_setup_without_writing(
     hass: HomeAssistant, hass_storage: dict[str, Any], store: str
 ) -> None:

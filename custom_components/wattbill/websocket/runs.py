@@ -65,8 +65,10 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
 
 
 def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
+    # Meter readings are long on an open Run and of no use to the panel.
+    stored = {key: value for key, value in run.as_dict().items() if key != "readings"}
     return {
-        **run.as_dict(),
+        **stored,
         **_summary(run, now, decimals),
         "line_items": [
             item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
@@ -240,13 +242,13 @@ async def _clear_flag(
 
 
 @command({vol.Required("type"): "wattbill/runs/end", vol.Required("run_id"): str})
-async def _end(
+def _end(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """End Run now: the open Run ends as Unknown and is finalised."""
+    """End Run now: the open Run ends as Unknown, finalised like any other end."""
     if (run := _find(connection, msg, wattbill)) is None:
         return
     tracker = next(
@@ -262,7 +264,7 @@ async def _end(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run is not open"
         )
         return
-    await tracker.async_end_run()
+    tracker.async_end_run()
     _send_run(hass, connection, msg["id"], run)
 
 

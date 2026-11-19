@@ -42,6 +42,29 @@ export interface RunDetail extends RunSummary {
   subtotals: Record<Kind, number>;
 }
 
+export interface Device {
+  id: string;
+  name: string;
+  /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
+  ha_settings: {
+    status: { entity_id: string; attribute: string | null };
+    job: { entity_id: string | null; attribute: string | null };
+    consumption:
+      | { source: "estimate"; running_power: number; paused_power: number | null }
+      | { source: "energy"; entity_id: string; attribute: string | null }
+      | {
+          source: "power";
+          entity_id: string;
+          attribute: string | null;
+          /** Fills gaps in the power reports. */
+          running_power: number | null;
+        };
+    price: { source: "fixed"; value: number };
+  };
+  /** WattBill's own settings for the Device, set in the Devices tab. */
+  settings: Record<string, unknown>;
+}
+
 export type RunChange = "started" | "updated" | "ended" | "deleted";
 export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSummary };
 
@@ -89,3 +112,6 @@ export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
 
 export const deleteRuns = (hass: HomeAssistant, runIds: string[]) =>
   hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete", run_ids: runIds });
+/** Current Devices only; a Run whose `device_id` isn't listed belongs to a removed Device. */
+export const listDevices = async (hass: HomeAssistant) =>
+  (await hass.callWS<{ devices: Device[] }>({ type: "wattbill/devices/list" })).devices;

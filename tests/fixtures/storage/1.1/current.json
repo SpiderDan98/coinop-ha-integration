@@ -21,6 +21,12 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120,
+        "paused_power": null
+      },
+      "readings": [],
       "line_items": [
         {
           "id": "01KF0000000000000000000I01",
@@ -64,6 +70,12 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120,
+        "paused_power": null
+      },
+      "readings": [],
       "line_items": [
         {
           "id": "01KF0000000000000000000I02",
@@ -108,6 +120,12 @@
       "flags": [],
       "part_count": 1,
       "note": null,
+      "consumption": {
+        "source": "estimate",
+        "running_power": 120,
+        "paused_power": null
+      },
+      "readings": [],
       "line_items": [
         {
           "id": "01KF0000000000000000000I03",

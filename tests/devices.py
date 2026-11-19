@@ -16,6 +16,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.wattbill.const import DOMAIN
 
 STATUS = "sensor.kobra_status"
+ENERGY = "sensor.kobra_plug_energy"
+POWER = "sensor.kobra_plug_power"
 MAPPING = {
     "running": ["printing"],
     "paused": ["paused"],
@@ -86,6 +88,14 @@ async def walk_to_mapping(
     return result
 
 
+async def walk_to_consumption(hass: HomeAssistant, entry: ConfigEntry) -> Any:
+    result = await configure(hass, await walk_to_mapping(hass, entry), MAPPING)
+    assert result["step_id"] == "job", result.get("errors")
+    result = await configure(hass, result, {})
+    assert result["type"] is FlowResultType.MENU, result.get("errors")
+    return result
+
+
 async def add_device(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -95,13 +105,18 @@ async def add_device(
     status: str = STATUS,
     attribute: str | None = None,
     mapping: dict[str, list[str]] = MAPPING,
+    source: str = "estimate",
+    meter: dict[str, Any] | None = None,
     job: str | None = None,
     job_attribute: str | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
     price: float = 0.30,
 ) -> ConfigSubentry:
-    """Walk Add Device to the end; returns the new Device once the entry reloaded."""
+    """Walk Add Device to the end; returns the new Device once the entry reloaded.
+
+    `source` picks the consumption source; Energy and Power take `meter` as input.
+    """
     result = await walk_to_mapping(
         hass, entry, name=name, printer=printer, status=status, attribute=attribute
     )
@@ -112,12 +127,15 @@ async def add_device(
     )
     result = await configure(hass, result, job_input)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": "estimate"})
-    estimate = {"running_power": running_power}
-    if paused_power is not None:
-        estimate["paused_power"] = paused_power
-    result = await configure(hass, result, estimate)
-    assert result["step_id"] == "price"
+    result = await configure(hass, result, {"next_step_id": source})
+    if source == "estimate":
+        estimate = {"running_power": running_power}
+        if paused_power is not None:
+            estimate["paused_power"] = paused_power
+        result = await configure(hass, result, estimate)
+    else:
+        result = await configure(hass, result, meter)
+    assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, {"price": price})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()

@@ -12,6 +12,7 @@ import {
   getRun,
   previewDelete,
   updateRun,
+  type Device,
   type Drop,
   type LineItem,
   type Outcome,
@@ -21,7 +22,7 @@ import {
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { isKey, localize, type Localize } from "./localize";
-import { outcomeChip, runName } from "./run-parts";
+import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 
 const evidence = (item: LineItem, t: Localize) =>
@@ -73,6 +74,8 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) runId = "";
   /** The Run's entry in the live list; a new object means the Run changed. */
   @property({ attribute: false }) summary?: RunSummary;
+  /** Current Devices; any other Device is shown as removed. */
+  @property({ attribute: false }) devices?: Device[];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
@@ -155,10 +158,11 @@ export class RunPage extends LitElement {
     if (!this.run) return html`<p class="muted">${t("run.loading")}</p>`;
     const run = this.run;
     const format = formatter(this.hass);
+    const device = deviceName(run, this.devices, t);
     return html`
       <div class="runbar row">
         ${outcomeChip(run, t)}
-        <span class="muted">${run.device_name} · ${format.dateTime(run.started)}</span>
+        <span class="muted">${device} · ${format.dateTime(run.started)}</span>
         <span class="spacer"></span>
         <span class="muted small">${t("run.saves")}</span>
         ${
@@ -185,7 +189,7 @@ export class RunPage extends LitElement {
           ${this.renderFields(run, t, format)}
           <dl>
             <dt>${t("run.device")}</dt>
-            <dd>${run.device_name}</dd>
+            <dd>${device}</dd>
             <dt>${t("run.running_time")}</dt>
             <dd>${format.duration(run.running_seconds)}</dd>
           </dl>

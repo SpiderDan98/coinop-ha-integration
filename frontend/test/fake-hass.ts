@@ -2,7 +2,8 @@
 // The recorded ones come from the backend tests (tests/contract.py), so they have
 // exactly the shapes the backend sends.
 import type { HomeAssistant, Message } from "../src/hass";
-import type { Drop, RunChange, RunDetail, RunSummary } from "../src/api";
+import type { Device, Drop, RunChange, RunDetail, RunSummary } from "../src/api";
+import devicesList from "./fixtures/backend/devices-list.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -22,6 +23,8 @@ export const recorded = {
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
+  /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
+  devices: devicesList.devices as Device[],
   summary: (id: string) =>
     found(
       recorded.snapshot.runs.find((run) => run.id === id),
@@ -114,5 +117,6 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       const run = recorded.runs.find((candidate) => candidate.id === msg.run_id);
       if (!run) throw new WsError("not_found");
       return { run };
-    });
+    })
+    .reply("wattbill/devices/list", () => ({ devices: recorded.devices }));
 }

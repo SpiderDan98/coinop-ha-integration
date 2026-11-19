@@ -23,6 +23,17 @@ SHARED_TERMS = {
     "sensor.energy_in_runs": "entity.sensor.energy_in_runs.name",
     "sensor.material_used": "entity.sensor.material_used.name",
     "sensor.flagged_runs": "entity.sensor.flagged_runs.name",
+    "device.status": "config_subentries.device.step.status.title",
+    "device.job": "config_subentries.device.step.job.title",
+    "device.consumption": (
+        "config_subentries.device.step.reconfigure.menu_options.consumption"
+    ),
+    "device.price": "config_subentries.device.step.price.title",
+    "consumption.energy": "config_subentries.device.step.consumption.menu_options.energy",
+    "consumption.power": "config_subentries.device.step.consumption.menu_options.power",
+    "consumption.estimate": (
+        "config_subentries.device.step.consumption.menu_options.estimate"
+    ),
 }
 
 
