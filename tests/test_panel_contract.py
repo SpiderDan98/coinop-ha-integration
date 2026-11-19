@@ -192,7 +192,8 @@ async def test_record_the_catalogue_the_panel_shows(
         created.append(result["material"]["id"])
         await panel.event()
     await panel.call("wattbill/materials/archive", material_id=created[-1])
-    await panel.call("wattbill/runs/update", run_id="vase", tags=["Gift", "Spare"])
+    tags = ["Cosplay helmet", "Gift", "Spare"]
+    await panel.call("wattbill/runs/update", run_id="vase", tags=tags)
     rename = await panel.call("wattbill/tags/rename", tag="Spare", name="Spare parts")
     # A panel opened now gets the whole catalogue at once.
     later = connect_panel(hass_admin_user)

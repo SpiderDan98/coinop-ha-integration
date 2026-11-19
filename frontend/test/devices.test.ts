@@ -37,7 +37,8 @@ describe("Devices tab", () => {
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
         "Electricity price €0.30 per kWh " +
         "Device Inputs, consumption source and price are changed in Home Assistant. " +
-        "Reconfigure in Home Assistant",
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device.",
     ]);
     expect(queryAll(panel, ".device input, .device select")).toHaveLength(0);
     expect(query(panel, ".device a").getAttribute("href")).toBe(

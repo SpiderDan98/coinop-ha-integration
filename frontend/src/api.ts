@@ -21,6 +21,8 @@ export interface RunSummary {
   cost_per_part: number;
   /** Open Flags; a cleared Flag is gone. */
   flags: string[];
+  /** Alphabetical. */
+  tags: string[];
 }
 
 export interface LineItem {
@@ -62,7 +64,7 @@ export interface Device {
     price: { source: "fixed"; value: number };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
-  settings: Record<string, unknown>;
+  settings: { tags_for_new_runs: string[] };
 }
 
 export type RunChange = "started" | "updated" | "ended" | "deleted";
@@ -95,7 +97,7 @@ export const updateRun = (
   hass: HomeAssistant,
   runId: string,
   changes: Partial<
-    Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count">
+    Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
   >,
 ) => runResult(hass, { type: "wattbill/runs/update", run_id: runId, ...changes });
 
@@ -112,6 +114,28 @@ export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
 
 export const deleteRuns = (hass: HomeAssistant, runIds: string[]) =>
   hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete", run_ids: runIds });
+/** Names a Tag doesn't exist under yet are created. */
+export const updateDeviceSettings = async (
+  hass: HomeAssistant,
+  deviceId: string,
+  settings: Partial<Device["settings"]>,
+) =>
+  (
+    await hass.callWS<{ settings: Device["settings"] }>({
+      type: "wattbill/devices/update_settings",
+      device_id: deviceId,
+      settings,
+    })
+  ).settings;
+
+/** Renaming to another Tag's name merges both; resolves to the resulting Tag. */
+export const renameTag = async (hass: HomeAssistant, tag: string, name: string) =>
+  (await hass.callWS<{ tag: string }>({ type: "wattbill/tags/rename", tag, name })).tag;
+
+/** Removes the Tag from every Run and Device. */
+export const deleteTag = (hass: HomeAssistant, tag: string) =>
+  hass.callWS<Record<string, never>>({ type: "wattbill/tags/delete", tag });
+
 /** Current Devices only; a Run whose `device_id` isn't listed belongs to a removed Device. */
 export const listDevices = async (hass: HomeAssistant) =>
   (await hass.callWS<{ devices: Device[] }>({ type: "wattbill/devices/list" })).devices;
@@ -145,7 +169,8 @@ export interface MaterialType {
 }
 
 /** Every catalogue in the first event; afterwards only the one that changed. */
-export type Catalog = { materials: Material[] };
+/** Tags are alphabetical; Runs and Devices name them. */
+export type Catalog = { materials: Material[]; tags: string[] };
 
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
   hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });

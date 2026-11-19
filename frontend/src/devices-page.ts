@@ -1,12 +1,13 @@
 // The Devices tab: a card per Device with its HA-side settings, which only the
-// Device's reconfigure flow in HA changes.
-import { LitElement, css, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
-import type { Device } from "./api";
+// Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import { updateDeviceSettings, type Device } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import "./tag-input";
 
 const RECONFIGURE = "/config/integrations/integration/wattbill";
 
@@ -41,7 +42,24 @@ export class DevicesPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Undefined while loading; null when loading failed. */
   @property({ attribute: false }) devices?: Device[] | null;
+  /** Every Tag there is, for suggestions. */
+  @property({ attribute: false }) tags: string[] = [];
   @property({ type: Boolean, reflect: true }) narrow = false;
+
+  /** Settings saved since the Devices were loaded, by Device id. */
+  @state() private saved = new Map<string, Device["settings"]>();
+  /** The Device whose last change could not be saved. */
+  @state() private failed?: string;
+
+  private async save(deviceId: string, changes: Partial<Device["settings"]>) {
+    this.failed = undefined;
+    try {
+      const settings = await updateDeviceSettings(this.hass, deviceId, changes);
+      this.saved = new Map(this.saved).set(deviceId, settings);
+    } catch {
+      this.failed = deviceId;
+    }
+  }
 
   override render() {
     const t = localize(this.hass);
@@ -59,8 +77,9 @@ export class DevicesPage extends LitElement {
     `;
   }
 
-  private renderDevice({ name, ha_settings: ha }: Device, t: Localize) {
+  private renderDevice({ id, name, ha_settings: ha, settings }: Device, t: Localize) {
     const format = formatter(this.hass);
+    const current = this.saved.get(id) ?? settings;
     return html`<div class="card device">
       <h3>${name}</h3>
       <dl>
@@ -78,6 +97,19 @@ export class DevicesPage extends LitElement {
       </dl>
       <p class="muted small">${t("device.ha_settings")}</p>
       <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
+      <div class="new-run-tags">
+        <h4>${t("device.tags_for_new_runs")}</h4>
+        <wattbill-tag-input
+          .hass=${this.hass}
+          .tags=${current.tags_for_new_runs}
+          .catalog=${this.tags}
+          .label=${t("device.tags_for_new_runs")}
+          @tags-change=${(event: CustomEvent<string[]>) =>
+            this.save(id, { tags_for_new_runs: event.detail })}
+        ></wattbill-tag-input>
+        <p class="muted small">${t("device.tags_hint")}</p>
+      </div>
+      ${this.failed === id ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
     </div>`;
   }
 
@@ -111,6 +143,21 @@ export class DevicesPage extends LitElement {
       }
       p {
         margin: 0 0 8px;
+      }
+      .new-run-tags {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+      }
+      h4 {
+        margin: 0 0 6px;
+        font-weight: 500;
+      }
+      .new-run-tags p {
+        margin: 6px 0 0;
+      }
+      .error {
+        color: var(--error-color, #db4437);
       }
     `,
   ];

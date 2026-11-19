@@ -3,9 +3,9 @@
 // exactly the shapes the backend sends.
 import type { HomeAssistant, Message } from "../src/hass";
 import type {
+  Catalog,
   Device,
   Drop,
-  Material,
   MaterialType,
   RunChange,
   RunDetail,
@@ -17,6 +17,7 @@ import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
+import tagsRename from "./fixtures/backend/tags-rename.json";
 
 const [snapshot, ...changes] = runsSubscribe;
 const found = <T>(value: T | undefined, what: string) => {
@@ -36,14 +37,17 @@ export const recorded = {
   /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
   /**
-   * `wattbill/catalog/subscribe`: first empty, then after "material-1" (eSun PLA+ black,
-   * default for PLA), "material-2" (Standard Resin grey) and "material-3" (PLA red,
-   * archived) were added.
+   * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened
+   * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
+   * Resin grey), "material-3" (PLA red, archived) and the Tags "Cosplay helmet", "Gift"
+   * and "Spare parts".
    */
   catalog: {
-    empty: catalogSubscribe[0] as { materials: Material[] },
-    filled: catalogSubscribe[1] as { materials: Material[] },
+    empty: catalogSubscribe[0] as Catalog,
+    filled: catalogSubscribe[1] as Catalog,
   },
+  /** `wattbill/tags/rename` of "Spare" to "Spare parts". */
+  tagRename: tagsRename,
   /** `wattbill/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
   material: (id: string) =>
