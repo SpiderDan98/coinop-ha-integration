@@ -114,7 +114,11 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
     }
     assert data["mapping"]["running"] == ["on"]
     assert data["mapping"]["finished"] == []
-    assert data["job"] == {"entity_id": "sensor.kobra_job", "attribute": "file_name"}
+    assert data["job"] == {
+        "entity_id": "sensor.kobra_job",
+        "attribute": "file_name",
+        "material": None,
+    }
     assert data["consumption"]["running_power"] == 90
     assert data["consumption"]["paused_power"] == 10
     assert data["price"]["value"] == 0.5

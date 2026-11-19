@@ -21,6 +21,7 @@ import {
   type Device,
   type Drop,
   type LineItem,
+  type Material,
   type LineItemTemplate,
   type Outcome,
   type RunDetail,
@@ -34,12 +35,26 @@ import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import "./tag-input";
 
-const evidence = (item: LineItem, t: Localize) =>
+/** How a measured length became grams, so the user can check the conversion. */
+const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: Format) => {
+  if (length === null) return undefined;
+  const measured = format.quantity(length, "mm");
+  return material?.diameter
+    ? t("evidence.length", {
+        length: measured,
+        diameter: format.quantity(material.diameter, "mm"),
+        density: format.quantity(material.density, "g/cm³"),
+      })
+    : t("evidence.length_only", { length: measured });
+};
+
+const evidence = (item: LineItem, t: Localize, format: Format) =>
   [
     item.method && t(`method.${item.method}`),
     item.template_id && t("evidence.template"),
     item.basis === "running_hours" && t("evidence.running_hours"),
     item.segments.length > 1 && t("evidence.segments", { count: item.segments.length }),
+    item.measured && (lengthEvidence(item, t, format) ?? t("evidence.measured")),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -89,6 +104,7 @@ const parseNumber = (value: string) => {
 /** What each Line Item field shows, as its input's value. */
 const itemValues = (item: LineItem, format: Format) => ({
   label: item.label ?? "",
+  material_id: item.material_id ?? "",
   unit: item.unit,
   quantity: format.toNumberInput(item.quantity, 4),
   unit_price: format.toNumberInput(item.unit_price, 4),
@@ -102,6 +118,8 @@ const itemChange = (field: ItemField, value: string) => {
   switch (field) {
     case "label":
       return { label: value.trim() || null };
+    case "material_id":
+      return value ? { material_id: value } : undefined;
     case "unit":
       return { unit: value.trim() };
     case "quantity": {
@@ -140,6 +158,8 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) devices?: Device[];
   /** Every Tag there is, for suggestions. */
   @property({ attribute: false }) tags: string[] = [];
+  /** The Materials catalogue, archived ones included. */
+  @property({ attribute: false }) materials: Material[] = [];
   @property({ attribute: false }) templates: LineItemTemplate[] = [];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
@@ -150,8 +170,8 @@ export class RunPage extends LitElement {
   @state() private failed?: "fields" | "items";
   /** Set while the delete confirmation is open. */
   @state() private drop?: Drop;
-  /** Which form for a new Other Line Item is open: by hand or from a template. */
-  @state() private adding?: "other" | "template";
+  /** Which form for a new Line Item is open: Material, Other by hand or from a template. */
+  @state() private adding?: "material" | "other" | "template";
   /** The template picked in its form; the first one until the user picks. */
   @state() private templateId?: string;
   /** The label of the Line Item last saved as a template. */
@@ -217,15 +237,34 @@ export class RunPage extends LitElement {
     const form = event.target as HTMLFormElement;
     const entered = Object.fromEntries(new FormData(form)) as Record<string, string>;
     const quantity = parseNumber(entered.quantity ?? "");
+    if (quantity === undefined) return;
+    if (this.adding === "material") {
+      if (!entered.material_id) return;
+      const material = {
+        kind: "material" as const,
+        material_id: entered.material_id,
+        quantity,
+        unit: entered.unit,
+      };
+      if (await this.saveItems(addLineItem(this.hass, this.runId, material)))
+        this.adding = undefined;
+      return;
+    }
     const unitPrice = parseNumber(entered.unit_price ?? "");
-    if (quantity === undefined || unitPrice === undefined || unitPrice === null) return;
+    if (unitPrice === undefined || unitPrice === null) return;
     const item = {
+      kind: "other" as const,
       label: (entered.label ?? "").trim() || null,
       quantity,
       unit: (entered.unit ?? "").trim(),
       unit_price: unitPrice,
     };
     if (await this.saveItems(addLineItem(this.hass, this.runId, item))) this.adding = undefined;
+  }
+
+  /** Materials a Line Item can pick: current ones, plus its own even when archived. */
+  private pickable(current: string | null) {
+    return this.materials.filter((material) => !material.archived || material.id === current);
   }
 
   private async onAddTemplate(event: SubmitEvent, template: LineItemTemplate) {
@@ -375,6 +414,7 @@ export class RunPage extends LitElement {
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
                 ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
+                ${kind === "material" ? this.renderAddMaterial(t) : nothing}
               </div>
             `;
           })}
@@ -483,11 +523,12 @@ export class RunPage extends LitElement {
   }
 
   private renderItem(item: LineItem, t: Localize, format: Format) {
-    const why = evidence(item, t);
+    const why = evidence(item, t, format);
     const shown = itemValues(item, format);
     const { computed, locked } = item;
-    // Labels and units WattBill sets stay as they are, rendered in the output language.
-    const entered = item.kind !== "electricity";
+    // Labels and units WattBill sets stay as they are, rendered in the output language;
+    // a Material Line Item is named by its Material and counts g or ml.
+    const entered = item.kind === "other";
     // Running hours are hours, whatever the template called them.
     const unitEntered = entered && item.basis !== "running_hours";
     const number = (field: (typeof VALUES)[number]) => {
@@ -511,9 +552,11 @@ export class RunPage extends LitElement {
     >
       <div class="label">
         ${
-          entered
-            ? html`<input name="label" aria-label=${t("item.label")} .value=${shown.label} />`
-            : html`<div>${item.label ?? t(`kind.${item.kind}`)}</div>`
+          item.kind === "material"
+            ? this.renderMaterialPicker(item, t)
+            : entered
+              ? html`<input name="label" aria-label=${t("item.label")} .value=${shown.label} />`
+              : html`<div>${item.label ?? t(`kind.${item.kind}`)}</div>`
         }
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
         ${
@@ -582,6 +625,70 @@ export class RunPage extends LitElement {
             : nothing
         }
       </div>
+    </div>`;
+  }
+
+  private renderMaterialPicker(item: LineItem, t: Localize) {
+    const options = this.pickable(item.material_id);
+    // The catalogue may still be loading; the Line Item's copy names its Material meanwhile.
+    const own = item.material_id !== null && !options.some(({ id }) => id === item.material_id);
+    return html`<select
+      name="material_id"
+      aria-label=${t("item.material")}
+      ?disabled=${item.locked}
+    >
+      ${
+        item.material_id === null
+          ? html`<option value="" selected>${t("item.no_material")}</option>`
+          : nothing
+      }
+      ${
+        own
+          ? html`<option value=${item.material_id} selected>${item.material?.name}</option>`
+          : nothing
+      }
+      ${options.map(
+        (material) =>
+          html`<option value=${material.id} ?selected=${material.id === item.material_id}>
+            ${material.archived ? t("materials.archived_name", { name: material.name }) : material.name}
+          </option>`,
+      )}
+    </select>`;
+  }
+
+  private renderAddMaterial(t: Localize) {
+    return html`<div class="add-item">
+      ${
+        this.adding === "material"
+          ? html`<form class="material" @submit=${this.onAdd}>
+              <select name="material_id" class="label" required aria-label=${t("item.material")}>
+                ${this.pickable(null).map(
+                  (material) => html`<option value=${material.id}>${material.name}</option>`,
+                )}
+              </select>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                name="quantity"
+                required
+                aria-label=${t("item.quantity")}
+              />
+              <select name="unit" aria-label=${t("item.unit")}>
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+              </select>
+              <div class="row">
+                <button class="btn" type="submit">${t("item.add")}</button>
+                <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+                  ${t("item.cancel")}
+                </button>
+              </div>
+            </form>`
+          : html`<button class="btn small add-material" @click=${() => (this.adding = "material")}>
+              ${t("item.add_material")}
+            </button>`
+      }
     </div>`;
   }
 
@@ -866,6 +973,9 @@ export class RunPage extends LitElement {
         display: grid;
         grid-template-columns: 1fr 72px 72px 110px;
         gap: 6px;
+      }
+      .add-item form.material {
+        grid-template-columns: 1fr 96px 72px;
       }
       .add-item form > :is(p, .row) {
         grid-column: 1 / -1;

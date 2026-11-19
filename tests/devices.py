@@ -120,6 +120,9 @@ async def add_device(
     meter: dict[str, Any] | None = None,
     job: str | None = None,
     job_attribute: str | None = None,
+    material: str | None = None,
+    material_attribute: str | None = None,
+    material_unit: str | None = None,
     thumbnail: str | None = None,
     camera: str | None = None,
     snapshot: bool | None = None,
@@ -131,16 +134,28 @@ async def add_device(
 
     `source` picks the consumption source; Energy and Power take `meter` as input.
     A fixed `price` is a number; a dict is the price entity step's input.
+    `material` is the Material used entity; with `material_attribute`, `material_unit`
+    answers the unit step.
     """
     result = await walk_to_mapping(
         hass, entry, name=name, printer=printer, status=status, attribute=attribute
     )
     result = await configure(hass, result, mapping)
     assert result["step_id"] == "job", result.get("errors")
-    job_input = ({"entity_id": job} if job else {}) | (
-        {"attribute": job_attribute} if job_attribute else {}
-    )
+    job_input = {
+        key: value
+        for key, value in (
+            ("entity_id", job),
+            ("attribute", job_attribute),
+            ("material_entity_id", material),
+            ("material_attribute", material_attribute),
+        )
+        if value
+    }
     result = await configure(hass, result, job_input)
+    if material_attribute:
+        assert result["step_id"] == "material_unit", result.get("errors")
+        result = await configure(hass, result, {"unit": material_unit})
     assert result["step_id"] == "images", result.get("errors")
     images = {
         key: value

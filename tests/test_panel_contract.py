@@ -14,10 +14,19 @@ from .contract import assert_recorded, stable_ids
 from .devices import STATUS, add_device, add_hub
 from .http import HttpClient
 from .images import picture
-from .stored import electricity, line_item, place_runs, place_tags, stored_run
+from .stored import (
+    electricity,
+    line_item,
+    place_materials,
+    place_runs,
+    place_tags,
+    stored_material,
+    stored_run,
+)
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
+FILAMENT = "sensor.kobra_filament_used"
 WEAR = {
     "label": "Wear Kobra",
     "unit": "h",
@@ -35,6 +44,22 @@ TEMPLATES = [
     },
     {"label": "Packaging", "unit_price": 0.5, "basis": "entered"},
 ]
+
+
+def materials() -> list[dict[str, Any]]:
+    fixed = {"source": "fixed", "pack_size": 1000.0, "pack_unit": "g"}
+    return [
+        stored_material(
+            "pla-black", name="PLA Basic Black", price=fixed | {"pack_price": 25.0}
+        ),
+        stored_material(
+            "petg-white",
+            name="PETG White",
+            type="PETG",
+            density=1.27,
+            price=fixed | {"pack_price": 30.0},
+        ),
+    ]
 
 
 def image(image_id: str, kind: str, created: datetime) -> dict[str, Any]:
@@ -63,7 +88,16 @@ def history() -> list[dict[str, Any]]:
                     "material",
                     0.3125,
                     id="benchy-pla",
-                    label="PLA Basic Black",
+                    material_id="pla-black",
+                    material={
+                        "name": "PLA Basic Black",
+                        "type": "PLA",
+                        "density": 1.24,
+                        "diameter": 1.75,
+                        "price_per_gram": 0.025,
+                    },
+                    measured=True,
+                    length=4191.0,
                     quantity=12.5,
                     unit="g",
                     unit_price=0.025,
@@ -77,7 +111,7 @@ def history() -> list[dict[str, Any]]:
             started=helmet_start,
             hours=9,
             outcome="failed",
-            flags=["fault"],
+            flags=["fault", "material_missing"],
             tags=["Cosplay helmet", "Gift"],
             images=[image("helmet-snapshot", "snapshot", helmet_start + DAY * 9 / 24)],
             line_items=[
@@ -101,6 +135,16 @@ def history() -> list[dict[str, Any]]:
                         },
                     ],
                 },
+                line_item(
+                    "material",
+                    0,
+                    id="helmet-filament",
+                    measured=True,
+                    length=30000.0,
+                    quantity=None,
+                    unit="g",
+                    unit_price=0,
+                ),
             ],
         ),
         stored_run(
@@ -120,14 +164,18 @@ async def test_record_the_runs_the_panel_shows(
 ) -> None:
     place_runs(hass_storage, *history())
     place_tags(hass_storage, "Cosplay helmet", "Gift", "Spare parts")
+    place_materials(hass_storage, *materials())
     entry = await add_hub(hass)
     hass.states.async_set(STATUS, "idle")
+    used = {"unit_of_measurement": "mm"}
+    hass.states.async_set(FILAMENT, "0", used)
     await panel.subscribe("wattbill/runs/subscribe")
     events = [await panel.event()]
     subentry = await add_device(
         hass,
         entry,
         job="sensor.kobra_job",
+        material=FILAMENT,
         running_power=120,
         paused_power=8,
         price=0.30,
@@ -139,11 +187,15 @@ async def test_record_the_runs_the_panel_shows(
         settings={
             "tags_for_new_runs": ["Batch 7"],
             "automatic_templates": [wear["template"]["id"]],
+            "default_material": "pla-black",
         },
     )
     hass.states.async_set(STATUS, "printing")
     await hass.async_block_till_done()
     events.append(await panel.event())
+    hass.states.async_set(FILAMENT, "1500", used)
+    await hass.async_block_till_done()
+    await panel.event()
     await clock.advance(minutes=45)
     events.append(await panel.event())
     live_id = events[-1]["run"]["id"]
@@ -154,10 +206,14 @@ async def test_record_the_runs_the_panel_shows(
     }
     runs = [run["id"] for run in events[0]["runs"]] + [live_id]
     details = [await panel.call("wattbill/runs/get", run_id=run) for run in runs]
-    [live_item, live_wear] = details[-1]["run"]["line_items"]
+    [live_item, live_material, live_wear] = details[-1]["run"]["line_items"]
     ids[live_item["id"]] = "print-live-electricity"
+    ids[live_material["id"]] = "print-live-material"
     ids[live_wear["id"]] = "print-live-wear"
     hass.states.async_set(STATUS, "finished")
+    await hass.async_block_till_done()
+    await panel.event()
+    hass.states.async_set(FILAMENT, "1600", used)
     await hass.async_block_till_done()
     events.append(await panel.event())
 
@@ -178,6 +234,7 @@ async def test_record_line_item_corrections(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     place_runs(hass_storage, *history())
+    place_materials(hass_storage, *materials())
     await add_hub(hass)
 
     overridden = await panel.call(
@@ -206,6 +263,20 @@ async def test_record_line_item_corrections(
         template_id=template["template"]["id"],
         quantity=2,
     )
+    picked = await panel.call(
+        "wattbill/line_items/update",
+        run_id="helmet",
+        line_item_id="helmet-filament",
+        material_id="petg-white",
+    )
+    added_material = await panel.call(
+        "wattbill/line_items/add",
+        run_id="benchy",
+        kind="material",
+        material_id="petg-white",
+        quantity=3,
+        unit="g",
+    )
 
     assert_recorded("line-items-update", overridden)
     refund = added["run"]["line_items"][-1]["id"]
@@ -214,6 +285,14 @@ async def test_record_line_item_corrections(
     ids = {template["template"]["id"]: "template-nozzle", copied: "benchy-nozzle"}
     assert_recorded("line-items-save-as-template", stable_ids(template, ids))
     assert_recorded("line-items-add-template", stable_ids(from_template, ids))
+    assert_recorded(
+        "line-items-material", stable_ids(picked, {refund: "helmet-refund"})
+    )
+    petg = added_material["run"]["line_items"][-1]["id"]
+    assert_recorded(
+        "line-items-add-material",
+        stable_ids(added_material, ids | {petg: "benchy-petg"}),
+    )
 
 
 async def test_record_what_deleting_a_run_drops(

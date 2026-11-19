@@ -142,7 +142,7 @@ async def test_adding_a_template_copies_its_values_into_an_other_line_item(
     )
     await panel.call("wattbill/templates/delete", template_id=inserts["id"])
     after = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
-    assert after["line_items"][1:] == [default, entered]
+    assert after["line_items"][2:] == [default, entered]
     assert value(hass, OTHER_COST) == pytest.approx(0.88)
 
 
@@ -235,7 +235,7 @@ async def test_any_line_item_is_saved_as_a_template_with_its_current_values(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     run = await printed(hass, clock, panel)
-    [electricity] = run["line_items"]
+    [electricity, _material] = run["line_items"]
     labour = await add_other(
         panel, run, label="Labour", quantity=0.5, unit="h", unit_price=15
     )
@@ -286,7 +286,7 @@ async def test_a_line_item_without_a_label_needs_one_to_be_saved(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
     run = await printed(hass, clock, panel)
-    [electricity] = run["line_items"]
+    [electricity, _material] = run["line_items"]
 
     errors = [
         await panel.error(

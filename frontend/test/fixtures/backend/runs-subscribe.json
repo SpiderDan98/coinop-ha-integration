@@ -40,7 +40,8 @@
         "part_count": 1,
         "cost_per_part": 0.3,
         "flags": [
-          "fault"
+          "fault",
+          "material_missing"
         ],
         "tags": [
           "Cosplay helmet",
@@ -107,9 +108,9 @@
       "outcome": null,
       "finalised": false,
       "running_seconds": 2700,
-      "total": 0.14,
+      "total": 0.25,
       "part_count": 1,
-      "cost_per_part": 0.14,
+      "cost_per_part": 0.25,
       "flags": [],
       "tags": [
         "Batch 7"
@@ -129,9 +130,9 @@
       "outcome": "completed",
       "finalised": true,
       "running_seconds": 2700,
-      "total": 0.14,
+      "total": 0.26,
       "part_count": 1,
-      "cost_per_part": 0.14,
+      "cost_per_part": 0.26,
       "flags": [],
       "tags": [
         "Batch 7"

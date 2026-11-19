@@ -51,6 +51,12 @@ export interface LineItem {
   /** Running hours make the quantity computed, live until the Run is final. */
   basis: QuantityBasis | null;
   segments: { start: string; end: string; kwh: number; unit_price: number }[];
+  /** Material Line Items: their Material, and a copy of it as it was when priced. */
+  material_id: string | null;
+  material: Pick<Material, "name" | "type" | "density" | "diameter" | "price_per_gram"> | null;
+  /** Follows the printer's Material used input; `length` (mm) is the measured length. */
+  measured: boolean;
+  length: number | null;
   /** What WattBill computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -73,7 +79,12 @@ export interface Device {
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
-    job: { entity_id: string | null; attribute: string | null };
+    job: {
+      entity_id: string | null;
+      attribute: string | null;
+      /** Missing for Devices added before Material used existed. */
+      material?: { entity_id: string; attribute: string | null; unit: string | null } | null;
+    };
     /** Missing for Devices added before images existed. */
     images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
@@ -97,7 +108,11 @@ export interface Device {
         };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
-  settings: { tags_for_new_runs: string[]; automatic_templates: string[] };
+  settings: {
+    tags_for_new_runs: string[];
+    automatic_templates: string[];
+    default_material: string | null;
+  };
 }
 
 export type RunChange = "started" | "updated" | "ended" | "deleted";
@@ -166,9 +181,13 @@ export const setCover = (hass: HomeAssistant, runId: string, imageId: string) =>
 
 export const deleteImage = (hass: HomeAssistant, runId: string, imageId: string) =>
   runResult(hass, { type: "wattbill/images/delete", run_id: runId, image_id: imageId });
-type Entered = Partial<Pick<LineItem, "label" | "unit" | "quantity" | "unit_price" | "amount">>;
 
-/** An amount back-computes the unit price; a computed Line Item becomes manual. */
+type Entered = Partial<
+  Pick<LineItem, "label" | "unit" | "quantity" | "unit_price" | "amount" | "material_id">
+>;
+
+/** An amount back-computes the unit price; a computed Line Item becomes manual.
+ * A new Material re-prices the Line Item and reweighs its measured length. */
 export const updateLineItem = (
   hass: HomeAssistant,
   runId: string,
@@ -185,9 +204,12 @@ export const updateLineItem = (
 export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
   runResult(hass, { type: "wattbill/line_items/reset", run_id: runId, line_item_id: lineItemId });
 
-/** Only Other Line Items are added by hand so far. */
-export const addLineItem = (hass: HomeAssistant, runId: string, item: Entered) =>
-  runResult(hass, { type: "wattbill/line_items/add", run_id: runId, kind: "other", ...item });
+/** A Material Line Item names its Material and counts g or ml at its current price. */
+export const addLineItem = (
+  hass: HomeAssistant,
+  runId: string,
+  item: Entered & { kind: Exclude<Kind, "electricity"> },
+) => runResult(hass, { type: "wattbill/line_items/add", run_id: runId, ...item });
 
 /** A copy of the template; `quantity` replaces an entered default quantity. */
 export const addTemplateLineItem = (

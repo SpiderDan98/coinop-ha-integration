@@ -23,12 +23,16 @@
       "cost_source": null,
       "prices": [],
       "average_powers": [],
+      "usage": null,
       "line_items": [
         {
           "id": "electricity",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": null,
           "basis": null,
           "quantity": 0.15,
@@ -51,8 +55,17 @@
         {
           "id": "benchy-pla",
           "kind": "material",
-          "label": "PLA Basic Black",
-          "material_id": null,
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 4191.0,
           "template_id": null,
           "basis": null,
           "quantity": 12.5,
@@ -70,6 +83,9 @@
           "kind": "other",
           "label": "Nozzle wear",
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": null,
           "basis": null,
           "quantity": 1,
@@ -132,7 +148,8 @@
       "finalised": true,
       "pauses": [],
       "flags": [
-        "fault"
+        "fault",
+        "material_missing"
       ],
       "part_count": 1,
       "note": null,
@@ -144,12 +161,16 @@
       "cost_source": null,
       "prices": [],
       "average_powers": [],
+      "usage": null,
       "line_items": [
         {
           "id": "electricity",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": null,
           "basis": null,
           "quantity": 1.08,
@@ -174,6 +195,26 @@
           "computed": null,
           "locked": false,
           "deletable": false
+        },
+        {
+          "id": "helmet-filament",
+          "kind": "material",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": true,
+          "length": 30000.0,
+          "template_id": null,
+          "basis": null,
+          "quantity": null,
+          "unit": "g",
+          "unit_price": 0,
+          "amount": 0.0,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": false,
+          "deletable": true
         }
       ],
       "images": [
@@ -225,12 +266,16 @@
       "cost_source": null,
       "prices": [],
       "average_powers": [],
+      "usage": null,
       "line_items": [
         {
           "id": "electricity",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": null,
           "basis": null,
           "quantity": 0.24,
@@ -306,12 +351,20 @@
           8.0
         ]
       ],
+      "usage": {
+        "at": "2026-01-15T10:00:00+00:00",
+        "value": 1500.0,
+        "unit": "mm"
+      },
       "line_items": [
         {
           "id": "print-live-electricity",
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": null,
           "basis": null,
           "quantity": 0.09,
@@ -332,10 +385,39 @@
           "deletable": false
         },
         {
+          "id": "print-live-material",
+          "kind": "material",
+          "label": null,
+          "material_id": "pla-black",
+          "material": {
+            "name": "PLA Basic Black",
+            "type": "PLA",
+            "density": 1.24,
+            "diameter": 1.75,
+            "price_per_gram": 0.025
+          },
+          "measured": true,
+          "length": 1500.0,
+          "template_id": null,
+          "basis": null,
+          "quantity": 4.473824288252715,
+          "unit": "g",
+          "unit_price": 0.025,
+          "amount": 0.11,
+          "method": null,
+          "segments": [],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        },
+        {
           "id": "print-live-wear",
           "kind": "other",
           "label": "Wear Kobra",
           "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
           "template_id": "template-wear",
           "basis": "running_hours",
           "quantity": 0.75,
@@ -352,12 +434,12 @@
       "images": [],
       "cover_id": null,
       "running_seconds": 2700,
-      "total": 0.14,
-      "cost_per_part": 0.14,
+      "total": 0.25,
+      "cost_per_part": 0.25,
       "cover": null,
       "subtotals": {
         "electricity": 0.03,
-        "material": 0.0,
+        "material": 0.11,
         "other": 0.11
       }
     }

@@ -13,7 +13,7 @@ from .test_device_flow import fields, suggested
 from .test_lifecycle import at
 from .test_measured import electricity, set_meter
 from .test_persistence import live_runs, restart
-from .test_runs import TOTAL_COST, set_status, stored_runs, value
+from .test_runs import NO_MATERIAL, TOTAL_COST, set_status, stored_runs, value
 
 PRICE_ENTITY = {"entity_id": PRICE}
 
@@ -179,7 +179,7 @@ async def test_each_kwh_is_charged_at_the_price_that_applied_when_it_was_used(
         (at(minutes=30), at(minutes=45), 0.25, 0.40),
         (at(minutes=45), at(hours=1), 0.25, 0.10),
     ]
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_meter_readings_at_a_price_change_are_interpolated(
@@ -267,7 +267,7 @@ async def test_while_the_price_is_unavailable_the_last_valid_price_applies(
         (at(), at(minutes=45), 0.75, 0.20),
         (at(minutes=45), at(hours=1), 0.25, 0.40),
     ]
-    assert run["flags"] == ["price_gap"]
+    assert run["flags"] == ["price_gap", *NO_MATERIAL]
 
 
 async def test_a_price_unavailable_at_start_is_the_last_known_one_before_it(
@@ -283,7 +283,7 @@ async def test_a_price_unavailable_at_start_is_the_last_known_one_before_it(
 
     [run] = stored_runs(hass_storage)
     assert segments(run) == [(at(minutes=10), at(minutes=70), 1.0, 0.20)]
-    assert run["flags"] == ["price_gap"]
+    assert run["flags"] == ["price_gap", *NO_MATERIAL]
 
 
 async def test_without_a_price_before_the_runs_first_one_that_one_applies(
@@ -301,7 +301,7 @@ async def test_without_a_price_before_the_runs_first_one_that_one_applies(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["amount"] == pytest.approx(0.30)
-    assert run["flags"] == ["price_gap"]
+    assert run["flags"] == ["price_gap", *NO_MATERIAL]
 
 
 async def test_without_any_price_electricity_costs_nothing_and_is_flagged(
@@ -316,7 +316,7 @@ async def test_without_any_price_electricity_costs_nothing_and_is_flagged(
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(1.0)
     assert electricity(run)["amount"] == 0
-    assert run["flags"] == ["price_gap"]
+    assert run["flags"] == ["price_gap", *NO_MATERIAL]
 
 
 async def test_a_price_report_updates_the_provisional_cost_at_once(
@@ -357,7 +357,7 @@ async def test_price_segments_survive_a_restart_of_the_open_run(
         (at(), at(minutes=20), 1 / 3, 0.20),
         (at(minutes=20), at(hours=1), 2 / 3, 0.40),
     ]
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def print_for_an_hour(hass: HomeAssistant, clock: Clock) -> None:

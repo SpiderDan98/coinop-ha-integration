@@ -19,7 +19,7 @@ from .devices import (
 )
 from .test_lifecycle import start_wattbill, stop_wattbill
 from .test_persistence import live_runs, restart
-from .test_runs import set_status, stored_runs
+from .test_runs import NO_MATERIAL, set_status, stored_runs
 
 
 async def set_meter(
@@ -67,7 +67,7 @@ async def test_meter_readings_are_interpolated_at_run_start_and_end(
     assert item["method"] == "measured"
     assert item["quantity"] == pytest.approx(10.52 - 10.1)
     assert item["amount"] == pytest.approx((10.52 - 10.1) * 0.30)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_without_a_final_report_the_last_reading_applies_after_five_minutes(
@@ -134,7 +134,7 @@ async def test_power_is_integrated_with_the_left_rule(
     item = electricity(run)
     assert item["method"] == "measured"
     assert item["quantity"] == pytest.approx(100 * 20 / 60_000 + 200 * 30 / 60_000)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_energy_across_a_meter_gap_is_spread_evenly_and_flagged(
@@ -153,7 +153,7 @@ async def test_energy_across_a_meter_gap_is_spread_evenly_and_flagged(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.3)
-    assert run["flags"] == ["consumption_gap"]
+    assert run["flags"] == ["consumption_gap", *NO_MATERIAL]
 
 
 async def test_a_meter_unavailable_at_run_start_is_a_gap(
@@ -170,7 +170,7 @@ async def test_a_meter_unavailable_at_run_start_is_a_gap(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.2)
-    assert run["flags"] == ["consumption_gap"]
+    assert run["flags"] == ["consumption_gap", *NO_MATERIAL]
 
 
 async def test_a_falling_reading_is_a_meter_reset_counting_from_zero(
@@ -190,7 +190,7 @@ async def test_a_falling_reading_is_a_meter_reset_counting_from_zero(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.1 + 0.1 + 0.2)
-    assert run["flags"] == ["meter_reset"]
+    assert run["flags"] == ["meter_reset", *NO_MATERIAL]
 
 
 async def test_a_small_dip_counts_nothing_and_is_flagged(
@@ -209,7 +209,7 @@ async def test_a_small_dip_counts_nothing_and_is_flagged(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.2 + 0.2)
-    assert run["flags"] == ["meter_reset"]
+    assert run["flags"] == ["meter_reset", *NO_MATERIAL]
 
 
 @pytest.mark.parametrize(
@@ -238,7 +238,7 @@ async def test_a_power_gap_holds_the_average_or_else_the_last_power(
     assert electricity(run)["quantity"] == pytest.approx(
         (100 * 10 + gap_watts * 20 + 150 * 30) / 60_000
     )
-    assert run["flags"] == ["consumption_gap"]
+    assert run["flags"] == ["consumption_gap", *NO_MATERIAL]
 
 
 async def print_half_an_hour(
@@ -340,7 +340,7 @@ async def test_meter_readings_survive_a_restart(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(10.2 + 0.3 * 20 / 22 - 10.1)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_a_restart_during_the_final_wait_keeps_waiting(
@@ -379,7 +379,7 @@ async def test_an_outage_during_a_run_is_a_consumption_gap(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.4)
-    assert run["flags"] == ["consumption_gap"]
+    assert run["flags"] == ["consumption_gap", *NO_MATERIAL]
 
 
 async def test_an_outage_holds_the_average_power(
@@ -400,4 +400,4 @@ async def test_an_outage_holds_the_average_power(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx((100 + 200 + 150) / 2 / 1000)
-    assert run["flags"] == ["consumption_gap"]
+    assert run["flags"] == ["consumption_gap", *NO_MATERIAL]

@@ -9,6 +9,8 @@ const [started, updated, ended] = recorded.changes;
 const receiptLine = (item: HTMLElement) => {
   const shown = (selector: string) => {
     const element = query(item, selector);
+    if (element instanceof HTMLSelectElement)
+      return text(query(element, `option[value="${element.value}"]`));
     return element instanceof HTMLInputElement ? element.value : text(element);
   };
   return [
@@ -48,7 +50,10 @@ describe("Run page", () => {
 
     expect(cards(panel)).toEqual([
       ["Electricity €0.05", "Electricity Estimated from average power 0.15 kWh × 0.3 = 0.05"],
-      ["Material €0.31", "PLA Basic Black 12.5 g × 0.025 = 0.31"],
+      [
+        "Material €0.31",
+        "PLA Basic Black 4,191 mm at 1.75 mm and 1.24 g/cm³ 12.5 g × 0.025 = 0.31",
+      ],
       ["Other €0.50", "Nozzle wear 1 pcs × 0.5 = 0.50"],
     ]);
     expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (4) €0.22");
@@ -73,11 +78,13 @@ describe("Run page", () => {
           "10:00 AM – 4:00 PM · 0.6 kWh × €0.30 4:00 – 7:00 PM · 0.48 kWh × €0.25 " +
           "1.08 kWh × 0.2778 = 0.30",
       ],
-      ["Material €0.00"],
+      [
+        "Material €0.00",
+        "No Material 30,000 mm measured; pick a Material to weigh it  g × 0 = 0.00",
+      ],
       ["Other €0.00"],
     ]);
-    const [, material, other] = queryAll(panel, ".kind").map(text);
-    expect(material).toBe("Material €0.00 None");
+    const [, , other] = queryAll(panel, ".kind").map(text);
     expect(other).toBe("Other €0.00 None + Add Other Line Item + From template");
   });
 

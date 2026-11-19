@@ -15,10 +15,12 @@ from .tags import retag, tag_name
 
 TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
 AUTOMATIC_TEMPLATES = "automatic_templates"
+DEFAULT_MATERIAL = "default_material"
 
 FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
     AUTOMATIC_TEMPLATES: ([], vol.All([str], vol.Unique())),
+    DEFAULT_MATERIAL: (None, vol.Any(None, str)),
 }
 
 

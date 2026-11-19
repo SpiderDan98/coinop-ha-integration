@@ -24,7 +24,6 @@ SHARED_TERMS = {
     "sensor.material_used": "entity.sensor.material_used.name",
     "sensor.flagged_runs": "entity.sensor.flagged_runs.name",
     "device.status": "config_subentries.device.step.status.title",
-    "device.job": "config_subentries.device.step.job.title",
     "device.consumption": (
         "config_subentries.device.step.reconfigure.menu_options.consumption"
     ),

@@ -30,7 +30,12 @@
         },
         "job": {
           "entity_id": "sensor.kobra_job",
-          "attribute": null
+          "attribute": null,
+          "material": {
+            "entity_id": "sensor.kobra_filament_used",
+            "attribute": null,
+            "unit": "mm"
+          }
         },
         "images": {
           "thumbnail": null,
@@ -53,7 +58,8 @@
         ],
         "automatic_templates": [
           "template-wear"
-        ]
+        ],
+        "default_material": "pla-black"
       }
     }
   ]

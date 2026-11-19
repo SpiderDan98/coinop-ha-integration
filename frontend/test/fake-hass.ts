@@ -21,6 +21,8 @@ import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
 import imagesUpload from "./fixtures/backend/images-upload.json";
 import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
+import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
@@ -43,8 +45,10 @@ export const recorded = {
   /** Then the Run "print-live" is started, updated (45 min in) and ended. */
   changes: changes as { change: RunChange; run: RunSummary }[],
   /** `wattbill/runs/get` for every recorded Run; "print-live" while still open, with its
-   * automatic template "print-live-wear" counting running hours.
-   * "benchy" has a Thumbnail and a Snapshot, "helmet" only a Snapshot. */
+   * measured Material ("print-live-material") locked and its automatic template
+   * "print-live-wear" counting running hours. "benchy" has a Thumbnail and a Snapshot and
+   * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
+   * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
@@ -59,14 +63,20 @@ export const recorded = {
   lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
   /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
   lineItemsAdd: lineItemsAdd as { run: RunDetail },
+  /** `wattbill/line_items/update`: PETG White picked for Helmet's measured 30 m
+   * ("helmet-filament"), which had no Material. */
+  lineItemsMaterial: lineItemsMaterial as { run: RunDetail },
+  /** `wattbill/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
+  lineItemsAddMaterial: lineItemsAddMaterial as { run: RunDetail },
   /** `wattbill/line_items/save_as_template`: Benchy's "Nozzle wear" as "template-nozzle". */
   saveAsTemplate: lineItemsSaveAsTemplate as { template: LineItemTemplate },
   /** `wattbill/line_items/add_template`: 2 × "template-nozzle" added to Benchy ("benchy-nozzle"). */
   lineItemsAddTemplate: lineItemsAddTemplate as { run: RunDetail },
   /** `wattbill/templates/update`: "template-packaging" repriced to 0.60. */
   templateUpdate: templatesUpdate as { template: LineItemTemplate },
-  /** `wattbill/devices/list`: only "device-kobra" (automatic template "template-wear");
-   * "device-mini" (Runs only) was removed. */
+  /** `wattbill/devices/list`: only "device-kobra" (automatic template "template-wear",
+   * Material used input in mm, default Material "pla-black"); "device-mini" (Runs only)
+   * was removed. */
   devices: devicesList.devices as Device[],
   /**
    * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened
