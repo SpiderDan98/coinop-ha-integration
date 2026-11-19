@@ -8,11 +8,15 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
-from custom_components.wattbill.device_settings import TAGS_FOR_NEW_RUNS
+from custom_components.wattbill.device_settings import (
+    DEFAULT_MATERIAL,
+    TAGS_FOR_NEW_RUNS,
+)
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
 from .command import command
+from .materials import pickable
 
 
 @command({vol.Required("type"): "wattbill/devices/list"})
@@ -53,7 +57,8 @@ async def _update_settings(
 ) -> None:
     """Change the named panel settings; returns all of the Device's panel settings.
 
-    Naming a Tag that doesn't exist yet creates it.
+    Naming a Tag that doesn't exist yet creates it; the default Material must
+    exist and not be archived.
     """
     if msg["device_id"] not in wattbill.settings:
         connection.send_error(
@@ -64,6 +69,10 @@ async def _update_settings(
         changes = wattbill.settings.validate(msg["settings"])
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None and not pickable(
+        connection, msg, wattbill, material_id
+    ):
         return
     if TAGS_FOR_NEW_RUNS in changes:
         changes[TAGS_FOR_NEW_RUNS] = await wattbill.catalog.async_add_tags(

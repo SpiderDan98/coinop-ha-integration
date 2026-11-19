@@ -8,6 +8,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
 from .devices import STATUS, add_device, add_hub
+from .stored import place_materials, stored_material
 from .test_device_management import remove
 from .test_persistence import restart
 from .websocket import PanelClient
@@ -48,7 +49,11 @@ async def test_each_device_lists_its_ha_side_settings(
                     "fault": [],
                     "ignored": [],
                 },
-                "job": {"entity_id": "sensor.kobra_job", "attribute": None},
+                "job": {
+                    "entity_id": "sensor.kobra_job",
+                    "attribute": None,
+                    "material": None,
+                },
                 "images": {"thumbnail": None, "camera": None, "snapshot": False},
                 "consumption": {
                     "source": "estimate",
@@ -57,13 +62,13 @@ async def test_each_device_lists_its_ha_side_settings(
                 },
                 "price": {"source": "fixed", "value": 0.30},
             },
-            "settings": {"tags_for_new_runs": []},
+            "settings": {"tags_for_new_runs": [], "default_material": None},
         },
         {
             "id": mini.subentry_id,
             "name": "Mini",
             "ha_settings": result["devices"][1]["ha_settings"],
-            "settings": {"tags_for_new_runs": []},
+            "settings": {"tags_for_new_runs": [], "default_material": None},
         },
     ]
     assert result["devices"][1]["ha_settings"]["status"]["entity_id"] == (
@@ -77,7 +82,7 @@ async def test_a_panel_setting_is_kept_across_restarts(
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"] == {"tags_for_new_runs": []}
+    assert listed["settings"] == {"tags_for_new_runs": [], "default_material": None}
 
     result = await panel.call(
         "wattbill/devices/update_settings",
@@ -86,9 +91,9 @@ async def test_a_panel_setting_is_kept_across_restarts(
     )
     await restart(hass, entry)
 
-    assert result == {"settings": {"tags_for_new_runs": ["Workshop"]}}
+    assert result["settings"]["tags_for_new_runs"] == ["Workshop"]
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"] == {"tags_for_new_runs": ["Workshop"]}
+    assert listed["settings"]["tags_for_new_runs"] == ["Workshop"]
 
 
 async def test_an_update_leaves_settings_it_does_not_name_alone(
@@ -106,7 +111,7 @@ async def test_an_update_leaves_settings_it_does_not_name_alone(
         "wattbill/devices/update_settings", device_id=kobra.subentry_id, settings={}
     )
 
-    assert result == {"settings": {"tags_for_new_runs": ["Workshop"]}}
+    assert result["settings"]["tags_for_new_runs"] == ["Workshop"]
 
 
 async def test_an_unknown_setting_or_value_is_rejected(
@@ -189,6 +194,39 @@ async def test_settings_written_by_a_newer_version_are_kept(
         "snapshot": True,
         "tags_for_new_runs": ["Workshop"],
     }
+
+
+async def test_the_default_material_is_a_current_material_or_none(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(
+        hass_storage, stored_material("pla"), stored_material("old", archived=True)
+    )
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry)
+
+    result = await panel.call(
+        "wattbill/devices/update_settings",
+        device_id=kobra.subentry_id,
+        settings={"default_material": "pla"},
+    )
+    assert result["settings"]["default_material"] == "pla"
+    for material, code in (("nope", "not_found"), ("old", "not_allowed")):
+        error = await panel.error(
+            "wattbill/devices/update_settings",
+            device_id=kobra.subentry_id,
+            settings={"default_material": material},
+        )
+        assert error["code"] == code, material
+    [listed] = (await panel.call("wattbill/devices/list"))["devices"]
+    assert listed["settings"]["default_material"] == "pla"
+
+    cleared = await panel.call(
+        "wattbill/devices/update_settings",
+        device_id=kobra.subentry_id,
+        settings={"default_material": None},
+    )
+    assert cleared["settings"]["default_material"] is None
 
 
 @pytest.mark.parametrize(

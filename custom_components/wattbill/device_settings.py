@@ -14,9 +14,11 @@ from .store import WattBillStore
 from .tags import retag, tag_name
 
 TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
+DEFAULT_MATERIAL = "default_material"
 
 FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
+    DEFAULT_MATERIAL: (None, vol.Any(None, str)),
 }
 
 

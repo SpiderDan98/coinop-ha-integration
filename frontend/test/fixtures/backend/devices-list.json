@@ -30,7 +30,8 @@
         },
         "job": {
           "entity_id": "sensor.kobra_job",
-          "attribute": null
+          "attribute": null,
+          "material": null
         },
         "images": {
           "thumbnail": null,
@@ -50,7 +51,8 @@
       "settings": {
         "tags_for_new_runs": [
           "Batch 7"
-        ]
+        ],
+        "default_material": null
       }
     }
   ]
