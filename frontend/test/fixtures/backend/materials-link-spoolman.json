@@ -1,0 +1,20 @@
+{
+  "material": {
+    "id": "pla-black",
+    "name": "PLA black",
+    "form": "filament",
+    "type": "PLA",
+    "density": 1.24,
+    "vendor": "eSun",
+    "colour": "#1a1a1a",
+    "diameter": 1.75,
+    "default_for_type": false,
+    "archived": false,
+    "price": {
+      "source": "spoolman",
+      "filament_id": 7,
+      "per_gram": 0.02
+    },
+    "price_per_gram": 0.02
+  }
+}

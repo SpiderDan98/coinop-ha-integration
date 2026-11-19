@@ -23,22 +23,21 @@ from .spoolman import spoolman_call
 
 _TEXT = vol.All(str, vol.Strip, vol.Length(min=1))
 _POSITIVE = vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
-_PRICE = vol.Any(
-    {
-        vol.Required("source"): "fixed",
-        vol.Required("pack_price"): vol.All(vol.Coerce(float), vol.Range(min=0)),
-        vol.Required("pack_size"): _POSITIVE,
-        vol.Optional("pack_unit"): vol.In([unit.value for unit in PackUnit]),
-    },
-    # The price and the synced fields are read from Spoolman when linking.
-    {vol.Required("source"): "spoolman", vol.Required("filament_id"): int},
-)
+_FIXED_PRICE = {
+    vol.Required("source"): "fixed",
+    vol.Required("pack_price"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Required("pack_size"): _POSITIVE,
+    vol.Optional("pack_unit"): vol.In([unit.value for unit in PackUnit]),
+}
+# Linking reads the price and the synced fields from Spoolman; a new Material
+# comes from a Filament through `create_from_spoolman`.
+_LINK = {vol.Required("source"): "spoolman", vol.Required("filament_id"): int}
 _FIELDS = {
     "name": _TEXT,
     "form": vol.In([form.value for form in MaterialForm]),
     "type": _TEXT,
     "density": _POSITIVE,
-    "price": _PRICE,
+    "price": _FIXED_PRICE,
     "vendor": vol.Any(None, _TEXT),
     "colour": vol.Any(None, vol.Match(r"^#[0-9a-fA-F]{6}$")),
     "diameter": vol.Any(None, _POSITIVE),
@@ -139,7 +138,10 @@ async def _create(
         vol.Required("type"): "wattbill/materials/update",
         _MATERIAL_ID: str,
         vol.Required("material"): {
-            vol.Optional(key): schema for key, schema in _FIELDS.items()
+            vol.Optional(key): schema
+            for key, schema in (
+                _FIELDS | {"price": vol.Any(_FIXED_PRICE, _LINK)}
+            ).items()
         },
     }
 )

@@ -403,6 +403,18 @@ async def test_linking_needs_spoolman_and_the_filament(
         material={"price": price | {"filament_id": 7}},
     )
 
+    # A Material comes from a Filament only through create_from_spoolman.
+    by_hand = await panel.error(
+        "wattbill/materials/create",
+        material={
+            "name": "PLA",
+            "form": "filament",
+            "type": "PLA",
+            "density": 1.24,
+            "price": price | {"filament_id": 7},
+        },
+    )
+    assert by_hand["code"] == "invalid_format"
     assert (missing["code"], not_created["code"]) == ("not_found", "not_found")
     assert unreachable["code"] == "spoolman_unreachable"
     [material] = (await panel.call("wattbill/materials/list"))["materials"]
