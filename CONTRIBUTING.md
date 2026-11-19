@@ -14,7 +14,8 @@
 - `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
 - `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; live refresh every minute, finalisation).
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
-- `store.py`: the `runs` and `live` Stores.
+- `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
+- `repairs.py`: the fix flow for missing data (restore guidance or a deliberate fresh start). `backup.py`: writes pending delayed saves before a backup.
 - `ha_device.py`: WattBill's own HA device per Device (registered at setup, linked to the printer's HA device), its `device_info`, and renames from the HA device page. Removing a Device ends its open Run as Unknown in `__init__.py` before the reload; `Run.device_name` always holds the Device's current name.
 - `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
 
@@ -53,6 +54,7 @@ uv run scripts/test_ha.py minimum -q    # also: stable, beta (each in its own .v
 
   `Clock` and `CLOCK_START` come from `tests/clock.py`.
 
+- Schema changes: a minor bump only adds fields (read with a default); a major bump adds a migration to the Store's `Schema` and a folder to `tests/fixtures/storage/` for the version just released (see `tests/test_migrations.py`).
 - `tests/devices.py` sets up the hub (`add_hub`) and walks Add Device through the real flow (`add_device`, `walk_to_mapping`, `add_printer` for a printer's HA device) and reconfigure (`start_reconfigure`, `reconfigure`). Stored Runs are read from the `hass_storage` fixture (`wattbill.runs`, `wattbill.live`).
 
 ## Lint and type check

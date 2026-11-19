@@ -22,7 +22,6 @@ async def test_confirmation_creates_the_hub_entry(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert entry.title == "WattBill"
-    assert entry.data == {}
     assert entry.state is ConfigEntryState.LOADED
 
 

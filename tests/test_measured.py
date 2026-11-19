@@ -84,7 +84,7 @@ async def test_without_a_final_report_the_last_reading_applies_after_five_minute
     assert waiting["ended"] is not None
     assert waiting["outcome"] == "completed"
     assert waiting["finalised"] is False
-    assert "wattbill.runs" not in hass_storage
+    assert stored_runs(hass_storage) == []
     await clock.advance(seconds=1)
 
     [run] = stored_runs(hass_storage)

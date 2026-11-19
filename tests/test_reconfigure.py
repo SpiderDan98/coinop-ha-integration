@@ -232,7 +232,7 @@ async def test_a_new_status_entitys_end_from_before_the_run_is_ignored(
         MAPPING,
     )
 
-    assert "wattbill.runs" not in hass_storage
+    assert stored_runs(hass_storage) == []
     [run] = live_runs(hass_storage)
     hass.states.async_set(other, "printing")
     await clock.advance(minutes=5)
