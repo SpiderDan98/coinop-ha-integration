@@ -71,7 +71,8 @@
             "computed": null
           }
         ],
-        "images": []
+        "images": [],
+        "cover_id": null
       }
     ]
   }

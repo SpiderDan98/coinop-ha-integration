@@ -73,7 +73,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     },
     {
       "id": "01KF0000000000000000000002",
@@ -132,7 +133,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     }
   ],
   "live": [
@@ -203,7 +205,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     }
   ],
   "catalog": {
