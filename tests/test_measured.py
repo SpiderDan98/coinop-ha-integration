@@ -4,10 +4,18 @@ from typing import Any
 
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 import pytest
 
 from .clock import Clock
-from .devices import ENERGY, POWER, add_device, add_hub
+from .devices import (
+    ENERGY,
+    POWER,
+    add_device,
+    add_hub,
+    configure,
+    walk_to_consumption,
+)
 from .test_persistence import live_runs
 from .test_runs import set_status, stored_runs
 
@@ -229,3 +237,82 @@ async def test_a_power_gap_holds_the_average_or_else_the_last_power(
         (100 * 10 + gap_watts * 20 + 150 * 30) / 60_000
     )
     assert run["flags"] == ["consumption_gap"]
+
+
+async def print_half_an_hour(
+    hass: HomeAssistant, clock: Clock, start: float, end: float, **meter: Any
+) -> None:
+    await set_meter(hass, start, **meter)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, end, **meter)
+    await set_status(hass, "finished")
+
+
+async def test_an_energy_meter_in_wh_is_read_in_kwh(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10_000, unit="Wh")
+    await add_metered_device(hass)
+
+    await print_half_an_hour(hass, clock, 10_000, 10_300, unit="Wh")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
+
+
+async def test_a_power_sensor_in_kw_is_read_in_watts(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 0.1, entity=POWER, unit="kW")
+    await add_metered_device(hass, "power")
+
+    await print_half_an_hour(hass, clock, 0.1, 0.1, entity=POWER, unit="kW")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.05)
+
+
+async def finish_add_device(hass: HomeAssistant, result: Any) -> None:
+    assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, {"price": 0.30})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+
+
+async def test_a_conversion_factor_turns_readings_into_kwh(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10_000, unit="pulses")
+    result = await walk_to_consumption(hass, await add_hub(hass))
+    result = await configure(hass, result, {"next_step_id": "energy"})
+    result = await configure(hass, result, {"entity_id": ENERGY})
+    result = await configure(hass, result, {"entity_id": ENERGY, "factor": 0.001})
+    await finish_add_device(hass, result)
+
+    await print_half_an_hour(hass, clock, 10_000, 10_300, unit="pulses")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
+
+
+async def test_a_meter_attribute_is_read_in_the_unit_given_for_it(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    plug = "switch.kobra_plug"
+    hass.states.async_set(plug, "on", {"energy_wh": 10_000})
+    result = await walk_to_consumption(hass, await add_hub(hass))
+    result = await configure(hass, result, {"next_step_id": "energy"})
+    result = await configure(
+        hass, result, {"entity_id": plug, "attribute": "energy_wh"}
+    )
+    result = await configure(hass, result, {"unit": "Wh"})
+    await finish_add_device(hass, result)
+
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    hass.states.async_set(plug, "on", {"energy_wh": 10_300})
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
