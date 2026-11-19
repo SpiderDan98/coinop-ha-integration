@@ -332,6 +332,20 @@ export class RunPage extends LitElement {
       <td>
         <div>${item.label ?? t(`kind.${item.kind}`)}</div>
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
+        ${
+          item.segments.length > 1
+            ? html`<ul class="evidence segments">
+                ${item.segments.map(
+                  (segment) =>
+                    html`<li>
+                      ${format.timeRange(segment.start, segment.end)} ·
+                      ${format.quantity(segment.kwh, "kWh")} ×
+                      ${format.unitPrice(segment.unit_price)}
+                    </li>`,
+                )}
+              </ul>`
+            : nothing
+        }
       </td>
       <td class="num small muted">
         ${
@@ -473,6 +487,10 @@ export class RunPage extends LitElement {
       .evidence {
         font-size: 11px;
         color: var(--secondary-text-color);
+      }
+      .segments {
+        margin: 2px 0 0;
+        padding-left: 16px;
       }
       .totals {
         display: grid;

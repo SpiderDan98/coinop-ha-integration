@@ -277,6 +277,7 @@ async def test_a_power_sensor_in_kw_is_read_in_watts(
 
 async def finish_add_device(hass: HomeAssistant, result: Any) -> None:
     assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
     result = await configure(hass, result, {"price": 0.30})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()

@@ -156,11 +156,43 @@
         },
         "price": {
           "title": "Strompreis",
+          "description": "Zahlst du einen festen Preis pro kWh, oder meldet eine Entität den aktuellen Preis, z. B. bei einem dynamischen Tarif?",
+          "menu_options": {
+            "fixed_price": "Fester Preis",
+            "price_entity": "Preis-Entität"
+          }
+        },
+        "fixed_price": {
+          "title": "Fester Strompreis",
           "data": {
             "price": "Preis pro kWh"
           },
           "data_description": {
             "price": "Was du pro kWh zahlst, in {currency}."
+          }
+        },
+        "price_entity": {
+          "title": "Preis-Entität",
+          "description": "Wähle die Entität, die den aktuellen Preis pro kWh oder MWh meldet, in {currency} oder einer Untereinheit wie ct. Jede kWh eines Laufs kostet den Preis, der galt, als sie verbraucht wurde. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Preis-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
+          }
+        },
+        "price_unit": {
+          "title": "Einheit des Preis-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Preis?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
           }
         }
       },

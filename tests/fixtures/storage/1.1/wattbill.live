@@ -31,6 +31,23 @@
           "paused_power": null
         },
         "readings": [],
+        "cost_source": {
+          "source": "fixed",
+          "value": 0.3
+        },
+        "prices": [
+          [
+            "2026-01-15T09:00:00+00:00",
+            0.3
+          ]
+        ],
+        "average_powers": [
+          [
+            "2026-01-15T09:00:00+00:00",
+            120,
+            null
+          ]
+        ],
         "line_items": [
           {
             "id": "01KF0000000000000000000I03",
