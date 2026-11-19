@@ -5,16 +5,19 @@ amount is rounded first and every sum adds rounded amounts, so each column adds
 up; Markup applies to the rounded subtotal only.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, tzinfo
 from decimal import ROUND_HALF_UP, Decimal
 from functools import partial
+from io import BytesIO
 from pathlib import Path
 
 from fpdf import FPDF, FontFace
+from PIL import Image
 
 from custom_components.wattbill.cost.rounding import round_amount, rounded_sum
 from custom_components.wattbill.cost.running_time import running_time
+from custom_components.wattbill.images.encode import InvalidImage, jpeg
 from custom_components.wattbill.models import LineItem, Outcome, Run
 
 from .export import Detail, Options
@@ -29,6 +32,10 @@ GREY = (110, 110, 110)
 RULE = (200, 200, 200)
 HEADINGS = FontFace(emphasis="BOLD", fill_color=(242, 242, 242))
 TOTAL_ROW = FontFace(emphasis="BOLD")
+# Pixels: sharp at the printed size (about 300 dpi), small in the file.
+COVER_EDGE = 800
+# The largest a Cover Image is printed, width and height in mm.
+COVER_BOX = (64, 48)
 
 
 class _Document(FPDF):
@@ -146,7 +153,24 @@ def _header(pdf: _Document, runs: list[Run], options: Options, now: datetime) ->
     pdf.ln(6)
 
 
-def _section(pdf: _Document, run: Run, now: datetime) -> None:
+def _cover(path: Path) -> tuple[bytes, float, float] | None:
+    """The JPEG to print and its printed width and height; None without a readable file."""
+    try:
+        data = jpeg(path.read_bytes(), COVER_EDGE)
+    except OSError, InvalidImage:
+        return None
+    with Image.open(BytesIO(data)) as image:
+        width, height = image.size
+    scale = min(COVER_BOX[0] / width, COVER_BOX[1] / height)
+    return data, width * scale, height * scale
+
+
+def _section(
+    pdf: _Document,
+    run: Run,
+    now: datetime,
+    cover: tuple[bytes, float, float] | None,
+) -> None:
     text, decimals = pdf.t, pdf.t.decimals
     pdf.line_of_text(_name(run, text), 12, "B")
     details = [
@@ -160,6 +184,10 @@ def _section(pdf: _Document, run: Run, now: datetime) -> None:
     if outcome := _outcome(run, text):
         pdf.line_of_text(text("outcome", outcome=outcome), 9, grey=True)
     pdf.ln(1.5)
+    if cover:
+        data, width, height = cover
+        pdf.image(BytesIO(data), w=width, h=height)
+        pdf.ln(2)
     pdf.rows(
         (46, 18, 18, 18),
         ("LEFT", "RIGHT", "RIGHT", "RIGHT"),
@@ -243,12 +271,13 @@ def render(
     runs: list[Run],
     options: Options,
     *,
+    covers: Mapping[str, Path],
     now: datetime,
     currency: str,
     country: str | None,
     time_zone: tzinfo,
 ) -> bytes:
-    """`runs`: the ended Runs, ordered by start."""
+    """`runs`: the ended Runs, ordered by start; `covers`: Cover Image files by Run id."""
     text = Text(options.language, currency, time_zone)
     pdf = _Document(text, "Letter" if country in LETTER_COUNTRIES else "A4")
     pdf.set_title(options.title or text("title"))
@@ -258,6 +287,7 @@ def render(
         _compact(pdf, runs)
     else:
         for run in runs:
-            pdf.keep_together(partial(_section, pdf, run, now))
+            cover = _cover(covers[run.id]) if run.id in covers else None
+            pdf.keep_together(partial(_section, pdf, run, now, cover))
     pdf.keep_together(partial(_totals, pdf, runs, options.markup))
     return bytes(pdf.output())

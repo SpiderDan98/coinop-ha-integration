@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from io import BytesIO
+from pathlib import Path
+import shutil
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -15,6 +17,7 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .devices import add_hub
 from .http import HttpClient
+from .images import colour, picture
 from .stored import electricity, line_item, place_runs, stored_run
 from .test_spoolman import set_options
 from .websocket import PanelClient
@@ -37,6 +40,7 @@ class Statement:
     pages: list[str]
     #: The first page's width and height in mm.
     paper: tuple[int, int]
+    pdf: bytes
 
     @property
     def lines(self) -> list[str]:
@@ -60,7 +64,40 @@ async def export(panel: PanelClient, browser: HttpClient, **options: Any) -> Sta
     assert headers["Content-Type"] == "application/pdf"
     disposition, filename = headers["Content-Disposition"].split("; filename=")
     assert disposition == "attachment"
-    return Statement(filename.strip('"'), *read(body))
+    return Statement(filename.strip('"'), *read(body), body)
+
+
+def pictures(pdf: bytes) -> list[tuple[int, str, tuple[int, int]]]:
+    """Each image in the PDF: its page (from 0), colour and size in pixels."""
+    found = []
+    for number, page in enumerate(PdfReader(BytesIO(pdf)).pages):
+        for image in page.images:
+            assert image.image is not None
+            found.append((number, colour(image.data), image.image.size))
+    return found
+
+
+async def upload(http: HttpClient, run_id: str, *photos: bytes) -> list[str]:
+    status, body = await http.upload(f"/api/wattbill/runs/{run_id}/images", *photos)
+    assert status == 200, body
+    return [image["id"] for image in body["images"]]
+
+
+@pytest.fixture
+async def photographed(
+    hass: HomeAssistant,
+    files: Path,
+    hass_storage: dict[str, Any],
+    panel: PanelClient,
+    http: HttpClient,
+) -> None:
+    """Benchy with a large red photo; Helmet with green and blue, blue picked as cover."""
+    hass.config.currency = "EUR"
+    place_runs(hass_storage, benchy(), helmet())
+    await add_hub(hass)
+    await upload(http, "benchy", picture("red", size=(4000, 3000)))
+    _, blue = await upload(http, "helmet", picture("green"), picture("blue"))
+    await panel.call("wattbill/images/set_cover", run_id="helmet", image_id=blue)
 
 
 def benchy(started: datetime = BENCHY, **fields: Any) -> dict[str, Any]:
@@ -445,6 +482,37 @@ async def test_a_run_longer_than_a_page_breaks_with_its_table_headings_repeated(
     assert "Subtotal €20.31" in pages[2]
 
 
+@pytest.mark.usefixtures("photographed")
+async def test_a_detailed_statement_shows_each_runs_cover_image_downscaled(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(panel, browser, run_ids=["helmet", "benchy"])
+
+    assert pictures(statement.pdf) == [(0, "red", (800, 600)), (0, "blue", (300, 200))]
+
+
+@pytest.mark.usefixtures("photographed")
+async def test_images_can_be_left_off_and_a_compact_statement_has_none(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    without = await export(panel, browser, run_ids=["benchy"], images=False)
+    compact = await export(panel, browser, run_ids=["benchy"], detail="compact")
+
+    assert pictures(without.pdf) == pictures(compact.pdf) == []
+
+
+@pytest.mark.usefixtures("photographed")
+async def test_a_cover_image_missing_on_disk_is_left_out(
+    clock: Clock, files: Path, panel: PanelClient, browser: HttpClient
+) -> None:
+    shutil.rmtree(files / "images" / "benchy")
+
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"])
+
+    assert pictures(statement.pdf) == [(0, "blue", (300, 200))]
+    assert "Benchy" in statement.lines
+
+
 @pytest.mark.usefixtures("two_runs")
 async def test_the_pdf_shows_the_runs_as_they_are_at_download(
     clock: Clock, panel: PanelClient, browser: HttpClient
@@ -514,3 +582,20 @@ async def test_the_download_needs_its_signature_and_expires(
     assert (await browser.get(result["path"]))[0] == 200
     await clock.advance(minutes=2)
     assert (await browser.get(result["path"]))[0] == 401
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_a_phones_download_manager_can_fetch_the_signed_path_again(
+    clock: Clock, panel: PanelClient, browser: HttpClient, http: HttpClient
+) -> None:
+    """The Android app's web view opens the link, then its download manager fetches
+    it again later, sending the app's auth header and the signature both."""
+    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+
+    first = await browser.download(result["path"])
+    await clock.advance(minutes=1)
+    again = await http.download(result["path"])
+
+    assert [first[0], again[0]] == [200, 200]
+    assert first[1]["Content-Disposition"] == again[1]["Content-Disposition"]
+    assert read(first[2]) == read(again[2])

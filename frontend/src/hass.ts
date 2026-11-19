@@ -28,10 +28,15 @@ export function navigate(path: string) {
   window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
 }
 
-/** Download a file the way HA's frontend does: a plain link, so the path must be signed. */
+/**
+ * Download a file the way HA's frontend `fileDownload` does, which the Companion apps
+ * handle: Android passes the link to its download manager, iOS downloads it or opens it in
+ * the browser. A plain link sends no token, so the path must be signed.
+ */
 export function download(path: string) {
   const link = document.createElement("a");
-  link.href = path;
+  link.target = "_blank";
+  link.href = new URL(path, location.href).href;
   link.download = "";
   link.style.display = "none";
   document.body.append(link);

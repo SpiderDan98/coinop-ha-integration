@@ -311,6 +311,8 @@ export const createStatement = async (
     title: string | null;
     note: string | null;
     detail: (typeof STATEMENT_DETAILS)[number];
+    /** Each Run's Cover Image, in a Detailed statement. */
+    images: boolean;
     language: (typeof STATEMENT_LANGUAGES)[number];
     markup: number;
   },

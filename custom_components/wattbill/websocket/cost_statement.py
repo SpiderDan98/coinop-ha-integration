@@ -40,6 +40,7 @@ def _text(value: str | None) -> str | None:
         vol.Optional("title"): vol.Any(None, str),
         vol.Optional("note"): vol.Any(None, str),
         vol.Optional("detail", default=Detail.DETAILED): vol.Coerce(Detail),
+        vol.Optional("images", default=True): bool,
         vol.Optional("language"): vol.In(LANGUAGES),
         vol.Optional("markup"): vol.All(vol.Coerce(float), vol.Range(min=0)),
     }
@@ -68,6 +69,7 @@ def _create(
         title=_text(msg.get("title")),
         note=_text(msg.get("note")),
         detail=msg["detail"],
+        images=msg["images"],
     )
     token = wattbill.statements.add(msg["run_ids"], options, dt_util.utcnow())
     connection.send_result(

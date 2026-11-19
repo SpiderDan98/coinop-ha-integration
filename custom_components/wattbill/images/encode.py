@@ -39,3 +39,21 @@ def encode(data: bytes, formats: Collection[str] | None = None) -> tuple[bytes, 
     except (UnidentifiedImageError, OSError, ValueError) as err:
         raise InvalidImage from err
     return _webp(clean, FULL_EDGE), _webp(clean, TILE_EDGE)
+
+
+def jpeg(data: bytes, edge: int) -> bytes:
+    """A stored image as a JPEG at most `edge` pixels wide and high, on white where transparent.
+
+    Raises `InvalidImage`; blocking, so run it in the executor.
+    """
+    try:
+        with Image.open(BytesIO(data)) as source:
+            image = source.convert("RGBA")
+    except (UnidentifiedImageError, OSError, ValueError) as err:
+        raise InvalidImage from err
+    image.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+    flat = Image.new("RGB", image.size, "white")
+    flat.paste(image, mask=image)
+    buffer = BytesIO()
+    flat.save(buffer, "JPEG", quality=QUALITY)
+    return buffer.getvalue()

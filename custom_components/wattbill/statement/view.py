@@ -62,10 +62,16 @@ class CostStatementView(HomeAssistantView):
         )
         if not runs:
             raise web.HTTPNotFound
+        covers = {
+            run.id: wattbill.images.path(run, cover, "full")
+            for run in runs
+            if export.options.images and (cover := run.cover)
+        }
         pdf = await hass.async_add_executor_job(
             lambda: render(
                 runs,
                 export.options,
+                covers=covers,
                 now=now,
                 currency=hass.config.currency,
                 country=hass.config.country,
