@@ -67,7 +67,7 @@ def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
             item.as_dict() | {"amount": float(round_amount(item.amount, decimals))}
             for item in run.line_items
         ],
-        "images": [image_info(run, image) for image in run.images],
+        "images": [image_info(run, image) for image in run.images_in_order],
         "subtotals": {
             kind: float(
                 rounded_sum(

@@ -201,13 +201,15 @@ class Run:
         return next(i for i in self.line_items if i.kind is LineItemKind.ELECTRICITY)
 
     @property
-    def cover(self) -> RunImage | None:
+    def images_in_order(self) -> list[RunImage]:
         order = list(ImageKind)
-        return min(
-            self.images,
-            key=lambda image: (order.index(image.kind), image.created),
-            default=None,
+        return sorted(
+            self.images, key=lambda image: (order.index(image.kind), image.created)
         )
+
+    @property
+    def cover(self) -> RunImage | None:
+        return next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
