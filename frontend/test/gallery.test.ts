@@ -12,8 +12,8 @@ describe("Run gallery", () => {
 
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
-      "No image Helmet Kobra · Jan 13, 2026 · 9 h 0 min Failed €0.30",
-      "No image Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86",
+      "No image ⚑ 1 Helmet Kobra · Jan 13, 2026 · 9 h 0 min Failed €0.30",
+      "No image Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86 €0.22 per part × 4",
     ]);
     expect(text(query(panel, ".head"))).toBe("Runs 3 · €1.23");
   });
@@ -84,7 +84,7 @@ describe("Run gallery", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }));
 
     expect(tiles(panel)[1]).toBe(
-      "Kein Bild Helmet Kobra · 13. Jan. 2026 · 9 Std. 0 Min. Fehlgeschlagen 0,30 €",
+      "Kein Bild ⚑ 1 Helmet Kobra · 13. Jan. 2026 · 9 Std. 0 Min. Fehlgeschlagen 0,30 €",
     );
   });
 

@@ -20,6 +20,7 @@
       ],
       "flags": [],
       "part_count": 1,
+      "note": null,
       "consumption": {
         "source": "estimate",
         "running_power": 120,
@@ -68,6 +69,7 @@
       "pauses": [],
       "flags": [],
       "part_count": 1,
+      "note": null,
       "consumption": {
         "source": "estimate",
         "running_power": 120,
@@ -117,6 +119,7 @@
       ],
       "flags": [],
       "part_count": 1,
+      "note": null,
       "consumption": {
         "source": "estimate",
         "running_power": 120,

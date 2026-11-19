@@ -164,6 +164,7 @@ class Run:
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
     part_count: int = 1
+    note: str | None = None
     consumption: dict[str, Any] | None = None
     readings: list[tuple[datetime, float | None]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -191,6 +192,7 @@ class Run:
             ],
             "flags": list(self.flags),
             "part_count": self.part_count,
+            "note": self.note,
             "consumption": self.consumption,
             "readings": [[at.isoformat(), value] for at, value in self.readings],
             "line_items": [item.as_dict() for item in self.line_items],
@@ -216,6 +218,7 @@ class Run:
             ],
             flags=list(data["flags"]),
             part_count=data["part_count"],
+            note=data.get("note"),
             consumption=data.get("consumption"),
             readings=[
                 (datetime.fromisoformat(at), value)

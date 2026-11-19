@@ -169,7 +169,7 @@ describe("Runs of removed Devices", () => {
     expect(text(query(panel, ".head"))).toContain("1 · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
-      "No image Helmet Kobra",
+      "No image ⚑ 1 Helmet Kobra",
       "No image Benchy Kobra",
     ]);
     await filterBy(panel, "");

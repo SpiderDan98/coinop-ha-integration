@@ -23,6 +23,8 @@ def history() -> list[dict[str, Any]]:
             name="Benchy",
             started=benchy_start,
             hours=1.25,
+            part_count=4,
+            note="Four on one plate",
             line_items=[
                 electricity(0.15, 0.30, benchy_start, benchy_start + DAY / 19.2),
                 line_item(
@@ -43,6 +45,7 @@ def history() -> list[dict[str, Any]]:
             started=helmet_start,
             hours=9,
             outcome="failed",
+            flags=["fault"],
             line_items=[
                 electricity(0.6, 0.30, helmet_start, helmet_start + DAY / 4)
                 | {
@@ -120,3 +123,14 @@ async def test_record_the_runs_the_panel_shows(
     # Mini's Runs stay in the history after it was removed.
     devices = await panel.call("wattbill/devices/list")
     assert_recorded("devices-list", stable_ids(devices, ids))
+
+
+async def test_record_what_deleting_a_run_drops(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, *history())
+    await add_hub(hass)
+
+    preview = await panel.call("wattbill/runs/delete_preview", run_ids=["helmet"])
+
+    assert_recorded("runs-delete-preview", preview)
