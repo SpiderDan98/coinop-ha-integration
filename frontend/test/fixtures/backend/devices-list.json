@@ -35,7 +35,10 @@
             "entity_id": "sensor.kobra_filament_used",
             "attribute": null,
             "unit": "mm"
-          }
+          },
+          "slots": [],
+          "colour_attribute": null,
+          "loaded_slot": null
         },
         "images": {
           "thumbnail": null,

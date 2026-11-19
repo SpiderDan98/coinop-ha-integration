@@ -229,6 +229,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 }
                 if material
                 else None,
+                "slots": list(user_input.get("slots", [])),
+                "colour_attribute": user_input.get("colour_attribute") or None,
+                "loaded_slot": user_input.get("loaded_slot"),
             }
             usage = self._job["material"]
             if usage is None:
@@ -245,6 +248,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 vol.Optional("attribute"): TextSelector(),
                 vol.Optional("material_entity_id"): EntitySelector(),
                 vol.Optional("material_attribute"): TextSelector(),
+                # The order picked is the Slot order.
+                vol.Optional("slots"): EntitySelector(
+                    EntitySelectorConfig(multiple=True, reorder=True)
+                ),
+                vol.Optional("colour_attribute"): TextSelector(),
+                vol.Optional("loaded_slot"): EntitySelector(),
             }
         )
         stored = self._data.get("job") or {}

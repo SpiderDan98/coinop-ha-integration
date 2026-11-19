@@ -477,6 +477,60 @@ async def test_record_the_catalogue_the_panel_shows(
     assert_recorded("templates-update", stable_ids(updated, ids))
 
 
+async def test_record_a_run_split_across_slots(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    pla, petg = materials()
+    place_materials(
+        hass_storage, pla | {"colour": "#1a1a1a"}, petg | {"default_for_type": True}
+    )
+    entry = await add_hub(hass)
+    used = {"unit_of_measurement": "mm"}
+    hass.states.async_set(FILAMENT, "0", used)
+    hass.states.async_set("sensor.ace_slot_1", "PLA", {"color_hex": "#1A1A1A"})
+    hass.states.async_set("sensor.ace_slot_2", "PETG", {"color_hex": "#FFFFFF"})
+    hass.states.async_set("sensor.ace_loaded_slot", "1")
+    subentry = await add_device(
+        hass,
+        entry,
+        material=FILAMENT,
+        slots=["sensor.ace_slot_1", "sensor.ace_slot_2"],
+        colour_attribute="color_hex",
+        loaded_slot="sensor.ace_loaded_slot",
+    )
+    await panel.call(
+        "wattbill/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={"default_material": "pla-black"},
+    )
+    hass.states.async_set(STATUS, "printing")
+    await clock.advance(minutes=45)
+    hass.states.async_set("sensor.ace_loaded_slot", "2")
+    await clock.advance(minutes=15)
+    hass.states.async_set(FILAMENT, "4000", used)
+    hass.states.async_set(STATUS, "finished")
+    await hass.async_block_till_done()
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    electricity_item, pla_item, petg_item = detail["line_items"]
+
+    corrected = await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=petg_item["id"],
+        quantity=4,
+    )
+
+    ids = {
+        run["id"]: "keychain",
+        subentry.subentry_id: "device-kobra",
+        electricity_item["id"]: "keychain-electricity",
+        pla_item["id"]: "keychain-pla",
+        petg_item["id"]: "keychain-petg",
+    }
+    assert_recorded("line-items-split", stable_ids(corrected, ids))
+
+
 async def test_record_what_spoolman_answers(
     hass: HomeAssistant,
     clock: Clock,

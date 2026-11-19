@@ -41,6 +41,10 @@ class DeviceConfig:
     job_attribute: str | None
     # The Material used input: entity_id, attribute and unit.
     material: Mapping[str, Any] | None
+    # The Slot entities in Slot order, their colour attribute and the Loaded slot input.
+    slots: tuple[str, ...]
+    colour_attribute: str | None
+    loaded_slot_entity_id: str | None
     thumbnail_entity_id: str | None
     camera_entity_id: str | None
     snapshot: bool
@@ -70,6 +74,9 @@ class DeviceConfig:
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
             material=job.get("material"),
+            slots=tuple(job.get("slots", ())),
+            colour_attribute=job.get("colour_attribute"),
+            loaded_slot_entity_id=job.get("loaded_slot"),
             thumbnail_entity_id=images.get("thumbnail"),
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),

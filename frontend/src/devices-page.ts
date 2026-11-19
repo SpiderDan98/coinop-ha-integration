@@ -106,6 +106,25 @@ export class DevicesPage extends LitElement {
               : t("device.not_used")
           }
         </dd>
+        <dt>${t("device.slots")}</dt>
+        <dd class="slots">
+          ${
+            ha.job.slots?.length
+              ? html`<ol>
+                    ${ha.job.slots.map((slot) => html`<li>${slot}</li>`)}
+                  </ol>
+                  <div class="muted small">
+                    ${[
+                      ha.job.colour_attribute &&
+                        t("device.slot_colour", { attribute: ha.job.colour_attribute }),
+                      ha.job.loaded_slot && t("device.loaded_slot", { entity: ha.job.loaded_slot }),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>`
+              : t("device.not_used")
+          }
+        </dd>
         <dt>${t("device.thumbnail")}</dt>
         <dd>${ha.images?.thumbnail ?? t("device.not_used")}</dd>
         <dt>${t("device.camera")}</dt>
@@ -237,6 +256,10 @@ export class DevicesPage extends LitElement {
       }
       dt {
         color: var(--secondary-text-color);
+      }
+      .slots ol {
+        margin: 0;
+        padding-left: 20px;
       }
       dd {
         margin: 0;

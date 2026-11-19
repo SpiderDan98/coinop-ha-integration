@@ -118,6 +118,9 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
         "entity_id": "sensor.kobra_job",
         "attribute": "file_name",
         "material": None,
+        "slots": [],
+        "colour_attribute": None,
+        "loaded_slot": None,
     }
     assert data["consumption"]["running_power"] == 90
     assert data["consumption"]["paused_power"] == 10
