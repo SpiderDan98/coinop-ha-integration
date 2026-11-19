@@ -31,12 +31,12 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min In progress €0.03 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min In progress €0.14 Batch 7",
     );
     backend.push(SUBSCRIBE, ended);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min Completed €0.03 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 h 45 min Completed €0.14 Batch 7",
     );
     backend.push(SUBSCRIBE, { ...ended, change: "deleted" });
     await settle(panel);

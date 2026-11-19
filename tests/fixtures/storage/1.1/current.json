@@ -51,6 +51,8 @@
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.2833333333333333,
           "unit": "kWh",
           "unit_price": 0.31176470588235294,
@@ -70,6 +72,21 @@
               "unit_price": 0.35714285714285715
             }
           ],
+          "computed": null
+        },
+        {
+          "id": "01KF0000000000000000000I11",
+          "kind": "other",
+          "label": "Wear Kobra",
+          "material_id": null,
+          "template_id": "01KF0000000000000000000T01",
+          "basis": "running_hours",
+          "quantity": 2.25,
+          "unit": "h",
+          "unit_price": 0.15,
+          "amount": 0.3375,
+          "method": null,
+          "segments": [],
           "computed": null
         }
       ],
@@ -117,6 +134,8 @@
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.04,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -189,6 +208,8 @@
           "kind": "electricity",
           "label": null,
           "material_id": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.06,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -250,6 +271,16 @@
     ],
     "tags": [
       "Gift"
+    ],
+    "templates": [
+      {
+        "id": "01KF0000000000000000000T01",
+        "label": "Wear Kobra",
+        "unit": "h",
+        "unit_price": 0.15,
+        "default_quantity": 1,
+        "basis": "running_hours"
+      }
     ]
   }
 }

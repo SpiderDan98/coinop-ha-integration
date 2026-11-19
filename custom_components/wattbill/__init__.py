@@ -45,9 +45,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
         (device.device_id for device in devices),
     )
     await settings.async_prune()
+    catalog = Catalog(stores["catalog"], data["catalog"], book.uses_material)
     entry.runtime_data = WattBill(
         book=book,
-        catalog=Catalog(stores["catalog"], data["catalog"], book.uses_material),
+        catalog=catalog,
         images=images,
         devices=devices,
         settings=settings,
@@ -58,6 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
                 device,
                 settings,
                 DeviceImages(hass, book, images, device),
+                catalog,
             )
             for device in devices
         ],

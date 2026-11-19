@@ -55,6 +55,8 @@
             "kind": "electricity",
             "label": null,
             "material_id": null,
+            "template_id": null,
+            "basis": null,
             "quantity": 0.06,
             "unit": "kWh",
             "unit_price": 0.3,

@@ -40,9 +40,11 @@ describe("Devices tab", () => {
         "Electricity price €0.30 per kWh " +
         "Device Inputs, consumption source and price are changed in Home Assistant. " +
         "Reconfigure in Home Assistant " +
-        "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device.",
+        "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device. " +
+        "Automatic templates Wear Kobra × + Add template Threaded inserts Packaging " +
+        "Added to every Run that starts on this Device. Changes affect future Runs only.",
     ]);
-    expect(queryAll(panel, ".device input, .device select")).toHaveLength(0);
+    expect(queryAll(panel, ".device dl input, .device dl select")).toHaveLength(0);
     expect(query(panel, ".device a").getAttribute("href")).toBe(
       "/config/integrations/integration/wattbill",
     );
