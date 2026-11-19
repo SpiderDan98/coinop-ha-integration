@@ -152,6 +152,7 @@ export class Overview extends LitElement {
           ? html`<wattbill-statement-dialog
               .hass=${this.hass}
               .runIds=${selected.map((run) => run.id)}
+              .tag=${this.filter.tags.length === 1 && !this.filter.untagged ? this.filter.tags[0] : undefined}
               @close=${() => (this.exporting = false)}
             ></wattbill-statement-dialog>`
           : nothing

@@ -1,5 +1,6 @@
 // The basket's "Cost Statement…" dialog: options for the PDF of the selected Runs, which
 // the backend renders and the browser downloads through a signed path. Fires `close`.
+// The browser remembers the options of the last statement made, all but title and note.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -14,6 +15,37 @@ import { shared } from "./styles";
 
 type Options = Omit<Parameters<typeof createStatement>[2], "title" | "note">;
 
+const REMEMBERED = "wattbill-statement-options";
+
+const FITS = {
+  detail: (value: unknown) => STATEMENT_DETAILS.some((detail) => detail === value),
+  images: (value: unknown) => typeof value === "boolean",
+  language: (value: unknown) => STATEMENT_LANGUAGES.some((language) => language === value),
+  markup: (value: unknown) => typeof value === "number" && value >= 0,
+} satisfies Record<keyof Options, (value: unknown) => boolean>;
+
+/** The remembered options that still fit; none where the browser keeps no storage. */
+function remembered(): Partial<Options> {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(REMEMBERED) ?? "{}");
+    return Object.fromEntries(
+      Object.entries(stored ?? {}).filter(
+        ([name, value]) => name in FITS && FITS[name as keyof Options](value),
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function remember(options: Options) {
+  try {
+    localStorage.setItem(REMEMBERED, JSON.stringify(options));
+  } catch {
+    // Private mode or storage switched off: next time starts from the defaults.
+  }
+}
+
 /** Each language by its own name. */
 const LANGUAGE_NAMES = { en: "English", de: "Deutsch" } satisfies Record<
   Options["language"],
@@ -25,6 +57,8 @@ export class StatementDialog extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** The selected final Runs, by start. */
   @property({ attribute: false }) runIds: string[] = [];
+  /** The Tag filtered by, when exactly one is: the default title names it. */
+  @property({ attribute: false }) tag?: string;
 
   @state() private titleText = "";
   @state() private noteText = "";
@@ -42,8 +76,8 @@ export class StatementDialog extends LitElement {
   private async load() {
     const language = panelLanguage(this.hass) as Options["language"];
     const { markup } = await getStatementDefaults(this.hass).catch(() => ({ markup: 0 }));
-    this.options = { detail: "detailed", language, markup };
-    this.markup = String(markup);
+    this.options = { detail: "detailed", images: true, language, markup, ...remembered() };
+    this.markup = String(this.options.markup);
   }
 
   /** The Markup typed, if it is one: a number of at least 0. */
@@ -52,11 +86,19 @@ export class StatementDialog extends LitElement {
     return markup >= 0 ? markup : undefined;
   }
 
+  /** The default title in the statement's language, not the panel's. */
+  private get defaultTitle() {
+    const t = this.options
+      ? localize({ ...this.hass, language: this.options.language })
+      : localize(this.hass);
+    return this.tag
+      ? t("statement.default_title_tag", { tag: this.tag })
+      : t("statement.default_title");
+  }
+
   override render() {
     const t = localize(this.hass);
     const options = this.options;
-    // The default title in the statement's language, not the panel's.
-    const statementT = options ? localize({ ...this.hass, language: options.language }) : t;
     const input = (event: Event) => (event.target as HTMLInputElement).value;
     const set = (changes: Partial<Options>) => {
       if (options) this.options = { ...options, ...changes };
@@ -75,7 +117,7 @@ export class StatementDialog extends LitElement {
           >${t("statement.title")}<input
             name="title"
             .value=${this.titleText}
-            placeholder=${statementT("statement.default_title")}
+            placeholder=${this.defaultTitle}
             @input=${(event: Event) => (this.titleText = input(event))}
         /></label>
         <label
@@ -99,6 +141,16 @@ export class StatementDialog extends LitElement {
                   </option>`,
               )}
             </select></label
+          >
+          <label class="check"
+            ><input
+              name="images"
+              type="checkbox"
+              .checked=${options?.images ?? true}
+              ?disabled=${options?.detail === "compact"}
+              @change=${(event: Event) =>
+                set({ images: (event.target as HTMLInputElement).checked })}
+            />${t("statement.images")}</label
           >
           <label
             >${t("statement.language")}<select
@@ -144,15 +196,16 @@ export class StatementDialog extends LitElement {
     if (!this.options || markup === undefined) return;
     this.busy = true;
     this.failed = false;
+    const options = { ...this.options, markup };
     try {
       download(
         await createStatement(this.hass, this.runIds, {
-          ...this.options,
-          markup,
-          title: this.titleText.trim() || null,
+          ...options,
+          title: this.titleText.trim() || (this.tag ? this.defaultTitle : null),
           note: this.noteText.trim() || null,
         }),
       );
+      remember(options);
       this.close();
     } catch {
       this.failed = true;
@@ -185,6 +238,15 @@ export class StatementDialog extends LitElement {
       }
       .options > label {
         flex: 1 1 130px;
+      }
+      .options > label.check {
+        flex: 0 0 auto;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        padding-bottom: 7px;
       }
       .error {
         color: var(--error-color, #db4437);
