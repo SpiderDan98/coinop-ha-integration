@@ -156,7 +156,7 @@ class SlotReport:
     """A Slot as its entity reported it while loaded: Material type and colour."""
 
     number: int
-    type: str | None
+    type: str
     colour: str | None
 
     def as_dict(self) -> dict[str, Any]:

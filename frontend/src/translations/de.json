@@ -201,5 +201,14 @@
   "device.automatic_templates": "Automatische Postenvorlagen",
   "device.add_template": "+ Postenvorlage hinzufügen",
   "device.remove_template": "{template} entfernen",
-  "device.templates_hint": "Wird jedem Lauf hinzugefügt, der auf diesem Gerät startet. Änderungen gelten nur für künftige Läufe."
+  "device.templates_hint": "Wird jedem Lauf hinzugefügt, der auf diesem Gerät startet. Änderungen gelten nur für künftige Läufe.",
+  "flag.estimated_split": "Das Material wurde nach Laufzeit auf die Fächer aufgeteilt: Mengen prüfen",
+  "flag.slot_fallback": "Ein Fach passte zu keinem Material: das Standardmaterial wurde berechnet",
+  "evidence.slot": "Fach {number}: {type}",
+  "evidence.share": "≈ {share} der gemessenen Gesamtmenge",
+  "split.measured": "Geschätzte Aufteilung von {measured} gemessen.",
+  "split.difference": "Die aufgeteilten Posten ergeben zusammen {total} ({difference}).",
+  "device.slots": "Fächer",
+  "device.slot_colour": "Farbe aus {attribute}",
+  "device.loaded_slot": "Geladenes Fach {entity}"
 }

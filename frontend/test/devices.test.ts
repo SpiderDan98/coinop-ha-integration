@@ -35,6 +35,7 @@ describe("Devices tab", () => {
         "Print status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
         "Material used sensor.kobra_filament_used · mm " +
+        "Slots Not used " +
         "Thumbnail Not used " +
         "Camera Not used " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
@@ -75,6 +76,7 @@ describe("Devices tab", () => {
       "Print status event.kobra_print · event_type " +
         "Print job Not used " +
         "Material used Not used " +
+        "Slots Not used " +
         "Thumbnail Not used " +
         "Camera Not used " +
         "Consumption source Estimate from average power 95.5 W running " +
@@ -110,6 +112,29 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toContain("Thumbnail Not used Camera Not used");
+  });
+
+  it("names the Slots in order with their colour attribute and the Loaded slot", async () => {
+    const [kobra] = recorded.devices;
+    const slots = {
+      slots: ["sensor.ace_slot_1", "sensor.ace_slot_2"],
+      colour_attribute: "color_hex",
+      loaded_slot: "sensor.ace_loaded_slot",
+    };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        {
+          ...kobra,
+          ha_settings: { ...kobra.ha_settings, job: { ...kobra.ha_settings.job, ...slots } },
+        },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device .slots"))).toBe(
+      "sensor.ace_slot_1 sensor.ace_slot_2 Colour from color_hex · Loaded slot sensor.ace_loaded_slot",
+    );
   });
 
   it("names the price entity of a dynamic tariff", async () => {
@@ -203,6 +228,7 @@ describe("Devices tab", () => {
       "Druckstatus sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
         "Materialverbrauch sensor.kobra_filament_used · mm " +
+        "Fächer Nicht verwendet " +
         "Vorschaubild Nicht verwendet " +
         "Kamera Nicht verwendet " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +

@@ -33,8 +33,6 @@ def slot_shares(
 
 def slot_material(slot: SlotReport, materials: Iterable[Material]) -> Material | None:
     """The Material of the reported type and colour, else the type's default."""
-    if slot.type is None:
-        return None
     of_type = [
         material
         for material in materials

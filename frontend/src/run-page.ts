@@ -55,9 +55,33 @@ const evidence = (item: LineItem, t: Localize, format: Format) =>
     item.basis === "running_hours" && t("evidence.running_hours"),
     item.segments.length > 1 && t("evidence.segments", { count: item.segments.length }),
     item.measured && (lengthEvidence(item, t, format) ?? t("evidence.measured")),
+    item.share !== null && t("evidence.share", { share: format.percent(item.share) }),
   ]
     .filter(Boolean)
     .join(" · ");
+
+/** How far corrected split Line Items are from the printer's measured total, in grams. */
+const splitHint = (items: LineItem[], t: Localize, format: Format) => {
+  const split = items.filter((item) => item.share !== null);
+  if (!split.length) return nothing;
+  const sum = (values: (number | null)[]) => values.reduce<number>((a, b) => a + (b ?? 0), 0);
+  const measured = sum(split.map((item) => (item.computed ?? item).quantity));
+  const total = sum(split.map((item) => item.quantity));
+  const difference = total - measured;
+  const shown = (grams: number) => format.quantity(grams, "g");
+  const off = shown(Math.abs(difference)) !== shown(0);
+  return html`<p class="split-hint muted small">
+    ${t("split.measured", { measured: shown(measured) })}
+    ${
+      off
+        ? t("split.difference", {
+            total: shown(total),
+            difference: `${difference > 0 ? "+" : "−"}${shown(Math.abs(difference))}`,
+          })
+        : nothing
+    }
+  </p>`;
+};
 
 const flagLabel = (flag: string, t: Localize) => {
   const key = `flag.${flag}`;
@@ -414,6 +438,7 @@ export class RunPage extends LitElement {
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
                 ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
+                ${kind === "material" ? splitHint(items, t, format) : nothing}
                 ${kind === "material" ? this.renderAddMaterial(t) : nothing}
               </div>
             `;
@@ -559,6 +584,18 @@ export class RunPage extends LitElement {
               : html`<div>${item.label ?? t(`kind.${item.kind}`)}</div>`
         }
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
+        ${item.slots.map(
+          (slot) =>
+            html`<div class="evidence slot">
+              ${t("evidence.slot", { number: slot.number, type: slot.type })}
+              ${
+                slot.colour
+                  ? html`<span class="swatch" style="background: ${slot.colour}"></span
+                      >${slot.colour}`
+                  : nothing
+              }
+            </div>`,
+        )}
         ${
           item.segments.length > 1
             ? html`<ul class="evidence segments">
@@ -1001,6 +1038,21 @@ export class RunPage extends LitElement {
       .segments {
         margin: 2px 0 0;
         padding-left: 16px;
+      }
+      .slot {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        flex: none;
+      }
+      .split-hint {
+        margin: 6px 0 0;
       }
       .totals {
         display: grid;

@@ -28,6 +28,7 @@ export function formatter(hass: HomeAssistant) {
     timeStyle: "short",
     timeZone,
   });
+  const percent = new Intl.NumberFormat(locale, { style: "percent" });
   const timeOfDay = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
   const wallClockParts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
@@ -67,6 +68,7 @@ export function formatter(hass: HomeAssistant) {
     unitPrice: (price: number) => unitPrice.format(price),
     quantity: (quantity: number, unit: string) =>
       `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,
+    percent: (share: number) => percent.format(share),
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
     timeRange: (start: string, end: string) =>

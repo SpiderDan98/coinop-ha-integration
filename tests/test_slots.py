@@ -95,6 +95,7 @@ async def test_reconfigure_offers_the_slots_as_stored(hass: HomeAssistant) -> No
     assert suggested(result, "loaded_slot") == LOADED
     result = await configure(hass, result, {"slots": SLOTS[:2], "loaded_slot": LOADED})
     await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
     job = entry.subentries[device.subentry_id].data["job"]
     assert (job["slots"], job["colour_attribute"]) == (SLOTS[:2], None)
 
