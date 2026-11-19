@@ -8,5 +8,81 @@
     "abort": {
       "single_instance_allowed": "WattBill is already set up. Add more printers as Devices to the existing entry."
     }
+  },
+  "config_subentries": {
+    "device": {
+      "entry_type": "Device",
+      "initiate_flow": {
+        "user": "Add Device"
+      },
+      "step": {
+        "user": {
+          "title": "Add Device",
+          "description": "Add a 3D printer whose Runs WattBill records.",
+          "data": {
+            "name": "Name"
+          }
+        },
+        "status": {
+          "title": "Print status",
+          "description": "Pick the entity that reports the printer's status. It does not need to be available now.",
+          "data": {
+            "entity_id": "Status entity",
+            "attribute": "Attribute (optional)"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state."
+          }
+        },
+        "mapping": {
+          "title": "Status mapping",
+          "description": "Assign each status value to what it means for a Run. A Run starts at the first running value and ends at the first finished, cancelled or ended value. Type in values that are not offered.",
+          "data": {
+            "running": "Running",
+            "paused": "Paused",
+            "finished": "Finished",
+            "cancelled": "Cancelled",
+            "ended": "Ended (Outcome unknown)",
+            "fault": "Fault",
+            "ignored": "Ignored"
+          },
+          "data_description": {
+            "ended": "Ends the Run with Outcome Unknown, e.g. when the printer only reports printing / not printing."
+          }
+        },
+        "consumption": {
+          "title": "Electricity consumption",
+          "description": "How should WattBill determine the electricity a Run uses?",
+          "menu_options": {
+            "estimate": "Estimate from average power"
+          }
+        },
+        "estimate": {
+          "title": "Estimate from average power",
+          "data": {
+            "running_power": "Average running power",
+            "paused_power": "Paused power (optional)"
+          },
+          "data_description": {
+            "running_power": "The average draw over a whole print, typically 80–150 W for a desktop FDM printer with a heated bed. Do not enter the rated power from the label or power supply: it is far higher than the real average.",
+            "paused_power": "Draw while paused. Leave empty to use the running power."
+          }
+        },
+        "price": {
+          "title": "Electricity price",
+          "data": {
+            "price": "Price per kWh"
+          },
+          "data_description": {
+            "price": "What you pay per kWh, in {currency}."
+          }
+        }
+      },
+      "error": {
+        "no_running_value": "Map at least one value to running, otherwise Runs never start.",
+        "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
+        "value_mapped_twice": "Each value can be mapped to one target only."
+      }
+    }
   }
 }
