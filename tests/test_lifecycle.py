@@ -11,6 +11,7 @@ import pytest
 from .clock import CLOCK_START, Clock
 from .devices import MAPPING, add_device, add_hub
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
+from .test_sensors import FLAGGED, RUNNING_TIME, enable
 
 WITH_FAULT = MAPPING | {"fault": ["error"]}
 PRINT_EVENT = "event.kobra_print"
@@ -36,6 +37,7 @@ async def test_pauses_are_recorded_and_estimated_at_paused_power(
 ) -> None:
     entry = await add_hub(hass)
     await add_device(hass, entry, running_power=120, paused_power=20)
+    await enable(hass, entry, RUNNING_TIME)
 
     await set_status(hass, "printing")
     await clock.advance(hours=1)
@@ -48,6 +50,7 @@ async def test_pauses_are_recorded_and_estimated_at_paused_power(
     [run] = stored_runs(hass_storage)
     assert run["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
     assert kwh(run) == pytest.approx(0.26)
+    assert value(hass, RUNNING_TIME) == pytest.approx(2)
 
 
 async def test_an_empty_paused_power_estimates_pauses_at_running_power(
@@ -86,6 +89,7 @@ async def test_a_fault_flags_the_run_and_pauses_it(
     assert run["flags"] == ["fault"]
     assert run["pauses"] == [{"start": at(hours=1), "end": at(hours=2)}]
     assert kwh(run) == pytest.approx(0.2)
+    assert value(hass, FLAGGED) == 1
 
 
 @pytest.mark.parametrize(
