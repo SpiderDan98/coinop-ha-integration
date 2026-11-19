@@ -21,7 +21,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import DeviceConfig, Target
 from .device_inputs import input_value
-from .models import ElectricityMethod, Outcome, Run
+from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 
 LIVE_INTERVAL = timedelta(minutes=1)
@@ -77,10 +77,24 @@ class DeviceTracker:
         )
         target = self._config.target(value)
         run = self._book.open_run(self._config.device_id)
-        if target is Target.RUNNING and run is None:
-            self._open(at)
-        elif target in OUTCOMES and run is not None:
-            self._end(run, at, OUTCOMES[target])
+        if run is None:
+            if target is Target.RUNNING:
+                self._open(at)
+        elif target in (Target.PAUSED, Target.FAULT):
+            if target is Target.FAULT and Flag.FAULT not in run.flags:
+                run.flags.append(Flag.FAULT)
+            if not run.pauses or run.pauses[-1].end is not None:
+                run.pauses.append(Pause(at))
+            self._book.async_update(run)
+        elif target is Target.RUNNING:
+            if run.pauses and run.pauses[-1].end is None:
+                run.pauses[-1].end = at
+                self._book.async_update(run)
+        elif target in OUTCOMES:
+            outcome = OUTCOMES[target]
+            if outcome is Outcome.CANCELLED and Flag.FAULT in run.flags:
+                outcome = Outcome.FAILED
+            self._end(run, at, outcome)
 
     def _open(self, at: datetime) -> None:
         run = Run(
@@ -95,6 +109,8 @@ class DeviceTracker:
 
     def _end(self, run: Run, at: datetime, outcome: Outcome) -> None:
         run.ended = at
+        if run.pauses and run.pauses[-1].end is None:
+            run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
         self._hass.async_create_task(self._book.async_finalise(run))

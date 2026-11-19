@@ -17,6 +17,10 @@ class Outcome(StrEnum):
     UNKNOWN = "unknown"
 
 
+class Flag(StrEnum):
+    FAULT = "fault"
+
+
 class LineItemKind(StrEnum):
     ELECTRICITY = "electricity"
     MATERIAL = "material"
