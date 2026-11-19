@@ -211,6 +211,7 @@ export class WattbillPanel extends LitElement {
         .hass=${this.hass}
         .devices=${this.devices}
         .tags=${this.catalog?.tags ?? []}
+        .materials=${this.catalog?.materials ?? []}
         .templates=${this.catalog?.templates ?? []}
         ?narrow=${this.narrow}
       ></wattbill-devices-page>`;
@@ -235,6 +236,7 @@ export class WattbillPanel extends LitElement {
           .summary=${run}
           .devices=${devices}
           .tags=${this.catalog?.tags ?? []}
+          .materials=${this.catalog?.materials ?? []}
           .templates=${this.catalog?.templates ?? []}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}

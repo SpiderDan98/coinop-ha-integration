@@ -23,7 +23,7 @@ from .images import (
 )
 from .test_device_flow import suggested
 from .test_lifecycle import JOB, at, start_job, start_wattbill, stop_wattbill
-from .test_runs import set_status, stored_runs
+from .test_runs import NO_MATERIAL, set_status, stored_runs
 from .websocket import PanelClient
 
 
@@ -437,7 +437,7 @@ async def test_a_run_without_images_has_no_cover_image_and_no_flag(
     run = await only_run(panel)
     assert run["cover"] is None
     detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
-    assert detail["flags"] == []
+    assert detail["flags"] == NO_MATERIAL
 
 
 async def test_images_are_served_to_admins_only(

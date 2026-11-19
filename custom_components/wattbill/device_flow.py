@@ -24,14 +24,21 @@ from homeassistant.helpers.selector import (
 
 from .const import SUBENTRY_DEVICE
 from .device_config import ENDING_TARGETS, ConsumptionSource, Target
-from .device_inputs import entity_unit, offered_values, price_scale, unit_scale
+from .device_inputs import (
+    entity_unit,
+    offered_values,
+    price_scale,
+    unit_scale,
+    usage_scale,
+)
 from .schema import vol
 
-# Offered when a meter attribute is picked, which has no unit of its own.
+# Offered when a meter or Material used attribute is picked, which has no unit of its own.
 ATTRIBUTE_UNITS = {
     ConsumptionSource.ENERGY: ["Wh", "kWh", "MWh"],
     ConsumptionSource.POWER: ["W", "kW"],
 }
+USAGE_UNITS = ["mm", "cm", "m", "g", "kg"]
 FACTOR = NumberSelector(
     NumberSelectorConfig(min=0, step="any", mode=NumberSelectorMode.BOX)
 )
@@ -72,6 +79,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         # The consumption or price section while its unit is still being asked for.
         self._meter: dict[str, Any] = {}
         self._price: dict[str, Any] = {}
+        self._job: dict[str, Any] = {}
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
         """Each section's first step, in Add Device order."""
@@ -208,24 +216,81 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_job(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._data["job"] = {
+            material = user_input.get("material_entity_id")
+            self._job = {
                 "entity_id": user_input.get("entity_id"),
                 "attribute": user_input.get("attribute") or None,
+                "material": {
+                    "entity_id": material,
+                    "attribute": user_input.get("material_attribute") or None,
+                    "unit": None,
+                }
+                if material
+                else None,
             }
-            return await self._section_done("job")
+            usage = self._job["material"]
+            if usage is None:
+                return await self._job_done()
+            if usage["attribute"]:
+                return await self.async_step_material_unit()
+            usage["unit"] = entity_unit(self.hass, usage["entity_id"])
+            if usage_scale(usage["unit"]):
+                return await self._job_done()
+            errors["material_entity_id"] = "not_length_or_mass"
         schema = vol.Schema(
             {
                 vol.Optional("entity_id"): EntitySelector(),
                 vol.Optional("attribute"): TextSelector(),
+                vol.Optional("material_entity_id"): EntitySelector(),
+                vol.Optional("material_attribute"): TextSelector(),
             }
         )
+        stored = self._data.get("job") or {}
+        usage = stored.get("material") or {}
         return self.async_show_form(
             step_id="job",
             data_schema=self.add_suggested_values_to_schema(
-                schema, self._data.get("job")
+                schema,
+                user_input
+                or stored
+                | {
+                    "material_entity_id": usage.get("entity_id"),
+                    "material_attribute": usage.get("attribute"),
+                },
             ),
+            errors=errors,
         )
+
+    async def async_step_material_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if usage_scale(user_input["unit"]):
+                self._job["material"]["unit"] = user_input["unit"]
+                return await self._job_done()
+            errors["unit"] = "not_length_or_mass"
+        schema = vol.Schema(
+            {
+                vol.Required("unit"): SelectSelector(
+                    SelectSelectorConfig(options=USAGE_UNITS, custom_value=True)
+                )
+            }
+        )
+        stored = (self._data.get("job") or {}).get("material")
+        return self.async_show_form(
+            step_id="material_unit",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, user_input or stored
+            ),
+            errors=errors,
+        )
+
+    async def _job_done(self) -> SubentryFlowResult:
+        self._data["job"] = self._job
+        return await self._section_done("job")
 
     async def async_step_images(
         self, user_input: dict[str, Any] | None = None

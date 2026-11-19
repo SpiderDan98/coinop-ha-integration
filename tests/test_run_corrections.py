@@ -258,7 +258,7 @@ async def test_deleting_a_run_says_and_lowers_what_the_totals_lose(
     drop = preview["drop"]
     assert drop["cost"] == 0.3
     assert drop["electricity_cost"] == 0.3
-    assert (drop["runs"], drop["flagged_runs"]) == (1, 0)
+    assert (drop["runs"], drop["flagged_runs"]) == (1, 1)
     assert drop["energy_kwh"] == pytest.approx(0.3)
     assert drop["running_hours"] == pytest.approx(3)
     assert value(hass, TOTAL_COST) == pytest.approx(0.4)

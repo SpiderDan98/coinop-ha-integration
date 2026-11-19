@@ -11,6 +11,8 @@ from .devices import STATUS, add_device, add_hub
 
 TOTAL_COST = "sensor.kobra_total_cost"
 RUNS = "sensor.kobra_runs"
+# A Device without a Material used input and default Material flags every Run it ends.
+NO_MATERIAL = ["usage_missing", "material_missing"]
 
 
 def value(hass: HomeAssistant, entity_id: str) -> float:
@@ -66,7 +68,8 @@ async def test_a_print_is_one_run_with_a_frozen_estimated_line_item(
     assert value(hass, TOTAL_COST) == pytest.approx(0.072)
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == "completed"
-    [item] = run["line_items"]
+    [item, material] = run["line_items"]
+    assert (material["kind"], material["quantity"]) == ("material", None)
     assert item | {"quantity": pytest.approx(0.24), "amount": pytest.approx(0.072)} == {
         **item,
         "kind": "electricity",

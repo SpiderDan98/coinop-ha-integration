@@ -14,7 +14,7 @@ from .devices import add_device, add_hub
 from .test_dynamic_price import PRICE_ENTITY, set_price
 from .test_lifecycle import start_wattbill, stop_wattbill
 from .test_measured import add_metered_device, electricity, set_meter
-from .test_runs import set_status, stored_runs
+from .test_runs import NO_MATERIAL, set_status, stored_runs
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ async def test_reports_missed_while_stopped_are_filled_from_recorder_history(
     [run] = stored_runs(hass_storage)
     assert run["ended"] == "2026-01-15T10:30:00+00:00"
     assert electricity(run)["quantity"] == pytest.approx(0.3)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_price_changes_missed_while_stopped_come_from_recorder_history(

@@ -10,12 +10,14 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.wattbill.device_settings import (
     AUTOMATIC_TEMPLATES,
+    DEFAULT_MATERIAL,
     TAGS_FOR_NEW_RUNS,
 )
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
 from .command import command
+from .materials import pickable
 
 
 @command({vol.Required("type"): "wattbill/devices/list"})
@@ -56,7 +58,8 @@ async def _update_settings(
 ) -> None:
     """Change the named panel settings; returns all of the Device's panel settings.
 
-    Naming a Tag that doesn't exist yet creates it; automatic templates must exist.
+    Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
+    the default Material must exist and not be archived.
     """
     if msg["device_id"] not in wattbill.settings:
         connection.send_error(
@@ -67,6 +70,10 @@ async def _update_settings(
         changes = wattbill.settings.validate(msg["settings"])
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None and not pickable(
+        connection, msg, wattbill, material_id
+    ):
         return
     templates = changes.get(AUTOMATIC_TEMPLATES, [])
     if len(wattbill.catalog.find_templates(templates)) < len(templates):

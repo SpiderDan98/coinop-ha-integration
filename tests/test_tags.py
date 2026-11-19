@@ -269,7 +269,7 @@ async def test_tags_follow_on_the_last_run_cost_but_never_touch_costs_or_totals(
     renamed = state_of(hass, LAST)
     assert renamed.attributes["tags"] == ["Present"]
     assert renamed.state == last.state
-    assert renamed.attributes["has_flags"] is False
+    assert renamed.attributes["has_flags"] is True
     assert {entity_id: state_of(hass, entity_id).state for entity_id in sensors} == (
         before
     )

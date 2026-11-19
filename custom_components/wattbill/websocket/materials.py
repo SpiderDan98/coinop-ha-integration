@@ -58,6 +58,26 @@ def _found(
     return material
 
 
+def pickable(
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+    material_id: str,
+) -> Material | None:
+    """The Material if it can be picked (it exists and isn't archived); else answers the error."""
+    material = wattbill.catalog.material(material_id)
+    if material is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "No Material with this id"
+        )
+    elif material.archived:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "This Material is archived"
+        )
+        return None
+    return material
+
+
 @command({vol.Required("type"): "wattbill/materials/list"})
 def _list(
     hass: HomeAssistant,

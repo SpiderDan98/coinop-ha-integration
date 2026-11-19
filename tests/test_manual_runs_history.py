@@ -16,6 +16,7 @@ from .devices import ENERGY, POWER, add_device, add_hub
 from .test_dynamic_price import PRICE_ENTITY, segments, set_price
 from .test_manual_runs import at, create
 from .test_measured import add_metered_device, electricity, set_meter
+from .test_runs import NO_MATERIAL
 from .websocket import PanelClient
 
 
@@ -62,7 +63,7 @@ async def test_an_energy_meters_history_is_interpolated_at_start_and_end(
     # 10.15 at 10:45, 10.35 at 12:00.
     assert item["quantity"] == pytest.approx(0.2)
     assert item["amount"] == pytest.approx(0.06)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_a_power_sensors_history_is_integrated_over_the_run(
@@ -107,7 +108,7 @@ async def test_the_price_entitys_history_splits_the_run_at_each_price_change(
         (at(1), at(1.5), 0.1, 0.40),
     ]
     assert electricity(run)["amount"] == pytest.approx(0.06)
-    assert run["flags"] == []
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_history_needs_a_meter_reading_at_the_runs_start(
@@ -153,4 +154,4 @@ async def test_a_print_made_while_home_assistant_was_down_is_estimated(
     assert item["method"] == "estimated"
     assert item["quantity"] == pytest.approx(0.05)
     assert item["unit_price"] == pytest.approx(0.25)
-    assert run["flags"] == ["price_gap"]
+    assert run["flags"] == ["price_gap", *NO_MATERIAL]

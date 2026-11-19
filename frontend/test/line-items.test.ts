@@ -126,7 +126,7 @@ describe("Line Items", () => {
   it("add Other items by hand, a refund too", async () => {
     const backend = recordedBackend().reply("wattbill/line_items/add", () => recorded.lineItemsAdd);
     const panel = await mountPanel(backend, { path: "/run/helmet" });
-    expect(queryAll(panel, ".add-item")).toHaveLength(1);
+    expect(queryAll(panel, ".add-item")).toHaveLength(2);
 
     await click(panel, query(panel, "button.add-other"));
     const form = query(panel, ".add-item form");

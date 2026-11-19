@@ -12,9 +12,11 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .devices import add_device, add_hub
 from .images import CAMERA, add_camera, picture
+from .stored import place_materials, stored_material
+from .test_material_usage import add_measuring_device, material_items
 from .test_measured import add_metered_device, electricity, set_meter
 from .test_run_event import record_events
-from .test_runs import RUNS, TOTAL_COST, stored_runs, value
+from .test_runs import NO_MATERIAL, RUNS, TOTAL_COST, stored_runs, value
 from .test_sensors import LAST, print_runs, state_of
 from .test_templates import (
     INSERTS,
@@ -235,6 +237,41 @@ async def test_tags_for_new_runs_apply_unless_the_dialog_sends_its_own(
 
     assert default["tags"] == ["Batch 7"]
     assert own["tags"] == ["gift", "Spare parts"]
+
+
+@pytest.mark.parametrize("measuring", [False, True])
+async def test_a_manual_runs_material_is_the_default_one_for_the_user_to_weigh(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    measuring: bool,
+) -> None:
+    place_materials(hass_storage, stored_material("pla", name="Black PLA"))
+    inputs = {} if measuring else {"material": None}
+    entry = await add_measuring_device(hass, panel, **inputs)
+    [device] = entry.subentries.values()
+    await clock.advance(hours=5)
+
+    run = await create(panel, device.subentry_id)
+
+    [item] = material_items(run)
+    assert (item["material_id"], item["quantity"], item["unit"]) == ("pla", None, "g")
+    assert run["flags"] == ["usage_missing"]
+
+
+async def test_a_manual_run_without_a_default_material_flags_it_missing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    device = await add_device(hass, entry)
+    await clock.advance(hours=5)
+
+    run = await create(panel, device.subentry_id)
+
+    [item] = material_items(run)
+    assert (item["material_id"], item["quantity"]) == (None, None)
+    assert run["flags"] == NO_MATERIAL
 
 
 async def test_only_admins_create_manual_runs(

@@ -1,0 +1,121 @@
+import { describe, expect, it } from "vitest";
+import type { Message } from "../src/hass";
+import { recorded, recordedBackend } from "./fake-hass";
+import { change, click, fill, mountPanel, query, queryAll, text } from "./render";
+
+const UPDATE = "wattbill/line_items/update";
+const ADD = "wattbill/line_items/add";
+const SETTINGS = "wattbill/devices/update_settings";
+const [started] = recorded.changes;
+
+const sent = (backend: { calls: Message[] }, type: string) =>
+  backend.calls.filter((call) => call.type === type);
+const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
+const picker = (row: HTMLElement) => query(row, "select[name=material_id]") as HTMLSelectElement;
+const options = (select: HTMLElement) => queryAll(select, "option").map(text);
+
+describe("Material Line Items", () => {
+  it("show the measured length and how it became grams", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
+
+    const pla = item(panel, "benchy-pla");
+    expect(text(query(pla, ".evidence"))).toBe("4,191 mm at 1.75 mm and 1.24 g/cm³");
+    expect(picker(pla).value).toBe("pla-black");
+    expect(text(query(pla, ".unit"))).toBe("g");
+    expect(queryAll(pla, "input[name=unit], input[name=label]")).toHaveLength(0);
+  });
+
+  it("pick a Material from the current ones and are re-priced by the backend", async () => {
+    const backend = recordedBackend().reply(UPDATE, () => recorded.lineItemsMaterial);
+    const panel = await mountPanel(backend, { path: "/run/helmet" });
+    const filament = item(panel, "helmet-filament");
+    expect(options(picker(filament))).toEqual([
+      "No Material",
+      "eSun PLA+ black",
+      "Standard Resin grey",
+    ]);
+    expect(text(query(filament, ".evidence"))).toBe(
+      "30,000 mm measured; pick a Material to weigh it",
+    );
+
+    await change(panel, picker(filament), "material-1");
+
+    expect(sent(backend, UPDATE)).toEqual([
+      {
+        type: UPDATE,
+        run_id: "helmet",
+        line_item_id: "helmet-filament",
+        material_id: "material-1",
+      },
+    ]);
+    const priced = item(panel, "helmet-filament");
+    expect(text(query(priced, ".evidence"))).toBe("30,000 mm at 1.75 mm and 1.27 g/cm³");
+    expect((query(priced, "[name=quantity]") as HTMLInputElement).value).toBe("91.6412");
+    const [, material] = queryAll(panel, ".kind .between").map(text);
+    expect(material).toBe("Material €2.75");
+  });
+
+  it("stay locked while the Run is open", async () => {
+    const backend = recordedBackend().subscription("wattbill/runs/subscribe", () => [
+      { runs: [...recorded.snapshot.runs, started.run] },
+    ]);
+    const panel = await mountPanel(backend, { path: "/run/print-live" });
+
+    const material = item(panel, "print-live-material");
+    expect(material.classList.contains("locked")).toBe(true);
+    expect(picker(material).disabled).toBe(true);
+    expect(text(query(material, ".evidence"))).toBe("1,500 mm at 1.75 mm and 1.24 g/cm³");
+    expect(queryAll(panel, "button.add-material")).toHaveLength(1);
+  });
+
+  it("are added by hand as a Material plus grams or millilitres", async () => {
+    const backend = recordedBackend().reply(ADD, () => recorded.lineItemsAddMaterial);
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+
+    await click(panel, query(panel, "button.add-material"));
+    const form = query(panel, ".add-item form");
+    expect(options(query(form, "select[name=material_id]"))).toEqual([
+      "eSun PLA+ black",
+      "Standard Resin grey",
+    ]);
+    await fill(panel, query(form, "select[name=material_id]"), "material-2");
+    await fill(panel, query(form, "[name=quantity]"), "25");
+    await fill(panel, query(form, "select[name=unit]"), "ml");
+    await click(panel, query(form, "button[type=submit]"));
+
+    expect(sent(backend, ADD)).toEqual([
+      {
+        type: ADD,
+        run_id: "benchy",
+        kind: "material",
+        material_id: "material-2",
+        quantity: 25,
+        unit: "ml",
+      },
+    ]);
+    expect(queryAll(panel, ".add-item form")).toHaveLength(0);
+    expect(picker(item(panel, "benchy-petg")).value).toBe("petg-white");
+  });
+});
+
+describe("Default Material", () => {
+  it("is picked per Device from the current Materials, or none", async () => {
+    const [kobra] = recorded.devices;
+    const backend = recordedBackend().reply(SETTINGS, (msg) => ({
+      settings: { ...kobra.settings, ...(msg.settings as object) },
+    }));
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const select = query(panel, ".default-material select") as HTMLSelectElement;
+    expect(options(select)).toEqual(["None", "eSun PLA+ black", "Standard Resin grey"]);
+    // "pla-black" is not in this catalogue, so no default applies.
+    expect(select.value).toBe("");
+
+    await fill(panel, select, "material-1");
+    await fill(panel, query(panel, ".default-material select"), "");
+
+    expect(sent(backend, SETTINGS)).toEqual([
+      { type: SETTINGS, device_id: "device-kobra", settings: { default_material: "material-1" } },
+      { type: SETTINGS, device_id: "device-kobra", settings: { default_material: null } },
+    ]);
+  });
+});

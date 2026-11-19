@@ -34,12 +34,15 @@ describe("Devices tab", () => {
       "Kobra " +
         "Print status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
+        "Material used sensor.kobra_filament_used · mm " +
         "Thumbnail Not used " +
         "Camera Not used " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
         "Electricity price €0.30 per kWh " +
         "Device Inputs, consumption source and price are changed in Home Assistant. " +
         "Reconfigure in Home Assistant " +
+        "Default Material None eSun PLA+ black Standard Resin grey " +
+        "Charged for a Run's measured usage, and pre-filled when the printer reports none. " +
         "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device. " +
         "Automatic templates Wear Kobra × + Add template Threaded inserts Packaging " +
         "Added to every Run that starts on this Device. Changes affect future Runs only.",
@@ -71,6 +74,7 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Print status event.kobra_print · event_type " +
         "Print job Not used " +
+        "Material used Not used " +
         "Thumbnail Not used " +
         "Camera Not used " +
         "Consumption source Estimate from average power 95.5 W running " +
@@ -198,6 +202,7 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Druckstatus sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
+        "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Vorschaubild Nicht verwendet " +
         "Kamera Nicht verwendet " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +
@@ -230,7 +235,7 @@ describe("Runs of removed Devices", () => {
     expect(text(query(panel, ".head"))).toContain("1 · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
-      "⚑ 1 Helmet Kobra",
+      "⚑ 2 Helmet Kobra",
       "Benchy Kobra",
     ]);
     await filterBy(panel, "");

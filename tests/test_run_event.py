@@ -90,7 +90,7 @@ async def test_a_run_fires_started_then_ended_once_with_its_final_values(
         "part_count": 1,
         "energy_kwh": pytest.approx(0.15),
         "material_grams": 0,
-        "has_flags": False,
+        "has_flags": True,
     }
 
 

@@ -12,7 +12,10 @@
     "end_reconstructed": false,
     "finalised": true,
     "pauses": [],
-    "flags": [],
+    "flags": [
+      "usage_missing",
+      "material_missing"
+    ],
     "part_count": 1,
     "note": null,
     "tags": [
@@ -29,12 +32,16 @@
     },
     "prices": [],
     "average_powers": [],
+    "usage": null,
     "line_items": [
       {
         "id": "manual-electricity",
         "kind": "electricity",
         "label": null,
         "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
         "template_id": null,
         "basis": null,
         "quantity": 0.24,
@@ -53,6 +60,26 @@
         "computed": null,
         "locked": false,
         "deletable": false
+      },
+      {
+        "id": "manual-material",
+        "kind": "material",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": null,
+        "unit": "g",
+        "unit_price": 0.0,
+        "amount": 0.0,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
       }
     ],
     "images": [],
