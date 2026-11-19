@@ -582,3 +582,20 @@ async def test_the_download_needs_its_signature_and_expires(
     assert (await browser.get(result["path"]))[0] == 200
     await clock.advance(minutes=2)
     assert (await browser.get(result["path"]))[0] == 401
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_a_phones_download_manager_can_fetch_the_signed_path_again(
+    clock: Clock, panel: PanelClient, browser: HttpClient, http: HttpClient
+) -> None:
+    """The Android app's web view opens the link, then its download manager fetches
+    it again later, sending the app's auth header and the signature both."""
+    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+
+    first = await browser.download(result["path"])
+    await clock.advance(minutes=1)
+    again = await http.download(result["path"])
+
+    assert [first[0], again[0]] == [200, 200]
+    assert first[1]["Content-Disposition"] == again[1]["Content-Disposition"]
+    assert read(first[2]) == read(again[2])
