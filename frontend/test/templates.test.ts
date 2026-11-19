@@ -140,3 +140,69 @@ describe("Line Item Templates tab", () => {
     expect(text(row(panel, "template-wear"))).toContain("Aus der Laufzeit des Laufs");
   });
 });
+
+describe("Line Item Templates on a Run", () => {
+  const SAVE = "wattbill/line_items/save_as_template";
+  const ADD = "wattbill/line_items/add_template";
+  const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
+
+  it("saves any Line Item as a template, a computed one under its kind's name", async () => {
+    const backend = recordedBackend().reply(SAVE, () => recorded.saveAsTemplate);
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+
+    const save = query(item(panel, "benchy-wear"), "button.save-template");
+    expect(save.title).toBe("Save as Line Item Template");
+    await click(panel, save);
+    expect(text(query(panel, ".items"))).toContain("Saved “Nozzle wear” as a Line Item Template.");
+    await click(panel, query(item(panel, "electricity"), "button.save-template"));
+
+    expect(sent(backend, SAVE)).toEqual([
+      { type: SAVE, run_id: "benchy", line_item_id: "benchy-wear" },
+      { type: SAVE, run_id: "benchy", line_item_id: "electricity", label: "Electricity" },
+    ]);
+  });
+
+  it("adds a template with its default or an entered quantity", async () => {
+    const backend = recordedBackend().reply(ADD, () => recorded.lineItemsAddTemplate);
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+
+    await click(panel, query(panel, "button.add-template"));
+    const form = query(panel, ".add-item form.template");
+    const options = queryAll(form, "select[name=template] option").map(text);
+    expect(options).toEqual([
+      "Wear Kobra · €0.15/h",
+      "Threaded inserts · €0.08/pcs",
+      "Packaging · €0.60",
+    ]);
+    expect(text(form)).toContain("Quantity: the Run's running hours (1.25 h)");
+    await fill(panel, field(form, "template"), "template-inserts");
+    expect(field(form, "quantity").placeholder).toBe("Quantity (default 8)");
+    await click(panel, query(form, "button[type=submit]"));
+    await click(panel, query(panel, "button.add-template"));
+    await fill(panel, field(query(panel, "form.template"), "template"), "template-packaging");
+    await fill(panel, field(query(panel, "form.template"), "quantity"), "2");
+    await click(panel, query(panel, "form.template button[type=submit]"));
+
+    expect(sent(backend, ADD)).toEqual([
+      { type: ADD, run_id: "benchy", template_id: "template-inserts" },
+      { type: ADD, run_id: "benchy", template_id: "template-packaging", quantity: 2 },
+    ]);
+    expect(queryAll(panel, ".add-item form")).toHaveLength(0);
+    expect(field(item(panel, "benchy-nozzle"), "label").value).toBe("Nozzle wear");
+    expect(text(query(panel, ".totals"))).toContain("Total €1.91");
+  });
+
+  it("shows a running-hours template live and locked while the Run is open", async () => {
+    const backend = recordedBackend().subscription("wattbill/runs/subscribe", () => [
+      { runs: [...recorded.snapshot.runs, recorded.changes[1].run] },
+    ]);
+    const panel = await mountPanel(backend, { path: "/run/print-live" });
+
+    const wear = item(panel, "print-live-wear");
+    expect(wear.classList.contains("locked")).toBe(true);
+    expect(text(wear)).toContain("From a template · running hours, pauses excluded");
+    expect(field(wear, "quantity").value).toBe("0.75");
+    expect(queryAll(wear, "[name=unit]")).toHaveLength(0);
+    expect(queryAll(wear, "button.delete")).toHaveLength(0);
+  });
+});

@@ -215,6 +215,7 @@ export class WattbillPanel extends LitElement {
           .summary=${run}
           .devices=${devices}
           .tags=${this.catalog?.tags ?? []}
+          .templates=${this.catalog?.templates ?? []}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-page>`
