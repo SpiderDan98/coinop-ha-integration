@@ -558,3 +558,39 @@ async def test_a_thumbnail_picked_while_a_run_is_open_applies_to_it_at_once(
     )
 
     assert await thumbnail_colour(panel, http) == "green"
+
+
+async def test_end_run_now_takes_a_snapshot(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_camera(hass, picture("blue"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, camera=CAMERA)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await panel.call("wattbill/runs/end", run_id=(await only_run(panel))["id"])
+    await hass.async_block_till_done()
+
+    assert await snapshot_colour(panel, http) == "blue"
+
+
+async def test_deleting_a_run_deletes_its_files(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    await add_thumbnail(hass, picture())
+    await add_camera(hass, picture("blue"), picture("green"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL, camera=CAMERA)
+    for _ in range(2):
+        await set_status(hass, "printing")
+        await clock.advance(hours=1)
+        await set_status(hass, "finished")
+    runs = (await panel.call("wattbill/runs/list"))["runs"]
+    assert len(stored_files(files)) == 8
+
+    await panel.call("wattbill/runs/delete", run_ids=[runs[0]["id"]])
+    await hass.async_block_till_done()
+
+    assert len(stored_files(files)) == 4
+    assert {path.parent.name for path in stored_files(files)} == {runs[1]["id"]}
