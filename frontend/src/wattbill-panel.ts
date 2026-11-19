@@ -158,6 +158,7 @@ export class WattbillPanel extends LitElement {
       .title {
         font-size: 20px;
         display: flex;
+        gap: 6px;
         min-width: 0;
         white-space: nowrap;
       }
