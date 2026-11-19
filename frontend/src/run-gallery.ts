@@ -1,9 +1,11 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { repeat } from "lit/directives/repeat.js";
 import type { Device, RunSummary } from "./api";
 import { formatter } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
+import "./run-image";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 
@@ -34,11 +36,16 @@ export class RunGallery extends LitElement {
       ${
         runs.length
           ? html`<div class="gallery">
-              ${runs.map(
+              ${repeat(
+                runs,
+                (run) => run.id,
                 (run) => html`
                   <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
                     <div class="image">
-                      <div class="no-image">${t("run.no_image")}</div>
+                      <wattbill-run-image
+                        .hass=${this.hass}
+                        .src=${run.cover?.tile_url}
+                      ></wattbill-run-image>
                       ${
                         run.flags.length
                           ? html`<span class="tile-flags">⚑ ${run.flags.length}</span>`

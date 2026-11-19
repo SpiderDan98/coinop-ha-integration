@@ -74,9 +74,32 @@
           "deletable": true
         }
       ],
+      "images": [
+        {
+          "id": "benchy-thumbnail",
+          "kind": "thumbnail",
+          "created": "2026-01-12T10:00:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+        },
+        {
+          "id": "benchy-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-12T11:15:00+00:00",
+          "url": "/api/wattbill/runs/benchy/images/benchy-snapshot",
+          "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
+        }
+      ],
       "running_seconds": 4500,
       "total": 0.86,
       "cost_per_part": 0.22,
+      "cover": {
+        "id": "benchy-thumbnail",
+        "kind": "thumbnail",
+        "created": "2026-01-12T10:00:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+      },
       "subtotals": {
         "electricity": 0.05,
         "material": 0.31,
@@ -137,9 +160,25 @@
           "deletable": false
         }
       ],
+      "images": [
+        {
+          "id": "helmet-snapshot",
+          "kind": "snapshot",
+          "created": "2026-01-13T19:00:00+00:00",
+          "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+          "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+        }
+      ],
       "running_seconds": 32400,
       "total": 0.3,
       "cost_per_part": 0.3,
+      "cover": {
+        "id": "helmet-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-13T19:00:00+00:00",
+        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      },
       "subtotals": {
         "electricity": 0.3,
         "material": 0.0,
@@ -192,9 +231,11 @@
           "deletable": false
         }
       ],
+      "images": [],
       "running_seconds": 1800,
       "total": 0.07,
       "cost_per_part": 0.07,
+      "cover": null,
       "subtotals": {
         "electricity": 0.07,
         "material": 0.0,
@@ -265,9 +306,11 @@
           "deletable": false
         }
       ],
+      "images": [],
       "running_seconds": 2700,
       "total": 0.03,
       "cost_per_part": 0.03,
+      "cover": null,
       "subtotals": {
         "electricity": 0.03,
         "material": 0.0,

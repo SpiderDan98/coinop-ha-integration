@@ -69,7 +69,8 @@
           ],
           "computed": null
         }
-      ]
+      ],
+      "images": []
     },
     {
       "id": "01KF0000000000000000000002",
@@ -126,7 +127,8 @@
           ],
           "computed": null
         }
-      ]
+      ],
+      "images": []
     }
   ],
   "live": [
@@ -195,7 +197,8 @@
           ],
           "computed": null
         }
-      ]
+      ],
+      "images": []
     }
   ],
   "catalog": {

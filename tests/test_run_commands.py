@@ -45,6 +45,7 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
         "part_count": 1,
         "cost_per_part": 0.07,
         "flags": [],
+        "cover": None,
     }
 
 

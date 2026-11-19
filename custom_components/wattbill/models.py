@@ -178,6 +178,40 @@ class LineItem:
         )
 
 
+class ImageKind(StrEnum):
+    """In Cover Image order: Thumbnail, Snapshot, then uploads by time."""
+
+    THUMBNAIL = "thumbnail"
+    SNAPSHOT = "snapshot"
+    UPLOAD = "upload"
+
+
+@dataclass
+class RunImage:
+    """A stored image of a Run; its files are named after `id`, which never changes."""
+
+    id: str
+    kind: ImageKind
+    created: datetime
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def as_dict(self) -> dict[str, Any]:
+        return self.unknown | {
+            "id": self.id,
+            "kind": self.kind,
+            "created": self.created.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> RunImage:
+        return cls(
+            id=data["id"],
+            kind=ImageKind(data["kind"]),
+            created=datetime.fromisoformat(data["created"]),
+            unknown=unknown_fields(cls, data),
+        )
+
+
 @dataclass
 class Pause:
     start: datetime
@@ -224,6 +258,7 @@ class Run:
     average_powers: list[tuple[datetime, float | None, float | None]] = field(
         default_factory=list
     )
+    images: list[RunImage] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -237,6 +272,17 @@ class Run:
     def deletable(self, item: LineItem) -> bool:
         """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
         return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
+
+    @property
+    def images_in_order(self) -> list[RunImage]:
+        order = list(ImageKind)
+        return sorted(
+            self.images, key=lambda image: (order.index(image.kind), image.created)
+        )
+
+    @property
+    def cover(self) -> RunImage | None:
+        return next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
@@ -267,6 +313,7 @@ class Run:
                 for at, running, paused in self.average_powers
             ],
             "line_items": [item.as_dict() for item in self.line_items],
+            "images": [image.as_dict() for image in self.images],
         }
 
     @classmethod
@@ -305,5 +352,6 @@ class Run:
                 for at, running, paused in data.get("average_powers", [])
             ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
+            images=[RunImage.from_dict(image) for image in data.get("images", [])],
             unknown=unknown_fields(cls, data),
         )

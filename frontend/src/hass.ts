@@ -6,6 +6,7 @@ export interface HomeAssistant {
   language: string;
   config: { currency: string; time_zone: string };
   callWS<T>(msg: Message): Promise<T>;
+  fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
   connection: {
     subscribeMessage<T>(callback: (event: T) => void, msg: Message): Promise<() => Promise<void>>;
   };

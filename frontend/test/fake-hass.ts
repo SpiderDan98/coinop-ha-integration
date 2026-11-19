@@ -1,4 +1,5 @@
-// Seam 2: a fake `hass` whose websocket calls are answered by canned responses.
+// Seam 2: a fake `hass` whose websocket calls and authenticated fetches are
+// answered by canned responses.
 // The recorded ones come from the backend tests (tests/contract.py), so they have
 // exactly the shapes the backend sends.
 import type { HomeAssistant, Message } from "../src/hass";
@@ -31,7 +32,8 @@ export const recorded = {
   snapshot: { runs: (snapshot as { runs: RunSummary[] }).runs },
   /** Then the Run "print-live" is started, updated (45 min in) and ended. */
   changes: changes as { change: RunChange; run: RunSummary }[],
-  /** `wattbill/runs/get` for every recorded Run; "print-live" while still open. */
+  /** `wattbill/runs/get` for every recorded Run; "print-live" while still open.
+   * "benchy" has a Thumbnail and a Snapshot, "helmet" only a Snapshot. */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
@@ -81,7 +83,10 @@ export class WsError extends Error {
 export class FakeBackend {
   /** Every message the panel sent (`callWS` and subscriptions), in order. */
   readonly calls: Message[] = [];
+  /** Every path the panel fetched with `fetchWithAuth`, in order. */
+  readonly fetches: string[] = [];
   hass: HomeAssistant;
+  private readonly files = new Map<string, Blob>();
   private readonly replies = new Map<string, Reply>();
   private readonly initialEvents = new Map<string, Reply>();
   private readonly listeners = new Map<string, Set<Listener>>();
@@ -95,6 +100,11 @@ export class FakeBackend {
         const reply = this.replies.get(msg.type);
         if (!reply) throw new WsError("unknown_command");
         return (await reply(msg)) as T;
+      },
+      fetchWithAuth: async (path: string) => {
+        this.fetches.push(path);
+        const file = this.files.get(path);
+        return file ? new Response(file) : new Response(null, { status: 404 });
       },
       connection: {
         subscribeMessage: async <T>(callback: (event: T) => void, msg: Message) => {
@@ -125,6 +135,12 @@ export class FakeBackend {
     return this;
   }
 
+  /** Serve `content` at `path` to `fetchWithAuth`; anything else is 404. */
+  file(path: string, content: Blob = new Blob([path], { type: "image/webp" })) {
+    this.files.set(path, content);
+    return this;
+  }
+
   /** Send an event to every open subscription to `type`. */
   push(type: string, event: unknown) {
     for (const listener of this.listeners.get(type) ?? []) listener(event);
@@ -141,9 +157,16 @@ export class FakeBackend {
   }
 }
 
+/** Every image the recorded Runs refer to. */
+const recordedImages = recorded.runs.flatMap((run) =>
+  run.images.flatMap((image) => [image.url, image.tile_url]),
+);
+
 /** A backend answering with the recorded responses; tests override what they need. */
 export function recordedBackend(options?: ConstructorParameters<typeof FakeBackend>[0]) {
-  return new FakeBackend(options)
+  const backend = new FakeBackend(options);
+  for (const path of recordedImages) backend.file(path);
+  return backend
     .subscription("wattbill/runs/subscribe", () => [recorded.snapshot])
     .subscription("wattbill/catalog/subscribe", () => [recorded.catalog.filled])
     .reply("wattbill/materials/types", () => recorded.materialTypes)

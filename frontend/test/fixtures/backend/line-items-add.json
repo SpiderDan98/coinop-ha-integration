@@ -66,9 +66,25 @@
         "deletable": true
       }
     ],
+    "images": [
+      {
+        "id": "helmet-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-13T19:00:00+00:00",
+        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      }
+    ],
     "running_seconds": 32400,
     "total": -1.7,
     "cost_per_part": -1.7,
+    "cover": {
+      "id": "helmet-snapshot",
+      "kind": "snapshot",
+      "created": "2026-01-13T19:00:00+00:00",
+      "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
+      "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+    },
     "subtotals": {
       "electricity": 0.3,
       "material": 0.0,

@@ -63,9 +63,13 @@ async def start_add_device(
 
 
 async def configure(hass: HomeAssistant, result: Any, user_input: Any) -> Any:
-    return await hass.config_entries.subentries.async_configure(
+    result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], user_input
     )
+    if result["type"] is FlowResultType.CREATE_ENTRY:
+        # A new Device reloads the hub entry; a test must not end halfway through.
+        await hass.async_block_till_done()
+    return result
 
 
 async def walk_to_mapping(
@@ -97,6 +101,8 @@ async def walk_to_consumption(
     )
     assert result["step_id"] == "job", result.get("errors")
     result = await configure(hass, result, {})
+    assert result["step_id"] == "images", result.get("errors")
+    result = await configure(hass, result, {})
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     return result
 
@@ -114,6 +120,9 @@ async def add_device(
     meter: dict[str, Any] | None = None,
     job: str | None = None,
     job_attribute: str | None = None,
+    thumbnail: str | None = None,
+    camera: str | None = None,
+    snapshot: bool | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
     price: float | dict[str, Any] = 0.30,
@@ -132,6 +141,17 @@ async def add_device(
         {"attribute": job_attribute} if job_attribute else {}
     )
     result = await configure(hass, result, job_input)
+    assert result["step_id"] == "images", result.get("errors")
+    images = {
+        key: value
+        for key, value in (
+            ("thumbnail", thumbnail),
+            ("camera", camera),
+            ("snapshot", snapshot),
+        )
+        if value is not None
+    }
+    result = await configure(hass, result, images)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     if source == "estimate":
