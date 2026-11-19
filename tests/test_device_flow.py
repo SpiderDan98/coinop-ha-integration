@@ -1,4 +1,4 @@
-"""Add Device: name, Status entity, Status mapping, job, consumption estimate, price."""
+"""Add Device: name, Status entity, Status mapping, job, images, consumption, price."""
 
 from typing import Any
 
@@ -152,7 +152,7 @@ async def test_the_job_name_is_optional(hass: HomeAssistant) -> None:
 
     result = await configure(hass, result, {})
 
-    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "images"
 
 
 async def test_a_value_mapped_to_two_targets_is_refused(hass: HomeAssistant) -> None:

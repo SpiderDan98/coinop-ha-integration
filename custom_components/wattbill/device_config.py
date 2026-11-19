@@ -33,6 +33,9 @@ class DeviceConfig:
     mapping: Mapping[str, Target]
     job_entity_id: str | None
     job_attribute: str | None
+    thumbnail_entity_id: str | None
+    camera_entity_id: str | None
+    snapshot: bool
     running_power: float
     paused_power: float | None
     price: float
@@ -41,6 +44,7 @@ class DeviceConfig:
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
         data: Mapping[str, Any] = subentry.data
         job = data.get("job", {})
+        images = data.get("images", {})
         return cls(
             device_id=subentry.subentry_id,
             name=subentry.title,
@@ -54,6 +58,9 @@ class DeviceConfig:
             },
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
+            thumbnail_entity_id=images.get("thumbnail"),
+            camera_entity_id=images.get("camera"),
+            snapshot=images.get("snapshot", False),
             running_power=data["consumption"]["running_power"],
             paused_power=data["consumption"]["paused_power"],
             price=data["price"]["value"],

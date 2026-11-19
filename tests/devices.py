@@ -97,6 +97,9 @@ async def add_device(
     mapping: dict[str, list[str]] = MAPPING,
     job: str | None = None,
     job_attribute: str | None = None,
+    thumbnail: str | None = None,
+    camera: str | None = None,
+    snapshot: bool | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
     price: float = 0.30,
@@ -111,6 +114,17 @@ async def add_device(
         {"attribute": job_attribute} if job_attribute else {}
     )
     result = await configure(hass, result, job_input)
+    assert result["step_id"] == "images", result.get("errors")
+    images = {
+        key: value
+        for key, value in (
+            ("thumbnail", thumbnail),
+            ("camera", camera),
+            ("snapshot", snapshot),
+        )
+        if value is not None
+    }
+    result = await configure(hass, result, images)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": "estimate"})
     estimate = {"running_power": running_power}

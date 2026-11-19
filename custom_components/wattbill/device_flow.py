@@ -10,8 +10,10 @@ from homeassistant.config_entries import (
 )
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     DeviceSelector,
     EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -64,6 +66,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return {
             "status": self.async_step_status,
             "job": self.async_step_job,
+            "images": self.async_step_images,
             "consumption": self.async_step_consumption,
             "price": self.async_step_price,
         }
@@ -209,6 +212,39 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             step_id="job",
             data_schema=self.add_suggested_values_to_schema(
                 schema, self._data.get("job")
+            ),
+        )
+
+    async def async_step_images(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            camera = user_input.get("camera")
+            self._data["images"] = {
+                "thumbnail": user_input.get("thumbnail"),
+                "camera": camera,
+                "snapshot": camera is not None and user_input["snapshot"],
+            }
+            return await self._section_done("images")
+        schema = vol.Schema(
+            {
+                vol.Optional("thumbnail"): EntitySelector(
+                    EntitySelectorConfig(domain="image")
+                ),
+                vol.Optional("camera"): EntitySelector(
+                    EntitySelectorConfig(domain="camera")
+                ),
+                vol.Optional("snapshot", default=True): BooleanSelector(),
+            }
+        )
+        stored = self._data.get("images", {})
+        return self.async_show_form(
+            step_id="images",
+            data_schema=self.add_suggested_values_to_schema(
+                schema,
+                # Without a camera the toggle was off only for lack of one.
+                stored
+                | {"snapshot": stored["snapshot"] if stored.get("camera") else True},
             ),
         )
 
