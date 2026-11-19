@@ -1,12 +1,19 @@
 """Per-Device sensors: totals for long-term statistics, current and last Run."""
 
+from datetime import datetime, timedelta
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .clock import Clock
 from .devices import add_device, add_hub
-from .test_runs import set_status, value
+from .test_runs import set_status, stored_runs, value
+
+RUNNING_TIME = "sensor.kobra_running_time"
 
 
 @pytest.mark.parametrize(
@@ -55,3 +62,64 @@ async def test_totals_split_the_cost_by_kind_and_count_energy(
     assert value(hass, "sensor.kobra_material_cost") == 0
     assert value(hass, "sensor.kobra_other_cost") == 0
     assert value(hass, "sensor.kobra_material_used") == 0
+
+
+async def enable(hass: HomeAssistant, entry: ConfigEntry, entity_id: str) -> None:
+    er.async_get(hass).async_update_entity(entity_id, disabled_by=None)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_running_time_is_disabled_by_default(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+
+    registered = er.async_get(hass).async_get(RUNNING_TIME)
+    assert registered is not None
+    assert registered.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get(RUNNING_TIME) is None
+
+
+async def test_running_time_counts_hours_of_every_run(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+    await enable(hass, entry, RUNNING_TIME)
+
+    await set_status(hass, "printing")
+    await clock.advance(minutes=90)
+    await set_status(hass, "cancelled")
+    await clock.advance(hours=1)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+
+    state = hass.states.get(RUNNING_TIME)
+    assert state is not None
+    assert state.attributes["device_class"] == "duration"
+    assert state.attributes["state_class"] == "total"
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == "h"
+    assert float(state.state) == pytest.approx(2)
+
+
+async def test_running_time_excludes_pauses(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry)
+    await enable(hass, entry, RUNNING_TIME)
+    await set_status(hass, "printing")
+    await clock.advance(hours=2)
+    await set_status(hass, "finished")
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+    [run] = stored_runs(hass_storage)
+    paused = datetime.fromisoformat(run["started"]) + timedelta(minutes=10)
+    resumed = paused + timedelta(minutes=45)
+    run["pauses"] = [{"start": paused.isoformat(), "end": resumed.isoformat()}]
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert value(hass, RUNNING_TIME) == pytest.approx(1.25)

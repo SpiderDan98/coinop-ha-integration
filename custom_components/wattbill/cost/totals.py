@@ -1,7 +1,9 @@
 """Per-Device totals: summed from Runs at startup, then advanced by deltas."""
 
 from dataclasses import dataclass, fields
+from datetime import datetime
 
+from custom_components.wattbill.cost.running_time import running_time
 from custom_components.wattbill.models import LineItemKind, Run
 
 
@@ -16,6 +18,7 @@ class Totals:
     material_grams: float = 0.0
     energy_kwh: float = 0.0
     runs: int = 0
+    running_hours: float = 0.0
 
     def __add__(self, other: Totals) -> Totals:
         return Totals(
@@ -32,7 +35,8 @@ def _amount(run: Run, kind: LineItemKind) -> float:
     return sum(item.amount for item in run.line_items if item.kind is kind)
 
 
-def run_totals(run: Run) -> Totals:
+def run_totals(run: Run, now: datetime) -> Totals:
+    """`now` is where the running time of an open Run ends."""
     return Totals(
         cost=sum(item.amount for item in run.line_items),
         electricity_cost=_amount(run, LineItemKind.ELECTRICITY),
@@ -45,6 +49,7 @@ def run_totals(run: Run) -> Totals:
         ),
         energy_kwh=run.electricity.quantity or 0.0,
         runs=1,
+        running_hours=running_time(run, now).total_seconds() / 3600,
     )
 
 
@@ -55,8 +60,8 @@ class DeviceTotals:
         self._by_run: dict[str, Totals] = {}
         self.sum = Totals()
 
-    def apply(self, run: Run) -> None:
-        contribution = run_totals(run)
+    def apply(self, run: Run, now: datetime) -> None:
+        contribution = run_totals(run, now)
         self.sum = self.sum - self._by_run.get(run.id, Totals()) + contribution
         self._by_run[run.id] = contribution
 

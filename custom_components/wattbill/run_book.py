@@ -9,6 +9,7 @@ from collections.abc import Callable
 from enum import StrEnum
 
 from homeassistant.core import CALLBACK_TYPE, callback
+from homeassistant.util import dt as dt_util
 
 from .cost.totals import DeviceTotals, Totals
 from .models import Run
@@ -27,7 +28,7 @@ class RunBook:
         self._runs = {run.id: run for run in runs}
         self._totals: defaultdict[str, DeviceTotals] = defaultdict(DeviceTotals)
         for run in runs:
-            self._totals[run.device_id].apply(run)
+            self._totals[run.device_id].apply(run, dt_util.utcnow())
         self._listeners: list[Callable[[RunChange, Run], None]] = []
 
     def runs(self) -> list[Run]:
@@ -64,7 +65,7 @@ class RunBook:
     async def async_finalise(self, run: Run) -> None:
         """Freeze the Run: written to runs first, then dropped from live."""
         run.finalised = True
-        self._totals[run.device_id].apply(run)
+        self._totals[run.device_id].apply(run, dt_util.utcnow())
         await self._store.async_save_runs(r for r in self.runs() if r.finalised)
         await self._store.async_save_live(self._unfinalised())
         for listener in list(self._listeners):
@@ -78,7 +79,7 @@ class RunBook:
         return [run for run in self._runs.values() if not run.finalised]
 
     def _changed(self, change: RunChange, run: Run) -> None:
-        self._totals[run.device_id].apply(run)
+        self._totals[run.device_id].apply(run, dt_util.utcnow())
         self._store.schedule_live_save(self._unfinalised)
         for listener in list(self._listeners):
             listener(change, run)

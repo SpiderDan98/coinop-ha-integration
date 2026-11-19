@@ -105,6 +105,9 @@
       "energy_in_runs": {
         "name": "Energie in Läufen"
       },
+      "running_time": {
+        "name": "Laufzeit"
+      },
       "runs": {
         "name": "Läufe"
       }

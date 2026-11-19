@@ -6,7 +6,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfMass
+from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -52,6 +52,15 @@ TOTALS = (
     ),
     SensorEntityDescription(
         key="runs", translation_key="runs", state_class=SensorStateClass.TOTAL
+    ),
+    SensorEntityDescription(
+        key="running_hours",
+        translation_key="running_time",
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        suggested_display_precision=2,
+        entity_registry_enabled_default=False,
     ),
 )
 
