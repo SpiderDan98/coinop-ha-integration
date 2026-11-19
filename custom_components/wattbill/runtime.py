@@ -9,6 +9,7 @@ from .device_config import DeviceConfig
 from .device_settings import DeviceSettings
 from .images import ImageLibrary
 from .run_book import RunBook
+from .spoolman import Spoolman
 from .tracker import DeviceTracker
 
 
@@ -19,6 +20,7 @@ class WattBill:
     images: ImageLibrary
     devices: list[DeviceConfig]
     settings: DeviceSettings
+    spoolman: Spoolman
     trackers: list[DeviceTracker]
 
 

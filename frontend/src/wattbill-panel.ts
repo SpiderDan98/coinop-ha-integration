@@ -16,6 +16,7 @@ import {
 import { followLink, type HomeAssistant, type PanelInfo, type PanelRoute } from "./hass";
 import { localize } from "./localize";
 import "./devices-page";
+import "./manual-run-dialog";
 import "./materials-page";
 import "./overview";
 import "./run-page";
@@ -50,6 +51,7 @@ export class WattbillPanel extends LitElement {
   @state() private catalogFailed = false;
   /** Undefined until loaded, null if loading failed. */
   @state() private devices?: Device[] | null;
+  @state() private manualRun = false;
   private unsubscribe?: Promise<() => Promise<void>>[];
   private devicesRequest = 0;
 
@@ -161,6 +163,13 @@ export class WattbillPanel extends LitElement {
               >`,
           )}
         </nav>
+        <button
+          class="btn manual-run"
+          ?disabled=${!this.devices?.length}
+          @click=${() => (this.manualRun = true)}
+        >
+          ${t("manual.open")}
+        </button>
       </header>
       <main>
         ${cache(
@@ -178,6 +187,17 @@ export class WattbillPanel extends LitElement {
               html`<div>${this.renderPage(current, run)}</div>`,
         )}
       </main>
+      ${
+        this.manualRun && this.devices
+          ? html`<wattbill-manual-run-dialog
+              .hass=${this.hass}
+              .devices=${this.devices}
+              .tags=${this.catalog?.tags ?? []}
+              .basePath=${this.route.prefix}
+              @close=${() => (this.manualRun = false)}
+            ></wattbill-manual-run-dialog>`
+          : nothing
+      }
     `;
   }
 
@@ -275,6 +295,9 @@ export class WattbillPanel extends LitElement {
         white-space: nowrap;
         color: var(--secondary-text-color);
         border-bottom: 2px solid transparent;
+      }
+      .manual-run {
+        flex: none;
       }
       .tab.on {
         color: var(--primary-color);

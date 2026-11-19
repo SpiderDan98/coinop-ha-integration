@@ -14,6 +14,7 @@ from . import (
     line_items,
     materials,
     runs,
+    spoolman,
     tags,
     templates,
 )
@@ -32,6 +33,7 @@ def async_setup(hass: HomeAssistant) -> None:
         images,
         devices,
         materials,
+        spoolman,
         catalog,
         tags,
         templates,

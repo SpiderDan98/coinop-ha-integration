@@ -20,7 +20,13 @@ const sent = (backend: { calls: Message[] }, type: string) =>
 
 describe("Correcting a Run", () => {
   it("names every kind of Flag", async () => {
-    const flags = ["consumption_gap", "meter_reset", "price_gap", "usage_missing"];
+    const flags = [
+      "consumption_gap",
+      "meter_reset",
+      "price_gap",
+      "usage_missing",
+      "spoolman_unreachable",
+    ];
     const run = { ...recorded.run("benchy"), flags };
     for (const [language, labels] of [
       [
@@ -28,14 +34,16 @@ describe("Correcting a Run", () => {
         "The energy meter or power sensor reported nothing for part of the Run|" +
           "The energy meter was reset during the Run|" +
           "The electricity price was unavailable for part of the Run|" +
-          "No material usage was reported: enter the quantity",
+          "No material usage was reported: enter the quantity|" +
+          "Spoolman couldn't be reached at the end of the Run: the last price read applies",
       ],
       [
         "de",
         "Der Energiezähler oder Leistungssensor hat während eines Teils des Laufs nichts gemeldet|" +
           "Der Energiezähler wurde während des Laufs zurückgesetzt|" +
           "Der Strompreis war während eines Teils des Laufs nicht verfügbar|" +
-          "Es wurde kein Materialverbrauch gemeldet: Menge eintragen",
+          "Es wurde kein Materialverbrauch gemeldet: Menge eintragen|" +
+          "Spoolman war am Ende des Laufs nicht erreichbar: Es gilt der zuletzt gelesene Preis",
       ],
     ]) {
       const backend = recordedBackend({ language }).reply("wattbill/runs/get", () => ({ run }));
