@@ -209,6 +209,7 @@
   "manual.cancel": "Cancel",
   "manual.failed": "The Run could not be created. It must end after it starts, and not in the future.",
   "flag.spoolman_unreachable": "Spoolman couldn't be reached at the end of the Run: the last price read applies",
+  "flag.spoolman_no_price": "Spoolman has no price for the Filament: enter the unit price",
   "materials.price_source": "Cost Source",
   "materials.price_fixed": "Fixed price",
   "materials.price_spoolman": "Spoolman",

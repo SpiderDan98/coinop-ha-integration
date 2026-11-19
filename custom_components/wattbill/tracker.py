@@ -698,21 +698,26 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
-        if not read and self._uses_spoolman(run):
+        linked = self._spoolman_prices(run)
+        if not read and linked:
             self._flag(run, Flag.SPOOLMAN_UNREACHABLE)
+        if any(price.last_read is None for price in linked):
+            self._flag(run, Flag.SPOOLMAN_NO_PRICE)
         run.readings = []
         run.prices = []
         run.loaded_slots = []
         await self._async_finalise(run)
         self._finishing.discard(run.id)
 
-    def _uses_spoolman(self, run: Run) -> bool:
-        return any(
-            isinstance(material.price, SpoolmanPrice)
+    def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
+        """The Cost Sources of the Run's Materials linked to Spoolman."""
+        return [
+            material.price
             for item in run.line_items
             if item.material_id
             and (material := self._catalog.material(item.material_id))
-        )
+            and isinstance(material.price, SpoolmanPrice)
+        ]
 
     def _settle_material(self, run: Run, *, measuring: bool = True) -> None:
         """Flag missing usage or Material; without a Material used input (or a

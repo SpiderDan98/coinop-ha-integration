@@ -26,6 +26,7 @@ describe("Correcting a Run", () => {
       "price_gap",
       "usage_missing",
       "spoolman_unreachable",
+      "spoolman_no_price",
     ];
     const run = { ...recorded.run("benchy"), flags };
     for (const [language, labels] of [
@@ -35,7 +36,8 @@ describe("Correcting a Run", () => {
           "The energy meter was reset during the Run|" +
           "The electricity price was unavailable for part of the Run|" +
           "No material usage was reported: enter the quantity|" +
-          "Spoolman couldn't be reached at the end of the Run: the last price read applies",
+          "Spoolman couldn't be reached at the end of the Run: the last price read applies|" +
+          "Spoolman has no price for the Filament: enter the unit price",
       ],
       [
         "de",
@@ -43,7 +45,8 @@ describe("Correcting a Run", () => {
           "Der Energiezähler wurde während des Laufs zurückgesetzt|" +
           "Der Strompreis war während eines Teils des Laufs nicht verfügbar|" +
           "Es wurde kein Materialverbrauch gemeldet: Menge eintragen|" +
-          "Spoolman war am Ende des Laufs nicht erreichbar: Es gilt der zuletzt gelesene Preis",
+          "Spoolman war am Ende des Laufs nicht erreichbar: Es gilt der zuletzt gelesene Preis|" +
+          "Spoolman hat keinen Preis für das Filament: Stückpreis eintragen",
       ],
     ]) {
       const backend = recordedBackend({ language }).reply("wattbill/runs/get", () => ({ run }));

@@ -209,6 +209,7 @@
   "manual.cancel": "Abbrechen",
   "manual.failed": "Der Lauf konnte nicht angelegt werden. Er muss nach seinem Start enden, und nicht in der Zukunft.",
   "flag.spoolman_unreachable": "Spoolman war am Ende des Laufs nicht erreichbar: Es gilt der zuletzt gelesene Preis",
+  "flag.spoolman_no_price": "Spoolman hat keinen Preis für das Filament: Stückpreis eintragen",
   "materials.price_source": "Preisquelle",
   "materials.price_fixed": "Fester Preis",
   "materials.price_spoolman": "Spoolman",

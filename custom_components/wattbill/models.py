@@ -26,6 +26,7 @@ class Flag(StrEnum):
     USAGE_MISSING = "usage_missing"
     MATERIAL_MISSING = "material_missing"
     SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
+    SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
 
