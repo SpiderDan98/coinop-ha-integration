@@ -40,6 +40,18 @@ _Avoid_: Quantity, pieces, copies
 A marker on a Run pointing out something the user may want to check, such as a reported fault or a gap in price or consumption data.
 _Avoid_: Warning, error, notice
 
+**Thumbnail**:
+The preview image of the model a Run produces, taken from the Device's thumbnail.
+_Avoid_: Preview, model image
+
+**Snapshot**:
+The camera image of a Device taken when a Run ends.
+_Avoid_: Photo, picture, completion image
+
+**Cover Image**:
+The one image that stands for a Run wherever only one is shown: the one the user picked, otherwise the first of its Thumbnail, Snapshot and uploaded images.
+_Avoid_: Main image, title image
+
 **Line Item**:
 One cost line on a Run, such as electricity, filament, or inserting threaded inserts.
 _Avoid_: Position, entry, cost line
