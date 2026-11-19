@@ -86,9 +86,49 @@
     }
   },
   "entity": {
+    "event": {
+      "run": {
+        "name": "Lauf",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Gestartet",
+              "ended": "Beendet"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "total_cost": {
         "name": "Gesamtkosten"
+      },
+      "electricity_cost": {
+        "name": "Stromkosten"
+      },
+      "material_cost": {
+        "name": "Materialkosten"
+      },
+      "other_cost": {
+        "name": "Sonstige Kosten"
+      },
+      "material_used": {
+        "name": "Materialverbrauch"
+      },
+      "energy_in_runs": {
+        "name": "Energie in Läufen"
+      },
+      "running_time": {
+        "name": "Laufzeit"
+      },
+      "current_run_cost": {
+        "name": "Kosten aktueller Lauf"
+      },
+      "last_run_cost": {
+        "name": "Kosten letzter Lauf"
+      },
+      "flagged_runs": {
+        "name": "Läufe mit Hinweisen"
       },
       "runs": {
         "name": "Läufe"
