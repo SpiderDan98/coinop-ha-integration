@@ -19,19 +19,20 @@
       "step": {
         "reconfigure": {
           "title": "Gerät neu konfigurieren",
-          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie.",
+          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch Status, Auftrag und Bilder, vorausgefüllt aus dem Integrationsprofil der Drucker-Integration, z. B. wenn ein Update ihre Entitäten umbenannt hat; Verbrauchsquelle und Preis bleiben unverändert.",
           "menu_options": {
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
             "images": "Bilder",
             "consumption": "Verbrauchsquelle",
             "price": "Strompreis",
+            "detect": "Erneut erkennen",
             "save": "Speichern"
           }
         },
         "user": {
           "title": "Gerät hinzufügen",
-          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer.",
+          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die WattBill kennt (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
           "data": {
             "device": "Home-Assistant-Gerät des Druckers (optional)"
           },

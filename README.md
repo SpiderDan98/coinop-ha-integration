@@ -59,6 +59,19 @@ days_to_show: 365
 
 Corrections and deleted Runs change the totals at the moment you make them, so they show up in that month rather than rewriting earlier ones.
 
+## Anycubic printers
+
+When you add a Device and pick a printer's Home Assistant device from one of these integrations, every setup step comes pre-filled. Check each step and change what you like; WattBill stores the entities themselves, not a link to the integration.
+
+| Integration | Status | Material used | Thumbnail | Slots |
+|---|---|---|---|---|
+| [Anycubic 3D Printer - Local Control](https://github.com/chrisfore/anycubic_ha_local) (`anycubic`) | Print event | Filament used, its `length_mm` attribute (mm) | Object top view (or Object thumbnail) | ACE Slot 1–4, colour attribute `color`, Loaded slot |
+| [Anycubic Cloud & LAN](https://github.com/Nino6689/hass-anycubic) (`anycubic_cloud`, 3.0 and 2.x) | Job state | Job filament used (mm) | Job preview (cloud mode only) | ACE Slot 1–4, colour attribute `color_hex`, ACE loaded slot |
+
+Both also fill in the job name and the printer's local camera. With Anycubic Cloud & LAN 2.x in LAN mode a finished print goes straight to idle, so its Runs end with Outcome Unknown.
+
+If an update of the integration renames or replaces its entities, open the Device's reconfigure menu and choose **Detect again**. It walks the status, job and image steps pre-filled from the integration again and leaves the consumption source and price as they are.
+
 ## Using it with hass-anycubic
 
 The hass-anycubic integration has cost sensors of its own (such as job energy, job electricity cost and last job total cost). WattBill ignores them and computes every cost itself. Turn off one of the two cost features, for example by disabling hass-anycubic's cost entities, so your dashboards don't count the same print twice.

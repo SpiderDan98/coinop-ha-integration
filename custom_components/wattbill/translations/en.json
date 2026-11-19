@@ -19,19 +19,20 @@
       "step": {
         "reconfigure": {
           "title": "Reconfigure Device",
-          "description": "Pick a section to change. Nothing is saved until you choose Save. Changes apply to an open Run at once; a new consumption source applies from the next Run. Ended Runs never change.",
+          "description": "Pick a section to change. Nothing is saved until you choose Save. Changes apply to an open Run at once; a new consumption source applies from the next Run. Ended Runs never change. Detect again walks status, job and images pre-filled from the printer integration's Integration Profile, e.g. after an update renamed its entities; consumption source and price stay as they are.",
           "menu_options": {
             "status": "Status & mapping",
             "job": "Job & Material",
             "images": "Images",
             "consumption": "Consumption source",
             "price": "Electricity price",
+            "detect": "Detect again",
             "save": "Save"
           }
         },
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty.",
+          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty. For a printer integration WattBill knows (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
           "data": {
             "device": "Printer's Home Assistant device (optional)"
           },
