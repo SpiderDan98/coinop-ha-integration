@@ -7,7 +7,7 @@ const rows = (panel: Element, selector = ".active tr.material") =>
   queryAll(panel, selector).map(text);
 const field = (panel: Element, name: string) => query(panel, `[name=${name}]`);
 const button = (root: Element, label: string) => {
-  const found = queryAll(root, "button").find((candidate) => text(candidate) === label);
+  const found = queryAll(root, "ha-button, button").find((candidate) => text(candidate) === label);
   if (!found) throw new Error(`no button "${label}"`);
   return found;
 };
@@ -51,9 +51,12 @@ describe("Materials tab", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/materials" });
 
     expect(rows(panel)).toEqual([
-      "eSun PLA+ black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €19.99 / 1,000 g €0.02 / g ★ Edit Archive Delete",
-      "Standard Resin grey Resin · Standard resin 1.1 g/cm³ €29.99 / 1,000 ml €0.0273 / g ☆ Edit Archive Delete",
+      "eSun PLA+ black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €19.99 / 1,000 g €0.02 / g Edit Archive Delete",
+      "Standard Resin grey Resin · Standard resin 1.1 g/cm³ €29.99 / 1,000 ml €0.0273 / g Edit Archive Delete",
     ]);
+    expect(
+      queryAll(panel, ".active ha-icon-button.star").map((star) => star.hasAttribute("selected")),
+    ).toEqual([true, false]);
     expect(text(query(panel, ".archived summary"))).toBe("Archived (1)");
     expect(rows(panel, ".archived tr.material")).toEqual([
       "PLA red (old brand) Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €15.99 / 1,000 g €0.016 / g Restore Delete",
@@ -71,7 +74,7 @@ describe("Materials tab", () => {
   it("creates a Material with its density pre-filled from the type", async () => {
     const backend = catalogBackend();
     const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(panel, "+ New Material"));
+    await click(panel, button(panel, "New Material"));
 
     await fill(panel, field(panel, "name"), "Sunlu PETG white");
     await fill(panel, field(panel, "type"), "petg");
@@ -102,7 +105,7 @@ describe("Materials tab", () => {
 
   it("offers the built-in types and suggests resin by the millilitre", async () => {
     const panel = await mountPanel(catalogBackend(), { path: "/materials" });
-    await click(panel, button(panel, "+ New Material"));
+    await click(panel, button(panel, "New Material"));
 
     await fill(panel, field(panel, "type"), "Standard resin");
 
@@ -148,7 +151,7 @@ describe("Materials tab", () => {
       throw new WsError("invalid_format");
     });
     const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(panel, "+ New Material"));
+    await click(panel, button(panel, "New Material"));
 
     await click(panel, button(panel, "Save"));
 
@@ -161,7 +164,7 @@ describe("Materials tab", () => {
     const backend = catalogBackend();
     const panel = await mountPanel(backend, { path: "/materials" });
 
-    await click(panel, query(row(panel, "Standard Resin grey"), "button.star"));
+    await click(panel, query(row(panel, "Standard Resin grey"), "ha-icon-button.star"));
 
     expect(lastCall(backend)).toEqual({
       type: "wattbill/materials/update",
@@ -228,7 +231,7 @@ describe("Materials tab", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/materials" });
 
     expect(rows(panel)[1]).toBe(
-      "Standard Resin grey Harz · Standard resin 1,1 g/cm³ 29,99 € / 1.000 ml 0,0273 € / g ☆ Bearbeiten Archivieren Löschen",
+      "Standard Resin grey Harz · Standard resin 1,1 g/cm³ 29,99 € / 1.000 ml 0,0273 € / g Bearbeiten Archivieren Löschen",
     );
   });
 });

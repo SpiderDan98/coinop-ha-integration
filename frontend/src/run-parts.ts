@@ -49,8 +49,12 @@ export const deleteDialog = (
       </dl>
       <p class="muted small">${t("delete.warning")}</p>
       <div class="row end">
-        <button class="btn cancel" @click=${cancel}>${t("delete.cancel")}</button>
-        <button class="btn danger confirm" @click=${confirm}>${t("delete.confirm")}</button>
+        <ha-button class="cancel" appearance="plain" @click=${cancel}>
+          ${t("delete.cancel")}
+        </ha-button>
+        <ha-button class="confirm" variant="danger" @click=${confirm}>
+          ${t("delete.confirm")}
+        </ha-button>
       </div>
     </div>
   </div>`;

@@ -176,14 +176,17 @@ export class StatementDialog extends LitElement {
         </div>
         ${this.failed ? html`<p class="error small">${t("statement.failed")}</p>` : nothing}
         <div class="row end">
-          <button class="btn cancel" @click=${this.close}>${t("statement.cancel")}</button>
-          <button
-            class="btn download"
+          <ha-button class="cancel" appearance="plain" @click=${this.close}>
+            ${t("statement.cancel")}
+          </ha-button>
+          <ha-button
+            class="download"
             ?disabled=${!options || this.typedMarkup === undefined || this.busy}
+            .loading=${this.busy}
             @click=${this.download}
           >
             ${t("statement.download")}
-          </button>
+          </ha-button>
         </div>
       </div>
     </div>`;

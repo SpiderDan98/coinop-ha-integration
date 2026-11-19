@@ -21,7 +21,7 @@ const creating = (options?: ConstructorParameters<typeof FakeBackend>[0]) => {
 };
 
 const open = async (panel: HTMLElement) => {
-  await click(panel, query(panel, "button.manual-run"));
+  await click(panel, query(panel, "ha-button.manual-run"));
   return query(panel, ".manual-dialog");
 };
 
@@ -59,7 +59,7 @@ describe("A manual Run", () => {
     await enter(panel, dialog);
     await fill(panel, field(dialog, "outcome"), "failed");
 
-    await click(panel, query(dialog, "button.create"));
+    await click(panel, query(dialog, "ha-button.create"));
 
     expect(backend.calls.filter((call) => call.type === CREATE)).toEqual([
       {
@@ -81,7 +81,7 @@ describe("A manual Run", () => {
     const backend = creating();
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
-    const create = query(dialog, "button.create") as HTMLButtonElement;
+    const create = query(dialog, "ha-button.create") as HTMLButtonElement;
     expect(create.disabled).toBe(true);
 
     await enter(panel, dialog);
@@ -99,7 +99,7 @@ describe("A manual Run", () => {
     const dialog = await open(panel);
     await enter(panel, dialog);
 
-    await click(panel, query(dialog, "button.create"));
+    await click(panel, query(dialog, "ha-button.create"));
 
     expect(text(query(panel, ".manual-dialog"))).toContain("could not be created");
     expect(location.pathname).toBe("/wattbill");
@@ -110,7 +110,7 @@ describe("A manual Run", () => {
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
 
-    await click(panel, query(dialog, "button.cancel"));
+    await click(panel, query(dialog, "ha-button.cancel"));
 
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
     expect(backend.calls.some((call) => call.type === CREATE)).toBe(false);

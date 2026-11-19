@@ -1,4 +1,4 @@
-// "+ Manual Run": a Run made by hand for a print WattBill did not see. Pre-fills the
+// "Manual Run": a Run made by hand for a print WattBill did not see. Pre-fills the
 // Device's Tags for new Runs, opens the new Run's page once created and fires `close`.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -110,14 +110,17 @@ export class ManualRunDialog extends LitElement {
         </div>
         ${this.failed ? html`<p class="error small">${t("manual.failed")}</p>` : nothing}
         <div class="row end">
-          <button class="btn cancel" @click=${this.close}>${t("manual.cancel")}</button>
-          <button
-            class="btn create"
+          <ha-button class="cancel" appearance="plain" @click=${this.close}>
+            ${t("manual.cancel")}
+          </ha-button>
+          <ha-button
+            class="create"
             ?disabled=${!device || !this.times || this.saving}
+            .loading=${this.saving}
             @click=${() => this.create(tags)}
           >
             ${t("manual.create")}
-          </button>
+          </ha-button>
         </div>
       </div>
     </div>`;

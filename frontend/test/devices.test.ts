@@ -44,8 +44,8 @@ describe("Devices tab", () => {
         "Reconfigure in Home Assistant " +
         "Default Material None eSun PLA+ black Standard Resin grey " +
         "Charged for a Run's measured usage, and pre-filled when the printer reports none. " +
-        "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device. " +
-        "Automatic templates Wear Kobra × + Add template Threaded inserts Packaging " +
+        "Tags for new Runs Batch 7 Copied onto every Run that starts on this Device. " +
+        "Automatic templates Wear Kobra + Add template Threaded inserts Packaging " +
         "Added to every Run that starts on this Device. Changes affect future Runs only.",
     ]);
     expect(queryAll(panel, ".device dl input, .device dl select")).toHaveLength(0);

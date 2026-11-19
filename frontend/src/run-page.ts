@@ -1,4 +1,12 @@
 // Refetches the Run whenever its summary changes, so it follows live updates.
+import {
+  mdiBookmarkPlusOutline,
+  mdiDelete,
+  mdiLockOutline,
+  mdiPlus,
+  mdiRestore,
+  mdiStopCircleOutline,
+} from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -363,21 +371,26 @@ export class RunPage extends LitElement {
         <span class="muted small">${t("run.saves")}</span>
         ${
           run.ended === null
-            ? html`<button
-                class="btn end-run"
+            ? html`<ha-button
+                class="end-run"
+                appearance="plain"
                 @click=${() => this.save(endRun(this.hass, this.runId))}
               >
+                <ha-svg-icon slot="start" .path=${mdiStopCircleOutline}></ha-svg-icon>
                 ${t("run.end_now")}
-              </button>`
+              </ha-button>`
             : nothing
         }
-        <button
-          class="btn danger delete-run"
+        <ha-button
+          class="delete-run"
+          appearance="plain"
+          variant="danger"
           ?disabled=${!run.finalised}
           @click=${this.confirmDelete}
         >
+          <ha-svg-icon slot="start" .path=${mdiDelete}></ha-svg-icon>
           ${t("run.delete")}
-        </button>
+        </ha-button>
       </div>
       <div class="grid">
         <div class="card facts">
@@ -402,12 +415,13 @@ export class RunPage extends LitElement {
                     (flag) =>
                       html`<div class="flag">
                         <span>⚑</span><span class="text">${flagLabel(flag, t)}</span>
-                        <button
-                          class="btn small"
+                        <ha-button
+                          class="small"
+                          appearance="plain"
                           @click=${() => this.save(clearFlag(this.hass, this.runId, flag))}
                         >
                           ${t("run.mark_checked")}
-                        </button>
+                        </ha-button>
                       </div>`,
                   )}
                 </div>`
@@ -600,39 +614,44 @@ export class RunPage extends LitElement {
       </div>
       ${number("unit_price")} ${number("amount")}
       <div class="actions">
-        ${locked ? html`<span class="lock" title=${t("item.locked")}>🔒</span>` : nothing}
+        ${
+          locked
+            ? html`<ha-svg-icon
+                class="lock"
+                title=${t("item.locked")}
+                .path=${mdiLockOutline}
+              ></ha-svg-icon>`
+            : nothing
+        }
         ${
           computed
-            ? html`<button
-                class="icon reset"
-                title=${t(
+            ? html`<ha-icon-button
+                class="reset"
+                .label=${t(
                   "item.reset",
                   Object.fromEntries(
                     VALUES.map((field) => [field, shownValue(item, computed, field, format)]),
                   ),
                 )}
+                .path=${mdiRestore}
                 @click=${() => this.saveItems(resetLineItem(this.hass, this.runId, item.id))}
-              >
-                ↺
-              </button>`
+              ></ha-icon-button>`
             : nothing
         }
-        <button
-          class="icon save-template"
-          title=${t("item.save_as_template")}
+        <ha-icon-button
+          class="save-template"
+          .label=${t("item.save_as_template")}
+          .path=${mdiBookmarkPlusOutline}
           @click=${() => this.onSaveTemplate(item)}
-        >
-          ☆
-        </button>
+        ></ha-icon-button>
         ${
           item.deletable
-            ? html`<button
-                class="icon delete"
-                title=${t("item.delete")}
+            ? html`<ha-icon-button
+                class="delete"
+                .label=${t("item.delete")}
+                .path=${mdiDelete}
                 @click=${() => this.saveItems(deleteLineItem(this.hass, this.runId, item.id))}
-              >
-                🗑
-              </button>`
+              ></ha-icon-button>`
             : nothing
         }
       </div>
@@ -690,15 +709,24 @@ export class RunPage extends LitElement {
                 <option value="ml">ml</option>
               </select>
               <div class="row">
-                <button class="btn" type="submit">${t("item.add")}</button>
-                <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
+                <ha-button
+                  class="small"
+                  appearance="plain"
+                  @click=${() => (this.adding = undefined)}
+                >
                   ${t("item.cancel")}
-                </button>
+                </ha-button>
               </div>
             </form>`
-          : html`<button class="btn small add-material" @click=${() => (this.adding = "material")}>
+          : html`<ha-button
+              class="small add-material"
+              appearance="filled"
+              @click=${() => (this.adding = "material")}
+            >
+              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
               ${t("item.add_material")}
-            </button>`
+            </ha-button>`
       }
     </div>`;
   }
@@ -734,24 +762,35 @@ export class RunPage extends LitElement {
               />
               <p class="muted small">${t("item.negative_hint")}</p>
               <div class="row">
-                <button class="btn" type="submit">${t("item.add")}</button>
-                <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
+                <ha-button
+                  class="small"
+                  appearance="plain"
+                  @click=${() => (this.adding = undefined)}
+                >
                   ${t("item.cancel")}
-                </button>
+                </ha-button>
               </div>
             </form>`
           : html`<div class="row">
-              <button class="btn small add-other" @click=${() => (this.adding = "other")}>
+              <ha-button
+                class="small add-other"
+                appearance="filled"
+                @click=${() => (this.adding = "other")}
+              >
+                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
                 ${t("item.add_other")}
-              </button>
+              </ha-button>
               ${
                 this.templates.length
-                  ? html`<button
-                      class="btn small add-template"
+                  ? html`<ha-button
+                      class="small add-template"
+                      appearance="filled"
                       @click=${() => (this.adding = "template")}
                     >
+                      <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
                       ${t("item.add_template")}
-                    </button>`
+                    </ha-button>`
                   : nothing
               }
             </div>`
@@ -797,10 +836,10 @@ export class RunPage extends LitElement {
               />`
         }
         <div class="row">
-          <button class="btn" type="submit">${t("item.add")}</button>
-          <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+          <ha-button class="small" type="submit">${t("item.add")}</ha-button>
+          <ha-button class="small" appearance="plain" @click=${() => (this.adding = undefined)}>
             ${t("item.cancel")}
-          </button>
+          </ha-button>
         </div>
       </form>
     </div>`;
@@ -918,7 +957,7 @@ export class RunPage extends LitElement {
       }
       .item {
         display: grid;
-        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 76px;
+        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 108px;
         gap: 6px;
         align-items: start;
         padding: 6px 4px;
@@ -934,7 +973,7 @@ export class RunPage extends LitElement {
         padding-left: 10px;
       }
       :host([narrow]) .item {
-        grid-template-columns: 1fr 1fr 1fr 76px;
+        grid-template-columns: 1fr 1fr 1fr 108px;
       }
       :host([narrow]) .item .label {
         grid-column: 1 / -1;
@@ -964,18 +1003,17 @@ export class RunPage extends LitElement {
         justify-content: flex-end;
         padding-top: 4px;
       }
-      .icon {
-        font: inherit;
-        border: 0;
-        background: none;
-        cursor: pointer;
-        padding: 2px 4px;
-        border-radius: 6px;
+      .actions ha-icon-button {
+        --ha-icon-button-size: 32px;
+        --mdc-icon-size: 20px;
         color: var(--secondary-text-color);
       }
-      .icon.reset {
+      .actions ha-icon-button.reset {
         color: var(--wattbill-manual);
-        font-weight: 700;
+      }
+      .lock {
+        --mdc-icon-size: 18px;
+        color: var(--secondary-text-color);
       }
       .add-item {
         margin-top: 8px;

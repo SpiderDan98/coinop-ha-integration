@@ -122,7 +122,7 @@ describe("Run gallery", () => {
     let toggled = false;
     window.addEventListener("hass-toggle-menu", () => (toggled = true), { once: true });
 
-    query(panel, "button.menu").click();
+    query(panel, "ha-icon-button.menu").click();
 
     expect(toggled).toBe(true);
   });

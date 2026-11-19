@@ -326,15 +326,24 @@ export class Overview extends LitElement {
       </div>
       <div class="muted small names">${runs.map((run) => runName(run, t)).join(", ")}</div>
       <div class="row actions">
-        <button class="btn small statement" @click=${() => (this.exporting = true)}>
+        <ha-button class="small statement" @click=${() => (this.exporting = true)}>
           ${t("basket.statement")}
-        </button>
-        <button class="btn small danger delete" @click=${this.confirmDelete}>
+        </ha-button>
+        <ha-button
+          class="small delete"
+          appearance="plain"
+          variant="danger"
+          @click=${this.confirmDelete}
+        >
           ${t("basket.delete")}
-        </button>
-        <button class="btn small clear" @click=${() => (this.selected = new Set())}>
+        </ha-button>
+        <ha-button
+          class="small clear"
+          appearance="plain"
+          @click=${() => (this.selected = new Set())}
+        >
           ${t("basket.clear")}
-        </button>
+        </ha-button>
       </div>
       ${this.deleteFailed ? html`<p class="error small">${t("basket.delete_failed")}</p>` : nothing}
     </aside>`;

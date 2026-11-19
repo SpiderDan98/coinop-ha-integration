@@ -138,10 +138,10 @@ describe("Correcting a Run", () => {
     }
     expect(query(panel, "input[name=name]").hasAttribute("disabled")).toBe(false);
 
-    await click(panel, query(panel, "button.end-run"));
+    await click(panel, query(panel, "ha-button.end-run"));
 
     expect(backend.calls.at(-1)).toEqual({ type: "wattbill/runs/end", run_id: "print-live" });
-    expect(queryAll(panel, "button.end-run")).toHaveLength(0);
+    expect(queryAll(panel, "ha-button.end-run")).toHaveLength(0);
   });
 
   it("lists open Flags until they are marked checked", async () => {
@@ -153,7 +153,7 @@ describe("Correcting a Run", () => {
       "⚑ The Device reported a fault Mark checked ⚑ No Material was known for the usage: pick the Material Mark checked",
     );
 
-    await click(panel, query(panel, ".flag button"));
+    await click(panel, query(panel, ".flag ha-button"));
 
     expect(backend.calls.at(-1)).toEqual({
       type: "wattbill/runs/clear_flag",
@@ -183,7 +183,7 @@ describe("Deleting a Run", () => {
     const backend = deleting();
     const panel = await mountPanel(backend, { path: "/run/helmet" });
 
-    await click(panel, query(panel, "button.delete-run"));
+    await click(panel, query(panel, "ha-button.delete-run"));
 
     expect(backend.calls.at(-1)).toEqual({
       type: "wattbill/runs/delete_preview",
@@ -199,14 +199,14 @@ describe("Deleting a Run", () => {
   it("deletes only when confirmed and then returns to all Runs", async () => {
     const backend = deleting();
     const panel = await mountPanel(backend, { path: "/run/helmet" });
-    await click(panel, query(panel, "button.delete-run"));
+    await click(panel, query(panel, "ha-button.delete-run"));
 
-    await click(panel, query(panel, ".dialog button.cancel"));
+    await click(panel, query(panel, ".dialog ha-button.cancel"));
     expect(queryAll(panel, ".dialog")).toHaveLength(0);
     expect(backend.sent("wattbill/runs/delete")).toEqual([]);
 
-    await click(panel, query(panel, "button.delete-run"));
-    await click(panel, query(panel, ".dialog button.confirm"));
+    await click(panel, query(panel, "ha-button.delete-run"));
+    await click(panel, query(panel, ".dialog ha-button.confirm"));
     expect(backend.sent("wattbill/runs/delete")).toEqual([
       { type: "wattbill/runs/delete", run_ids: ["helmet"] },
     ]);
@@ -219,7 +219,7 @@ describe("Deleting a Run", () => {
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });
 
-    expect(query(panel, "button.delete-run").hasAttribute("disabled")).toBe(true);
+    expect(query(panel, "ha-button.delete-run").hasAttribute("disabled")).toBe(true);
   });
 
   it("is in German when Home Assistant is", async () => {
@@ -229,7 +229,7 @@ describe("Deleting a Run", () => {
     );
     const panel = await mountPanel(german, { path: "/run/helmet" });
 
-    await click(panel, query(panel, "button.delete-run"));
+    await click(panel, query(panel, "ha-button.delete-run"));
 
     expect(text(query(panel, ".dialog"))).toContain(
       "Gesamtkosten 0,30 € Energie in Läufen 1,08 kWh Materialverbrauch 0 g Läufe 1",

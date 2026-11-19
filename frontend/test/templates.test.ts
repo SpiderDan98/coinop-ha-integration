@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
-import { change, click, fill, mountPanel, query, queryAll, settle, text } from "./render";
+import {
+  change,
+  click,
+  fill,
+  iconButton,
+  label,
+  mountPanel,
+  query,
+  queryAll,
+  settle,
+  text,
+} from "./render";
 
 const row = (panel: Element, id: string) => query(panel, `tr.template[data-id="${id}"]`);
 const field = (root: HTMLElement, name: string) =>
@@ -85,13 +96,13 @@ describe("Line Item Templates tab", () => {
     const backend = templatesBackend();
     const panel = await mountPanel(backend, { path: "/templates" });
 
-    await click(panel, query(panel, "button.new-template"));
+    await click(panel, query(panel, "ha-button.new-template"));
     const form = query(panel, "form.new");
     await fill(panel, field(form, "label"), " Labour ");
     await fill(panel, field(form, "unit"), "h");
     await fill(panel, field(form, "unit_price"), "15");
     await fill(panel, field(form, "default_quantity"), "0.5");
-    await click(panel, query(form, "button[type=submit]"));
+    await click(panel, query(form, "ha-button[type=submit]"));
 
     expect(backend.sent("wattbill/templates/create")).toEqual([
       {
@@ -112,8 +123,8 @@ describe("Line Item Templates tab", () => {
     const backend = templatesBackend();
     const panel = await mountPanel(backend, { path: "/templates" });
 
-    const remove = query(row(panel, "template-wear"), "button.delete");
-    expect(remove.title).toBe("Delete (past Runs keep their copies)");
+    const remove = query(row(panel, "template-wear"), "ha-icon-button.delete");
+    expect(label(remove)).toBe("Delete (past Runs keep their copies)");
     await click(panel, remove);
 
     expect(backend.sent("wattbill/templates/delete")).toEqual([
@@ -149,11 +160,11 @@ describe("Line Item Templates on a Run", () => {
     const backend = recordedBackend().reply(SAVE, () => recorded.saveAsTemplate);
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
-    const save = query(item(panel, "benchy-wear"), "button.save-template");
-    expect(save.title).toBe("Save as Line Item Template");
+    const save = query(item(panel, "benchy-wear"), "ha-icon-button.save-template");
+    expect(label(save)).toBe("Save as Line Item Template");
     await click(panel, save);
     expect(text(query(panel, ".items"))).toContain("Saved “Nozzle wear” as a Line Item Template.");
-    await click(panel, query(item(panel, "electricity"), "button.save-template"));
+    await click(panel, query(item(panel, "electricity"), "ha-icon-button.save-template"));
 
     expect(backend.sent(SAVE)).toEqual([
       { type: SAVE, run_id: "benchy", line_item_id: "benchy-wear" },
@@ -165,7 +176,7 @@ describe("Line Item Templates on a Run", () => {
     const backend = recordedBackend().reply(ADD, () => recorded.lineItemsAddTemplate);
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
-    await click(panel, query(panel, "button.add-template"));
+    await click(panel, query(panel, "ha-button.add-template"));
     const form = query(panel, ".add-item form.template");
     const options = queryAll(form, "select[name=template] option").map(text);
     expect(options).toEqual([
@@ -176,11 +187,11 @@ describe("Line Item Templates on a Run", () => {
     expect(text(form)).toContain("Quantity: the Run's running hours (1.25 h)");
     await fill(panel, field(form, "template"), "template-inserts");
     expect(field(form, "quantity").placeholder).toBe("Quantity (default 8)");
-    await click(panel, query(form, "button[type=submit]"));
-    await click(panel, query(panel, "button.add-template"));
+    await click(panel, query(form, "ha-button[type=submit]"));
+    await click(panel, query(panel, "ha-button.add-template"));
     await fill(panel, field(query(panel, "form.template"), "template"), "template-packaging");
     await fill(panel, field(query(panel, "form.template"), "quantity"), "2");
-    await click(panel, query(panel, "form.template button[type=submit]"));
+    await click(panel, query(panel, "form.template ha-button[type=submit]"));
 
     expect(backend.sent(ADD)).toEqual([
       { type: ADD, run_id: "benchy", template_id: "template-inserts" },
@@ -202,7 +213,7 @@ describe("Line Item Templates on a Run", () => {
     expect(text(wear)).toContain("From a template · running hours, pauses excluded");
     expect(field(wear, "quantity").value).toBe("0.75");
     expect(queryAll(wear, "[name=unit]")).toHaveLength(0);
-    expect(queryAll(wear, "button.delete")).toHaveLength(0);
+    expect(queryAll(wear, "ha-icon-button.delete")).toHaveLength(0);
   });
 });
 
@@ -231,7 +242,7 @@ describe("Automatic templates", () => {
 
     await fill(panel, picker, "template-inserts");
     expect(chosen(panel)).toEqual(["Wear Kobra", "Threaded inserts"]);
-    await click(panel, query(panel, `.template-chip button[aria-label="Remove Wear Kobra"]`));
+    await click(panel, iconButton(panel, "Remove Wear Kobra"));
 
     expect(backend.sent(SETTINGS)).toEqual([
       {
@@ -254,7 +265,7 @@ describe("Automatic templates", () => {
     });
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    await click(panel, query(panel, `.template-chip button[aria-label="Remove Wear Kobra"]`));
+    await click(panel, iconButton(panel, "Remove Wear Kobra"));
 
     expect(chosen(panel)).toEqual(["Wear Kobra"]);
     expect(text(query(panel, ".device .error"))).toBe("This change could not be saved.");

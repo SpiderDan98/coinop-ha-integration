@@ -5,6 +5,7 @@ export type Message = { type: string } & Record<string, unknown>;
 export interface HomeAssistant {
   language: string;
   config: { currency: string; time_zone: string };
+  dockedSidebar?: "docked" | "always_hidden" | "auto";
   callWS<T>(msg: Message): Promise<T>;
   fetchWithAuth(path: string, init?: RequestInit): Promise<Response>;
   connection: {

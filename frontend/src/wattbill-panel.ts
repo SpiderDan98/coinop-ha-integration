@@ -1,3 +1,4 @@
+import { mdiMenu, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { cache } from "lit/directives/cache.js";
@@ -22,8 +23,6 @@ import "./tags-page";
 import "./templates-page";
 import { runName } from "./run-parts";
 import { shared } from "./styles";
-
-const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
 const TABS = ["analysis", "materials", "templates", "tags", "devices"] as const;
 
@@ -70,7 +69,8 @@ export class WattbillPanel extends LitElement {
     return (
       old.language !== this.hass.language ||
       old.config.currency !== this.hass.config.currency ||
-      old.config.time_zone !== this.hass.config.time_zone
+      old.config.time_zone !== this.hass.config.time_zone ||
+      old.dockedSidebar !== this.hass.dockedSidebar
     );
   }
 
@@ -125,15 +125,14 @@ export class WattbillPanel extends LitElement {
     return html`
       <header class="toolbar">
         ${
-          this.narrow
-            ? html`<button
+          // When HA's own ha-menu-button shows itself.
+          this.narrow || this.hass.dockedSidebar === "always_hidden"
+            ? html`<ha-icon-button
                 class="menu"
-                title=${t("menu")}
-                aria-label=${t("menu")}
+                .label=${t("menu")}
+                .path=${mdiMenu}
                 @click=${this.toggleMenu}
-              >
-                <svg viewBox="0 0 24 24"><path d=${MENU_ICON}></path></svg>
-              </button>`
+              ></ha-icon-button>`
             : nothing
         }
         <nav class="title">
@@ -159,13 +158,15 @@ export class WattbillPanel extends LitElement {
               >`,
           )}
         </nav>
-        <button
-          class="btn manual-run"
+        <ha-button
+          class="manual-run"
+          appearance="plain"
           ?disabled=${!this.devices?.length}
           @click=${() => (this.manualRun = true)}
         >
+          <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
           ${t("manual.open")}
-        </button>
+        </ha-button>
       </header>
       <main>
         ${cache(
@@ -273,18 +274,23 @@ export class WattbillPanel extends LitElement {
         min-height: 100%;
         background: var(--primary-background-color, #fafafa);
       }
+      /* As in HA's hass-subpage. */
       .toolbar {
         position: sticky;
         top: 0;
         z-index: 2;
-        height: var(--header-height, 56px);
+        box-sizing: border-box;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        background: var(--app-header-background-color, var(--primary-background-color, #fafafa));
-        color: var(--app-header-text-color, var(--primary-text-color));
+        padding: 8px 12px;
+        padding-top: calc(8px + var(--safe-area-inset-top, 0px));
+        height: calc(var(--header-height, 56px) + var(--safe-area-inset-top, 0px));
+        font-size: var(--ha-font-size-xl, 20px);
+        font-weight: var(--ha-font-weight-normal, 400);
+        border-bottom: var(--app-header-border-bottom, none);
+        background: var(--app-header-background-color);
+        color: var(--app-header-text-color, white);
       }
       .tabs {
         display: flex;
@@ -294,6 +300,7 @@ export class WattbillPanel extends LitElement {
       }
       .tab {
         display: flex;
+        font-size: var(--ha-font-size-m, 14px);
         align-items: center;
         padding: 0 14px;
         white-space: nowrap;
@@ -308,26 +315,14 @@ export class WattbillPanel extends LitElement {
         border-bottom-color: var(--primary-color);
       }
       .title {
-        font-size: 20px;
         display: flex;
         gap: 6px;
         min-width: 0;
+        margin-inline-start: var(--ha-space-6, 24px);
         white-space: nowrap;
       }
-      .menu {
-        border: 0;
-        background: none;
-        color: inherit;
-        padding: 8px;
-        margin-left: -8px;
-        cursor: pointer;
-        border-radius: 50%;
-      }
-      .menu svg {
-        width: 24px;
-        height: 24px;
-        display: block;
-        fill: currentColor;
+      :host([narrow]) .title {
+        margin-inline-start: var(--ha-space-2, 8px);
       }
       main {
         padding: 16px 24px 48px;

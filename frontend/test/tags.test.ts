@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "../src/hass";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
+import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
 const chips = (root: Element) => queryAll(root, ".tag-chip .tag-name").map(text);
 const button = (root: Element, label: string) => {
-  const found = queryAll(root, "button").find((candidate) => text(candidate) === label);
+  const found = queryAll(root, "ha-button, button").find((candidate) => text(candidate) === label);
   if (!found) throw new Error(`no button "${label}"`);
   return found;
 };
@@ -191,7 +191,7 @@ describe("Tags for new Runs", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
     const card = query(panel, ".device");
     expect(text(query(card, ".new-run-tags"))).toBe(
-      "Tags for new Runs Batch 7 × Copied onto every Run that starts on this Device.",
+      "Tags for new Runs Batch 7 Copied onto every Run that starts on this Device.",
     );
 
     await fill(panel, query(card, ".tag-input input"), "gif");
@@ -213,7 +213,7 @@ describe("Tags for new Runs", () => {
     });
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    await click(panel, query(panel, `.tag-chip button[aria-label="Remove Batch 7"]`));
+    await click(panel, iconButton(panel, "Remove Batch 7"));
 
     expect(chips(panel)).toEqual(["Batch 7"]);
     expect(text(query(panel, ".device .error"))).toBe("This change could not be saved.");
@@ -272,7 +272,7 @@ describe("Tags on a Run", () => {
     const backend = taggingBackend();
     const panel = await mountPanel(backend, { path: "/run/helmet" });
 
-    await click(panel, query(panel, `.tag-chip button[aria-label="Remove Gift"]`));
+    await click(panel, iconButton(panel, "Remove Gift"));
 
     expect(backend.sent("wattbill/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
     expect(chips(panel)).toEqual(["Cosplay helmet"]);

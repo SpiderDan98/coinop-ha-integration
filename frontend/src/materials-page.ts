@@ -1,6 +1,7 @@
 // The Materials tab: the global catalogue, edited in place. The list itself comes
 // from the panel's catalogue subscription, so every open panel shows each change.
 // Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
+import { mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -137,7 +138,10 @@ export class MaterialsPage extends LitElement {
     return html`
       <div class="head row between">
         <h2>${t("tab.materials")}</h2>
-        <button class="primary" @click=${() => this.open()}>${t("materials.new")}</button>
+        <ha-button @click=${() => this.open()}>
+          <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+          ${t("materials.new")}
+        </ha-button>
       </div>
       ${this.notice ? html`<p class="notice">${this.notice}</p>` : nothing}
       ${this.draft ? this.renderForm(this.draft, t) : nothing}
@@ -192,9 +196,13 @@ export class MaterialsPage extends LitElement {
           ${
             linked
               ? html`<span class="muted">${t("spoolman.linked", { name: linked.name })}</span>`
-              : html`<button @click=${() => this.createFrom(filament)}>
+              : html`<ha-button
+                  class="small"
+                  appearance="plain"
+                  @click=${() => this.createFrom(filament)}
+                >
                   ${t("spoolman.create")}
-                </button>`
+                </ha-button>`
           }
         </td>
       </tr>`;
@@ -250,19 +258,18 @@ export class MaterialsPage extends LitElement {
               ${
                 material.archived
                   ? nothing
-                  : html`<button
-                      class="star ${material.default_for_type ? "on" : ""}"
-                      title=${t("materials.default_for", { type: material.type })}
-                      aria-pressed=${material.default_for_type}
+                  : html`<ha-icon-button
+                      class="star"
+                      .label=${t("materials.default_for", { type: material.type })}
+                      .path=${material.default_for_type ? mdiStar : mdiStarOutline}
+                      .selected=${material.default_for_type}
                       @click=${() =>
                         this.act(() =>
                           updateMaterial(this.hass, material.id, {
                             default_for_type: !material.default_for_type,
                           }),
                         )}
-                    >
-                      ${material.default_for_type ? "★" : "☆"}
-                    </button>`
+                    ></ha-icon-button>`
               }
             </td>
             <td class="actions">${this.renderActions(material, t)}</td>
@@ -273,19 +280,41 @@ export class MaterialsPage extends LitElement {
 
   private renderActions(material: Material, t: Localize) {
     if (this.confirming === material.id) {
-      return html`<button class="danger" @click=${() => this.delete(material)}>
-          ${t("materials.delete_confirm")}</button
-        ><button @click=${() => (this.confirming = undefined)}>${t("materials.cancel")}</button>`;
+      return html`<ha-button class="small" variant="danger" @click=${() => this.delete(material)}>
+          ${t("materials.delete_confirm")}
+        </ha-button>
+        <ha-button class="small" appearance="plain" @click=${() => (this.confirming = undefined)}>
+          ${t("materials.cancel")}
+        </ha-button>`;
     }
-    const confirm = () => (this.confirming = material.id);
+    const remove = html`<ha-button
+      class="small"
+      appearance="plain"
+      variant="danger"
+      @click=${() => (this.confirming = material.id)}
+    >
+      ${t("materials.delete")}
+    </ha-button>`;
     return material.archived
-      ? html`<button @click=${() => this.act(() => restoreMaterial(this.hass, material.id))}>
-            ${t("materials.restore")}</button
-          ><button @click=${confirm}>${t("materials.delete")}</button>`
-      : html`<button @click=${() => this.open(material)}>${t("materials.edit")}</button
-          ><button @click=${() => this.act(() => archiveMaterial(this.hass, material.id))}>
-            ${t("materials.archive")}</button
-          ><button @click=${confirm}>${t("materials.delete")}</button>`;
+      ? html`<ha-button
+            class="small"
+            appearance="plain"
+            @click=${() => this.act(() => restoreMaterial(this.hass, material.id))}
+          >
+            ${t("materials.restore")}
+          </ha-button>
+          ${remove}`
+      : html`<ha-button class="small" appearance="plain" @click=${() => this.open(material)}>
+            ${t("materials.edit")}
+          </ha-button>
+          <ha-button
+            class="small"
+            appearance="plain"
+            @click=${() => this.act(() => archiveMaterial(this.hass, material.id))}
+          >
+            ${t("materials.archive")}
+          </ha-button>
+          ${remove}`;
   }
 
   private renderForm(draft: Draft, t: Localize) {
@@ -377,8 +406,8 @@ export class MaterialsPage extends LitElement {
       ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}
       ${this.invalid ? html`<p class="error">${t("materials.invalid")}</p>` : nothing}
       <div class="row">
-        <button class="primary" type="submit">${t("materials.save")}</button>
-        <button type="button" @click=${this.close}>${t("materials.cancel")}</button>
+        <ha-button type="submit">${t("materials.save")}</ha-button>
+        <ha-button appearance="plain" @click=${this.close}>${t("materials.cancel")}</ha-button>
       </div>
     </form>`;
   }
@@ -518,31 +547,12 @@ export class MaterialsPage extends LitElement {
       .head {
         margin: 8px 0 12px;
       }
-      button {
-        font: inherit;
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        background: var(--card-background-color, #fff);
-        color: var(--primary-text-color);
-        border-radius: 8px;
-        padding: 6px 12px;
-        cursor: pointer;
-      }
-      button.primary {
-        background: var(--primary-color, #03a9f4);
-        border-color: var(--primary-color, #03a9f4);
-        color: var(--text-primary-color, #fff);
-      }
-      button.danger {
-        color: var(--error-color, #db4437);
-      }
-      button.star {
-        border: 0;
-        background: none;
-        font-size: 18px;
-        padding: 2px 6px;
+      .star {
+        --ha-icon-button-size: 36px;
+        --mdc-icon-size: 20px;
         color: var(--secondary-text-color);
       }
-      button.star.on {
+      .star[selected] {
         color: var(--warning-color, #ffa600);
       }
       .card.flush {
@@ -563,9 +573,6 @@ export class MaterialsPage extends LitElement {
       .actions {
         white-space: nowrap;
         text-align: right;
-      }
-      .actions button + button {
-        margin-left: 6px;
       }
       .swatch {
         width: 14px;

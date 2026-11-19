@@ -99,43 +99,49 @@ export class TagsPage extends LitElement {
 
   private renderActions(tag: string, runs: number, t: Localize) {
     if (this.renaming?.tag === tag) {
-      return html`<button
-          class="btn small"
+      return html`<ha-button
+          class="small"
           ?disabled=${!this.renaming.name.trim()}
           @click=${this.rename}
         >
-          ${t("tags.save")}</button
-        ><button class="btn small" @click=${() => (this.renaming = undefined)}>
+          ${t("tags.save")}
+        </ha-button>
+        <ha-button class="small" appearance="plain" @click=${() => (this.renaming = undefined)}>
           ${t("tags.cancel")}
-        </button>`;
+        </ha-button>`;
     }
     if (this.confirming === tag) {
       return html`<div class="delete-hint muted small">
           ${t("tags.delete_hint", { tag, count: runs })}
         </div>
-        <button class="btn small danger" @click=${() => this.delete(tag)}>
-          ${t("tags.delete_confirm")}</button
-        ><button class="btn small" @click=${() => (this.confirming = undefined)}>
+        <ha-button class="small" variant="danger" @click=${() => this.delete(tag)}>
+          ${t("tags.delete_confirm")}
+        </ha-button>
+        <ha-button class="small" appearance="plain" @click=${() => (this.confirming = undefined)}>
           ${t("tags.cancel")}
-        </button>`;
+        </ha-button>`;
     }
-    return html`<button
-        class="btn small"
+    return html`<ha-button
+        class="small"
+        appearance="plain"
         @click=${() => {
           this.renaming = { tag, name: tag };
           this.confirming = undefined;
         }}
       >
-        ${t("tags.rename")}</button
-      ><button
-        class="btn small danger"
+        ${t("tags.rename")}
+      </ha-button>
+      <ha-button
+        class="small"
+        appearance="plain"
+        variant="danger"
         @click=${() => {
           this.confirming = tag;
           this.renaming = undefined;
         }}
       >
         ${t("tags.delete")}
-      </button>`;
+      </ha-button>`;
   }
 
   private async rename() {
@@ -195,9 +201,6 @@ export class TagsPage extends LitElement {
       .actions {
         text-align: right;
         white-space: nowrap;
-      }
-      .actions .btn + .btn {
-        margin-left: 6px;
       }
       .delete-hint {
         white-space: normal;

@@ -1,6 +1,7 @@
 // Tags as chips plus a field to add one: suggests existing Tags while typing, and Enter
 // adds what was typed, as the existing Tag when only the case differs. Fires
 // `tags-change` with the new alphabetical list; the owner saves it.
+import { mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "./hass";
@@ -46,15 +47,13 @@ export class TagInput extends LitElement {
           (tag) =>
             html`<span class="tag-chip"
               ><span class="tag-name">${tag}</span
-              ><button
+              ><ha-icon-button
                 class="remove"
-                aria-label=${t("tags.remove", { tag })}
-                title=${t("tags.remove", { tag })}
+                .label=${t("tags.remove", { tag })}
+                .path=${mdiClose}
                 @click=${() => this.change(this.tags.filter((own) => own !== tag))}
-              >
-                ×
-              </button></span
-            >`,
+              ></ha-icon-button
+            ></span>`,
         )}
         <input
           .value=${this.text}
@@ -118,12 +117,9 @@ export class TagInput extends LitElement {
         background: var(--card-background-color, #fff);
       }
       .tag-chip .remove {
-        border: 0;
-        background: none;
-        color: inherit;
-        padding: 0 0 0 4px;
-        cursor: pointer;
-        font: inherit;
+        --ha-icon-button-size: 24px;
+        --mdc-icon-size: 16px;
+        margin-inline-end: -6px;
       }
       input {
         flex: 1;

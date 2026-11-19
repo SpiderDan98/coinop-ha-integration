@@ -62,14 +62,14 @@ describe("Material Line Items", () => {
     expect(material.classList.contains("locked")).toBe(true);
     expect(picker(material).disabled).toBe(true);
     expect(text(query(material, ".evidence"))).toBe("1,500 mm at 1.75 mm and 1.24 g/cm³");
-    expect(queryAll(panel, "button.add-material")).toHaveLength(1);
+    expect(queryAll(panel, "ha-button.add-material")).toHaveLength(1);
   });
 
   it("are added by hand as a Material plus grams or millilitres", async () => {
     const backend = recordedBackend().reply(ADD, () => recorded.lineItemsAddMaterial);
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
-    await click(panel, query(panel, "button.add-material"));
+    await click(panel, query(panel, "ha-button.add-material"));
     const form = query(panel, ".add-item form");
     expect(options(query(form, "select[name=material_id]"))).toEqual([
       "eSun PLA+ black",
@@ -78,7 +78,7 @@ describe("Material Line Items", () => {
     await fill(panel, query(form, "select[name=material_id]"), "material-2");
     await fill(panel, query(form, "[name=quantity]"), "25");
     await fill(panel, query(form, "select[name=unit]"), "ml");
-    await click(panel, query(form, "button[type=submit]"));
+    await click(panel, query(form, "ha-button[type=submit]"));
 
     expect(backend.sent(ADD)).toEqual([
       {

@@ -1,5 +1,6 @@
 // The Devices tab: a card per Device with its HA-side settings, which only the
 // Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
+import { mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
@@ -206,15 +207,13 @@ export class DevicesPage extends LitElement {
           ({ id, label }) =>
             html`<span class="template-chip"
               ><span class="template-name">${label}</span
-              ><button
+              ><ha-icon-button
                 class="remove"
-                aria-label=${t("device.remove_template", { template: label })}
-                title=${t("device.remove_template", { template: label })}
+                .label=${t("device.remove_template", { template: label })}
+                .path=${mdiClose}
                 @click=${() => save(chosen.filter((own) => own !== id))}
-              >
-                ×
-              </button></span
-            >`,
+              ></ha-icon-button
+            ></span>`,
         )}
         <select
           aria-label=${t("device.add_template")}
@@ -292,12 +291,9 @@ export class DevicesPage extends LitElement {
         background: color-mix(in srgb, var(--wattbill-other) 14%, transparent);
       }
       .template-chip .remove {
-        border: 0;
-        background: none;
-        color: inherit;
-        padding: 0 0 0 4px;
-        cursor: pointer;
-        font: inherit;
+        --ha-icon-button-size: 24px;
+        --mdc-icon-size: 16px;
+        margin-inline-end: -6px;
       }
       select {
         font: inherit;

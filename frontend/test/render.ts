@@ -28,6 +28,15 @@ export function query(root: Element | ShadowRoot, selector: string) {
   return first;
 }
 
+/** An `ha-icon-button`'s label, which HA takes as a property, not an attribute. */
+export const label = (button: HTMLElement) => (button as HTMLElement & { label: string }).label;
+
+export function iconButton(root: Element | ShadowRoot, name: string) {
+  const found = queryAll(root, "ha-icon-button").find((candidate) => label(candidate) === name);
+  if (!found) throw new Error(`no icon button "${name}"`);
+  return found;
+}
+
 /** Rendered text, shadow roots included, with whitespace collapsed. */
 export function text(node: Node): string {
   const parts: string[] = [];

@@ -1,5 +1,6 @@
 // A Run's image column: the Cover Image, every image with "Set as cover" and delete,
 // and the photo upload. Hands each Run the backend returns to the page as `run-changed`.
+import { mdiDelete, mdiUpload } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { deleteImage, getRun, setCover, uploadImages, type RunDetail, type RunImage } from "./api";
@@ -68,16 +69,24 @@ export class RunImages extends LitElement {
             </div>`
           : nothing
       }
-      <label class="btn small upload" aria-disabled=${String(full || this.busy)}>
-        ${this.busy ? t("images.uploading") : `+ ${t("images.upload")}`}
-        <input
-          type="file"
-          multiple
-          accept=${types.join(",")}
-          ?disabled=${full || this.busy}
-          @change=${this.onFiles}
-        />
-      </label>
+      <ha-button
+        class="small upload"
+        appearance="filled"
+        ?disabled=${full || this.busy}
+        .loading=${this.busy}
+        @click=${() => this.renderRoot.querySelector<HTMLInputElement>("input[type=file]")?.click()}
+      >
+        <ha-svg-icon slot="start" .path=${mdiUpload}></ha-svg-icon>
+        ${this.busy ? t("images.uploading") : t("images.upload")}
+      </ha-button>
+      <input
+        type="file"
+        multiple
+        hidden
+        accept=${types.join(",")}
+        ?disabled=${full || this.busy}
+        @change=${this.onFiles}
+      />
       <p class="muted small">${t("images.limit", rules)}</p>
       ${
         this.error
@@ -99,23 +108,22 @@ export class RunImages extends LitElement {
         ${
           isCover
             ? html`<span class="is-cover">${t("images.is_cover")}</span>`
-            : html`<button
-                class="link set-cover"
+            : html`<ha-button
+                class="small set-cover"
+                appearance="plain"
                 ?disabled=${this.busy}
                 @click=${() => this.change(() => setCover(this.hass, this.run.id, image.id))}
               >
                 ${t("images.set_cover")}
-              </button>`
+              </ha-button>`
         }
-        <button
-          class="link delete-image"
-          title=${t("images.delete")}
-          aria-label=${t("images.delete")}
+        <ha-icon-button
+          class="delete-image"
+          .label=${t("images.delete")}
+          .path=${mdiDelete}
           ?disabled=${this.busy}
           @click=${() => (this.deleting = image)}
-        >
-          ✕
-        </button>
+        ></ha-icon-button>
       </div>
     </figure>`;
   }
@@ -128,12 +136,12 @@ export class RunImages extends LitElement {
         <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
         <p class="muted small">${t("images.delete_warning")}</p>
         <div class="row end">
-          <button class="btn cancel" @click=${() => (this.deleting = undefined)}>
+          <ha-button class="cancel" appearance="plain" @click=${() => (this.deleting = undefined)}>
             ${t("delete.cancel")}
-          </button>
-          <button class="btn danger confirm" @click=${() => this.delete(image)}>
+          </ha-button>
+          <ha-button class="confirm" variant="danger" @click=${() => this.delete(image)}>
             ${t("delete.confirm")}
-          </button>
+          </ha-button>
         </div>
       </div>
     </div>`;
@@ -179,37 +187,10 @@ export class RunImages extends LitElement {
         color: var(--primary-color);
         font-weight: 600;
       }
-      .link {
-        font: inherit;
-        color: var(--primary-color);
-        background: none;
-        border: 0;
-        padding: 2px 0;
-        cursor: pointer;
-        text-align: left;
-      }
       .delete-image {
+        --ha-icon-button-size: 32px;
+        --mdc-icon-size: 20px;
         color: var(--secondary-text-color);
-      }
-      .link:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-      .upload {
-        position: relative;
-        display: inline-flex;
-        cursor: pointer;
-      }
-      .upload[aria-disabled="true"] {
-        opacity: 0.5;
-        cursor: default;
-      }
-      .upload input {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
-        pointer-events: none;
       }
       p {
         margin: 6px 0 12px;

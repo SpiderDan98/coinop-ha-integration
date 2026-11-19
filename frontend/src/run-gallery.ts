@@ -264,9 +264,13 @@ export class RunGallery extends LitElement {
       </label>
       ${
         shown.some(selectable)
-          ? html`<button class="btn small select-all" @click=${() => this.selectAll(shown)}>
+          ? html`<ha-button
+              class="small select-all"
+              appearance="plain"
+              @click=${() => this.selectAll(shown)}
+            >
               ${t("runs.select_all")}
-            </button>`
+            </ha-button>`
           : nothing
       }
     </div>`;

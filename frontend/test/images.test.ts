@@ -79,7 +79,7 @@ describe("Run images", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/cancelled" });
 
     expect(shown(query(panel, ".facts"))).toEqual([]);
-    expect(text(query(panel, ".facts"))).toMatch(/^No image \+ Upload photos /);
+    expect(text(query(panel, ".facts"))).toMatch(/^No image Upload photos /);
     expect(queryAll(panel, ".strip")).toEqual([]);
   });
 

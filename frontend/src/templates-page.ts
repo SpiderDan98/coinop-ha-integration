@@ -1,5 +1,6 @@
 // The Line Item Templates tab: the global catalogue as a table edited in place, each
 // field saved as it is changed, with the Devices that add a template automatically.
+import { mdiDelete, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -72,9 +73,10 @@ export class TemplatesPage extends LitElement {
         ${
           this.adding
             ? nothing
-            : html`<button class="btn new-template" @click=${() => (this.adding = "entered")}>
+            : html`<ha-button class="new-template" @click=${() => (this.adding = "entered")}>
+                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
                 ${t("templates.new")}
-              </button>`
+              </ha-button>`
         }
       </div>
       ${this.adding ? this.renderNew(this.adding, t) : nothing}
@@ -142,13 +144,12 @@ export class TemplatesPage extends LitElement {
       <td>${this.renderBasis(template.basis, t)}</td>
       <td class="automatic small">${automatic || html`<span class="muted">–</span>`}</td>
       <td class="actions">
-        <button
-          class="icon delete"
-          title=${t("templates.delete")}
+        <ha-icon-button
+          class="delete"
+          .label=${t("templates.delete")}
+          .path=${mdiDelete}
           @click=${() => this.attempt(deleteTemplate(this.hass, template.id))}
-        >
-          🗑
-        </button>
+        ></ha-icon-button>
       </td>
     </tr>`;
   }
@@ -198,10 +199,10 @@ export class TemplatesPage extends LitElement {
           : nothing
       }
       <div class="row">
-        <button class="btn" type="submit">${t("templates.create")}</button>
-        <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+        <ha-button type="submit">${t("templates.create")}</ha-button>
+        <ha-button appearance="plain" @click=${() => (this.adding = undefined)}>
           ${t("item.cancel")}
-        </button>
+        </ha-button>
       </div>
     </form>`;
   }
@@ -301,12 +302,10 @@ export class TemplatesPage extends LitElement {
       .actions {
         text-align: right;
       }
-      .icon {
-        border: 0;
-        background: none;
-        cursor: pointer;
-        padding: 2px 4px;
-        font-size: 16px;
+      .actions ha-icon-button {
+        --ha-icon-button-size: 36px;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
       }
       form.new {
         display: grid;

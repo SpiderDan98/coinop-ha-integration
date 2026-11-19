@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
-import { change, click, mountPanel, query, queryAll, text } from "./render";
+import { change, click, label, mountPanel, query, queryAll, text } from "./render";
 
 const UPDATE = "wattbill/line_items/update";
 const [started] = recorded.changes;
@@ -29,7 +29,7 @@ describe("Line Items", () => {
     const backend = recordedBackend().reply(UPDATE, () => recorded.lineItemsUpdate);
     const panel = await mountPanel(backend, { path: "/run/benchy" });
     expect(item(panel, "electricity").classList.contains("manual")).toBe(false);
-    expect(queryAll(panel, "button.reset")).toHaveLength(0);
+    expect(queryAll(panel, "ha-icon-button.reset")).toHaveLength(0);
 
     await change(panel, field(item(panel, "electricity"), "amount"), "0.1");
 
@@ -39,7 +39,7 @@ describe("Line Items", () => {
     const electricity = item(panel, "electricity");
     expect(electricity.classList.contains("manual")).toBe(true);
     expect(values(electricity)).toEqual(["0.15", "0.6667", "0.10"]);
-    expect(query(electricity, "button.reset").title).toBe(
+    expect(label(query(electricity, "ha-icon-button.reset"))).toBe(
       "Manual value. Reset to the computed value: 0.15 kWh × €0.30 = €0.05",
     );
     expect(field(electricity, "unit_price").title).toBe("Computed: €0.30");
@@ -53,7 +53,7 @@ describe("Line Items", () => {
       .reply("wattbill/line_items/reset", () => ({ run: recorded.run("benchy") }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
-    await click(panel, query(item(panel, "electricity"), "button.reset"));
+    await click(panel, query(item(panel, "electricity"), "ha-icon-button.reset"));
 
     expect(backend.sent("wattbill/line_items/reset")).toEqual([
       { type: "wattbill/line_items/reset", run_id: "benchy", line_item_id: "electricity" },
@@ -110,9 +110,9 @@ describe("Line Items", () => {
       },
     }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    expect(queryAll(item(panel, "electricity"), "button.delete")).toHaveLength(0);
+    expect(queryAll(item(panel, "electricity"), "ha-icon-button.delete")).toHaveLength(0);
 
-    await click(panel, query(item(panel, "benchy-wear"), "button.delete"));
+    await click(panel, query(item(panel, "benchy-wear"), "ha-icon-button.delete"));
 
     expect(backend.sent("wattbill/line_items/delete")).toEqual([
       { type: "wattbill/line_items/delete", run_id: "benchy", line_item_id: "benchy-wear" },
@@ -125,12 +125,12 @@ describe("Line Items", () => {
     const panel = await mountPanel(backend, { path: "/run/helmet" });
     expect(queryAll(panel, ".add-item")).toHaveLength(2);
 
-    await click(panel, query(panel, "button.add-other"));
+    await click(panel, query(panel, "ha-button.add-other"));
     const form = query(panel, ".add-item form");
     expect(text(form)).toContain("Negative unit prices are allowed here, e.g. a refund.");
     await change(panel, field(form, "label"), "Refund for the failed print");
     await change(panel, field(form, "unit_price"), "-2");
-    await click(panel, query(form, "button[type=submit]"));
+    await click(panel, query(form, "ha-button[type=submit]"));
 
     expect(backend.sent("wattbill/line_items/add")).toEqual([
       {
@@ -160,7 +160,7 @@ describe("Line Items", () => {
       expect(field(electricity, name).disabled).toBe(true);
     }
     expect(query(electricity, ".lock").title).toBe("Updates live until the Run is final.");
-    expect(queryAll(panel, "button.add-other")).toHaveLength(1);
+    expect(queryAll(panel, "ha-button.add-other")).toHaveLength(1);
   });
 
   it("are labelled in German when Home Assistant is, user labels verbatim", async () => {
@@ -170,6 +170,6 @@ describe("Line Items", () => {
 
     expect(text(item(panel, "electricity"))).toContain("Strom");
     expect(field(item(panel, "benchy-wear"), "label").value).toBe("Nozzle wear");
-    expect(text(query(panel, "button.add-other"))).toBe("+ Sonstigen Posten hinzufügen");
+    expect(text(query(panel, "ha-button.add-other"))).toBe("Sonstigen Posten hinzufügen");
   });
 });
