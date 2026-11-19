@@ -54,7 +54,59 @@
           "title": "Stromverbrauch",
           "description": "Wie soll WattBill den Strom bestimmen, den ein Lauf verbraucht?",
           "menu_options": {
+            "energy": "Energiezähler",
+            "power": "Leistungssensor",
             "estimate": "Aus Durchschnittsleistung schätzen"
+          }
+        },
+        "energy": {
+          "title": "Energiezähler",
+          "description": "Wähle die Entität, die die Energie des Druckers zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Energie-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um kWh zu erhalten."
+          }
+        },
+        "power": {
+          "title": "Leistungssensor",
+          "description": "Wähle die Entität, die die Leistungsaufnahme des Druckers meldet. WattBill integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Leistungs-Entität",
+            "attribute": "Attribut (optional)",
+            "running_power": "Durchschnittliche Leistung im Betrieb (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "running_power": "Füllt Lücken, in denen der Sensor nichts meldet. Leer lassen, um seinen letzten Wert zu halten.",
+            "factor": "Jeder Messwert wird damit multipliziert, um W zu erhalten."
+          }
+        },
+        "energy_unit": {
+          "title": "Einheit des Energie-Attributs",
+          "description": "In welcher Einheit zählt das Attribut die Energie?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um kWh zu erhalten."
+          }
+        },
+        "power_unit": {
+          "title": "Einheit des Leistungs-Attributs",
+          "description": "In welcher Einheit meldet das Attribut die Leistung?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um W zu erhalten."
           }
         },
         "estimate": {
@@ -81,7 +133,8 @@
       "error": {
         "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
-        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden."
+        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
+        "unknown_unit": "WattBill erkennt diese Einheit nicht. Gib einen Umrechnungsfaktor ein oder wähle eine andere Entität."
       }
     }
   },

@@ -102,14 +102,15 @@ class DeviceTracker:
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
         config = self._config
+        running_power = config.running_power or 0.0
         paused_power = (
-            config.running_power if config.paused_power is None else config.paused_power
+            running_power if config.paused_power is None else config.paused_power
         )
         item = electricity_line_item(
             run.electricity.id if run.line_items else ulid_now(),
             run.started,
             until,
-            consumption.estimate(config.running_power, paused_power, run.pauses),
+            consumption.estimate(running_power, paused_power, run.pauses),
             [(run.started, config.price)],
             ElectricityMethod.ESTIMATED,
         )

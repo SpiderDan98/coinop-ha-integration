@@ -1,12 +1,30 @@
 """Reading Device Inputs from Home Assistant's state machine and entity registry."""
 
+import math
+
 from homeassistant.components.event import ATTR_EVENT_TYPE, ATTR_EVENT_TYPES
 from homeassistant.components.sensor import ATTR_OPTIONS
-from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfEnergy,
+    UnitOfPower,
+)
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
+
+from .device_config import ConsumptionSource, DeviceConfig
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
+# Readings are kept in kWh (energy) or W (power).
+METER_UNITS = {
+    ConsumptionSource.ENERGY: (EnergyConverter, UnitOfEnergy.KILO_WATT_HOUR),
+    ConsumptionSource.POWER: (PowerConverter, UnitOfPower.WATT),
+}
 
 
 def input_value(state: State | None, attribute: str | None) -> str | None:
@@ -40,3 +58,42 @@ def offered_values(
             return [STATE_ON, STATE_OFF]
     current = input_value(state, attribute)
     return [current] if current else []
+
+
+def entity_unit(hass: HomeAssistant, entity_id: str) -> str | None:
+    """The unit from the entity registry, which keeps it while unavailable."""
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    if registry_entry and registry_entry.unit_of_measurement:
+        return registry_entry.unit_of_measurement
+    state = hass.states.get(entity_id)
+    return state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if state else None
+
+
+def unit_scale(source: ConsumptionSource, unit: str | None) -> float | None:
+    """Factor from `unit` to kWh or W; None if WattBill doesn't recognise it."""
+    converter, canonical = METER_UNITS[source]
+    if unit not in converter.VALID_UNITS:
+        return None
+    return converter.get_unit_ratio(canonical, unit)
+
+
+def meter_reading(state: State | None, config: DeviceConfig) -> float | None:
+    """The meter's current reading in kWh or W, or None while it has none."""
+    value = input_value(state, config.meter_attribute)
+    if state is None or value is None:
+        return None
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    reported_unit = (
+        state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        if config.meter_attribute is None
+        else None
+    )
+    scale = (
+        unit_scale(config.source, reported_unit)
+        or unit_scale(config.source, config.meter_unit)
+        or config.meter_factor
+    )
+    return None if scale is None or not math.isfinite(number) else number * scale
