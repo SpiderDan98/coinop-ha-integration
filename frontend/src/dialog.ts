@@ -1,13 +1,16 @@
-// A native modal <dialog> around its content: Escape and a click on the backdrop fire
-// `cancel`, focus moves to the content's `[autofocus]` element and stays inside.
-import { LitElement, css, html } from "lit";
+// A native modal <dialog> laid out as HA's dialogs: Escape, a click on the backdrop and
+// the close button fire `cancel`, focus moves to the content's `[autofocus]` element.
+import { mdiClose } from "@mdi/js";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 
 @customElement("wattbill-dialog")
 export class Dialog extends LitElement {
-  /** A confirmation that needs an answer: an `alertdialog`. */
+  /** A confirmation that needs an answer: an `alertdialog` without a close button. */
   @property({ type: Boolean }) alert = false;
+  /** The dialog's heading. */
   @property() label = "";
+  @property() closeLabel = "";
 
   @query("dialog") private dialog!: HTMLDialogElement;
 
@@ -19,7 +22,7 @@ export class Dialog extends LitElement {
   override render() {
     return html`<dialog
       role=${this.alert ? "alertdialog" : "dialog"}
-      aria-label=${this.label}
+      aria-labelledby="heading"
       @cancel=${(event: Event) => {
         event.preventDefault();
         this.cancel();
@@ -28,7 +31,23 @@ export class Dialog extends LitElement {
         if (event.target === this.dialog) this.cancel();
       }}
     >
-      <slot></slot>
+      <div class="surface">
+        <header>
+          ${
+            this.alert
+              ? nothing
+              : html`<ha-icon-button
+                  class="close"
+                  .label=${this.closeLabel}
+                  .path=${mdiClose}
+                  @click=${this.cancel}
+                ></ha-icon-button>`
+          }
+          <h2 id="heading">${this.label}</h2>
+        </header>
+        <div class="content"><slot></slot></div>
+        <footer><slot name="footer"></slot></footer>
+      </div>
     </dialog>`;
   }
 
@@ -43,17 +62,56 @@ export class Dialog extends LitElement {
       box-sizing: border-box;
       padding: 0;
       border: 0;
-      background: transparent;
-      color: inherit;
+      border-radius: 24px;
+      background: var(--card-background-color, #fff);
+      color: var(--primary-text-color);
+      box-shadow:
+        0 6px 12px -3px rgba(0, 0, 0, 0.4),
+        0 16px 32px -6px rgba(0, 0, 0, 0.55);
       font: inherit;
-      overflow: auto;
+      overflow: hidden;
     }
-    ::slotted(*) {
-      width: 100%;
-      box-sizing: border-box;
+    dialog[open] {
+      display: flex;
     }
     dialog::backdrop {
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .surface {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 16px 24px 8px;
+    }
+    .close {
+      margin: -6px 0 -6px -16px;
+    }
+    h2 {
+      margin: 0;
+      font-size: var(--ha-font-size-xl, 20px);
+      font-weight: var(--ha-font-weight-medium, 500);
+      line-height: 24px;
+    }
+    .content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 24px;
+    }
+    footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 8px 16px 16px;
     }
   `;
 }

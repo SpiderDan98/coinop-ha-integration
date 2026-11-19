@@ -106,87 +106,88 @@ export class StatementDialog extends LitElement {
       this.runIds.length === 1
         ? t("statement.dialog_title_one")
         : t("statement.dialog_title", { count: this.runIds.length });
-    return html`<wattbill-dialog .label=${title} @cancel=${this.close}>
-      <div class="statement-dialog dialog card">
-        <h2>${title}</h2>
-        <p class="muted small">${t("statement.hint")}</p>
+    return html`<wattbill-dialog
+      class="statement-dialog dialog"
+      .label=${title}
+      .closeLabel=${t("dialog.close")}
+      @cancel=${this.close}
+    >
+      <p class="muted small">${t("statement.hint")}</p>
+      <label
+        >${t("statement.title")}<input
+          name="title"
+          .value=${this.titleText}
+          placeholder=${this.defaultTitle}
+          @input=${(event: Event) => (this.titleText = input(event))}
+      /></label>
+      <label
+        >${t("statement.note")}<textarea
+          name="note"
+          rows="3"
+          .value=${this.noteText}
+          @input=${(event: Event) => (this.noteText = input(event))}
+        ></textarea>
+      </label>
+      <div class="row options">
         <label
-          >${t("statement.title")}<input
-            name="title"
-            .value=${this.titleText}
-            placeholder=${this.defaultTitle}
-            @input=${(event: Event) => (this.titleText = input(event))}
+          >${t("statement.detail")}<select
+            name="detail"
+            @change=${(event: Event) => set({ detail: input(event) as Options["detail"] })}
+          >
+            ${STATEMENT_DETAILS.map(
+              (detail) =>
+                html`<option value=${detail} ?selected=${options?.detail === detail}>
+                  ${t(`statement.${detail}`)}
+                </option>`,
+            )}
+          </select></label
+        >
+        <label class="check"
+          ><input
+            name="images"
+            type="checkbox"
+            .checked=${options?.images ?? true}
+            ?disabled=${options?.detail === "compact"}
+            @change=${(event: Event) => set({ images: (event.target as HTMLInputElement).checked })}
+          />${t("statement.images")}</label
+        >
+        <label
+          >${t("statement.language")}<select
+            name="language"
+            @change=${(event: Event) => set({ language: input(event) as Options["language"] })}
+          >
+            ${STATEMENT_LANGUAGES.map(
+              (language) =>
+                html`<option value=${language} ?selected=${options?.language === language}>
+                  ${LANGUAGE_NAMES[language]}
+                </option>`,
+            )}
+          </select></label
+        >
+        <label
+          >${t("statement.markup")}<input
+            name="markup"
+            type="number"
+            min="0"
+            step="any"
+            inputmode="decimal"
+            .value=${this.markup}
+            @input=${(event: Event) => (this.markup = input(event))}
         /></label>
-        <label
-          >${t("statement.note")}<textarea
-            name="note"
-            rows="3"
-            .value=${this.noteText}
-            @input=${(event: Event) => (this.noteText = input(event))}
-          ></textarea>
-        </label>
-        <div class="row options">
-          <label
-            >${t("statement.detail")}<select
-              name="detail"
-              @change=${(event: Event) => set({ detail: input(event) as Options["detail"] })}
-            >
-              ${STATEMENT_DETAILS.map(
-                (detail) =>
-                  html`<option value=${detail} ?selected=${options?.detail === detail}>
-                    ${t(`statement.${detail}`)}
-                  </option>`,
-              )}
-            </select></label
-          >
-          <label class="check"
-            ><input
-              name="images"
-              type="checkbox"
-              .checked=${options?.images ?? true}
-              ?disabled=${options?.detail === "compact"}
-              @change=${(event: Event) =>
-                set({ images: (event.target as HTMLInputElement).checked })}
-            />${t("statement.images")}</label
-          >
-          <label
-            >${t("statement.language")}<select
-              name="language"
-              @change=${(event: Event) => set({ language: input(event) as Options["language"] })}
-            >
-              ${STATEMENT_LANGUAGES.map(
-                (language) =>
-                  html`<option value=${language} ?selected=${options?.language === language}>
-                    ${LANGUAGE_NAMES[language]}
-                  </option>`,
-              )}
-            </select></label
-          >
-          <label
-            >${t("statement.markup")}<input
-              name="markup"
-              type="number"
-              min="0"
-              step="any"
-              inputmode="decimal"
-              .value=${this.markup}
-              @input=${(event: Event) => (this.markup = input(event))}
-          /></label>
-        </div>
-        ${this.failed ? html`<p class="error small">${t("statement.failed")}</p>` : nothing}
-        <div class="row end">
-          <ha-button class="cancel" appearance="plain" @click=${this.close}>
-            ${t("statement.cancel")}
-          </ha-button>
-          <ha-button
-            class="download"
-            ?disabled=${!options || this.typedMarkup === undefined || this.busy}
-            .loading=${this.busy}
-            @click=${this.download}
-          >
-            ${t("statement.download")}
-          </ha-button>
-        </div>
+      </div>
+      ${this.failed ? html`<p class="error small">${t("statement.failed")}</p>` : nothing}
+      <div slot="footer" class="row end">
+        <ha-button class="cancel" appearance="plain" @click=${this.close}>
+          ${t("statement.cancel")}
+        </ha-button>
+        <ha-button
+          class="download"
+          ?disabled=${!options || this.typedMarkup === undefined || this.busy}
+          .loading=${this.busy}
+          @click=${this.download}
+        >
+          ${t("statement.download")}
+        </ha-button>
       </div>
     </wattbill-dialog>`;
   }
@@ -249,20 +250,6 @@ export class StatementDialog extends LitElement {
         gap: 3px;
         font-size: 12px;
         color: var(--secondary-text-color);
-      }
-      input,
-      select,
-      textarea {
-        font: inherit;
-        font-size: 14px;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 6px 8px;
-      }
-      textarea {
-        resize: vertical;
       }
     `,
   ];

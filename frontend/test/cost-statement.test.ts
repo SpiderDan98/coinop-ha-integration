@@ -56,7 +56,7 @@ describe("Cost Statement export", () => {
     const backend = recordedBackend();
     const panel = await openDialog(backend);
 
-    expect(text(query(panel, ".statement-dialog h2"))).toBe("Cost Statement for 2 Runs");
+    expect(text(query(panel, ".statement-dialog"))).toMatch(/^Cost Statement for 2 Runs /);
     expect(field(panel, "title").placeholder).toBe("Cost Statement");
     expect(field(panel, "detail").value).toBe("detailed");
     expect(field(panel, "language").value).toBe("en");

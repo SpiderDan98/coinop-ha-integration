@@ -40,7 +40,7 @@ describe("Line Item Templates tab", () => {
       "Tags",
       "Devices",
     ]);
-    expect(text(query(panel, "h2"))).toBe("Line Item Templates");
+    expect(text(query(panel, "a.tab.on"))).toBe("Line Item Templates");
   });
 
   it("lists every template as an editable row with the Devices using it automatically", async () => {
@@ -149,7 +149,7 @@ describe("Line Item Templates tab", () => {
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/templates" });
 
-    expect(text(query(panel, "h2"))).toBe("Postenvorlagen");
+    expect(text(query(panel, "a.tab.on"))).toBe("Postenvorlagen");
     expect(text(row(panel, "template-wear"))).toContain("Aus der Laufzeit des Laufs");
   });
 });

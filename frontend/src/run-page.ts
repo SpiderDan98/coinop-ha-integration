@@ -937,18 +937,9 @@ export class RunPage extends LitElement {
       input,
       select,
       textarea {
-        font: inherit;
-        font-size: 14px;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 6px 8px;
         width: 100%;
-        box-sizing: border-box;
       }
       textarea {
-        resize: vertical;
         min-height: 56px;
       }
       :disabled {
@@ -1050,7 +1041,7 @@ export class RunPage extends LitElement {
         text-align: right;
       }
       .item input.manual {
-        border-color: var(--wattbill-manual);
+        border-bottom-color: var(--wattbill-manual);
         color: var(--wattbill-manual);
       }
       .quantity {

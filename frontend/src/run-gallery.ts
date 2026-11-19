@@ -1,4 +1,5 @@
 // Filter and selection belong to the Overview, which sets them from its tiles and charts too.
+import { mdiMagnify } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -239,14 +240,17 @@ export class RunGallery extends LitElement {
       .reverse();
     const value = (event: Event) => (event.target as HTMLInputElement | HTMLSelectElement).value;
     return html`<div class="filters row">
-      <input
-        type="search"
-        class="name-filter"
-        placeholder=${t("runs.search")}
-        aria-label=${t("runs.search")}
-        .value=${this.filter.name}
-        @input=${(event: Event) => this.setFilter({ name: value(event) })}
-      />
+      <div class="search">
+        <ha-svg-icon .path=${mdiMagnify}></ha-svg-icon>
+        <input
+          type="search"
+          class="name-filter"
+          placeholder=${t("runs.search")}
+          aria-label=${t("runs.search")}
+          .value=${this.filter.name}
+          @input=${(event: Event) => this.setFilter({ name: value(event) })}
+        />
+      </div>
       ${
         devices.size > 1 || this.filter.deviceId
           ? html`<select
@@ -369,18 +373,46 @@ export class RunGallery extends LitElement {
       .filters {
         margin-bottom: 12px;
       }
-      input[type="search"],
-      select,
+      /* Outlined like the search and filter controls above HA's data tables. */
+      .filters input[type="search"],
+      .filters select,
       .tag-filter summary,
       .flagged-filter {
+        height: 40px;
+        min-height: 0;
         font: inherit;
         color: inherit;
         background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 6px 8px;
+        border: 1px solid var(--outline-color, var(--divider-color, rgba(0, 0, 0, 0.12)));
+        border-radius: 10px;
+        padding: 0 12px;
         max-width: 100%;
         box-sizing: border-box;
+        box-shadow: none;
+      }
+      .filters input[type="search"]:focus-visible,
+      .filters select:focus-visible,
+      .tag-filter summary:focus-visible {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+      .search {
+        position: relative;
+        flex: 1 1 240px;
+        max-width: 480px;
+      }
+      .search ha-svg-icon {
+        position: absolute;
+        inset-inline-start: 10px;
+        top: 50%;
+        translate: 0 -50%;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
+        pointer-events: none;
+      }
+      .filters input[type="search"] {
+        width: 100%;
+        padding-inline-start: 38px;
       }
       .flagged-filter {
         display: flex;
@@ -388,14 +420,16 @@ export class RunGallery extends LitElement {
         gap: 6px;
         cursor: pointer;
       }
-      :host([narrow]) .name-filter {
-        width: 100%;
+      :host([narrow]) .search {
+        flex-basis: 100%;
+        max-width: none;
       }
       .tag-filter {
         position: relative;
       }
       .tag-filter summary {
         display: block;
+        line-height: 38px;
         cursor: pointer;
         max-width: 260px;
         white-space: nowrap;

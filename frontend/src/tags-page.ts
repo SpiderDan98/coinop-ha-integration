@@ -49,7 +49,6 @@ export class TagsPage extends LitElement {
     const t = localize(this.hass);
     if (!this.tags) return html`<p class="muted">${t("tags.loading")}</p>`;
     return html`
-      <h2>${t("tags.title")}</h2>
       ${
         this.tags.length
           ? html`<table>
@@ -177,9 +176,6 @@ export class TagsPage extends LitElement {
   static override styles = [
     shared,
     css`
-      h2 {
-        margin: 8px 0 12px;
-      }
       table {
         width: 100%;
         max-width: 900px;
@@ -220,14 +216,7 @@ export class TagsPage extends LitElement {
         margin-bottom: 6px;
       }
       input {
-        font: inherit;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 4px 8px;
         width: 100%;
-        box-sizing: border-box;
       }
       .error {
         color: var(--error-color, #db4437);

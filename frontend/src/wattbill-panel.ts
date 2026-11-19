@@ -158,25 +158,6 @@ export class WattbillPanel extends LitElement {
               >`,
           )}
         </nav>
-        ${
-          this.narrow
-            ? html`<ha-icon-button
-                class="manual-run"
-                .label=${t("manual.open")}
-                .path=${mdiPlus}
-                ?disabled=${!this.devices}
-                @click=${() => (this.manualRun = true)}
-              ></ha-icon-button>`
-            : html`<ha-button
-                class="manual-run"
-                appearance="plain"
-                ?disabled=${!this.devices}
-                @click=${() => (this.manualRun = true)}
-              >
-                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-                ${t("manual.open")}
-              </ha-button>`
-        }
       </header>
       <main>
         ${cache(
@@ -194,6 +175,18 @@ export class WattbillPanel extends LitElement {
               html`<div>${this.renderPage(current, run)}</div>`,
         )}
       </main>
+      ${
+        current.name === "overview"
+          ? html`<ha-button
+              class="manual-run fab"
+              ?disabled=${!this.devices}
+              @click=${() => (this.manualRun = true)}
+            >
+              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+              ${t("manual.open")}
+            </ha-button>`
+          : nothing
+      }
       ${
         this.manualRun && this.devices
           ? html`<wattbill-manual-run-dialog
@@ -318,12 +311,12 @@ export class WattbillPanel extends LitElement {
         color: var(--secondary-text-color);
         border-bottom: 2px solid transparent;
       }
-      .manual-run {
-        flex: none;
-      }
       .tab.on {
         color: var(--primary-color);
         border-bottom-color: var(--primary-color);
+      }
+      .title a {
+        color: inherit;
       }
       .title {
         display: flex;
@@ -351,12 +344,13 @@ export class WattbillPanel extends LitElement {
         margin: 0 -12px;
         padding: 0 4px;
       }
+      /* The bottom padding keeps the last row clear of the floating button. */
       main {
-        padding: 16px 24px 48px;
+        padding: 16px 24px 88px;
         max-width: 1400px;
       }
       :host([narrow]) main {
-        padding: 12px 16px 32px;
+        padding: 12px 16px 88px;
       }
     `,
   ];

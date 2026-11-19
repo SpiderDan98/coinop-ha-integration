@@ -1,5 +1,6 @@
 {
   "menu": "Open sidebar",
+  "dialog.close": "Close",
   "runs.title": "Runs",
   "runs.loading": "Loading Runs…",
   "runs.error": "WattBill could not load its Runs. Check that the integration is set up and loaded.",

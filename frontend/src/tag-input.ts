@@ -152,12 +152,22 @@ export class TagInput extends LitElement {
       .tag-input {
         position: relative;
       }
+      /* Looks like the shared text field around its chips and input. */
       .chips {
         gap: 4px;
-        padding: 4px;
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        background: var(--card-background-color, #fff);
+        min-height: 40px;
+        box-sizing: border-box;
+        padding: 4px 8px;
+        border-bottom: 1px solid var(--input-idle-line-color, rgba(0, 0, 0, 0.42));
+        border-radius: 4px 4px 0 0;
+        background: var(--ha-color-form-background, var(--secondary-background-color, #ededed));
+      }
+      .chips:hover {
+        border-bottom-color: var(--input-hover-line-color, rgba(0, 0, 0, 0.87));
+      }
+      .chips:focus-within {
+        border-bottom-color: var(--primary-color);
+        box-shadow: inset 0 -1px 0 var(--primary-color);
       }
       .tag-chip .remove {
         --ha-icon-button-size: 24px;
@@ -167,11 +177,9 @@ export class TagInput extends LitElement {
       input {
         flex: 1;
         min-width: 120px;
+        min-height: 0;
         border: 0;
-        outline: none;
-        font: inherit;
-        font-size: 14px;
-        color: var(--primary-text-color);
+        box-shadow: none;
         background: transparent;
         padding: 2px 4px;
       }

@@ -50,7 +50,7 @@ describe("Tags tab", () => {
       "Tags",
       "Devices",
     ]);
-    expect(text(query(panel, "h2"))).toBe("Tags");
+    expect(text(query(panel, "a.tab.on"))).toBe("Tags");
   });
 
   it("lists each Tag with its Run count and total cost", async () => {

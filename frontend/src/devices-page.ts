@@ -84,7 +84,6 @@ export class DevicesPage extends LitElement {
     if (this.devices === null) return html`<p class="muted">${t("devices.error")}</p>`;
     if (!this.devices) return html`<p class="muted">${t("devices.loading")}</p>`;
     return html`
-      <h2>${t("devices.title")}</h2>
       ${
         this.devices.length
           ? html`<div class="cards">
@@ -303,9 +302,6 @@ export class DevicesPage extends LitElement {
   static override styles = [
     shared,
     css`
-      h2 {
-        margin: 8px 0 12px;
-      }
       .cards {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -362,18 +358,8 @@ export class DevicesPage extends LitElement {
         --mdc-icon-size: 16px;
         margin-inline-end: -6px;
       }
-      select {
-        font: inherit;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 3px 6px;
-      }
       .default-material select {
         width: 100%;
-        padding: 6px 8px;
-        box-sizing: border-box;
       }
       .error {
         color: var(--error-color, #db4437);

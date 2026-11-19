@@ -137,19 +137,21 @@ export class RunImages extends LitElement {
   private renderDeleteDialog(image: RunImage) {
     const t = localize(this.hass);
     const cancel = () => (this.deleting = undefined);
-    return html`<wattbill-dialog alert .label=${t("images.delete_title")} @cancel=${cancel}>
-      <div class="image-dialog dialog card">
-        <h2>${t("images.delete_title")}</h2>
-        <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
-        <p class="muted small">${t("images.delete_warning")}</p>
-        <div class="row end">
-          <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
-            ${t("delete.cancel")}
-          </ha-button>
-          <ha-button class="confirm" variant="danger" @click=${() => this.delete(image)}>
-            ${t("delete.confirm")}
-          </ha-button>
-        </div>
+    return html`<wattbill-dialog
+      class="image-dialog dialog"
+      alert
+      .label=${t("images.delete_title")}
+      @cancel=${cancel}
+    >
+      <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
+      <p class="muted small">${t("images.delete_warning")}</p>
+      <div slot="footer" class="row end">
+        <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
+          ${t("delete.cancel")}
+        </ha-button>
+        <ha-button class="confirm" variant="danger" @click=${() => this.delete(image)}>
+          ${t("delete.confirm")}
+        </ha-button>
       </div>
     </wattbill-dialog>`;
   }

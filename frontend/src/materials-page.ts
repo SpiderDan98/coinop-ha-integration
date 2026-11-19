@@ -179,13 +179,14 @@ export class MaterialsPage extends LitElement {
     const active = this.materials.filter((material) => !material.archived);
     const archived = this.materials.filter((material) => material.archived);
     return html`
-      <div class="head row between">
-        <h2>${t("tab.materials")}</h2>
-        <ha-button @click=${() => this.open()}>
-          <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-          ${t("materials.new")}
-        </ha-button>
-      </div>
+      ${
+        this.draft
+          ? nothing
+          : html`<ha-button class="new-material fab" @click=${() => this.open()}>
+              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+              ${t("materials.new")}
+            </ha-button>`
+      }
       ${this.notice ? html`<p class="notice">${this.notice}</p>` : nothing}
       ${this.draft ? this.renderForm(this.draft, t) : nothing}
       ${
@@ -651,9 +652,6 @@ export class MaterialsPage extends LitElement {
   static override styles = [
     shared,
     css`
-      .head {
-        margin: 8px 0 12px;
-      }
       .star {
         --ha-icon-button-size: 36px;
         --mdc-icon-size: 20px;
@@ -699,9 +697,9 @@ export class MaterialsPage extends LitElement {
       }
       .colour-picker {
         flex: none;
-        width: 36px;
-        height: 32px;
-        padding: 2px;
+        width: 40px;
+        height: 40px;
+        padding: 4px;
         cursor: pointer;
       }
       .clear-colour {
@@ -772,16 +770,6 @@ export class MaterialsPage extends LitElement {
         align-items: center;
         align-self: end;
         font-size: 14px;
-        color: var(--primary-text-color);
-      }
-      input,
-      select {
-        font: inherit;
-        font-size: 14px;
-        padding: 6px 8px;
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        background: var(--card-background-color, #fff);
         color: var(--primary-text-color);
       }
       .pack {

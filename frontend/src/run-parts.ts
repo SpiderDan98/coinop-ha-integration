@@ -42,26 +42,23 @@ export const deleteDialog = (
     [t("runs.title"), String(drop.runs)],
     [t("sensor.flagged_runs"), String(drop.flagged_runs)],
   ];
-  return html`<wattbill-dialog alert .label=${title} @cancel=${cancel}>
-    <div class="dialog card">
-      <h2>${title}</h2>
-      <p>${t("delete.drop")}</p>
-      <dl>
-        ${rows.map(
-          ([label, value]) =>
-            html`<dt>${label}</dt>
-              <dd class="num">${value}</dd>`,
-        )}
-      </dl>
-      <p class="muted small">${t("delete.warning")}</p>
-      <div class="row end">
-        <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
-          ${t("delete.cancel")}
-        </ha-button>
-        <ha-button class="confirm" variant="danger" @click=${confirm}>
-          ${t("delete.confirm")}
-        </ha-button>
-      </div>
+  return html`<wattbill-dialog class="dialog" alert .label=${title} @cancel=${cancel}>
+    <p>${t("delete.drop")}</p>
+    <dl>
+      ${rows.map(
+        ([label, value]) =>
+          html`<dt>${label}</dt>
+            <dd class="num">${value}</dd>`,
+      )}
+    </dl>
+    <p class="muted small">${t("delete.warning")}</p>
+    <div slot="footer" class="row end">
+      <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
+        ${t("delete.cancel")}
+      </ha-button>
+      <ha-button class="confirm" variant="danger" @click=${confirm}>
+        ${t("delete.confirm")}
+      </ha-button>
     </div>
   </wattbill-dialog>`;
 };

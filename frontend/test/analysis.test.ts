@@ -24,7 +24,7 @@ describe("Analysis tab", () => {
       "Tags",
       "Devices",
     ]);
-    expect(text(query(panel, "h2"))).toBe("Analysis");
+    expect(text(query(panel, "a.tab.on"))).toBe("Analysis");
   });
 
   it("totals the cost by kind with each kind's share", async () => {

@@ -1,7 +1,7 @@
 // The Line Item Templates tab: the global catalogue as a table edited in place, each
 // field saved as it is changed, with the Devices that add a template automatically.
 import { mdiDelete, mdiPlus } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   createTemplate,
@@ -66,21 +66,24 @@ export class TemplatesPage extends LitElement {
   /** The template whose delete confirmation is open. */
   @state() private confirming?: string;
 
+  protected override updated(changed: PropertyValues) {
+    // The form opens at the top, far from the floating button that opened it.
+    if (changed.has("adding") && this.adding && !changed.get("adding"))
+      this.renderRoot.querySelector<HTMLInputElement>("form.new [name=label]")?.focus();
+  }
+
   override render() {
     const t = localize(this.hass);
     if (!this.templates) return html`<p class="muted">${t("templates.loading")}</p>`;
     return html`
-      <div class="row between head">
-        <h2>${t("templates.title")}</h2>
-        ${
-          this.adding
-            ? nothing
-            : html`<ha-button class="new-template" @click=${() => (this.adding = "entered")}>
-                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-                ${t("templates.new")}
-              </ha-button>`
-        }
-      </div>
+      ${
+        this.adding
+          ? nothing
+          : html`<ha-button class="new-template fab" @click=${() => (this.adding = "entered")}>
+              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+              ${t("templates.new")}
+            </ha-button>`
+      }
       ${this.adding ? this.renderNew(this.adding, t) : nothing}
       ${
         this.templates.length
@@ -281,9 +284,6 @@ export class TemplatesPage extends LitElement {
   static override styles = [
     shared,
     css`
-      .head {
-        margin: 8px 0 12px;
-      }
       table {
         width: 100%;
         max-width: 1100px;
@@ -312,14 +312,7 @@ export class TemplatesPage extends LitElement {
       }
       input,
       select {
-        font: inherit;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 4px 8px;
         width: 100%;
-        box-sizing: border-box;
       }
       input[type="number"] {
         max-width: 110px;

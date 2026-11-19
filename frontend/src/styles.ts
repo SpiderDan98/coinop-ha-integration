@@ -64,14 +64,57 @@ export const shared = css`
     border-radius: 12px;
     padding: 16px;
   }
+  /* HA's filled text field; :where() lets every page's own field rules win. */
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea) {
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--primary-text-color);
+    background: var(--ha-color-form-background, var(--secondary-background-color, #ededed));
+    border: 0;
+    border-bottom: 1px solid var(--input-idle-line-color, rgba(0, 0, 0, 0.42));
+    border-radius: 4px 4px 0 0;
+    outline: none;
+  }
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea):hover {
+    border-bottom-color: var(--input-hover-line-color, rgba(0, 0, 0, 0.87));
+  }
+  :where(
+    input:not([type="checkbox"], [type="radio"], [type="file"]),
+    select,
+    textarea
+  ):focus-visible {
+    border-bottom-color: var(--primary-color);
+    box-shadow: inset 0 -1px 0 var(--primary-color);
+  }
+  :where(input, select, textarea)[aria-invalid="true"] {
+    border-bottom-color: var(--error-color, #db4437);
+    box-shadow: inset 0 -1px 0 var(--error-color, #db4437);
+  }
+  :where(textarea) {
+    resize: vertical;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--primary-color);
+  }
+  /* As HA's floating action button, built from ha-button since ha-fab may not be loaded. */
+  ha-button.fab {
+    position: fixed;
+    z-index: 3;
+    inset-inline-end: calc(16px + var(--safe-area-inset-right, 0px));
+    bottom: calc(16px + var(--safe-area-inset-bottom, 0px));
+    --ha-button-height: 48px;
+    border-radius: 9999px;
+    box-shadow:
+      0 6px 12px -3px rgba(0, 0, 0, 0.4),
+      0 16px 32px -6px rgba(0, 0, 0, 0.55);
+  }
   /* HA's size="small" became size="s" in 2026.11, so the height is set directly. */
   ha-button.small {
     --ha-button-height: 32px;
-  }
-  .dialog {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
   }
   .dialog p {
     margin: 0;

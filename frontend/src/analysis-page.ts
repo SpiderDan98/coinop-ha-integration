@@ -112,7 +112,6 @@ export class AnalysisPage extends LitElement {
     const format = formatter(this.hass);
     const aggregates = this.aggregates;
     return html`
-      <h2>${t("tab.analysis")}</h2>
       <p class="muted small intro">${t("analysis.intro")}</p>
       ${
         aggregates === null
@@ -233,13 +232,11 @@ export class AnalysisPage extends LitElement {
   static override styles = [
     shared,
     css`
-      h2 {
-        margin: 8px 0 4px;
-      }
       .intro {
         margin: 0 0 12px;
       }
       .tables {
+        container-type: inline-size;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
         grid-auto-flow: dense;
@@ -248,6 +245,12 @@ export class AnalysisPage extends LitElement {
       }
       .by-month {
         grid-column: 1 / -1;
+      }
+      /* Five columns of figures don't fit one 400px column; spans two once there are two. */
+      @container (min-width: 816px) {
+        .by-device {
+          grid-column: span 2;
+        }
       }
       :host([narrow]) .tables {
         grid-template-columns: minmax(0, 1fr);

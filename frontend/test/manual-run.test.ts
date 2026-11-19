@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
+import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
 const CREATE = "wattbill/runs/create";
 const SUBSCRIBE = "wattbill/runs/subscribe";
@@ -168,6 +168,21 @@ describe("The Manual Run dialog", () => {
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
   });
 
+  it("is closed with its close button", async () => {
+    const panel = await mountPanel(creating());
+    await open(panel);
+
+    await click(panel, iconButton(panel, "Close"));
+
+    expect(queryAll(panel, ".manual-dialog")).toEqual([]);
+  });
+
+  it("is offered on the Runs overview only", async () => {
+    const panel = await mountPanel(creating(), { path: "/materials" });
+
+    expect(queryAll(panel, "ha-button.manual-run")).toEqual([]);
+  });
+
   it("opens as a modal dialog with the name focused", async () => {
     const panel = await mountPanel(creating());
     const dialog = await open(panel);
@@ -189,10 +204,10 @@ describe("The Manual Run dialog", () => {
     expect(queryAll(dialog, "ha-button.create")).toEqual([]);
   });
 
-  it("is an icon button on a narrow screen", async () => {
+  it("opens from the floating button on a narrow screen too", async () => {
     const panel = await mountPanel(creating(), { narrow: true });
 
-    await click(panel, query(panel, "ha-icon-button.manual-run"));
+    await click(panel, query(panel, "ha-button.manual-run.fab"));
 
     expect(queryAll(panel, ".manual-dialog")).toHaveLength(1);
   });

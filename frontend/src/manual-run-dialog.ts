@@ -57,119 +57,123 @@ export class ManualRunDialog extends LitElement {
     const now = formatter(this.hass).toInput(new Date().toISOString());
     const tags = this.runTags ?? device?.settings.tags_for_new_runs ?? [];
     const input = (event: Event) => (event.target as HTMLInputElement).value;
-    return html`<wattbill-dialog .label=${t("manual.title")} @cancel=${this.close}>
-      <div class="manual-dialog dialog card">
-        <h2>${t("manual.title")}</h2>
-        <p class="muted small">${t("manual.hint")}</p>
-        ${
-          this.devices.length > 1
-            ? html`<label
-                >${t("run.device")}<select
-                  name="device"
-                  @change=${(event: Event) => {
-                    this.deviceId = input(event);
-                    this.runTags = undefined;
-                  }}
-                >
-                  ${this.devices.map(
-                    ({ id, name }) =>
-                      html`<option value=${id} ?selected=${id === device?.id}>${name}</option>`,
-                  )}
-                </select></label
-              >`
-            : nothing
-        }
+    return html`<wattbill-dialog
+      class="manual-dialog dialog"
+      .label=${t("manual.title")}
+      .closeLabel=${t("dialog.close")}
+      @cancel=${this.close}
+    >
+      <p class="muted small">${t("manual.hint")}</p>
+      ${
+        this.devices.length > 1
+          ? html`<label
+              >${t("run.device")}<select
+                name="device"
+                @change=${(event: Event) => {
+                  this.deviceId = input(event);
+                  this.runTags = undefined;
+                }}
+              >
+                ${this.devices.map(
+                  ({ id, name }) =>
+                    html`<option value=${id} ?selected=${id === device?.id}>${name}</option>`,
+                )}
+              </select></label
+            >`
+          : nothing
+      }
+      <label
+        >${t("run.name")}<input
+          name="name"
+          autofocus
+          .value=${this.name}
+          placeholder=${t("run.untitled")}
+          @input=${(event: Event) => (this.name = input(event))}
+      /></label>
+      <div class="row times">
         <label
-          >${t("run.name")}<input
-            name="name"
-            autofocus
-            .value=${this.name}
-            placeholder=${t("run.untitled")}
-            @input=${(event: Event) => (this.name = input(event))}
+          >${t("run.started")}<input
+            type="datetime-local"
+            name="started"
+            max=${now}
+            .value=${this.started}
+            @input=${(event: Event) => (this.started = input(event))}
         /></label>
-        <div class="row times">
-          <label
-            >${t("run.started")}<input
-              type="datetime-local"
-              name="started"
-              max=${now}
-              .value=${this.started}
-              @input=${(event: Event) => (this.started = input(event))}
-          /></label>
-          <label
-            >${t("run.ended")}<input
-              type="datetime-local"
-              name="ended"
-              max=${now}
-              aria-invalid=${times.problem ? "true" : "false"}
-              .value=${this.ended}
-              @input=${(event: Event) => (this.ended = input(event))}
-          /></label>
-        </div>
-        ${
-          times.problem
-            ? html`<p class="error small times-problem">${t(`manual.${times.problem}`)}</p>`
-            : nothing
-        }
         <label
-          >${t("run.outcome")}<select
-            name="outcome"
-            @change=${(event: Event) => (this.outcome = input(event) as Outcome)}
-          >
-            ${OUTCOMES.map(
-              (outcome) =>
-                html`<option value=${outcome} ?selected=${outcome === this.outcome}>
-                  ${t(`outcome.${outcome}`)}
-                </option>`,
-            )}
-          </select></label
+          >${t("run.ended")}<input
+            type="datetime-local"
+            name="ended"
+            max=${now}
+            aria-invalid=${times.problem ? "true" : "false"}
+            .value=${this.ended}
+            @input=${(event: Event) => (this.ended = input(event))}
+        /></label>
+      </div>
+      ${
+        times.problem
+          ? html`<p class="error small times-problem">${t(`manual.${times.problem}`)}</p>`
+          : nothing
+      }
+      <label
+        >${t("run.outcome")}<select
+          name="outcome"
+          @change=${(event: Event) => (this.outcome = input(event) as Outcome)}
         >
-        <div class="label">
-          ${t("run.tags")}
-          <wattbill-tag-input
-            .hass=${this.hass}
-            .tags=${tags}
-            .catalog=${this.tags}
-            .label=${t("run.tags")}
-            @tags-change=${(event: CustomEvent<string[]>) => (this.runTags = event.detail)}
-          ></wattbill-tag-input>
-        </div>
-        ${this.failed ? html`<p class="error small">${t("manual.failed")}</p>` : nothing}
-        <div class="row end">
-          <ha-button class="cancel" appearance="plain" @click=${this.close}>
-            ${t("manual.cancel")}
-          </ha-button>
-          <ha-button
-            class="create"
-            ?disabled=${!device || !times.started || this.saving}
-            .loading=${this.saving}
-            @click=${() => this.create(tags)}
-          >
-            ${t("manual.create")}
-          </ha-button>
-        </div>
+          ${OUTCOMES.map(
+            (outcome) =>
+              html`<option value=${outcome} ?selected=${outcome === this.outcome}>
+                ${t(`outcome.${outcome}`)}
+              </option>`,
+          )}
+        </select></label
+      >
+      <div class="label">
+        ${t("run.tags")}
+        <wattbill-tag-input
+          .hass=${this.hass}
+          .tags=${tags}
+          .catalog=${this.tags}
+          .label=${t("run.tags")}
+          @tags-change=${(event: CustomEvent<string[]>) => (this.runTags = event.detail)}
+        ></wattbill-tag-input>
+      </div>
+      ${this.failed ? html`<p class="error small">${t("manual.failed")}</p>` : nothing}
+      <div slot="footer" class="row end">
+        <ha-button class="cancel" appearance="plain" @click=${this.close}>
+          ${t("manual.cancel")}
+        </ha-button>
+        <ha-button
+          class="create"
+          ?disabled=${!device || !times.started || this.saving}
+          .loading=${this.saving}
+          @click=${() => this.create(tags)}
+        >
+          ${t("manual.create")}
+        </ha-button>
       </div>
     </wattbill-dialog>`;
   }
 
   private renderNoDevices(t: Localize) {
-    return html`<wattbill-dialog .label=${t("manual.title")} @cancel=${this.close}>
-      <div class="manual-dialog dialog card">
-        <h2>${t("manual.title")}</h2>
-        <p class="no-devices">${t("devices.empty")}</p>
-        <a
-          href=${RECONFIGURE}
-          @click=${(event: MouseEvent) => {
-            followLink(event);
-            this.close();
-          }}
-          >${t("manual.add_device")}</a
-        >
-        <div class="row end">
-          <ha-button class="cancel" appearance="plain" autofocus @click=${this.close}>
-            ${t("manual.close")}
-          </ha-button>
-        </div>
+    return html`<wattbill-dialog
+      class="manual-dialog dialog"
+      .label=${t("manual.title")}
+      .closeLabel=${t("dialog.close")}
+      @cancel=${this.close}
+    >
+      <p class="no-devices">${t("devices.empty")}</p>
+      <a
+        href=${RECONFIGURE}
+        @click=${(event: MouseEvent) => {
+          followLink(event);
+          this.close();
+        }}
+        >${t("manual.add_device")}</a
+      >
+      <div slot="footer" class="row end">
+        <ha-button class="cancel" appearance="plain" autofocus @click=${this.close}>
+          ${t("manual.close")}
+        </ha-button>
       </div>
     </wattbill-dialog>`;
   }
@@ -219,18 +223,8 @@ export class ManualRunDialog extends LitElement {
         font-size: 12px;
         color: var(--secondary-text-color);
       }
-      input[aria-invalid="true"] {
-        border-color: var(--error-color, #db4437);
-      }
       input,
       select {
-        font: inherit;
-        font-size: 14px;
-        color: var(--primary-text-color);
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 6px;
-        padding: 6px 8px;
         min-width: 0;
       }
     `,

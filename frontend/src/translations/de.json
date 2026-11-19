@@ -1,5 +1,6 @@
 {
   "menu": "Seitenleiste öffnen",
+  "dialog.close": "Schließen",
   "runs.title": "Läufe",
   "runs.loading": "Läufe werden geladen …",
   "runs.error": "WattBill konnte seine Läufe nicht laden. Prüfe, ob die Integration eingerichtet und geladen ist.",
