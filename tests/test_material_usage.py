@@ -111,6 +111,9 @@ async def test_the_material_used_input_is_stored_with_the_job(
         "entity_id": "sensor.kobra_job",
         "attribute": None,
         "material": {"entity_id": FILAMENT, "attribute": None, "unit": "m"},
+        "slots": [],
+        "colour_attribute": None,
+        "loaded_slot": None,
     }
 
 

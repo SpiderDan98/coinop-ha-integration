@@ -57,6 +57,10 @@ export interface LineItem {
   /** Follows the printer's Material used input; `length` (mm) is the measured length. */
   measured: boolean;
   length: number | null;
+  /** The Slots the measured total was attributed through, as their entities reported them. */
+  slots: { number: number; type: string; colour: string | null }[];
+  /** Split across several Materials: this Line Item's estimated share of the measured total. */
+  share: number | null;
   /** What WattBill computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -67,6 +71,8 @@ export interface LineItem {
 export interface RunDetail extends RunSummary {
   job_name: string | null;
   note: string | null;
+  /** The printer's measured total, which corrections of split Line Items never change. */
+  usage: { at: string; value: number; unit: "mm" | "g" } | null;
   line_items: LineItem[];
   /** Thumbnail, Snapshot, then uploads by time. */
   images: RunImage[];
@@ -84,6 +90,10 @@ export interface Device {
       attribute: string | null;
       /** Missing for Devices added before Material used existed. */
       material?: { entity_id: string; attribute: string | null; unit: string | null } | null;
+      /** In Slot order; missing for Devices added before Slots existed. */
+      slots?: string[];
+      colour_attribute?: string | null;
+      loaded_slot?: string | null;
     };
     /** Missing for Devices added before images existed. */
     images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };

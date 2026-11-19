@@ -31,6 +31,7 @@ import lineItemsAdd from "./fixtures/backend/line-items-add.json";
 import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
 import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
+import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
@@ -63,7 +64,7 @@ export const recorded = {
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/aggregates/get` over the snapshot's Runs (all in January 2026), for each
-   * grouping the Overview asks for. */
+   * grouping the Overview and Analysis ask for. */
   aggregates: aggregatesGet as { group_by: Dimension[]; groups: Group[] }[],
   /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
@@ -90,6 +91,10 @@ export const recorded = {
   lineItemsMaterial: lineItemsMaterial as { run: RunDetail },
   /** `wattbill/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
   lineItemsAddMaterial: lineItemsAddMaterial as { run: RunDetail },
+  /** `wattbill/line_items/update` of a Run ("keychain") split across two Slots: 75% to
+   * PLA Basic Black ("keychain-pla"), 25% to PETG White ("keychain-petg"), whose quantity
+   * was corrected to 4 g. */
+  splitRun: lineItemsSplit.run as RunDetail,
   /** `wattbill/line_items/save_as_template`: Benchy's "Nozzle wear" as "template-nozzle". */
   saveAsTemplate: lineItemsSaveAsTemplate as { template: LineItemTemplate },
   /** `wattbill/line_items/add_template`: 2 × "template-nozzle" added to Benchy ("benchy-nozzle"). */

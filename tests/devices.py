@@ -123,6 +123,9 @@ async def add_device(
     material: str | None = None,
     material_attribute: str | None = None,
     material_unit: str | None = None,
+    slots: list[str] | None = None,
+    colour_attribute: str | None = None,
+    loaded_slot: str | None = None,
     thumbnail: str | None = None,
     camera: str | None = None,
     snapshot: bool | None = None,
@@ -135,7 +138,7 @@ async def add_device(
     `source` picks the consumption source; Energy and Power take `meter` as input.
     A fixed `price` is a number; a dict is the price entity step's input.
     `material` is the Material used entity; with `material_attribute`, `material_unit`
-    answers the unit step.
+    answers the unit step. `slots` are the Slot entities in Slot order.
     """
     result = await walk_to_mapping(
         hass, entry, name=name, printer=printer, status=status, attribute=attribute
@@ -149,6 +152,9 @@ async def add_device(
             ("attribute", job_attribute),
             ("material_entity_id", material),
             ("material_attribute", material_attribute),
+            ("slots", slots),
+            ("colour_attribute", colour_attribute),
+            ("loaded_slot", loaded_slot),
         )
         if value
     }
