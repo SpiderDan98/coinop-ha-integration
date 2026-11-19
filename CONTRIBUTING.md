@@ -6,6 +6,7 @@
 - `tests/`: backend tests, run inside a real Home Assistant test instance.
 - `frontend/`: the sidebar panel (TypeScript + Lit). It builds into `custom_components/wattbill/frontend/wattbill-panel.js`, which is gitignored and built by CI.
 - `scripts/test_ha.py`: runs the tests against the minimum, stable or beta Home Assistant release.
+- `scripts/release.py`: builds the release asset `wattbill.zip` from a version tag (see [Release](#release)).
 - `GLOSSARY.md`: domain terms; use them in code, tests and docs. Decisions go in `docs/adr/`.
 
 ### Backend modules
@@ -115,6 +116,16 @@ npm run typecheck
 ## CI
 
 `.github/workflows/ci.yaml` runs on every push, pull request and nightly: hassfest, HACS validation, lint and type check, the panel's lint, type check, tests and build, and the backend tests against the minimum, stable and beta HA releases.
+
+## Release
+
+The committed `manifest.json` keeps the placeholder version `0.0.0`; a release gets its version only from its tag.
+
+1. Push a tag with the version, without a `v` prefix: `1.2.0`, or `1.2.0b1` / `1.2.0rc1` for a pre-release (releases before 1.0 are pre-releases).
+2. `.github/workflows/release.yaml` builds the panel, runs `scripts/release.py` (which fails for any other tag) to zip `custom_components/wattbill/` with the tag as the manifest's version, and creates a **draft** release with `wattbill.zip` and generated notes, marked as a pre-release for `b` / `rc` tags.
+3. Edit the notes (they become the release notes users see in Home Assistant; mention any raise of the minimum HA version) and publish the release. HACS and the Marketplace only offer published releases.
+
+To check an asset locally: build the panel, then `uv run scripts/release.py 1.2.0b1 custom_components/wattbill dist`.
 
 ## Conventions
 
