@@ -63,6 +63,27 @@ export const shared = css`
     border-radius: 12px;
     padding: 16px;
   }
+  .btn {
+    font: inherit;
+    color: inherit;
+    border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+    background: var(--card-background-color, #fff);
+    border-radius: 18px;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn.small {
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+  .btn.danger {
+    color: var(--error-color, #db4437);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
   .no-image {
     display: grid;
     place-items: center;

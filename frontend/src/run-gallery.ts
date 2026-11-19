@@ -1,4 +1,4 @@
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import type { RunSummary } from "./api";
 import { formatter } from "./format";
@@ -31,7 +31,14 @@ export class RunGallery extends LitElement {
               ${runs.map(
                 (run) => html`
                   <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
-                    <div class="no-image">${t("run.no_image")}</div>
+                    <div class="image">
+                      <div class="no-image">${t("run.no_image")}</div>
+                      ${
+                        run.flags.length
+                          ? html`<span class="tile-flags">⚑ ${run.flags.length}</span>`
+                          : nothing
+                      }
+                    </div>
                     <div class="body">
                       <div class="strong ellipsis">${runName(run, t)}</div>
                       <div class="muted small">
@@ -41,6 +48,16 @@ export class RunGallery extends LitElement {
                       <div class="row between">
                         ${outcomeChip(run, t)}<b>${format.money(run.total)}</b>
                       </div>
+                      ${
+                        run.part_count > 1
+                          ? html`<div class="muted small">
+                              ${t("run.per_part", {
+                                amount: format.money(run.cost_per_part),
+                                count: run.part_count,
+                              })}
+                            </div>`
+                          : nothing
+                      }
                     </div>
                   </a>
                 `,
@@ -79,6 +96,19 @@ export class RunGallery extends LitElement {
       .tile:hover,
       .tile:focus-visible {
         border-color: var(--primary-color);
+      }
+      .image {
+        position: relative;
+      }
+      .tile-flags {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 11px;
+        background: var(--warning-color, #ffa600);
+        color: #000;
       }
       .body {
         padding: 10px 12px;
