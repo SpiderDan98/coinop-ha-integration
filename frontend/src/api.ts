@@ -5,6 +5,8 @@ import type { HomeAssistant, Message } from "./hass";
 export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
 export type Kind = "electricity" | "material" | "other";
 export type Method = "measured" | "from_history" | "estimated" | "entered";
+/** Running hours are the Run's running time without pauses. */
+export type QuantityBasis = "entered" | "running_hours";
 
 /** Fetched with `hass.fetchWithAuth`: the image views need authentication. */
 export interface RunImage {
@@ -44,6 +46,10 @@ export interface LineItem {
   unit_price: number;
   amount: number;
   method: Method | null;
+  /** The Line Item Template it was copied from; the template may be gone since. */
+  template_id: string | null;
+  /** Running hours make the quantity computed, live until the Run is final. */
+  basis: QuantityBasis | null;
   segments: { start: string; end: string; kwh: number; unit_price: number }[];
   /** What WattBill computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
@@ -91,7 +97,7 @@ export interface Device {
         };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
-  settings: { tags_for_new_runs: string[] };
+  settings: { tags_for_new_runs: string[]; automatic_templates: string[] };
 }
 
 export type RunChange = "started" | "updated" | "ended" | "deleted";
@@ -158,6 +164,36 @@ export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: st
 export const addLineItem = (hass: HomeAssistant, runId: string, item: Entered) =>
   runResult(hass, { type: "wattbill/line_items/add", run_id: runId, kind: "other", ...item });
 
+/** A copy of the template; `quantity` replaces an entered default quantity. */
+export const addTemplateLineItem = (
+  hass: HomeAssistant,
+  runId: string,
+  templateId: string,
+  quantity?: number,
+) =>
+  runResult(hass, {
+    type: "wattbill/line_items/add_template",
+    run_id: runId,
+    template_id: templateId,
+    ...(quantity === undefined ? {} : { quantity }),
+  });
+
+/** Computed Line Items have no label of their own, so they need `label`. */
+export const saveAsTemplate = async (
+  hass: HomeAssistant,
+  runId: string,
+  lineItemId: string,
+  label?: string,
+) =>
+  (
+    await hass.callWS<{ template: LineItemTemplate }>({
+      type: "wattbill/line_items/save_as_template",
+      run_id: runId,
+      line_item_id: lineItemId,
+      ...(label === undefined ? {} : { label }),
+    })
+  ).template;
+
 export const deleteLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
   runResult(hass, { type: "wattbill/line_items/delete", run_id: runId, line_item_id: lineItemId });
 
@@ -221,9 +257,21 @@ export interface MaterialType {
   density: number;
 }
 
+export interface LineItemTemplate {
+  id: string;
+  label: string;
+  unit: string;
+  unit_price: number;
+  /** Not used with running hours. */
+  default_quantity: number;
+  basis: QuantityBasis;
+}
+
+export type TemplateFields = Omit<LineItemTemplate, "id">;
+
 /** Every catalogue in the first event; afterwards only the one that changed. */
 /** Tags are alphabetical; Runs and Devices name them. */
-export type Catalog = { materials: Material[]; tags: string[] };
+export type Catalog = { materials: Material[]; tags: string[]; templates: LineItemTemplate[] };
 
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
   hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });
@@ -265,3 +313,25 @@ export const deleteMaterial = async (hass: HomeAssistant, materialId: string) =>
       material_id: materialId,
     })
   ).deleted;
+
+export const createTemplate = (hass: HomeAssistant, template: TemplateFields) =>
+  hass.callWS<{ template: LineItemTemplate }>({ type: "wattbill/templates/create", template });
+
+/** Runs keep their copies; only Line Items added afterwards follow. */
+export const updateTemplate = (
+  hass: HomeAssistant,
+  templateId: string,
+  template: Partial<TemplateFields>,
+) =>
+  hass.callWS<{ template: LineItemTemplate }>({
+    type: "wattbill/templates/update",
+    template_id: templateId,
+    template,
+  });
+
+/** Runs keep their copies; Devices stop adding it automatically. */
+export const deleteTemplate = (hass: HomeAssistant, templateId: string) =>
+  hass.callWS<Record<string, never>>({
+    type: "wattbill/templates/delete",
+    template_id: templateId,
+  });

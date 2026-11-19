@@ -37,13 +37,18 @@ describe("Tags tab", () => {
       .reply("wattbill/tags/rename", (msg) => ({ tag: msg.name }))
       .reply("wattbill/tags/delete", () => ({}));
 
-  it("opens from the toolbar between Materials and Devices", async () => {
+  it("opens from the toolbar between Line Item Templates and Devices", async () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, `a.tab[href$="/tags"]`));
 
     expect(location.pathname).toBe("/wattbill/tags");
-    expect(queryAll(panel, "a.tab").map(text)).toEqual(["Materials", "Tags", "Devices"]);
+    expect(queryAll(panel, "a.tab").map(text)).toEqual([
+      "Materials",
+      "Line Item Templates",
+      "Tags",
+      "Devices",
+    ]);
     expect(text(query(panel, "h2"))).toBe("Tags");
   });
 

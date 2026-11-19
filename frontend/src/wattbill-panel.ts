@@ -19,12 +19,13 @@ import "./materials-page";
 import "./run-gallery";
 import "./run-page";
 import "./tags-page";
+import "./templates-page";
 import { runName } from "./run-parts";
 import { shared } from "./styles";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
-const TABS = ["materials", "tags", "devices"] as const;
+const TABS = ["materials", "templates", "tags", "devices"] as const;
 
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
@@ -76,8 +77,9 @@ export class WattbillPanel extends LitElement {
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("hass") && !this.unsubscribe && this.isConnected) this.subscribe();
-    // Devices change in HA's own settings, so the tab reads them afresh.
-    else if (changed.get("route") && page(this.route).name === "devices") void this.loadDevices();
+    // Devices change in HA's own settings, so the tabs showing them read them afresh.
+    else if (changed.get("route") && ["devices", "templates"].includes(page(this.route).name))
+      void this.loadDevices();
   }
 
   private subscribe() {
@@ -174,11 +176,22 @@ export class WattbillPanel extends LitElement {
             ?narrow=${this.narrow}
           ></wattbill-materials-page>`;
     }
+    if (current.name === "templates") {
+      return this.catalogFailed
+        ? html`<p class="muted">${t("catalog.error")}</p>`
+        : html`<wattbill-templates-page
+            .hass=${this.hass}
+            .templates=${this.catalog?.templates}
+            .devices=${this.devices ?? undefined}
+            ?narrow=${this.narrow}
+          ></wattbill-templates-page>`;
+    }
     if (current.name === "devices") {
       return html`<wattbill-devices-page
         .hass=${this.hass}
         .devices=${this.devices}
         .tags=${this.catalog?.tags ?? []}
+        .templates=${this.catalog?.templates ?? []}
         ?narrow=${this.narrow}
       ></wattbill-devices-page>`;
     }
