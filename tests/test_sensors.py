@@ -153,6 +153,7 @@ async def test_current_run_cost_follows_the_open_run(
         "name": None,
         "start": started,
         "running_hours": pytest.approx(1.5),
+        "tags": [],
         "device_class": "monetary",
         ATTR_UNIT_OF_MEASUREMENT: "EUR",
         "friendly_name": "Kobra Current Run cost",

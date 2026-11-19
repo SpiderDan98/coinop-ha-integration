@@ -94,6 +94,20 @@ export const shared = css`
     background: var(--secondary-background-color, #ededed);
     font-size: 12px;
   }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+  }
+  .tag-chip .tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .outcome {
     display: inline-block;
     font-size: 12px;

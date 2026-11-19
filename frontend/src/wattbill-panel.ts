@@ -18,12 +18,13 @@ import "./devices-page";
 import "./materials-page";
 import "./run-gallery";
 import "./run-page";
+import "./tags-page";
 import { runName } from "./run-parts";
 import { shared } from "./styles";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
-const TABS = ["materials", "devices"] as const;
+const TABS = ["materials", "tags", "devices"] as const;
 
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
@@ -177,11 +178,22 @@ export class WattbillPanel extends LitElement {
       return html`<wattbill-devices-page
         .hass=${this.hass}
         .devices=${this.devices}
+        .tags=${this.catalog?.tags ?? []}
         ?narrow=${this.narrow}
       ></wattbill-devices-page>`;
     }
     if (this.failed) return html`<p class="muted">${t("runs.error")}</p>`;
     if (!this.runs) return html`<p class="muted">${t("runs.loading")}</p>`;
+    if (current.name === "tags") {
+      return this.catalogFailed
+        ? html`<p class="muted">${t("catalog.error")}</p>`
+        : html`<wattbill-tags-page
+            .hass=${this.hass}
+            .tags=${this.catalog?.tags}
+            .runs=${[...this.runs.values()]}
+            ?narrow=${this.narrow}
+          ></wattbill-tags-page>`;
+    }
     const devices = this.devices ?? undefined;
     return current.name === "run"
       ? html`<wattbill-run-page
@@ -189,6 +201,7 @@ export class WattbillPanel extends LitElement {
           .runId=${current.runId}
           .summary=${run}
           .devices=${devices}
+          .tags=${this.catalog?.tags ?? []}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-page>`
@@ -196,6 +209,7 @@ export class WattbillPanel extends LitElement {
           .hass=${this.hass}
           .runs=${[...this.runs.values()]}
           .devices=${devices}
+          .tags=${this.catalog?.tags ?? []}
           .basePath=${this.route.prefix}
           ?narrow=${this.narrow}
         ></wattbill-run-gallery>`;

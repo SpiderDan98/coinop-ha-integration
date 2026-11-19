@@ -149,7 +149,7 @@ async def test_a_first_setup_starts_with_empty_stores(
 
     assert entry.state is ConfigEntryState.LOADED
     assert value(hass, RUNS) == 0
-    assert hass_storage["wattbill.catalog"]["data"] == {"materials": []}
+    assert hass_storage["wattbill.catalog"]["data"] == {"materials": [], "tags": []}
     assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
 
 

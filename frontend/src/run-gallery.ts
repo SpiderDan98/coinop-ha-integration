@@ -8,6 +8,9 @@ import { localize, type Localize } from "./localize";
 import "./run-image";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
+import { sortTags, tagChip } from "./tag-input";
+
+const SHOWN_TAGS = 2;
 
 @customElement("wattbill-run-gallery")
 export class RunGallery extends LitElement {
@@ -15,17 +18,31 @@ export class RunGallery extends LitElement {
   @property({ attribute: false }) runs: RunSummary[] = [];
   /** Current Devices; Runs of any other Device are shown as removed. */
   @property({ attribute: false }) devices?: Device[];
+  /** Every Tag there is, offered in the Tag filter. */
+  @property({ attribute: false }) tags: string[] = [];
   /** Where Run pages live, e.g. "/wattbill". */
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   @state() private deviceId = "";
+  /** Runs with any of these Tags pass the Tag filter, and untagged ones if `untagged`. */
+  @state() private tagFilter: string[] = [];
+  @state() private untagged = false;
+
+  private matchesTags(run: RunSummary) {
+    if (!this.tagFilter.length && !this.untagged) return true;
+    return (
+      (this.untagged && !run.tags.length) || run.tags.some((tag) => this.tagFilter.includes(tag))
+    );
+  }
 
   override render() {
     const t = localize(this.hass);
     const format = formatter(this.hass);
     const all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
-    const runs = this.deviceId ? all.filter((run) => run.device_id === this.deviceId) : all;
+    const runs = all.filter(
+      (run) => (!this.deviceId || run.device_id === this.deviceId) && this.matchesTags(run),
+    );
     const total = runs.reduce((sum, run) => sum + run.total, 0);
     return html`
       <div class="head">
@@ -71,6 +88,20 @@ export class RunGallery extends LitElement {
                             </div>`
                           : nothing
                       }
+                      ${
+                        run.tags.length
+                          ? html`<div class="tags">
+                              ${run.tags.slice(0, SHOWN_TAGS).map(tagChip)}
+                              ${
+                                run.tags.length > SHOWN_TAGS
+                                  ? html`<span class="more-tags muted small"
+                                      >${`+${run.tags.length - SHOWN_TAGS}`}</span
+                                    >`
+                                  : nothing
+                              }
+                            </div>`
+                          : nothing
+                      }
                     </div>
                   </a>
                 `,
@@ -98,7 +129,44 @@ export class RunGallery extends LitElement {
             html`<option value=${id} ?selected=${id === this.deviceId}>${name}</option>`,
         )}
       </select>
+      ${this.renderTagFilter(runs, t)}
     </div>`;
+  }
+
+  private renderTagFilter(runs: RunSummary[], t: Localize) {
+    const tags = sortTags([...new Set([...this.tags, ...runs.flatMap((run) => run.tags)])]);
+    const chosen = [
+      ...(this.untagged ? [t("runs.no_tag")] : []),
+      ...tags.filter((tag) => this.tagFilter.includes(tag)),
+    ];
+    const toggle = (event: Event) => {
+      const box = event.target as HTMLInputElement;
+      if (box.classList.contains("no-tag")) this.untagged = box.checked;
+      else
+        this.tagFilter = box.checked
+          ? [...this.tagFilter, box.value]
+          : this.tagFilter.filter((tag) => tag !== box.value);
+    };
+    return html`<details class="tag-filter" aria-label=${t("runs.filter_tags")}>
+      <summary>${chosen.length ? chosen.join(", ") : t("runs.all_tags")}</summary>
+      <div class="options" @change=${toggle}>
+        <label
+          ><input type="checkbox" class="no-tag" .checked=${this.untagged} />${t(
+            "runs.no_tag",
+          )}</label
+        >
+        ${tags.map(
+          (tag) =>
+            html`<label
+              ><input
+                type="checkbox"
+                .value=${tag}
+                .checked=${this.tagFilter.includes(tag)}
+              />${tag}</label
+            >`,
+        )}
+      </div>
+    </details>`;
   }
 
   static override styles = [
@@ -113,7 +181,8 @@ export class RunGallery extends LitElement {
       .filters {
         margin-bottom: 12px;
       }
-      select {
+      select,
+      .tag-filter summary {
         font: inherit;
         color: inherit;
         background: var(--card-background-color, #fff);
@@ -121,6 +190,46 @@ export class RunGallery extends LitElement {
         border-radius: 6px;
         padding: 6px 8px;
         max-width: 100%;
+      }
+      .tag-filter {
+        position: relative;
+      }
+      .tag-filter summary {
+        display: block;
+        cursor: pointer;
+        max-width: 260px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tag-filter .options {
+        position: absolute;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 180px;
+        max-height: 320px;
+        overflow-y: auto;
+        margin-top: 4px;
+        padding: 8px 10px;
+        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        border-radius: 6px;
+        background: var(--card-background-color, #fff);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      }
+      .tag-filter label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .tags {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        min-width: 0;
+        overflow: hidden;
       }
       .gallery {
         display: grid;

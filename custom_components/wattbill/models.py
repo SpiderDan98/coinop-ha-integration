@@ -251,6 +251,7 @@ class Run:
     flags: list[str] = field(default_factory=list)
     part_count: int = 1
     note: str | None = None
+    tags: list[str] = field(default_factory=list)
     consumption: dict[str, Any] | None = None
     readings: list[tuple[datetime, float | None]] = field(default_factory=list)
     cost_source: dict[str, Any] | None = None
@@ -304,6 +305,7 @@ class Run:
             "flags": list(self.flags),
             "part_count": self.part_count,
             "note": self.note,
+            "tags": list(self.tags),
             "consumption": self.consumption,
             "readings": [[at.isoformat(), value] for at, value in self.readings],
             "cost_source": self.cost_source,
@@ -337,6 +339,7 @@ class Run:
             flags=list(data["flags"]),
             part_count=data["part_count"],
             note=data.get("note"),
+            tags=list(data.get("tags", [])),
             consumption=data.get("consumption"),
             readings=[
                 (datetime.fromisoformat(at), value)

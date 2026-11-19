@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 from .cost.totals import DeviceTotals, Totals
 from .models import Run
 from .store import RunStore
+from .tags import retag
 
 
 class RunChange(StrEnum):
@@ -104,19 +105,25 @@ class RunBook:
         ]
         for run in renamed:
             run.device_name = name
-        if any(run.finalised for run in renamed):
-            await self._store.async_save_runs(r for r in self.runs() if r.finalised)
-        if not all(run.finalised for run in renamed):
-            await self.async_flush()
+        await self._save(*renamed)
+
+    async def async_retag(self, tag: str, new: str | None) -> None:
+        """Replace `tag` by `new` on every Run carrying it, or remove it when None."""
+        tagged = [run for run in self._runs.values() if tag in run.tags]
+        for run in tagged:
+            run.tags = retag(run.tags, tag, new)
+        await self._save(*tagged)
+        for run in tagged:
+            self._announce(RunChange.UPDATED, run)
 
     async def async_flush(self) -> None:
         """Write pending live changes now, e.g. before unloading."""
         await self._store.async_save_live(self._unfinalised())
 
-    async def _save(self, run: Run) -> None:
-        if run.finalised:
+    async def _save(self, *runs: Run) -> None:
+        if any(run.finalised for run in runs):
             await self._store.async_save_runs(r for r in self.runs() if r.finalised)
-        else:
+        if not all(run.finalised for run in runs):
             await self.async_flush()
 
     def _unfinalised(self) -> list[Run]:

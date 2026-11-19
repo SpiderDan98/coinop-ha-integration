@@ -1,14 +1,16 @@
 """Records what the panel receives, as canned responses for the panel's own tests."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from pytest_homeassistant_custom_component.common import MockUser
 
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
 from .devices import STATUS, add_device, add_hub
-from .stored import electricity, line_item, place_runs, stored_run
+from .stored import electricity, line_item, place_runs, place_tags, stored_run
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
@@ -29,6 +31,7 @@ def history() -> list[dict[str, Any]]:
             hours=1.25,
             part_count=4,
             note="Four on one plate",
+            tags=["Gift"],
             images=[
                 image("benchy-thumbnail", "thumbnail", benchy_start),
                 image("benchy-snapshot", "snapshot", benchy_start + DAY / 19.2),
@@ -54,6 +57,7 @@ def history() -> list[dict[str, Any]]:
             hours=9,
             outcome="failed",
             flags=["fault"],
+            tags=["Cosplay helmet", "Gift"],
             images=[image("helmet-snapshot", "snapshot", helmet_start + DAY * 9 / 24)],
             line_items=[
                 electricity(0.6, 0.30, helmet_start, helmet_start + DAY / 4)
@@ -94,6 +98,7 @@ async def test_record_the_runs_the_panel_shows(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     place_runs(hass_storage, *history())
+    place_tags(hass_storage, "Cosplay helmet", "Gift", "Spare parts")
     entry = await add_hub(hass)
     hass.states.async_set(STATUS, "idle")
     await panel.subscribe("wattbill/runs/subscribe")
@@ -105,6 +110,11 @@ async def test_record_the_runs_the_panel_shows(
         running_power=120,
         paused_power=8,
         price=0.30,
+    )
+    await panel.call(
+        "wattbill/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={"tags_for_new_runs": ["Batch 7"]},
     )
     hass.states.async_set(STATUS, "printing")
     await hass.async_block_till_done()
@@ -172,8 +182,14 @@ async def test_record_what_deleting_a_run_drops(
 
 
 async def test_record_the_catalogue_the_panel_shows(
-    hass: HomeAssistant, clock: Clock, panel: PanelClient
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    connect_panel: Callable[[MockUser], PanelClient],
+    hass_admin_user: MockUser,
+    hass_storage: dict[str, Any],
 ) -> None:
+    place_runs(hass_storage, stored_run("vase"))
     await add_hub(hass)
     types = await panel.call("wattbill/materials/types")
     await panel.subscribe("wattbill/catalog/subscribe")
@@ -211,8 +227,15 @@ async def test_record_the_catalogue_the_panel_shows(
         created.append(result["material"]["id"])
         await panel.event()
     await panel.call("wattbill/materials/archive", material_id=created[-1])
-    events.append(await panel.event())
+    tags = ["Cosplay helmet", "Gift", "Spare"]
+    await panel.call("wattbill/runs/update", run_id="vase", tags=tags)
+    rename = await panel.call("wattbill/tags/rename", tag="Spare", name="Spare parts")
+    # A panel opened now gets the whole catalogue at once.
+    later = connect_panel(hass_admin_user)
+    await later.subscribe("wattbill/catalog/subscribe")
+    events.append(await later.event())
     ids = {material: f"material-{n}" for n, material in enumerate(created, 1)}
 
     assert_recorded("materials-types", types)
     assert_recorded("catalog-subscribe", stable_ids(events, ids))
+    assert_recorded("tags-rename", rename)

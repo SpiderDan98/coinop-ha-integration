@@ -1,10 +1,11 @@
 """Catalogue changes pushed to every open panel.
 
 `CATALOGUES` names each catalogue and how the panel receives it; a new catalogue
-(Line Item Templates, Tags) only adds an entry there and announces its name from
+(e.g. Line Item Templates) only adds an entry there and announces its name from
 `Catalog`.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -18,6 +19,7 @@ from custom_components.wattbill.catalog import MATERIALS, Catalog
 from custom_components.wattbill.const import DOMAIN
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
+from custom_components.wattbill.tags import TAGS
 
 from .command import command
 from .materials import material_dict
@@ -25,14 +27,14 @@ from .materials import material_dict
 # Outlives a reload of the hub entry, so open subscriptions keep receiving.
 SIGNAL_CATALOG_CHANGED = f"{DOMAIN}_catalog_changed"
 
-CATALOGUES = {
+CATALOGUES: dict[str, Callable[[Catalog], list[Any]]] = {
     MATERIALS: lambda catalog: [material_dict(m) for m in catalog.materials()],
+    TAGS: lambda catalog: catalog.tags(),
 }
 
 
-def _catalogue(catalog: Catalog, name: str) -> list[dict[str, Any]]:
-    entries: list[dict[str, Any]] = CATALOGUES[name](catalog)
-    return entries
+def _catalogue(catalog: Catalog, name: str) -> list[Any]:
+    return CATALOGUES[name](catalog)
 
 
 @callback
@@ -50,7 +52,10 @@ def _subscribe(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    """First event: every catalogue (`{"materials": [...]}`); then the changed one."""
+    """First event: every catalogue (`{"materials": [...], "tags": [...]}`).
+
+    Then each change: the changed catalogue alone.
+    """
 
     @callback
     def forward(catalog: Catalog, name: str) -> None:
