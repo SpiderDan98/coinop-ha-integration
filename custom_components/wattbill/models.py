@@ -23,6 +23,15 @@ class Flag(StrEnum):
     CONSUMPTION_GAP = "consumption_gap"
     METER_RESET = "meter_reset"
     PRICE_GAP = "price_gap"
+    USAGE_MISSING = "usage_missing"
+    MATERIAL_MISSING = "material_missing"
+
+
+class UsageUnit(StrEnum):
+    """A Material used input reports a length (kept in mm) or a mass (in g)."""
+
+    MILLIMETRE = "mm"
+    GRAM = "g"
 
 
 class LineItemKind(StrEnum):

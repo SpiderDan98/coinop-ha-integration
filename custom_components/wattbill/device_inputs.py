@@ -19,9 +19,15 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
-from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
+from homeassistant.util.unit_conversion import (
+    DistanceConverter,
+    EnergyConverter,
+    MassConverter,
+    PowerConverter,
+)
 
 from .device_config import ConsumptionSource
+from .models import UsageUnit
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
 # Readings are kept in kWh (energy) or W (power).
@@ -29,6 +35,10 @@ METER_UNITS = {
     ConsumptionSource.ENERGY: (EnergyConverter, UnitOfEnergy.KILO_WATT_HOUR),
     ConsumptionSource.POWER: (PowerConverter, UnitOfPower.WATT),
 }
+USAGE_UNITS = (
+    (DistanceConverter, UsageUnit.MILLIMETRE),
+    (MassConverter, UsageUnit.GRAM),
+)
 # Price units name the currency by its code or one of these symbols.
 CURRENCY_SYMBOLS = {
     "EUR": {"€"},
@@ -110,6 +120,14 @@ def unit_scale(source: ConsumptionSource, unit: str | None) -> float | None:
     if unit not in converter.VALID_UNITS:
         return None
     return converter.get_unit_ratio(canonical, unit)
+
+
+def usage_scale(unit: str | None) -> tuple[float, UsageUnit] | None:
+    """Factor from `unit` to mm or g; None if it is neither a length nor a mass."""
+    for converter, canonical in USAGE_UNITS:
+        if unit in converter.VALID_UNITS:
+            return converter.get_unit_ratio(canonical, unit), canonical
+    return None
 
 
 def price_scale(unit: str | None, currency: str) -> float | None:

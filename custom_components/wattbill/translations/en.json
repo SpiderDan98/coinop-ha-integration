@@ -74,15 +74,26 @@
           }
         },
         "job": {
-          "title": "Print job",
-          "description": "Optionally pick the entity that reports the name of the current print job. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
+          "title": "Job & Material",
+          "description": "Optionally pick the entity that reports the name of the current print job, and the one that reports how much material the job used. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
           "data": {
             "entity_id": "Job name entity (optional)",
-            "attribute": "Attribute (optional)"
+            "attribute": "Attribute (optional)",
+            "material_entity_id": "Material used entity (optional)",
+            "material_attribute": "Material used attribute (optional)"
           },
           "data_description": {
             "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
-            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity."
+            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity.",
+            "material_entity_id": "The printer's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
+            "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor."
+          }
+        },
+        "material_unit": {
+          "title": "Unit of the Material used attribute",
+          "description": "In which unit does the attribute report the material used? It must be a length or a mass.",
+          "data": {
+            "unit": "Unit"
           }
         },
         "images": {
@@ -215,7 +226,8 @@
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
         "unknown_unit": "WattBill does not recognise this unit. Enter a conversion factor, or pick another entity.",
-        "status_already_used": "Another Device already uses this entity as its print status. Each print would be recorded twice."
+        "status_already_used": "Another Device already uses this entity as its print status. Each print would be recorded twice.",
+        "not_length_or_mass": "WattBill can only use a length (e.g. mm) or a mass (e.g. g) as Material used. Pick another entity or unit."
       },
       "abort": {
         "reconfigure_successful": "The Device was saved."
