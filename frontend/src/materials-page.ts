@@ -1,14 +1,19 @@
 // The Materials tab: the global catalogue, edited in place. The list itself comes
 // from the panel's catalogue subscription, so every open panel shows each change.
+// Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   archiveMaterial,
   createMaterial,
+  createMaterialFromSpoolman,
   deleteMaterial,
   getMaterialTypes,
+  listFilaments,
   restoreMaterial,
   updateMaterial,
+  type Filament,
+  type Filaments,
   type Material,
   type MaterialFields,
   type MaterialForm,
@@ -38,11 +43,14 @@ const blankDraft = () => ({
   pack_size: "1000",
   pack_unit: "g" as PackUnit,
   default_for_type: false,
+  price_source: "fixed" as Material["price"]["source"],
+  filament_id: "",
 });
 
 type Draft = ReturnType<typeof blankDraft>;
 
-const draftOf = (material: Material): Draft => ({
+const draftOf = ({ price, ...material }: Material): Draft => ({
+  ...blankDraft(),
   name: material.name,
   form: material.form,
   type: material.type,
@@ -50,11 +58,26 @@ const draftOf = (material: Material): Draft => ({
   vendor: material.vendor ?? "",
   colour: material.colour ?? "",
   diameter: material.diameter === null ? DEFAULT_DIAMETER : String(material.diameter),
-  pack_price: String(material.price.pack_price),
-  pack_size: String(material.price.pack_size),
-  pack_unit: material.price.pack_unit,
   default_for_type: material.default_for_type,
+  price_source: price.source,
+  ...(price.source === "fixed"
+    ? {
+        pack_price: String(price.pack_price),
+        pack_size: String(price.pack_size),
+        pack_unit: price.pack_unit,
+      }
+    : { pack_unit: usualUnit(material.form), filament_id: String(price.filament_id) }),
 });
+
+/** Spoolman supplies everything else of a linked Material. */
+const linkOf = (draft: Draft) => ({
+  name: draft.name,
+  default_for_type: draft.default_for_type,
+  price: { source: "spoolman" as const, filament_id: Number(draft.filament_id) },
+});
+
+const filamentName = (filament: Filament) =>
+  [filament.vendor, filament.name].filter(Boolean).join(" ") || filament.type || `#${filament.id}`;
 
 const fieldsOf = (draft: Draft): MaterialFields => ({
   name: draft.name,
@@ -87,6 +110,8 @@ export class MaterialsPage extends LitElement {
   @state() private invalid = false;
   @state() private confirming?: string;
   @state() private notice?: string;
+  /** Undefined until read, or when the backend couldn't answer. */
+  @state() private spoolman?: Filaments;
   private typesRequested = false;
 
   protected override willUpdate(changed: PropertyValues<this>) {
@@ -95,6 +120,10 @@ export class MaterialsPage extends LitElement {
       getMaterialTypes(this.hass).then(
         (types) => (this.types = types),
         () => (this.typesRequested = false),
+      );
+      listFilaments(this.hass).then(
+        (spoolman) => (this.spoolman = spoolman),
+        () => undefined,
       );
     }
   }
@@ -128,7 +157,62 @@ export class MaterialsPage extends LitElement {
             `
           : html`<p class="muted">${t("materials.empty")}</p>`
       }
+      ${this.renderSpoolman(t, format)}
     `;
+  }
+
+  private renderSpoolman(t: Localize, format: Format) {
+    const spoolman = this.spoolman;
+    if (!spoolman || spoolman.status === "not_configured") return nothing;
+    const linkedTo = (filament: Filament) =>
+      this.materials?.find(
+        (material) =>
+          !material.archived &&
+          material.price.source === "spoolman" &&
+          material.price.filament_id === filament.id,
+      );
+    const rows = spoolman.filaments.map((filament) => {
+      const linked = linkedTo(filament);
+      return html`<tr class="filament">
+        <td class="name">
+          <div class="row">
+            <span class="swatch" style="background: ${filament.colour ?? "transparent"}"></span>
+            <span class="strong">${filamentName(filament)}</span>
+          </div>
+        </td>
+        <td>${filament.type ?? ""}</td>
+        <td class="num">
+          ${
+            filament.price_per_gram === null
+              ? html`<span class="muted">${t("spoolman.no_price")}</span>`
+              : `${format.unitPrice(filament.price_per_gram)} / g`
+          }
+        </td>
+        <td class="actions">
+          ${
+            linked
+              ? html`<span class="muted">${t("spoolman.linked", { name: linked.name })}</span>`
+              : html`<button @click=${() => this.createFrom(filament)}>
+                  ${t("spoolman.create")}
+                </button>`
+          }
+        </td>
+      </tr>`;
+    });
+    return html`<section class="spoolman">
+      <h3>${t("spoolman.title")}</h3>
+      ${
+        spoolman.status === "unreachable"
+          ? html`<p class="muted">${t("spoolman.unreachable")}</p>`
+          : rows.length
+            ? html`<div class="card flush">
+                <table>
+                  ${rows}
+                </table>
+              </div>`
+            : html`<p class="muted">${t("spoolman.empty")}</p>`
+      }
+    </section>`;
   }
 
   private renderTable(materials: Material[], t: Localize, format: Format) {
@@ -152,8 +236,14 @@ export class MaterialsPage extends LitElement {
               g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
             </td>
             <td class="small">
-              ${format.money(material.price.pack_price)} /
-              ${format.quantity(material.price.pack_size, material.price.pack_unit)}
+              ${
+                material.price.source === "fixed"
+                  ? `${format.money(material.price.pack_price)} / ${format.quantity(
+                      material.price.pack_size,
+                      material.price.pack_unit,
+                    )}`
+                  : t("materials.from_spoolman")
+              }
             </td>
             <td class="num">${format.unitPrice(material.price_per_gram)} / g</td>
             <td>
@@ -224,54 +314,56 @@ export class MaterialsPage extends LitElement {
         ...(this.materials ?? []).map((material) => material.type),
       ]),
     ];
+    const linked = draft.price_source === "spoolman";
+    const details = html`<label
+        >${t("materials.form")}<select
+          name="form"
+          @change=${(event: Event) => {
+            const form = (event.target as HTMLSelectElement).value as MaterialForm;
+            set({ form, pack_unit: usualUnit(form) });
+          }}
+        >
+          ${FORMS.map(
+            (form) =>
+              html`<option value=${form} ?selected=${draft.form === form}>
+                ${t(`form.${form}`)}
+              </option>`,
+          )}
+        </select></label
+      >
+      <label
+        >${t("materials.type")}<input
+          name="type"
+          list="material-types"
+          .value=${draft.type}
+          @input=${(event: Event) => this.setType((event.target as HTMLInputElement).value)}
+        /><datalist id="material-types">
+          ${known.map((type) => html`<option value=${type}></option>`)}
+        </datalist></label
+      >
+      ${number("density", t("materials.density"))}
+      ${draft.form === "filament" ? number("diameter", t("materials.diameter")) : nothing}
+      ${text("vendor", t("materials.vendor"))} ${text("colour", t("materials.colour"), "#rrggbb")}
+      ${number("pack_price", t("materials.pack_price"))}
+      <div class="pack">
+        ${number("pack_size", t("materials.pack_size"))}
+        <select
+          name="pack_unit"
+          aria-label=${t("materials.pack_unit")}
+          @change=${(event: Event) =>
+            set({ pack_unit: (event.target as HTMLSelectElement).value as PackUnit })}
+        >
+          ${PACK_UNITS.map(
+            (unit) =>
+              html`<option value=${unit} ?selected=${draft.pack_unit === unit}>${unit}</option>`,
+          )}
+        </select>
+      </div>`;
     return html`<form class="card material" @submit=${this.save}>
       <h3>${this.editing ? t("materials.edit_title") : t("materials.new_title")}</h3>
       <div class="fields">
-        ${text("name", t("materials.name"))}
-        <label
-          >${t("materials.form")}<select
-            name="form"
-            @change=${(event: Event) => {
-              const form = (event.target as HTMLSelectElement).value as MaterialForm;
-              set({ form, pack_unit: usualUnit(form) });
-            }}
-          >
-            ${FORMS.map(
-              (form) =>
-                html`<option value=${form} ?selected=${draft.form === form}>
-                  ${t(`form.${form}`)}
-                </option>`,
-            )}
-          </select></label
-        >
-        <label
-          >${t("materials.type")}<input
-            name="type"
-            list="material-types"
-            .value=${draft.type}
-            @input=${(event: Event) => this.setType((event.target as HTMLInputElement).value)}
-          /><datalist id="material-types">
-            ${known.map((type) => html`<option value=${type}></option>`)}
-          </datalist></label
-        >
-        ${number("density", t("materials.density"))}
-        ${draft.form === "filament" ? number("diameter", t("materials.diameter")) : nothing}
-        ${text("vendor", t("materials.vendor"))} ${text("colour", t("materials.colour"), "#rrggbb")}
-        ${number("pack_price", t("materials.pack_price"))}
-        <div class="pack">
-          ${number("pack_size", t("materials.pack_size"))}
-          <select
-            name="pack_unit"
-            aria-label=${t("materials.pack_unit")}
-            @change=${(event: Event) =>
-              set({ pack_unit: (event.target as HTMLSelectElement).value as PackUnit })}
-          >
-            ${PACK_UNITS.map(
-              (unit) =>
-                html`<option value=${unit} ?selected=${draft.pack_unit === unit}>${unit}</option>`,
-            )}
-          </select>
-        </div>
+        ${text("name", t("materials.name"))} ${this.renderCostSource(draft, set, t)}
+        ${linked ? nothing : details}
         <label class="check"
           ><input
             name="default_for_type"
@@ -282,12 +374,80 @@ export class MaterialsPage extends LitElement {
           />${t("materials.default_for_type")}</label
         >
       </div>
+      ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}
       ${this.invalid ? html`<p class="error">${t("materials.invalid")}</p>` : nothing}
       <div class="row">
         <button class="primary" type="submit">${t("materials.save")}</button>
         <button type="button" @click=${this.close}>${t("materials.cancel")}</button>
       </div>
     </form>`;
+  }
+
+  /** Linking happens on existing Materials; new ones come from the Filament list. */
+  private renderCostSource(draft: Draft, set: (changes: Partial<Draft>) => void, t: Localize) {
+    const linked = draft.price_source === "spoolman";
+    if (!this.editing || (!linked && this.spoolman?.status !== "ok")) return nothing;
+    const filaments = this.spoolman?.filaments ?? [];
+    const known = filaments.some((filament) => String(filament.id) === draft.filament_id);
+    const pick = (event: Event) => (event.target as HTMLSelectElement).value;
+    return html`<label
+        >${t("materials.price_source")}<select
+          name="price_source"
+          @change=${(event: Event) => set({ price_source: pick(event) as Draft["price_source"] })}
+        >
+          <option value="fixed" ?selected=${!linked}>${t("materials.price_fixed")}</option>
+          <option value="spoolman" ?selected=${linked}>${t("materials.price_spoolman")}</option>
+        </select></label
+      >${
+        linked
+          ? html`<label
+              >${t("materials.filament")}<select
+                name="filament_id"
+                @change=${(event: Event) => set({ filament_id: pick(event) })}
+              >
+                <option value="" disabled ?selected=${!draft.filament_id}>
+                  ${t("materials.pick_filament")}
+                </option>
+                ${
+                  draft.filament_id && !known
+                    ? html`<option value=${draft.filament_id} selected>
+                        #${draft.filament_id}
+                      </option>`
+                    : nothing
+                }
+                ${filaments.map(
+                  (filament) =>
+                    html`<option
+                      value=${filament.id}
+                      ?selected=${String(filament.id) === draft.filament_id}
+                    >
+                      ${filamentName(filament)}
+                    </option>`,
+                )}
+              </select></label
+            >`
+          : nothing
+      }`;
+  }
+
+  private async createFrom(filament: Filament) {
+    this.notice = undefined;
+    try {
+      await createMaterialFromSpoolman(this.hass, filament.id);
+    } catch (error) {
+      this.spoolmanFailed(error);
+    }
+  }
+
+  /** Says so when Spoolman went away; otherwise the list was stale, so read it again. */
+  private spoolmanFailed(error: unknown) {
+    if ((error as { code?: string }).code === "spoolman_unreachable") {
+      this.notice = localize(this.hass)("spoolman.unreachable");
+    }
+    listFilaments(this.hass).then(
+      (spoolman) => (this.spoolman = spoolman),
+      () => undefined,
+    );
   }
 
   /** A built-in type pre-fills its form, density and usual pack unit. */
@@ -322,14 +482,20 @@ export class MaterialsPage extends LitElement {
   private save = async (event: Event) => {
     event.preventDefault();
     if (!this.draft) return;
-    const fields = fieldsOf(this.draft);
+    const draft = this.draft;
+    const linking = draft.price_source === "spoolman";
+    if (linking && !draft.filament_id) {
+      this.invalid = true;
+      return;
+    }
     try {
       await (this.editing
-        ? updateMaterial(this.hass, this.editing, fields)
-        : createMaterial(this.hass, fields));
+        ? updateMaterial(this.hass, this.editing, linking ? linkOf(draft) : fieldsOf(draft))
+        : createMaterial(this.hass, fieldsOf(draft)));
       this.close();
-    } catch {
-      this.invalid = true;
+    } catch (error) {
+      if (linking) this.spoolmanFailed(error);
+      else this.invalid = true;
     }
   };
 
@@ -410,6 +576,12 @@ export class MaterialsPage extends LitElement {
       }
       .archived {
         margin-top: 12px;
+      }
+      .spoolman {
+        margin-top: 20px;
+      }
+      .spoolman h3 {
+        margin: 0 0 8px;
       }
       .archived summary {
         cursor: pointer;

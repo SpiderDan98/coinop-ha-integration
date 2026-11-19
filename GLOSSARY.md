@@ -98,3 +98,8 @@ _German UI_: Aufschlag
 A consumable a Device uses up during a Run, bought at one price, such as "PLA" or "eSun PLA+ black"; as broad or as specific as the user keeps it.
 _Avoid_: Filament (as the generic term), consumable
 _German UI_: Material
+
+**Spoolman Filament**:
+A filament product in Spoolman, not a single spool, that a Material links to; the Material then takes its price per gram and its type, density, diameter, colour and vendor from it, so a new spool needs no relinking.
+_Avoid_: Spool (as what a Material links to)
+_German UI_: Spoolman-Filament

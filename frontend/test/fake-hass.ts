@@ -7,7 +7,9 @@ import type {
   Catalog,
   Device,
   Drop,
+  Filaments,
   LineItemTemplate,
+  Material,
   MaterialType,
   RunChange,
   RunDetail,
@@ -26,11 +28,15 @@ import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
+import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
+import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
+import spoolmanFilamentsUnavailable from "./fixtures/backend/spoolman-filaments-unavailable.json";
+import spoolmanFilaments from "./fixtures/backend/spoolman-filaments.json";
 import tagsRename from "./fixtures/backend/tags-rename.json";
 import templatesUpdate from "./fixtures/backend/templates-update.json";
 
@@ -95,6 +101,18 @@ export const recorded = {
   },
   /** `wattbill/tags/rename` of "Spare" to "Spare parts". */
   tagRename: tagsRename,
+  /** `wattbill/spoolman/filaments`: 7 eSun PLA+ black (0.02 / g), 8 Prusament PETG Galaxy
+   * Black (priced from its spool), 9 eSun TPU clear (no price); then with Spoolman not set
+   * up and unreachable. */
+  spoolman: {
+    filaments: spoolmanFilaments as Filaments,
+    notConfigured: spoolmanFilamentsUnavailable[0] as Filaments,
+    unreachable: spoolmanFilamentsUnavailable[1] as Filaments,
+  },
+  /** `wattbill/materials/create_from_spoolman` of Filament 8 ("material-petg"). */
+  createFromSpoolman: materialsCreateFromSpoolman as { material: Material },
+  /** `wattbill/materials/update`: "pla-black" linked to Filament 7. */
+  linkSpoolman: materialsLinkSpoolman as { material: Material },
   /** `wattbill/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
   material: (id: string) =>

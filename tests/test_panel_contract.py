@@ -8,6 +8,9 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockUser
+from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    AiohttpClientMocker,
+)
 
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
@@ -22,6 +25,13 @@ from .stored import (
     place_tags,
     stored_material,
     stored_run,
+)
+from .test_spoolman import (
+    add_spoolman_hub,
+    filament,
+    set_options,
+    spool,
+    spoolman_down,
 )
 from .websocket import PanelClient
 
@@ -437,3 +447,50 @@ async def test_record_the_catalogue_the_panel_shows(
     assert_recorded("catalog-subscribe", stable_ids(events, ids))
     assert_recorded("tags-rename", rename)
     assert_recorded("templates-update", stable_ids(updated, ids))
+
+
+async def test_record_what_spoolman_answers(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    place_materials(hass_storage, stored_material("pla-black", name="PLA black"))
+    petg = filament(
+        8,
+        name="PETG Galaxy Black",
+        vendor={"id": 2, "name": "Prusament"},
+        material="PETG",
+        price=None,
+        density=1.27,
+        color_hex="2B2B33",
+    )
+    entry = await add_spoolman_hub(
+        hass,
+        aioclient_mock,
+        filaments=[
+            filament(7),
+            petg,
+            filament(9, name="TPU clear", material="TPU", price=None, color_hex=None),
+        ],
+        spools=[spool(1, petg, price=29.99, initial_weight=1000.0)],
+    )
+
+    listed = await panel.call("wattbill/spoolman/filaments")
+    created = await panel.call("wattbill/materials/create_from_spoolman", filament_id=8)
+    linked = await panel.call(
+        "wattbill/materials/update",
+        material_id="pla-black",
+        material={"price": {"source": "spoolman", "filament_id": 7}},
+    )
+    spoolman_down(aioclient_mock)
+    unreachable = await panel.call("wattbill/spoolman/filaments")
+    await set_options(hass, entry)
+    not_configured = await panel.call("wattbill/spoolman/filaments")
+
+    assert_recorded("spoolman-filaments", listed)
+    assert_recorded("spoolman-filaments-unavailable", [not_configured, unreachable])
+    ids = {created["material"]["id"]: "material-petg"}
+    assert_recorded("materials-create-from-spoolman", stable_ids(created, ids))
+    assert_recorded("materials-link-spoolman", linked)

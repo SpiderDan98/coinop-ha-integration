@@ -19,21 +19,25 @@ from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 
 from .command import command
+from .spoolman import spoolman_call
 
 _TEXT = vol.All(str, vol.Strip, vol.Length(min=1))
 _POSITIVE = vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
-_PRICE = {
+_FIXED_PRICE = {
     vol.Required("source"): "fixed",
     vol.Required("pack_price"): vol.All(vol.Coerce(float), vol.Range(min=0)),
     vol.Required("pack_size"): _POSITIVE,
     vol.Optional("pack_unit"): vol.In([unit.value for unit in PackUnit]),
 }
+# Linking reads the price and the synced fields from Spoolman; a new Material
+# comes from a Filament through `create_from_spoolman`.
+_LINK = {vol.Required("source"): "spoolman", vol.Required("filament_id"): int}
 _FIELDS = {
     "name": _TEXT,
     "form": vol.In([form.value for form in MaterialForm]),
     "type": _TEXT,
     "density": _POSITIVE,
-    "price": _PRICE,
+    "price": _FIXED_PRICE,
     "vendor": vol.Any(None, _TEXT),
     "colour": vol.Any(None, vol.Match(r"^#[0-9a-fA-F]{6}$")),
     "diameter": vol.Any(None, _POSITIVE),
@@ -134,7 +138,10 @@ async def _create(
         vol.Required("type"): "wattbill/materials/update",
         _MATERIAL_ID: str,
         vol.Required("material"): {
-            vol.Optional(key): schema for key, schema in _FIELDS.items()
+            vol.Optional(key): schema
+            for key, schema in (
+                _FIELDS | {"price": vol.Any(_FIXED_PRICE, _LINK)}
+            ).items()
         },
     }
 )
@@ -144,10 +151,19 @@ async def _update(
     msg: dict[str, Any],
     wattbill: WattBill,
 ) -> None:
-    if material := _found(connection, msg, wattbill):
-        updated = await wattbill.catalog.async_update_material(
-            material, msg["material"]
+    if not (material := _found(connection, msg, wattbill)):
+        return
+    changes = msg["material"]
+    if changes.get("price", {}).get("source") == "spoolman":
+        filament_id = changes["price"]["filament_id"]
+        updated = await spoolman_call(
+            connection,
+            msg,
+            wattbill.spoolman.async_link(material, filament_id, changes),
         )
+    else:
+        updated = await wattbill.catalog.async_update_material(material, changes)
+    if updated:
         connection.send_result(msg["id"], {"material": material_dict(updated)})
 
 
@@ -188,4 +204,33 @@ async def _delete(
         connection.send_result(msg["id"], {"deleted": deleted})
 
 
-COMMANDS = (_list, _types, _create, _update, _archive, _restore, _delete)
+@command(
+    {
+        vol.Required("type"): "wattbill/materials/create_from_spoolman",
+        vol.Required("filament_id"): int,
+    }
+)
+async def _create_from_spoolman(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+) -> None:
+    """A Material linked to the Filament, named and filled in from it."""
+    material = await spoolman_call(
+        connection, msg, wattbill.spoolman.async_create_material(msg["filament_id"])
+    )
+    if material:
+        connection.send_result(msg["id"], {"material": material_dict(material)})
+
+
+COMMANDS = (
+    _list,
+    _types,
+    _create,
+    _create_from_spoolman,
+    _update,
+    _archive,
+    _restore,
+    _delete,
+)

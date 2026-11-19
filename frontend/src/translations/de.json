@@ -207,5 +207,19 @@
   "manual.hint": "Für einen Druck, den WattBill nicht gesehen hat, z. B. während Home Assistant aus war. Der Strom kommt aus dem aufgezeichneten Verlauf, wenn er den Lauf abdeckt, sonst aus der Durchschnittsleistung; andernfalls trägst du ihn auf der Seite des Laufs ein.",
   "manual.create": "Anlegen",
   "manual.cancel": "Abbrechen",
-  "manual.failed": "Der Lauf konnte nicht angelegt werden. Er muss nach seinem Start enden, und nicht in der Zukunft."
+  "manual.failed": "Der Lauf konnte nicht angelegt werden. Er muss nach seinem Start enden, und nicht in der Zukunft.",
+  "flag.spoolman_unreachable": "Spoolman war am Ende des Laufs nicht erreichbar: Es gilt der zuletzt gelesene Preis",
+  "materials.price_source": "Preisquelle",
+  "materials.price_fixed": "Fester Preis",
+  "materials.price_spoolman": "Spoolman",
+  "materials.filament": "Spoolman-Filament",
+  "materials.pick_filament": "Filament wählen",
+  "materials.synced": "Typ, Dichte, Durchmesser, Farbe und Hersteller kommen vom Spoolman-Filament und bleiben synchron.",
+  "materials.from_spoolman": "Aus Spoolman",
+  "spoolman.title": "Spoolman-Filamente",
+  "spoolman.unreachable": "Spoolman ist gerade nicht erreichbar. Verknüpfte Materialien behalten den zuletzt gelesenen Preis.",
+  "spoolman.empty": "Spoolman hat noch keine Filamente.",
+  "spoolman.no_price": "Kein Preis in Spoolman",
+  "spoolman.linked": "Verknüpft mit {name}",
+  "spoolman.create": "Material erstellen"
 }

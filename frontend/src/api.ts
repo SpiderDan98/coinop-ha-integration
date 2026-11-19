@@ -298,11 +298,33 @@ export interface MaterialFields {
   price: { source: "fixed"; pack_price: number; pack_size: number; pack_unit: PackUnit };
 }
 
-export interface Material extends MaterialFields {
+/** Linking to a Spoolman Filament; Spoolman then supplies the price and the details. */
+export type SpoolmanLink = { source: "spoolman"; filament_id: number };
+
+export interface Material extends Omit<MaterialFields, "price"> {
   id: string;
   archived: boolean;
+  /** A linked Material keeps the last price per gram read from Spoolman. */
+  price: MaterialFields["price"] | (SpoolmanLink & { per_gram: number | null });
   price_per_gram: number;
 }
+
+export interface Filament {
+  id: number;
+  name: string | null;
+  vendor: string | null;
+  type: string | null;
+  density: number;
+  diameter: number;
+  colour: string | null;
+  price_per_gram: number | null;
+}
+
+/** Reading the Filaments also brings the linked Materials up to date. */
+export type Filaments = {
+  status: "ok" | "unreachable" | "not_configured";
+  filaments: Filament[];
+};
 
 export interface MaterialType {
   type: string;
@@ -335,10 +357,22 @@ export const getMaterialTypes = async (hass: HomeAssistant) =>
 export const createMaterial = (hass: HomeAssistant, material: MaterialFields) =>
   hass.callWS<{ material: Material }>({ type: "wattbill/materials/create", material });
 
+export const listFilaments = (hass: HomeAssistant) =>
+  hass.callWS<Filaments>({ type: "wattbill/spoolman/filaments" });
+
+export const createMaterialFromSpoolman = (hass: HomeAssistant, filamentId: number) =>
+  hass.callWS<{ material: Material }>({
+    type: "wattbill/materials/create_from_spoolman",
+    filament_id: filamentId,
+  });
+
+/** Answers the error code `spoolman_unreachable` when linking while Spoolman is away. */
 export const updateMaterial = (
   hass: HomeAssistant,
   materialId: string,
-  material: Partial<MaterialFields>,
+  material: Partial<Omit<MaterialFields, "price">> & {
+    price?: MaterialFields["price"] | SpoolmanLink;
+  },
 ) =>
   hass.callWS<{ material: Material }>({
     type: "wattbill/materials/update",

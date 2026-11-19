@@ -13,6 +13,7 @@ from .device_settings import DeviceSettings
 from .images import DeviceImages, ImageLibrary, RunImageView, RunUploadView
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
+from .spoolman import CONF_SPOOLMAN_URL, Spoolman
 from .store import RunStore, WattBillStores
 from .tracker import DeviceTracker
 
@@ -46,12 +47,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
     )
     await settings.async_prune()
     catalog = Catalog(stores["catalog"], data["catalog"], book.uses_material)
+    spoolman = Spoolman(hass, entry.options.get(CONF_SPOOLMAN_URL), catalog)
     entry.runtime_data = WattBill(
         book=book,
         catalog=catalog,
         images=images,
         devices=devices,
         settings=settings,
+        spoolman=spoolman,
         trackers=[
             DeviceTracker(
                 hass,
@@ -60,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WattBillConfigEntry) -> 
                 settings,
                 DeviceImages(hass, book, images, device),
                 catalog,
+                spoolman,
             )
             for device in devices
         ],
