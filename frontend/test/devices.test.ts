@@ -19,7 +19,7 @@ describe("Devices tab", () => {
   it("opens from the toolbar, and the title leads back to the Runs", async () => {
     const panel = await mountPanel(recordedBackend());
 
-    await click(panel, query(panel, "a.tab"));
+    await click(panel, query(panel, `a.tab[href$="/devices"]`));
 
     expect(location.pathname).toBe("/wattbill/devices");
     expect(cards(panel)).toHaveLength(1);

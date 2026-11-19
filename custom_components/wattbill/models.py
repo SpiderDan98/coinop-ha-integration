@@ -45,7 +45,7 @@ def _iso(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
-def _unknown(cls: type, data: dict[str, Any]) -> dict[str, Any]:
+def unknown_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
     known = {f.name for f in fields(cls)}
     return {key: value for key, value in data.items() if key not in known}
 
@@ -75,7 +75,7 @@ class PriceSegment:
             end=datetime.fromisoformat(data["end"]),
             kwh=data["kwh"],
             unit_price=data["unit_price"],
-            unknown=_unknown(cls, data),
+            unknown=unknown_fields(cls, data),
         )
 
 
@@ -84,7 +84,8 @@ class LineItem:
     """One cost line: amount = quantity * unit price.
 
     Computed Line Items keep `label` None and are labelled by their kind in the
-    output language.
+    output language. Material Line Items reference their Material by
+    `material_id`, which keeps it from being deleted.
     """
 
     id: str
@@ -94,6 +95,7 @@ class LineItem:
     unit_price: float
     amount: float
     label: str | None = None
+    material_id: str | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -103,6 +105,7 @@ class LineItem:
             "id": self.id,
             "kind": self.kind,
             "label": self.label,
+            "material_id": self.material_id,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -117,6 +120,7 @@ class LineItem:
             id=data["id"],
             kind=LineItemKind(data["kind"]),
             label=data["label"],
+            material_id=data.get("material_id"),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],
@@ -125,7 +129,7 @@ class LineItem:
             if data["method"] is None
             else ElectricityMethod(data["method"]),
             segments=[PriceSegment.from_dict(s) for s in data["segments"]],
-            unknown=_unknown(cls, data),
+            unknown=unknown_fields(cls, data),
         )
 
 
@@ -225,5 +229,5 @@ class Run:
                 for at, value in data.get("readings", [])
             ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
-            unknown=_unknown(cls, data),
+            unknown=unknown_fields(cls, data),
         )

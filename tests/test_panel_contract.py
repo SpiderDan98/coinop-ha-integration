@@ -134,3 +134,50 @@ async def test_record_what_deleting_a_run_drops(
     preview = await panel.call("wattbill/runs/delete_preview", run_ids=["helmet"])
 
     assert_recorded("runs-delete-preview", preview)
+
+
+async def test_record_the_catalogue_the_panel_shows(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    types = await panel.call("wattbill/materials/types")
+    await panel.subscribe("wattbill/catalog/subscribe")
+    events = [await panel.event()]
+    fixed = {"source": "fixed", "pack_price": 19.99, "pack_size": 1000}
+    created = []
+    for material in (
+        {
+            "name": "eSun PLA+ black",
+            "form": "filament",
+            "type": "PLA",
+            "density": 1.24,
+            "vendor": "eSun",
+            "colour": "#1a1a1a",
+            "default_for_type": True,
+            "price": fixed,
+        },
+        {
+            "name": "Standard Resin grey",
+            "form": "resin",
+            "type": "Standard resin",
+            "density": 1.1,
+            "colour": "#8a8a8a",
+            "price": fixed | {"pack_price": 29.99},
+        },
+        {
+            "name": "PLA red (old brand)",
+            "form": "filament",
+            "type": "PLA",
+            "density": 1.24,
+            "price": fixed | {"pack_price": 15.99},
+        },
+    ):
+        result = await panel.call("wattbill/materials/create", material=material)
+        created.append(result["material"]["id"])
+        await panel.event()
+    await panel.call("wattbill/materials/archive", material_id=created[-1])
+    events.append(await panel.event())
+    ids = {material: f"material-{n}" for n, material in enumerate(created, 1)}
+
+    assert_recorded("materials-types", types)
+    assert_recorded("catalog-subscribe", stable_ids(events, ids))

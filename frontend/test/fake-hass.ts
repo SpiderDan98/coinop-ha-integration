@@ -2,8 +2,18 @@
 // The recorded ones come from the backend tests (tests/contract.py), so they have
 // exactly the shapes the backend sends.
 import type { HomeAssistant, Message } from "../src/hass";
-import type { Device, Drop, RunChange, RunDetail, RunSummary } from "../src/api";
+import type {
+  Device,
+  Drop,
+  Material,
+  MaterialType,
+  RunChange,
+  RunDetail,
+  RunSummary,
+} from "../src/api";
+import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -25,6 +35,22 @@ export const recorded = {
   deletePreview: runsDeletePreview as { drop: Drop },
   /** `wattbill/devices/list`: only "device-kobra"; "device-mini" (Runs only) was removed. */
   devices: devicesList.devices as Device[],
+  /**
+   * `wattbill/catalog/subscribe`: first empty, then after "material-1" (eSun PLA+ black,
+   * default for PLA), "material-2" (Standard Resin grey) and "material-3" (PLA red,
+   * archived) were added.
+   */
+  catalog: {
+    empty: catalogSubscribe[0] as { materials: Material[] },
+    filled: catalogSubscribe[1] as { materials: Material[] },
+  },
+  /** `wattbill/materials/types`: the built-in types for pre-filling. */
+  materialTypes: materialsTypes as { types: MaterialType[] },
+  material: (id: string) =>
+    found(
+      recorded.catalog.filled.materials.find((material) => material.id === id),
+      id,
+    ),
   summary: (id: string) =>
     found(
       recorded.snapshot.runs.find((run) => run.id === id),
@@ -113,6 +139,8 @@ export class FakeBackend {
 export function recordedBackend(options?: ConstructorParameters<typeof FakeBackend>[0]) {
   return new FakeBackend(options)
     .subscription("wattbill/runs/subscribe", () => [recorded.snapshot])
+    .subscription("wattbill/catalog/subscribe", () => [recorded.catalog.filled])
+    .reply("wattbill/materials/types", () => recorded.materialTypes)
     .reply("wattbill/runs/get", (msg) => {
       const run = recorded.runs.find((candidate) => candidate.id === msg.run_id);
       if (!run) throw new WsError("not_found");

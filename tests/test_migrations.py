@@ -1,8 +1,8 @@
 """Stored data of every released schema version loads into the current version.
 
 `fixtures/storage/<major>.<minor>/` holds the Store files exactly as that
-version wrote them, the hub entry's data (`entry.json`) and the Runs as the
-current version stores them after migrating (`current.json`). Add a folder for
+version wrote them, the hub entry's data (`entry.json`) and the Runs and
+catalogue as the current version stores them after migrating (`current.json`). Add a folder for
 every released schema version; once released, never change it except
 `current.json`. Until then it follows what the code writes.
 """
@@ -19,9 +19,10 @@ from .clock import Clock
 from .devices import add_device
 from .test_persistence import live_runs
 from .test_runs import RUNS, set_status, stored_runs, value
+from .websocket import PanelClient
 
 FIXTURES = Path(__file__).parent / "fixtures" / "storage"
-STORES = ("wattbill.runs", "wattbill.live")
+STORES = ("wattbill.catalog", "wattbill.runs", "wattbill.live")
 
 
 def read(path: Path) -> Any:
@@ -32,11 +33,15 @@ def read(path: Path) -> Any:
     "version", sorted(folder.name for folder in FIXTURES.iterdir())
 )
 async def test_stored_data_of_a_released_version_migrates_to_current(
-    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], version: str
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    version: str,
 ) -> None:
     fixture = FIXTURES / version
-    files = {key: read(fixture / key) for key in STORES}
-    hass_storage.update({key: read(fixture / key) for key in STORES})
+    files = {key: read(fixture / key) for key in STORES if (fixture / key).exists()}
+    hass_storage.update(files)
     entry = MockConfigEntry(
         domain="wattbill", title="WattBill", data=read(fixture / "entry.json")
     )
@@ -57,6 +62,11 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
         "runs"
     ]
     assert live_runs(hass_storage) == current["live"]
+    listed = (await panel.call("wattbill/materials/list"))["materials"]
+    assert [
+        {key: value for key, value in m.items() if key != "price_per_gram"}
+        for m in listed
+    ] == current["catalog"]["materials"]
     for key, file in files.items():
         if file["version"] < hass_storage[key]["version"]:
             assert hass_storage[f"{key}.bak"]["data"] == file["data"]

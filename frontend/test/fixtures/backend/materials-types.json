@@ -1,0 +1,74 @@
+{
+  "types": [
+    {
+      "type": "PLA",
+      "form": "filament",
+      "density": 1.24
+    },
+    {
+      "type": "PLA-CF",
+      "form": "filament",
+      "density": 1.29
+    },
+    {
+      "type": "PETG",
+      "form": "filament",
+      "density": 1.27
+    },
+    {
+      "type": "PETG-CF",
+      "form": "filament",
+      "density": 1.3
+    },
+    {
+      "type": "ABS",
+      "form": "filament",
+      "density": 1.04
+    },
+    {
+      "type": "ASA",
+      "form": "filament",
+      "density": 1.07
+    },
+    {
+      "type": "TPU",
+      "form": "filament",
+      "density": 1.21
+    },
+    {
+      "type": "PA",
+      "form": "filament",
+      "density": 1.14
+    },
+    {
+      "type": "PC",
+      "form": "filament",
+      "density": 1.2
+    },
+    {
+      "type": "HIPS",
+      "form": "filament",
+      "density": 1.04
+    },
+    {
+      "type": "PVA",
+      "form": "filament",
+      "density": 1.23
+    },
+    {
+      "type": "Standard resin",
+      "form": "resin",
+      "density": 1.1
+    },
+    {
+      "type": "ABS-like resin",
+      "form": "resin",
+      "density": 1.1
+    },
+    {
+      "type": "Water-washable resin",
+      "form": "resin",
+      "density": 1.1
+    }
+  ]
+}

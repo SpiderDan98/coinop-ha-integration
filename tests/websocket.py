@@ -1,7 +1,7 @@
 """Talk to WattBill's websocket commands the way the panel does."""
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.auth.models import User
 from homeassistant.core import HomeAssistant
@@ -23,6 +23,7 @@ class PanelClient:
     def __init__(self, connect: Callable[[], Awaitable[MockHAClientWebSocket]]) -> None:
         self._connect = connect
         self._connection: MockHAClientWebSocket | None = None
+        self._events: list[dict[str, Any]] = []
 
     async def _client(self) -> MockHAClientWebSocket:
         if self._connection is None:
@@ -32,8 +33,10 @@ class PanelClient:
     async def _send(self, command: str, data: dict[str, Any]) -> dict[str, Any]:
         client = await self._client()
         await client.send_json_auto_id({"type": command, **data})
-        response: dict[str, Any] = await client.receive_json()
-        return response
+        while (response := await client.receive_json())["type"] == "event":
+            # A change the command caused may be pushed before its result.
+            self._events.append(response)
+        return cast(dict[str, Any], response)
 
     async def call(self, command: str, **data: Any) -> Any:
         response = await self._send(command, data)
@@ -51,7 +54,10 @@ class PanelClient:
 
     async def event(self) -> Any:
         """The next message pushed to a subscription on this connection."""
-        message: dict[str, Any] = await (await self._client()).receive_json()
+        if self._events:
+            message = self._events.pop(0)
+        else:
+            message = await (await self._client()).receive_json()
         assert message["type"] == "event", message
         return message["event"]
 
