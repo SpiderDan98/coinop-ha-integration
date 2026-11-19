@@ -274,6 +274,47 @@ async def test_a_manual_run_without_a_default_material_flags_it_missing(
     assert run["flags"] == NO_MATERIAL
 
 
+async def fix(panel: PanelClient, run: dict[str, Any], **values: Any) -> list[str]:
+    [item] = material_items(run)
+    result = await panel.call(
+        "wattbill/line_items/update",
+        run_id=run["id"],
+        line_item_id=item["id"],
+        **values,
+    )
+    flags: list[str] = result["run"]["flags"]
+    return flags
+
+
+async def test_weighing_the_material_clears_the_flags_it_fixed(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla", name="Black PLA"))
+    entry = await add_hub(hass)
+    device = await add_device(hass, entry)
+    await clock.advance(hours=5)
+    run = await create(panel, device.subentry_id)
+
+    assert await fix(panel, run, material_id="pla") == ["usage_missing"]
+    assert await fix(panel, run, quantity=42) == []
+
+
+async def test_deleting_the_material_line_item_clears_its_flags(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    device = await add_device(hass, entry)
+    await clock.advance(hours=5)
+    run = await create(panel, device.subentry_id)
+    [item] = material_items(run)
+
+    result = await panel.call(
+        "wattbill/line_items/delete", run_id=run["id"], line_item_id=item["id"]
+    )
+
+    assert result["run"]["flags"] == []
+
+
 async def test_only_admins_create_manual_runs(
     hass: HomeAssistant,
     clock: Clock,

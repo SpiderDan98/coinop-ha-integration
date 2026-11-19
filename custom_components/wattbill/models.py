@@ -460,6 +460,17 @@ class Run:
         """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
         return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
 
+    def drop_fixed_flags(self) -> None:
+        """Drops the Flags the user's corrections fixed; the others wait for "Mark as checked"."""
+        items = [i for i in self.line_items if i.kind is LineItemKind.MATERIAL]
+        fixed: dict[str, bool] = {
+            Flag.USAGE_MISSING: all(
+                i.quantity is not None or i.length is not None for i in items
+            ),
+            Flag.MATERIAL_MISSING: all(i.material_id is not None for i in items),
+        }
+        self.flags = [flag for flag in self.flags if not fixed.get(flag, False)]
+
     @property
     def images_in_order(self) -> list[RunImage]:
         order = list(ImageKind)
