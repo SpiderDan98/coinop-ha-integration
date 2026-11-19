@@ -72,6 +72,28 @@ describe("Devices tab", () => {
     );
   });
 
+  it("names the price entity of a dynamic tariff", async () => {
+    const [kobra] = recorded.devices;
+    const price = { attribute: "current", unit: "ct/kWh", factor: null };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        {
+          ...kobra,
+          ha_settings: {
+            ...kobra.ha_settings,
+            price: { ...price, source: "entity", entity_id: "sensor.electricity_price" },
+          },
+        },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device dl"))).toContain(
+      "Electricity price From sensor.electricity_price · current",
+    );
+  });
+
   it("names the entity of a measured consumption source", async () => {
     const [kobra] = recorded.devices;
     const meter = { attribute: null, unit: "kWh", factor: null };

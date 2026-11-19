@@ -20,6 +20,9 @@
         "Gift"
       ],
       "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
       "line_items": [
         {
           "id": "electricity",
@@ -99,6 +102,9 @@
         "Gift"
       ],
       "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
       "line_items": [
         {
           "id": "electricity",
@@ -155,6 +161,9 @@
       "note": null,
       "tags": [],
       "consumption": null,
+      "cost_source": null,
+      "prices": [],
+      "average_powers": [],
       "line_items": [
         {
           "id": "electricity",
@@ -211,6 +220,23 @@
         "running_power": 120.0,
         "paused_power": 8.0
       },
+      "cost_source": {
+        "source": "fixed",
+        "value": 0.3
+      },
+      "prices": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          0.3
+        ]
+      ],
+      "average_powers": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          120.0,
+          8.0
+        ]
+      ],
       "line_items": [
         {
           "id": "print-live-electricity",

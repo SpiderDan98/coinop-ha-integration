@@ -61,7 +61,15 @@ export interface Device {
           /** Fills gaps in the power reports. */
           running_power: number | null;
         };
-    price: { source: "fixed"; value: number };
+    price:
+      | { source: "fixed"; value: number }
+      | {
+          source: "entity";
+          entity_id: string;
+          attribute: string | null;
+          unit: string | null;
+          factor: number | null;
+        };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
   settings: { tags_for_new_runs: string[] };

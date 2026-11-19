@@ -3,6 +3,7 @@
 from copy import deepcopy
 from typing import Any
 
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
@@ -11,6 +12,8 @@ from .clock import Clock
 from .devices import (
     ENERGY,
     MAPPING,
+    POWER,
+    PRICE,
     STATUS,
     add_device,
     add_hub,
@@ -21,6 +24,8 @@ from .devices import (
 from .test_device_flow import suggested
 from .test_persistence import live_runs
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
+
+FIXED = ({"next_step_id": "price"}, {"next_step_id": "fixed_price"})
 
 
 async def test_reconfigure_is_a_menu_of_the_devices_sections(
@@ -71,6 +76,8 @@ async def test_each_section_is_pre_filled_and_returns_to_the_menu(
     assert result["step_id"] == "reconfigure"
 
     result = await configure(hass, result, {"next_step_id": "price"})
+    assert result["type"] is FlowResultType.MENU
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
     assert suggested(result, "price") == 0.31
     result = await configure(hass, result, {"price": 0.31})
     assert result["step_id"] == "reconfigure"
@@ -93,6 +100,7 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
         {"next_step_id": "estimate"},
         {"running_power": 90, "paused_power": 10},
         {"next_step_id": "price"},
+        {"next_step_id": "fixed_price"},
         {"price": 0.5},
     )
 
@@ -117,6 +125,7 @@ async def test_leaving_without_save_changes_nothing(hass: HomeAssistant) -> None
     menu = await start_reconfigure(hass, entry, subentry)
 
     result = await configure(hass, menu, {"next_step_id": "price"})
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
     await configure(hass, result, {"price": 0.5})
 
     assert entry.subentries[subentry.subentry_id].data["price"]["value"] == 0.30
@@ -131,7 +140,7 @@ async def test_an_open_run_survives_save_and_continues_at_the_new_price(
     await clock.advance(hours=1)
     [open_run] = live_runs(hass_storage)
 
-    await reconfigure(hass, entry, subentry, {"next_step_id": "price"}, {"price": 2})
+    await reconfigure(hass, entry, subentry, *FIXED, {"price": 2})
     await clock.advance(minutes=1)
     before = value(hass, TOTAL_COST)
     await clock.advance(hours=1)
@@ -164,6 +173,99 @@ async def test_a_new_average_power_applies_to_the_open_run(
     await clock.advance(hours=1)
 
     assert value(hass, TOTAL_COST) - before == pytest.approx(0.3)
+
+
+async def test_a_new_fixed_price_applies_from_that_moment(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, running_power=100, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(hass, entry, subentry, *FIXED, {"price": 2})
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    item = run["line_items"][0]
+    assert item["amount"] == pytest.approx(0.1 * 1 + 0.1 * 2)
+    assert [s["unit_price"] for s in item["segments"]] == [1, 2]
+    assert value(hass, TOTAL_COST) == pytest.approx(0.3)
+
+
+async def test_a_price_entity_picked_during_the_run_applies_from_that_moment(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    hass.states.async_set(PRICE, "0.5", {"unit_of_measurement": "EUR/kWh"})
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, running_power=100, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "price"},
+        {"next_step_id": "price_entity"},
+        {"entity_id": PRICE},
+    )
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["line_items"][0]["amount"] == pytest.approx(0.1 * 1 + 0.1 * 0.5)
+
+
+async def test_a_new_average_power_applies_from_that_moment(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, running_power=100, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "consumption"},
+        {"next_step_id": "estimate"},
+        {"running_power": 300},
+    )
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["line_items"][0]["quantity"] == pytest.approx(0.1 + 0.3)
+    assert value(hass, TOTAL_COST) == pytest.approx(0.4)
+
+
+async def test_a_new_average_power_fills_later_power_sensor_gaps_only(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    hass.states.async_set(POWER, STATE_UNAVAILABLE, {"unit_of_measurement": "W"})
+    entry = await add_hub(hass)
+    power = {"entity_id": POWER, "running_power": 100}
+    subentry = await add_device(hass, entry, source="power", meter=power, price=1)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "consumption"},
+        {"next_step_id": "power"},
+        power | {"running_power": 200},
+    )
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=5)
+
+    [run] = stored_runs(hass_storage)
+    assert run["line_items"][0]["quantity"] == pytest.approx(0.1 + 0.2)
 
 
 async def test_a_new_mapping_applies_to_the_open_run(
@@ -254,7 +356,7 @@ async def test_ended_runs_never_change(
     await set_status(hass, "finished")
     ended = deepcopy(stored_runs(hass_storage))
 
-    await reconfigure(hass, entry, subentry, {"next_step_id": "price"}, {"price": 5})
+    await reconfigure(hass, entry, subentry, *FIXED, {"price": 5})
     await clock.advance(hours=1)
 
     assert stored_runs(hass_storage) == ended

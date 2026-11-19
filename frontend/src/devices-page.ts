@@ -93,7 +93,13 @@ export class DevicesPage extends LitElement {
           <div class="muted small">${consumptionDetails(ha, t, format)}</div>
         </dd>
         <dt>${t("device.price")}</dt>
-        <dd>${t(`price.${ha.price.source}`, { price: format.unitPrice(ha.price.value) })}</dd>
+        <dd>
+          ${
+            ha.price.source === "fixed"
+              ? t("price.fixed", { price: format.unitPrice(ha.price.value) })
+              : t("price.entity", { entity: input(ha.price, t) })
+          }
+        </dd>
       </dl>
       <p class="muted small">${t("device.ha_settings")}</p>
       <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>

@@ -156,11 +156,43 @@
         },
         "price": {
           "title": "Electricity price",
+          "description": "Do you pay a fixed price per kWh, or does an entity report the current price, e.g. for a dynamic tariff?",
+          "menu_options": {
+            "fixed_price": "Fixed price",
+            "price_entity": "Price entity"
+          }
+        },
+        "fixed_price": {
+          "title": "Fixed electricity price",
           "data": {
             "price": "Price per kWh"
           },
           "data_description": {
             "price": "What you pay per kWh, in {currency}."
+          }
+        },
+        "price_entity": {
+          "title": "Price entity",
+          "description": "Pick the entity that reports the current price per kWh or MWh, in {currency} or a sub-unit like ct. Each kWh of a Run is charged at the price that applied when it was used. It does not need to be available now.",
+          "data": {
+            "entity_id": "Price entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each price by this to get {currency}/kWh."
+          }
+        },
+        "price_unit": {
+          "title": "Unit of the price attribute",
+          "description": "In which unit does the attribute report the price?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each price by this to get {currency}/kWh."
           }
         }
       },

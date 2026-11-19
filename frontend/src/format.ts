@@ -28,6 +28,7 @@ export function formatter(hass: HomeAssistant) {
     timeStyle: "short",
     timeZone,
   });
+  const timeOfDay = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
   const wallClockParts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -62,6 +63,8 @@ export function formatter(hass: HomeAssistant) {
       `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
+    timeRange: (start: string, end: string) =>
+      timeOfDay.formatRange(new Date(start), new Date(end)),
     duration: (seconds: number) => {
       const minutes = Math.round(seconds / 60);
       return t("duration", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });

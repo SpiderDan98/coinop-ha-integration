@@ -22,6 +22,7 @@ class Flag(StrEnum):
     FAULT = "fault"
     CONSUMPTION_GAP = "consumption_gap"
     METER_RESET = "meter_reset"
+    PRICE_GAP = "price_gap"
 
 
 class LineItemKind(StrEnum):
@@ -150,7 +151,10 @@ class Run:
     `last_seen` is the last time the Status input was seen during the open Run.
     `consumption` is the Device's consumption section when the Run started;
     `readings` are its meter's (time, kWh or W) reports, None while it had no
-    value, kept until finalised.
+    value, kept until finalised. `cost_source` is the Device's price section the
+    Run follows; `prices` its (since, price per kWh) timeline, None while the
+    price entity had no value, kept until finalised. `average_powers` are the
+    (since, running W, paused W) the Run's consumption model used.
     """
 
     id: str
@@ -172,6 +176,11 @@ class Run:
     tags: list[str] = field(default_factory=list)
     consumption: dict[str, Any] | None = None
     readings: list[tuple[datetime, float | None]] = field(default_factory=list)
+    cost_source: dict[str, Any] | None = None
+    prices: list[tuple[datetime, float | None]] = field(default_factory=list)
+    average_powers: list[tuple[datetime, float | None, float | None]] = field(
+        default_factory=list
+    )
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -201,6 +210,12 @@ class Run:
             "tags": list(self.tags),
             "consumption": self.consumption,
             "readings": [[at.isoformat(), value] for at, value in self.readings],
+            "cost_source": self.cost_source,
+            "prices": [[at.isoformat(), price] for at, price in self.prices],
+            "average_powers": [
+                [at.isoformat(), running, paused]
+                for at, running, paused in self.average_powers
+            ],
             "line_items": [item.as_dict() for item in self.line_items],
         }
 
@@ -230,6 +245,15 @@ class Run:
             readings=[
                 (datetime.fromisoformat(at), value)
                 for at, value in data.get("readings", [])
+            ],
+            cost_source=data.get("cost_source"),
+            prices=[
+                (datetime.fromisoformat(at), price)
+                for at, price in data.get("prices", [])
+            ],
+            average_powers=[
+                (datetime.fromisoformat(at), running, paused)
+                for at, running, paused in data.get("average_powers", [])
             ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             unknown=unknown_fields(cls, data),
