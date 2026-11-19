@@ -1,5 +1,6 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
+import asyncio
 from datetime import datetime, timedelta
 
 from homeassistant.core import (
@@ -85,6 +86,9 @@ class DeviceTracker:
             return
         returned, self._status_lost = self._status_lost, False
         at = input_time(state, attribute)
+        if run is not None and at < run.started:
+            # E.g. a Status entity picked during the Run still shows an older end.
+            return
         target = self._config.target(value)
         job_name = self._job_name()
         if (
@@ -146,13 +150,18 @@ class DeviceTracker:
         self._refresh(run, at)
         self._book.async_start(run)
 
-    def _end(self, run: Run, at: datetime, outcome: Outcome) -> None:
+    async def async_end_run(self) -> None:
+        """End the open Run now as Unknown, e.g. because its Device is removed."""
+        if run := self._book.open_run(self._config.device_id):
+            await self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+
+    def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Task[None]:
         run.ended = at
         if run.pauses and run.pauses[-1].end is None:
             run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
-        self._hass.async_create_task(self._book.async_finalise(run))
+        return self._hass.async_create_task(self._book.async_finalise(run))
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
