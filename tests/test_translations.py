@@ -14,6 +14,7 @@ from .clock import Clock
 from .devices import add_device, add_hub
 
 TRANSLATIONS = Path(__file__).parents[1] / "custom_components" / DOMAIN / "translations"
+STATEMENT = TRANSLATIONS.parent / "statement" / "strings"
 
 
 def _keys(tree: dict[str, Any], prefix: str = "") -> set[str]:
@@ -24,9 +25,9 @@ def _keys(tree: dict[str, Any], prefix: str = "") -> set[str]:
     return keys
 
 
-def _load(language: str) -> dict[str, Any]:
+def _load(language: str, folder: Path = TRANSLATIONS) -> dict[str, Any]:
     tree: dict[str, Any] = json.loads(
-        (TRANSLATIONS / f"{language}.json").read_text(encoding="utf-8")
+        (folder / f"{language}.json").read_text(encoding="utf-8")
     )
     return tree
 
@@ -41,6 +42,15 @@ def test_language_has_the_same_keys_as_english(language: str) -> None:
     assert {
         "missing": sorted(english - other),
         "not in en.json": sorted(other - english),
+    } == {"missing": [], "not in en.json": []}
+
+
+def test_the_cost_statement_has_the_same_strings_in_german_as_in_english() -> None:
+    english, german = _keys(_load("en", STATEMENT)), _keys(_load("de", STATEMENT))
+
+    assert {
+        "missing": sorted(english - german),
+        "not in en.json": sorted(german - english),
     } == {"missing": [], "not in en.json": []}
 
 
