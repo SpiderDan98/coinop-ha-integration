@@ -66,3 +66,37 @@ def energy(
         return totals[after - 1] + share * (totals[after] - totals[after - 1])
 
     return lambda start, end: total(end) - total(start)
+
+
+def power(
+    readings: Sequence[tuple[datetime, float | None]], gap_watts: float | None
+) -> Callable[[datetime, datetime], float]:
+    """Left rule: each reading holds until the next one.
+
+    A gap holds `gap_watts` if given, otherwise the last value (before the first
+    value: the first one).
+    """
+    last = next((watts for _, watts in readings if watts is not None), 0.0)
+    leading = last if gap_watts is None else gap_watts
+    steps: list[tuple[datetime, float]] = []
+    for at, watts in readings:
+        if watts is not None:
+            last = watts
+        if watts is None:
+            watts = last if gap_watts is None else gap_watts
+        steps.append((at, watts))
+
+    def kwh(start: datetime, end: datetime) -> float:
+        joules = 0.0
+        watts, since = leading, start
+        for at, step in steps:
+            if at >= end:
+                break
+            if at > start:
+                joules += watts * (at - since).total_seconds()
+                since = at
+            watts = step
+        joules += watts * (end - since).total_seconds()
+        return joules / 3_600_000
+
+    return kwh

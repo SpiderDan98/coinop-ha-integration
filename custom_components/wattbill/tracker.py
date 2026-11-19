@@ -127,15 +127,16 @@ class DeviceTracker:
         run.ended = at
         run.outcome = outcome
         self._refresh(run, at)
-        if self._config.source is ConsumptionSource.ESTIMATE:
+        if self._config.source is ConsumptionSource.ESTIMATE or self._has_final_report(
+            run
+        ):
             self._finish(run)
             return
         self._book.async_update(run)
         self._await_final_report(run)
 
     def _await_final_report(self, run: Run) -> None:
-        """Freeze the Run at its meter's first report after the end, or at the latest
-        after FINAL_REPORT_WAIT."""
+        """Freeze the Run at the meter's next report, at the latest after the wait."""
         assert run.ended is not None
         due = run.ended + FINAL_REPORT_WAIT - dt_util.utcnow()
 
@@ -165,7 +166,7 @@ class DeviceTracker:
 
     def _has_final_report(self, run: Run) -> bool:
         return any(
-            value is not None and run.ended is not None and at > run.ended
+            value is not None and run.ended is not None and at >= run.ended
             for at, value in run.readings
         )
 
@@ -220,6 +221,8 @@ class DeviceTracker:
         config = self._config
         if config.source is ConsumptionSource.ENERGY:
             return consumption.energy(run.readings)
+        if config.source is ConsumptionSource.POWER:
+            return consumption.power(run.readings, config.running_power)
         running_power = config.running_power or 0.0
         paused_power = (
             running_power if config.paused_power is None else config.paused_power

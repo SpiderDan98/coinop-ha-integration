@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -99,3 +100,132 @@ async def test_reports_after_finalisation_change_nothing(
 
     [run] = stored_runs(hass_storage)
     assert electricity(run)["quantity"] == pytest.approx(0.4 * 30 / 31)
+
+
+async def set_power(hass: HomeAssistant, watts: float | str) -> None:
+    await set_meter(hass, watts, entity=POWER, unit="W")
+
+
+async def test_power_is_integrated_with_the_left_rule(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_power(hass, 100)
+    await add_metered_device(hass, "power")
+
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=20)
+    await set_power(hass, 200)
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    await set_power(hass, 5)
+
+    [run] = stored_runs(hass_storage)
+    item = electricity(run)
+    assert item["method"] == "measured"
+    assert item["quantity"] == pytest.approx(100 * 20 / 60_000 + 200 * 30 / 60_000)
+    assert run["flags"] == []
+
+
+async def test_energy_across_a_meter_gap_is_spread_evenly_and_flagged(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    await add_metered_device(hass)
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_meter(hass, STATE_UNAVAILABLE)
+    await clock.advance(minutes=20)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=4)
+    await set_meter(hass, 10.44)
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.3)
+    assert run["flags"] == ["consumption_gap"]
+
+
+async def test_a_meter_unavailable_at_run_start_is_a_gap(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, STATE_UNAVAILABLE)
+    await add_metered_device(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.0)
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.2)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.2)
+    assert run["flags"] == ["consumption_gap"]
+
+
+async def test_a_falling_reading_is_a_meter_reset_counting_from_zero(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 5.0)
+    await add_metered_device(hass)
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_meter(hass, 5.2)
+    await clock.advance(minutes=10)
+    await set_meter(hass, 0.1)
+    await clock.advance(minutes=10)
+    await set_meter(hass, 0.3)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.1 + 0.1 + 0.2)
+    assert run["flags"] == ["meter_reset"]
+
+
+async def test_a_small_dip_counts_nothing_and_is_flagged(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    await add_metered_device(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.2)
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.1)
+    await clock.advance(minutes=10)
+    await set_meter(hass, 10.3)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.2 + 0.2)
+    assert run["flags"] == ["meter_reset"]
+
+
+@pytest.mark.parametrize(
+    ("running_power", "gap_watts"), [(None, 100), (120, 120)], ids=["last", "average"]
+)
+async def test_a_power_gap_holds_the_average_or_else_the_last_power(
+    hass: HomeAssistant,
+    clock: Clock,
+    hass_storage: dict[str, Any],
+    running_power: float | None,
+    gap_watts: float,
+) -> None:
+    await set_power(hass, 100)
+    gaps = {} if running_power is None else {"running_power": running_power}
+    await add_metered_device(hass, "power", **gaps)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_power(hass, STATE_UNAVAILABLE)
+    await clock.advance(minutes=20)
+    await set_power(hass, 150)
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=5)
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(
+        (100 * 10 + gap_watts * 20 + 150 * 30) / 60_000
+    )
+    assert run["flags"] == ["consumption_gap"]
