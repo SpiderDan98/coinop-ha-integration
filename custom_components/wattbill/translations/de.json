@@ -32,7 +32,7 @@
         },
         "user": {
           "title": "Gerät hinzufügen",
-          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die WattBill kennt (Anycubic Local, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die WattBill kennt (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
           "data": {
             "device": "Home-Assistant-Gerät des Druckers (optional)"
           },

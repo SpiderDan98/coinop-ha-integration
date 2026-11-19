@@ -32,7 +32,7 @@
         },
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty. For a printer integration WattBill knows (Anycubic Local, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
+          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty. For a printer integration WattBill knows (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
           "data": {
             "device": "Printer's Home Assistant device (optional)"
           },
