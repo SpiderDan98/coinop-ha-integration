@@ -65,11 +65,9 @@ class RunBook:
     async def async_finalise(self, run: Run) -> None:
         """Freeze the Run: written to runs first, then dropped from live."""
         run.finalised = True
-        self._totals[run.device_id].apply(run, dt_util.utcnow())
         await self._store.async_save_runs(r for r in self.runs() if r.finalised)
         await self._store.async_save_live(self._unfinalised())
-        for listener in list(self._listeners):
-            listener(RunChange.ENDED, run)
+        self._announce(RunChange.ENDED, run)
 
     async def async_flush(self) -> None:
         """Write pending live changes now, e.g. before unloading."""
@@ -79,7 +77,18 @@ class RunBook:
         return [run for run in self._runs.values() if not run.finalised]
 
     def _changed(self, change: RunChange, run: Run) -> None:
-        self._totals[run.device_id].apply(run, dt_util.utcnow())
         self._store.schedule_live_save(self._unfinalised)
+        self._announce(change, run)
+
+    def _announce(self, change: RunChange, run: Run) -> None:
+        """Move the Device's totals by this Run's delta, then tell listeners.
+
+        Any kind of change works: a Run no longer in the book leaves the totals.
+        """
+        totals = self._totals[run.device_id]
+        if run.id in self._runs:
+            totals.apply(run, dt_util.utcnow())
+        else:
+            totals.remove(run.id)
         for listener in list(self._listeners):
             listener(change, run)
