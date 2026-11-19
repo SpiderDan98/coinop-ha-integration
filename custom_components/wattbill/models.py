@@ -128,7 +128,8 @@ class Run:
     """One working cycle of a Device.
 
     Open while `ended` is None; ended but not `finalised` while its last values
-    are still awaited; frozen once finalised.
+    are still awaited; frozen once finalised. `end_reconstructed` marks an end
+    WattBill only learnt about after the Status input or WattBill itself was away.
     """
 
     id: str
@@ -139,6 +140,7 @@ class Run:
     name: str | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
+    end_reconstructed: bool = False
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
@@ -156,6 +158,7 @@ class Run:
             "started": self.started.isoformat(),
             "ended": _iso(self.ended),
             "outcome": self.outcome,
+            "end_reconstructed": self.end_reconstructed,
             "finalised": self.finalised,
             "pauses": [
                 {"start": pause.start.isoformat(), "end": _iso(pause.end)}
@@ -175,6 +178,7 @@ class Run:
             started=datetime.fromisoformat(data["started"]),
             ended=_time(data["ended"]),
             outcome=None if data["outcome"] is None else Outcome(data["outcome"]),
+            end_reconstructed=data.get("end_reconstructed", False),
             finalised=data["finalised"],
             pauses=[
                 Pause(datetime.fromisoformat(p["start"]), _time(p["end"]))

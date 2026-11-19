@@ -20,7 +20,7 @@ from homeassistant.util.ulid import ulid_now
 from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import DeviceConfig, Target
-from .device_inputs import input_value
+from .device_inputs import input_time, input_value
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 
@@ -40,6 +40,8 @@ class DeviceTracker:
         self._book = book
         self._config = config
         self._unsubscribe: list[CALLBACK_TYPE] = []
+        # Until WattBill has seen the Status input, it may have missed the end.
+        self._status_lost = True
 
     @callback
     def async_start(self) -> None:
@@ -67,14 +69,13 @@ class DeviceTracker:
             self._book.async_update(run)
 
     def _apply(self, state: State | None) -> None:
-        value = input_value(state, self._config.status_attribute)
+        attribute = self._config.status_attribute
+        value = input_value(state, attribute)
         if state is None or value is None:
+            self._status_lost = True
             return
-        at = (
-            state.last_changed
-            if self._config.status_attribute is None
-            else state.last_updated
-        )
+        returned, self._status_lost = self._status_lost, False
+        at = input_time(state, attribute)
         target = self._config.target(value)
         run = self._book.open_run(self._config.device_id)
         if run is None:
@@ -94,6 +95,7 @@ class DeviceTracker:
             outcome = OUTCOMES[target]
             if outcome is Outcome.CANCELLED and Flag.FAULT in run.flags:
                 outcome = Outcome.FAILED
+            run.end_reconstructed = returned
             self._end(run, at, outcome)
 
     def _open(self, at: datetime) -> None:

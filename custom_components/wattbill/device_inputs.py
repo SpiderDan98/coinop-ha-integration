@@ -1,10 +1,13 @@
 """Reading Device Inputs from Home Assistant's state machine and entity registry."""
 
+from datetime import datetime
+
 from homeassistant.components.event import ATTR_EVENT_TYPE, ATTR_EVENT_TYPES
 from homeassistant.components.sensor import ATTR_OPTIONS
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
 
@@ -18,6 +21,13 @@ def input_value(state: State | None, attribute: str | None) -> str | None:
         attribute = ATTR_EVENT_TYPE
     value = state.state if attribute is None else state.attributes.get(attribute)
     return None if value is None else str(value)
+
+
+def input_time(state: State, attribute: str | None) -> datetime:
+    """When the input took its current value."""
+    if state.domain == "event" and (fired := dt_util.parse_datetime(state.state)):
+        return fired
+    return state.last_changed if attribute is None else state.last_updated
 
 
 def offered_values(
