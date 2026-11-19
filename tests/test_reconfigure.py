@@ -9,6 +9,7 @@ import pytest
 
 from .clock import Clock
 from .devices import (
+    ENERGY,
     MAPPING,
     STATUS,
     add_device,
@@ -274,3 +275,80 @@ async def test_reconfigure_keeps_its_own_status_entity_but_refuses_another_devic
 
     assert refused["errors"] == {"entity_id": "status_already_used"}
     assert kept["step_id"] == "mapping"
+
+
+async def test_energy_and_power_are_offered_and_pre_filled(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(ENERGY, "1", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    subentry = await add_device(
+        hass, entry, source="energy", meter={"entity_id": ENERGY}
+    )
+
+    result = await start_reconfigure(hass, entry, subentry)
+    result = await configure(hass, result, {"next_step_id": "consumption"})
+    assert result["menu_options"] == ["energy", "power", "estimate"]
+    result = await configure(hass, result, {"next_step_id": "energy"})
+
+    assert suggested(result, "entity_id") == ENERGY
+
+
+async def test_a_new_consumption_source_applies_from_the_next_run(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    hass.states.async_set(ENERGY, "10", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, running_power=100)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "consumption"},
+        {"next_step_id": "energy"},
+        {"entity_id": ENERGY},
+    )
+    await clock.advance(hours=1)
+    hass.states.async_set(ENERGY, "11", {"unit_of_measurement": "kWh"})
+    await set_status(hass, "finished")
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    hass.states.async_set(ENERGY, "11.5", {"unit_of_measurement": "kWh"})
+    await set_status(hass, "finished")
+
+    estimated, measured = (run["line_items"][0] for run in stored_runs(hass_storage))
+    assert estimated["method"] == "estimated"
+    assert estimated["quantity"] == pytest.approx(0.2)
+    assert measured["method"] == "measured"
+    assert measured["quantity"] == pytest.approx(0.5)
+
+
+async def test_an_open_measured_run_keeps_its_meter_after_a_change(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    hass.states.async_set(ENERGY, "10", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    subentry = await add_device(
+        hass, entry, source="energy", meter={"entity_id": ENERGY}
+    )
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "consumption"},
+        {"next_step_id": "estimate"},
+        {"running_power": 100},
+    )
+    await clock.advance(hours=1)
+    hass.states.async_set(ENERGY, "10.3", {"unit_of_measurement": "kWh"})
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["line_items"][0]["method"] == "measured"
+    assert run["line_items"][0]["quantity"] == pytest.approx(0.3)
