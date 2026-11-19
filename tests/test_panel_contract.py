@@ -14,6 +14,23 @@ from .stored import electricity, line_item, place_runs, place_tags, stored_run
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
+WEAR = {
+    "label": "Wear Kobra",
+    "unit": "h",
+    "unit_price": 0.15,
+    "basis": "running_hours",
+}
+TEMPLATES = [
+    WEAR,
+    {
+        "label": "Threaded inserts",
+        "unit": "pcs",
+        "unit_price": 0.08,
+        "default_quantity": 8,
+        "basis": "entered",
+    },
+    {"label": "Packaging", "unit_price": 0.5, "basis": "entered"},
+]
 
 
 def image(image_id: str, kind: str, created: datetime) -> dict[str, Any]:
@@ -111,10 +128,14 @@ async def test_record_the_runs_the_panel_shows(
         paused_power=8,
         price=0.30,
     )
+    wear = await panel.call("wattbill/templates/create", template=WEAR)
     await panel.call(
         "wattbill/devices/update_settings",
         device_id=subentry.subentry_id,
-        settings={"tags_for_new_runs": ["Batch 7"]},
+        settings={
+            "tags_for_new_runs": ["Batch 7"],
+            "automatic_templates": [wear["template"]["id"]],
+        },
     )
     hass.states.async_set(STATUS, "printing")
     await hass.async_block_till_done()
@@ -122,11 +143,16 @@ async def test_record_the_runs_the_panel_shows(
     await clock.advance(minutes=45)
     events.append(await panel.event())
     live_id = events[-1]["run"]["id"]
-    ids = {live_id: "print-live", subentry.subentry_id: "device-kobra"}
+    ids = {
+        live_id: "print-live",
+        subentry.subentry_id: "device-kobra",
+        wear["template"]["id"]: "template-wear",
+    }
     runs = [run["id"] for run in events[0]["runs"]] + [live_id]
     details = [await panel.call("wattbill/runs/get", run_id=run) for run in runs]
-    [live_item] = details[-1]["run"]["line_items"]
+    [live_item, live_wear] = details[-1]["run"]["line_items"]
     ids[live_item["id"]] = "print-live-electricity"
+    ids[live_wear["id"]] = "print-live-wear"
     hass.states.async_set(STATUS, "finished")
     await hass.async_block_till_done()
     events.append(await panel.event())
@@ -165,9 +191,25 @@ async def test_record_line_item_corrections(
         unit_price=-2,
     )
 
+    template = await panel.call(
+        "wattbill/line_items/save_as_template",
+        run_id="benchy",
+        line_item_id="benchy-wear",
+    )
+    from_template = await panel.call(
+        "wattbill/line_items/add_template",
+        run_id="benchy",
+        template_id=template["template"]["id"],
+        quantity=2,
+    )
+
     assert_recorded("line-items-update", overridden)
     refund = added["run"]["line_items"][-1]["id"]
     assert_recorded("line-items-add", stable_ids(added, {refund: "helmet-refund"}))
+    copied = from_template["run"]["line_items"][-1]["id"]
+    ids = {template["template"]["id"]: "template-nozzle", copied: "benchy-nozzle"}
+    assert_recorded("line-items-save-as-template", stable_ids(template, ids))
+    assert_recorded("line-items-add-template", stable_ids(from_template, ids))
 
 
 async def test_record_what_deleting_a_run_drops(
@@ -230,12 +272,29 @@ async def test_record_the_catalogue_the_panel_shows(
     tags = ["Cosplay helmet", "Gift", "Spare"]
     await panel.call("wattbill/runs/update", run_id="vase", tags=tags)
     rename = await panel.call("wattbill/tags/rename", tag="Spare", name="Spare parts")
+    templates = []
+    for fields in TEMPLATES:
+        result = await panel.call("wattbill/templates/create", template=fields)
+        templates.append(result["template"])
+        await panel.event()
+    updated = await panel.call(
+        "wattbill/templates/update",
+        template_id=templates[2]["id"],
+        template={"unit_price": 0.6},
+    )
     # A panel opened now gets the whole catalogue at once.
     later = connect_panel(hass_admin_user)
     await later.subscribe("wattbill/catalog/subscribe")
     events.append(await later.event())
     ids = {material: f"material-{n}" for n, material in enumerate(created, 1)}
+    ids |= {
+        template["id"]: f"template-{name}"
+        for template, name in zip(
+            templates, ("wear", "inserts", "packaging"), strict=True
+        )
+    }
 
     assert_recorded("materials-types", types)
     assert_recorded("catalog-subscribe", stable_ids(events, ids))
     assert_recorded("tags-rename", rename)
+    assert_recorded("templates-update", stable_ids(updated, ids))

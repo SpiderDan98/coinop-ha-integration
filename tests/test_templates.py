@@ -1,11 +1,13 @@
 """Line Item Templates: recurring costs one click away, copied into Runs."""
 
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 import pytest
+from pytest_homeassistant_custom_component.common import MockUser
 
 from .clock import Clock
 from .devices import add_device, add_hub
@@ -445,3 +447,35 @@ async def test_a_template_is_added_only_to_runs_and_from_templates_that_exist(
     ]
 
     assert [error["code"] for error in errors] == ["not_found"] * 2
+
+
+@pytest.mark.parametrize(
+    ("command", "data"),
+    [
+        ("wattbill/templates/create", {"template": INSERTS}),
+        ("wattbill/templates/update", {"template_id": "t", "template": {}}),
+        ("wattbill/templates/delete", {"template_id": "t"}),
+        ("wattbill/line_items/add_template", {"run_id": "vase", "template_id": "t"}),
+        (
+            "wattbill/line_items/save_as_template",
+            {"run_id": "vase", "line_item_id": "electricity", "label": "Power"},
+        ),
+    ],
+)
+async def test_only_admins_use_templates(
+    hass: HomeAssistant,
+    clock: Clock,
+    connect_panel: Callable[[MockUser], PanelClient],
+    hass_read_only_user: MockUser,
+    hass_storage: dict[str, Any],
+    command: str,
+    data: dict[str, Any],
+) -> None:
+    place_runs(hass_storage, stored_run("vase"))
+    await add_hub(hass)
+    user = connect_panel(hass_read_only_user)
+
+    error = await user.error(command, **data)
+
+    assert error["code"] == "unauthorized"
+    assert catalogue(hass_storage) == []

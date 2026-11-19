@@ -1,0 +1,10 @@
+{
+  "template": {
+    "id": "template-nozzle",
+    "label": "Nozzle wear",
+    "unit": "pcs",
+    "unit_price": 0.5,
+    "default_quantity": 1,
+    "basis": "entered"
+  }
+}

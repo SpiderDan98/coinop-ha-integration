@@ -1,0 +1,10 @@
+{
+  "template": {
+    "id": "template-packaging",
+    "label": "Packaging",
+    "unit": "",
+    "unit_price": 0.6,
+    "default_quantity": 1.0,
+    "basis": "entered"
+  }
+}
