@@ -186,5 +186,11 @@
   "device.automatic_templates": "Automatic templates",
   "device.add_template": "+ Add template",
   "device.remove_template": "Remove {template}",
-  "device.templates_hint": "Added to every Run that starts on this Device. Changes affect future Runs only."
+  "device.templates_hint": "Added to every Run that starts on this Device. Changes affect future Runs only.",
+  "manual.open": "+ Manual Run",
+  "manual.title": "Manual Run",
+  "manual.hint": "For a print WattBill did not see, e.g. while Home Assistant was down. Electricity comes from recorder history if it covers the Run, else from the average power; otherwise enter it on the Run page.",
+  "manual.create": "Create",
+  "manual.cancel": "Cancel",
+  "manual.failed": "The Run could not be created. It must end after it starts, and not in the future."
 }

@@ -25,6 +25,7 @@ import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.jso
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
+import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -46,6 +47,9 @@ export const recorded = {
    * automatic template "print-live-wear" counting running hours.
    * "benchy" has a Thumbnail and a Snapshot, "helmet" only a Snapshot. */
   runs: runsGet.map((result) => result.run as RunDetail),
+  /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
+   * estimated from average power. */
+  manualRun: runsCreate.run as RunDetail,
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
   /** The upload of one photo to "benchy", and of ten more, refused. */

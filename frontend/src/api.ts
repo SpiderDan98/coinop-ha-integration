@@ -100,7 +100,7 @@ export interface Device {
   settings: { tags_for_new_runs: string[]; automatic_templates: string[] };
 }
 
-export type RunChange = "started" | "updated" | "ended" | "deleted";
+export type RunChange = "started" | "created" | "updated" | "ended" | "deleted";
 export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSummary };
 
 /** How much the sensor totals fall when Runs are deleted. */
@@ -133,6 +133,12 @@ export const updateRun = (
     Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
   >,
 ) => runResult(hass, { type: "wattbill/runs/update", run_id: runId, ...changes });
+
+/** A Run made by hand, final at once. */
+export const createRun = (
+  hass: HomeAssistant,
+  run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags">,
+) => runResult(hass, { type: "wattbill/runs/create", ...run });
 
 export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
   runResult(hass, { type: "wattbill/runs/clear_flag", run_id: runId, flag });
