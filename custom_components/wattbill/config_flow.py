@@ -14,6 +14,9 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -23,11 +26,17 @@ from .const import DOMAIN, NAME, SUBENTRY_DEVICE
 from .device_flow import DeviceSubentryFlow
 from .schema import vol
 from .spoolman import CONF_SPOOLMAN_URL, SpoolmanUnreachable, async_check
+from .statement import CONF_MARKUP
 
 OPTIONS_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_SPOOLMAN_URL): TextSelector(
             TextSelectorConfig(type=TextSelectorType.URL)
+        ),
+        vol.Optional(CONF_MARKUP): NumberSelector(
+            NumberSelectorConfig(
+                min=0, step="any", unit_of_measurement="%", mode=NumberSelectorMode.BOX
+            )
         ),
     }
 )

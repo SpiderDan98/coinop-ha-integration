@@ -6,6 +6,7 @@ from io import BytesIO
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pypdf import PdfReader
 import pytest
 
@@ -13,6 +14,7 @@ from .clock import CLOCK_START, Clock
 from .devices import add_hub
 from .http import HttpClient
 from .stored import electricity, line_item, place_runs, stored_run
+from .test_spoolman import set_options
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
@@ -148,3 +150,98 @@ async def test_a_detailed_statement_shows_each_run_with_its_line_items_and_total
         assert expected in text
     assert text.index("Benchy") < text.index("Helmet")
     assert "Completed" not in text
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_markup_is_its_own_line_and_never_in_the_runs(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"], markup=12.5)
+
+    text = "\n".join(statement.lines)
+    assert "Run total €1.11" in text
+    assert "Run total -€0.80" in text
+    assert statement.lines[-4:-1] == [
+        "Subtotal €0.31",
+        "Markup 12.5% €0.04",
+        "Total €0.35",
+    ]
+
+
+async def test_markup_applies_to_the_rounded_subtotal(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency = "EUR"
+    started = CLOCK_START - DAY
+    items = [
+        electricity(0, 0.3, started, started + timedelta(hours=2)),
+        line_item("other", 0.004, id="wear"),
+    ]
+    place_runs(
+        hass_storage,
+        *(stored_run(f"run-{n}", started=started, line_items=items) for n in range(3)),
+    )
+    await add_hub(hass)
+
+    statement = await export(
+        panel, browser, run_ids=["run-0", "run-1", "run-2"], markup=100
+    )
+
+    # Unrounded, 3 * 0.004 would make a subtotal of 0.01 and a Markup of 0.01.
+    assert statement.lines[-4:-1] == [
+        "Subtotal €0.00",
+        "Markup 100% €0.00",
+        "Total €0.00",
+    ]
+
+
+async def test_the_default_markup_is_a_hub_option(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    browser: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    hass.config.currency = "EUR"
+    place_runs(hass_storage, benchy(), helmet())
+    entry = await add_hub(hass)
+
+    result = await set_options(hass, entry, markup=10)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert await panel.call("wattbill/cost_statement/defaults") == {"markup": 10}
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"])
+    assert statement.lines[-4:-1] == [
+        "Subtotal €0.31",
+        "Markup 10% €0.03",
+        "Total €0.34",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_without_markup_there_is_no_markup_line(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    assert await panel.call("wattbill/cost_statement/defaults") == {"markup": 0}
+
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"], markup=0)
+
+    assert statement.lines[-3:-1] == ["Subtotal €0.31", "Total €0.31"]
+
+
+async def test_markup_cannot_be_negative(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_runs(hass_storage, benchy())
+    entry = await add_hub(hass)
+
+    with pytest.raises(InvalidData):
+        await set_options(hass, entry, markup=-5)
+    error = await panel.error(
+        "wattbill/cost_statement/create", run_ids=["benchy"], markup=-5
+    )
+    assert error["code"] == "invalid_format"
