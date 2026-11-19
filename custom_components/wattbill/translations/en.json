@@ -84,5 +84,15 @@
         "value_mapped_twice": "Each value can be mapped to one target only."
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "total_cost": {
+        "name": "Total cost"
+      },
+      "runs": {
+        "name": "Runs"
+      }
+    }
   }
 }

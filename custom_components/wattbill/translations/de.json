@@ -84,5 +84,15 @@
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden."
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "total_cost": {
+        "name": "Gesamtkosten"
+      },
+      "runs": {
+        "name": "Läufe"
+      }
+    }
   }
 }
