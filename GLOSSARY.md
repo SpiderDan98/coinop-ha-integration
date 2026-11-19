@@ -7,71 +7,94 @@ Tracks what individual household devices cost to run, one Run at a time, inside 
 **Device**:
 A single tracked appliance, such as one specific 3D printer.
 _Avoid_: Machine, appliance, printer (as the generic term)
+_German UI_: Gerät
 
 **Device Type**:
 The kind of Device (3D printer, washing machine, …), which determines which computed Line Items, such as electricity and material, its Runs get.
 _Avoid_: Category, device class
+_German UI_: Gerätetyp
 
 **Device Input**:
 A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
 _Avoid_: Sensor mapping, source
+_German UI_: Geräteeingang
 
 **Slot**:
 A place on a Device that holds one Material at a time, such as one bay of a multi-material unit.
 _Avoid_: Gate, bay, tray
+_German UI_: Fach
 
 **Integration Profile**:
 The known Device Inputs of a specific printer integration, used to fill in a Device's Device Inputs automatically.
 _Avoid_: Preset, adapter, template
+_German UI_: Integrationsprofil
 
 **Run**:
 One working cycle of a Device, such as a single print job, from start to end and together with its costs, whatever its Outcome.
 _Avoid_: Job, session, cycle, print
+_German UI_: Lauf
 
 **Outcome**:
 How a Run ended: Completed, Cancelled, Failed or Unknown; a Run still going has no Outcome yet.
 _Avoid_: Result, status (for the ending)
+_German UI_: Ausgang (Abgeschlossen, Abgebrochen, Fehlgeschlagen, Unbekannt)
 
 **Part Count**:
 The number of usable parts a Run produced, which its total cost is divided by to give the cost per part.
 _Avoid_: Quantity, pieces, copies
+_German UI_: Teileanzahl
+
+**Tag**:
+A user-chosen keyword that groups Runs across Devices and periods, such as "Cosplay helmet" or "Gift"; a Run can have any number of them.
+_Avoid_: Project, label, category
+_German UI_: Tag
 
 **Flag**:
 A marker on a Run pointing out something the user may want to check, such as a reported fault or a gap in price or consumption data.
 _Avoid_: Warning, error, notice
+_German UI_: Hinweis
 
 **Thumbnail**:
 The preview image of the model a Run produces, taken from the Device's thumbnail.
 _Avoid_: Preview, model image
+_German UI_: Vorschaubild
 
 **Snapshot**:
 The camera image of a Device taken when a Run ends.
 _Avoid_: Photo, picture, completion image
+_German UI_: Kamerabild
 
 **Cover Image**:
 The one image that stands for a Run wherever only one is shown: the one the user picked, otherwise the first of its Thumbnail, Snapshot and uploaded images.
 _Avoid_: Main image, title image
+_German UI_: Titelbild
 
 **Line Item**:
 One cost line on a Run, such as electricity, filament, or inserting threaded inserts.
 _Avoid_: Position, entry, cost line
+_German UI_: Posten
 
 **Line Item Template**:
 A saved Line Item that can be added to any Run again.
 _Avoid_: Preset, Vorlage
+_German UI_: Postenvorlage
 
 **Cost Source**:
 Where a Line Item's unit price comes from: a fixed value, or a live value read from Home Assistant or Spoolman.
 _Avoid_: Price provider, input
+_German UI_: Preisquelle
 
 **Cost Statement**:
 A document that lists selected ended Runs with their costs and a total, optionally plus a Markup; explicitly not an invoice.
 _Avoid_: Invoice, bill, Rechnung, quote
+_German UI_: Kostenaufstellung
 
 **Markup**:
 A percentage added on top of a Cost Statement's total; never part of a Run's own costs.
-_Avoid_: Surcharge, margin, Aufschlag
+_Avoid_: Surcharge, margin
+_German UI_: Aufschlag
 
 **Material**:
 A consumable a Device uses up during a Run, bought at one price, such as "PLA" or "eSun PLA+ black"; as broad or as specific as the user keeps it.
 _Avoid_: Filament (as the generic term), consumable
+_German UI_: Material
