@@ -1,0 +1,141 @@
+{
+  "run": {
+    "id": "benchy",
+    "device_id": "device-kobra",
+    "device_name": "Kobra",
+    "name": "Benchy",
+    "job_name": null,
+    "started": "2026-01-12T10:00:00+00:00",
+    "last_seen": null,
+    "ended": "2026-01-12T11:15:00+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": 4,
+    "note": "Four on one plate",
+    "tags": [
+      "Gift"
+    ],
+    "consumption": null,
+    "cost_source": null,
+    "prices": [],
+    "average_powers": [],
+    "usage": null,
+    "line_items": [
+      {
+        "id": "electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 0.15,
+        "unit": "kWh",
+        "unit_price": 0.3,
+        "amount": 0.05,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-12T10:00:00+00:00",
+            "end": "2026-01-12T11:15:00+00:00",
+            "kwh": 0.15,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "benchy-pla",
+        "kind": "material",
+        "label": null,
+        "material_id": "pla-black",
+        "material": {
+          "name": "PLA Basic Black",
+          "type": "PLA",
+          "density": 1.24,
+          "diameter": 1.75,
+          "price_per_gram": 0.025
+        },
+        "measured": true,
+        "length": 4191.0,
+        "template_id": null,
+        "basis": null,
+        "quantity": 12.5,
+        "unit": "g",
+        "unit_price": 0.025,
+        "amount": 0.31,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      },
+      {
+        "id": "benchy-wear",
+        "kind": "other",
+        "label": "Nozzle wear",
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 1,
+        "unit": "pcs",
+        "unit_price": 0.5,
+        "amount": 0.5,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [
+      {
+        "id": "benchy-thumbnail",
+        "kind": "thumbnail",
+        "created": "2026-01-12T10:00:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+      },
+      {
+        "id": "benchy-snapshot",
+        "kind": "snapshot",
+        "created": "2026-01-12T11:15:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-snapshot",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
+      },
+      {
+        "id": "benchy-upload",
+        "kind": "upload",
+        "created": "2026-01-15T10:00:00+00:00",
+        "url": "/api/wattbill/runs/benchy/images/benchy-upload",
+        "tile_url": "/api/wattbill/runs/benchy/images/benchy-upload/tile"
+      }
+    ],
+    "cover_id": "benchy-upload",
+    "running_seconds": 4500,
+    "total": 0.86,
+    "cost_per_part": 0.22,
+    "cover": {
+      "id": "benchy-upload",
+      "kind": "upload",
+      "created": "2026-01-15T10:00:00+00:00",
+      "url": "/api/wattbill/runs/benchy/images/benchy-upload",
+      "tile_url": "/api/wattbill/runs/benchy/images/benchy-upload/tile"
+    },
+    "subtotals": {
+      "electricity": 0.05,
+      "material": 0.31,
+      "other": 0.5
+    }
+  }
+}

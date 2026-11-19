@@ -59,6 +59,8 @@
             "material": null,
             "measured": false,
             "length": null,
+            "template_id": null,
+            "basis": null,
             "quantity": 0.06,
             "unit": "kWh",
             "unit_price": 0.3,
@@ -75,7 +77,8 @@
             "computed": null
           }
         ],
-        "images": []
+        "images": [],
+        "cover_id": null
       }
     ]
   }

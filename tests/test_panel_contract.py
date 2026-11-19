@@ -2,6 +2,8 @@
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -10,6 +12,8 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
 from .devices import STATUS, add_device, add_hub
+from .http import HttpClient
+from .images import picture
 from .stored import (
     electricity,
     line_item,
@@ -23,6 +27,23 @@ from .websocket import PanelClient
 
 DAY = timedelta(days=1)
 FILAMENT = "sensor.kobra_filament_used"
+WEAR = {
+    "label": "Wear Kobra",
+    "unit": "h",
+    "unit_price": 0.15,
+    "basis": "running_hours",
+}
+TEMPLATES = [
+    WEAR,
+    {
+        "label": "Threaded inserts",
+        "unit": "pcs",
+        "unit_price": 0.08,
+        "default_quantity": 8,
+        "basis": "entered",
+    },
+    {"label": "Packaging", "unit_price": 0.5, "basis": "entered"},
+]
 
 
 def materials() -> list[dict[str, Any]]:
@@ -159,10 +180,15 @@ async def test_record_the_runs_the_panel_shows(
         paused_power=8,
         price=0.30,
     )
+    wear = await panel.call("wattbill/templates/create", template=WEAR)
     await panel.call(
         "wattbill/devices/update_settings",
         device_id=subentry.subentry_id,
-        settings={"tags_for_new_runs": ["Batch 7"], "default_material": "pla-black"},
+        settings={
+            "tags_for_new_runs": ["Batch 7"],
+            "automatic_templates": [wear["template"]["id"]],
+            "default_material": "pla-black",
+        },
     )
     hass.states.async_set(STATUS, "printing")
     await hass.async_block_till_done()
@@ -173,12 +199,17 @@ async def test_record_the_runs_the_panel_shows(
     await clock.advance(minutes=45)
     events.append(await panel.event())
     live_id = events[-1]["run"]["id"]
-    ids = {live_id: "print-live", subentry.subentry_id: "device-kobra"}
+    ids = {
+        live_id: "print-live",
+        subentry.subentry_id: "device-kobra",
+        wear["template"]["id"]: "template-wear",
+    }
     runs = [run["id"] for run in events[0]["runs"]] + [live_id]
     details = [await panel.call("wattbill/runs/get", run_id=run) for run in runs]
-    [live_electricity, live_material] = details[-1]["run"]["line_items"]
-    ids[live_electricity["id"]] = "print-live-electricity"
+    [live_item, live_material, live_wear] = details[-1]["run"]["line_items"]
+    ids[live_item["id"]] = "print-live-electricity"
     ids[live_material["id"]] = "print-live-material"
+    ids[live_wear["id"]] = "print-live-wear"
     hass.states.async_set(STATUS, "finished")
     await hass.async_block_till_done()
     await panel.event()
@@ -221,6 +252,17 @@ async def test_record_line_item_corrections(
         unit_price=-2,
     )
 
+    template = await panel.call(
+        "wattbill/line_items/save_as_template",
+        run_id="benchy",
+        line_item_id="benchy-wear",
+    )
+    from_template = await panel.call(
+        "wattbill/line_items/add_template",
+        run_id="benchy",
+        template_id=template["template"]["id"],
+        quantity=2,
+    )
     picked = await panel.call(
         "wattbill/line_items/update",
         run_id="helmet",
@@ -239,12 +281,17 @@ async def test_record_line_item_corrections(
     assert_recorded("line-items-update", overridden)
     refund = added["run"]["line_items"][-1]["id"]
     assert_recorded("line-items-add", stable_ids(added, {refund: "helmet-refund"}))
+    copied = from_template["run"]["line_items"][-1]["id"]
+    ids = {template["template"]["id"]: "template-nozzle", copied: "benchy-nozzle"}
+    assert_recorded("line-items-save-as-template", stable_ids(template, ids))
+    assert_recorded("line-items-add-template", stable_ids(from_template, ids))
     assert_recorded(
         "line-items-material", stable_ids(picked, {refund: "helmet-refund"})
     )
     petg = added_material["run"]["line_items"][-1]["id"]
     assert_recorded(
-        "line-items-add-material", stable_ids(added_material, {petg: "benchy-petg"})
+        "line-items-add-material",
+        stable_ids(added_material, ids | {petg: "benchy-petg"}),
     )
 
 
@@ -257,6 +304,36 @@ async def test_record_what_deleting_a_run_drops(
     preview = await panel.call("wattbill/runs/delete_preview", run_ids=["helmet"])
 
     assert_recorded("runs-delete-preview", preview)
+
+
+async def test_record_what_the_image_commands_answer(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    panel: PanelClient,
+    http: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    place_runs(hass_storage, *history())
+    await add_hub(hass)
+    path = "/api/wattbill/runs/benchy/images"
+
+    status, uploaded = await http.upload(path, picture("green"))
+    refused = await http.upload(path, *[picture()] * 10)
+    [upload] = uploaded["images"]
+    cover = await panel.call(
+        "wattbill/images/set_cover", run_id="benchy", image_id=upload["id"]
+    )
+    deleted = await panel.call(
+        "wattbill/images/delete", run_id="benchy", image_id=upload["id"]
+    )
+
+    assert (status, refused[0]) == (HTTPStatus.OK, HTTPStatus.CONFLICT)
+    ids = {upload["id"]: "benchy-upload"}
+    assert_recorded("images-upload", stable_ids(uploaded, ids))
+    assert_recorded("images-upload-too-many", refused[1])
+    assert_recorded("images-set-cover", stable_ids(cover, ids))
+    assert_recorded("images-delete", deleted)
 
 
 async def test_record_the_catalogue_the_panel_shows(
@@ -308,12 +385,29 @@ async def test_record_the_catalogue_the_panel_shows(
     tags = ["Cosplay helmet", "Gift", "Spare"]
     await panel.call("wattbill/runs/update", run_id="vase", tags=tags)
     rename = await panel.call("wattbill/tags/rename", tag="Spare", name="Spare parts")
+    templates = []
+    for fields in TEMPLATES:
+        result = await panel.call("wattbill/templates/create", template=fields)
+        templates.append(result["template"])
+        await panel.event()
+    updated = await panel.call(
+        "wattbill/templates/update",
+        template_id=templates[2]["id"],
+        template={"unit_price": 0.6},
+    )
     # A panel opened now gets the whole catalogue at once.
     later = connect_panel(hass_admin_user)
     await later.subscribe("wattbill/catalog/subscribe")
     events.append(await later.event())
     ids = {material: f"material-{n}" for n, material in enumerate(created, 1)}
+    ids |= {
+        template["id"]: f"template-{name}"
+        for template, name in zip(
+            templates, ("wear", "inserts", "packaging"), strict=True
+        )
+    }
 
     assert_recorded("materials-types", types)
     assert_recorded("catalog-subscribe", stable_ids(events, ids))
     assert_recorded("tags-rename", rename)
+    assert_recorded("templates-update", stable_ids(updated, ids))

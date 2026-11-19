@@ -7,6 +7,7 @@ import {
   KINDS,
   OUTCOMES,
   addLineItem,
+  addTemplateLineItem,
   clearFlag,
   deleteLineItem,
   deleteRuns,
@@ -14,12 +15,14 @@ import {
   getRun,
   previewDelete,
   resetLineItem,
+  saveAsTemplate,
   updateLineItem,
   updateRun,
   type Device,
   type Drop,
   type LineItem,
   type Material,
+  type LineItemTemplate,
   type Outcome,
   type RunDetail,
   type RunSummary,
@@ -27,7 +30,7 @@ import {
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { isKey, localize, type Localize } from "./localize";
-import "./run-image";
+import "./run-images";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 import "./tag-input";
@@ -48,6 +51,8 @@ const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: For
 const evidence = (item: LineItem, t: Localize, format: Format) =>
   [
     item.method && t(`method.${item.method}`),
+    item.template_id && t("evidence.template"),
+    item.basis === "running_hours" && t("evidence.running_hours"),
     item.segments.length > 1 && t("evidence.segments", { count: item.segments.length }),
     item.measured && (lengthEvidence(item, t, format) ?? t("evidence.measured")),
   ]
@@ -155,6 +160,7 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) tags: string[] = [];
   /** The Materials catalogue, archived ones included. */
   @property({ attribute: false }) materials: Material[] = [];
+  @property({ attribute: false }) templates: LineItemTemplate[] = [];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
@@ -164,8 +170,12 @@ export class RunPage extends LitElement {
   @state() private failed?: "fields" | "items";
   /** Set while the delete confirmation is open. */
   @state() private drop?: Drop;
-  /** The kind whose form for a new Line Item is open. */
-  @state() private adding?: "material" | "other";
+  /** Which form for a new Line Item is open: Material, Other by hand or from a template. */
+  @state() private adding?: "material" | "other" | "template";
+  /** The template picked in its form; the first one until the user picks. */
+  @state() private templateId?: string;
+  /** The label of the Line Item last saved as a template. */
+  @state() private savedTemplate?: string;
   private request = 0;
 
   protected override willUpdate(changed: PropertyValues<this>) {
@@ -174,7 +184,7 @@ export class RunPage extends LitElement {
       this.missing = false;
       this.failed = undefined;
       this.drop = undefined;
-      this.adding = undefined;
+      this.adding = this.savedTemplate = undefined;
     }
     if (changed.has("runId") || changed.has("summary")) void this.load();
   }
@@ -257,6 +267,27 @@ export class RunPage extends LitElement {
     return this.materials.filter((material) => !material.archived || material.id === current);
   }
 
+  private async onAddTemplate(event: SubmitEvent, template: LineItemTemplate) {
+    event.preventDefault();
+    const entered = new FormData(event.target as HTMLFormElement).get("quantity");
+    const quantity = parseNumber(typeof entered === "string" ? entered : "");
+    if (quantity === undefined || (quantity !== null && quantity < 0)) return;
+    const added = addTemplateLineItem(this.hass, this.runId, template.id, quantity ?? undefined);
+    if (await this.saveItems(added)) this.adding = undefined;
+  }
+
+  private async onSaveTemplate(item: LineItem) {
+    const t = localize(this.hass);
+    const label = item.label ?? t(`kind.${item.kind}`);
+    this.failed = this.savedTemplate = undefined;
+    try {
+      await saveAsTemplate(this.hass, this.runId, item.id, item.label ? undefined : label);
+      this.savedTemplate = label;
+    } catch {
+      this.failed = "items";
+    }
+  }
+
   private onFieldChange(event: Event) {
     if (!this.run) return;
     const input = event.target as HTMLInputElement;
@@ -267,6 +298,11 @@ export class RunPage extends LitElement {
     const changes = correction(field, input.value, format);
     if (!changes) return undo();
     void this.save(updateRun(this.hass, this.runId, changes), undo);
+  }
+
+  private onImagesChanged(event: CustomEvent<RunDetail>) {
+    ++this.request;
+    this.run = event.detail;
   }
 
   private async confirmDelete() {
@@ -324,27 +360,11 @@ export class RunPage extends LitElement {
       </div>
       <div class="grid">
         <div class="card facts">
-          <wattbill-run-image
-            class="cover"
+          <wattbill-run-images
             .hass=${this.hass}
-            .src=${run.cover?.url}
-          ></wattbill-run-image>
-          ${
-            run.images.length
-              ? html`<div class="strip">
-                  ${run.images.map(
-                    (image) =>
-                      html`<figure>
-                        <wattbill-run-image
-                          .hass=${this.hass}
-                          .src=${image.tile_url}
-                        ></wattbill-run-image>
-                        <figcaption>${t(`image.${image.kind}`)}</figcaption>
-                      </figure>`,
-                  )}
-                </div>`
-              : nothing
-          }
+            .run=${run}
+            @run-changed=${this.onImagesChanged}
+          ></wattbill-run-images>
           ${this.renderFields(run, t, format)}
           <dl>
             <dt>${t("run.device")}</dt>
@@ -373,6 +393,13 @@ export class RunPage extends LitElement {
               : nothing
           }
           ${this.failed === "items" ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+          ${
+            this.savedTemplate
+              ? html`<p class="saved small">
+                  ${t("item.saved_as_template", { label: this.savedTemplate })}
+                </p>`
+              : nothing
+          }
           ${KINDS.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
             return html`
@@ -386,7 +413,8 @@ export class RunPage extends LitElement {
                     ? items.map((item) => this.renderItem(item, t, format))
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
-                ${kind === "electricity" ? nothing : this.renderAdd(kind, t)}
+                ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
+                ${kind === "material" ? this.renderAddMaterial(t) : nothing}
               </div>
             `;
           })}
@@ -501,6 +529,8 @@ export class RunPage extends LitElement {
     // Labels and units WattBill sets stay as they are, rendered in the output language;
     // a Material Line Item is named by its Material and counts g or ml.
     const entered = item.kind === "other";
+    // Running hours are hours, whatever the template called them.
+    const unitEntered = entered && item.basis !== "running_hours";
     const number = (field: (typeof VALUES)[number]) => {
       const manual = computed !== null && computed[field] !== item[field];
       return html`<input
@@ -547,7 +577,7 @@ export class RunPage extends LitElement {
       <div class="quantity">
         ${number("quantity")}
         ${
-          entered
+          unitEntered
             ? html`<input
                 name="unit"
                 class="unit"
@@ -576,6 +606,13 @@ export class RunPage extends LitElement {
               </button>`
             : nothing
         }
+        <button
+          class="icon save-template"
+          title=${t("item.save_as_template")}
+          @click=${() => this.onSaveTemplate(item)}
+        >
+          ☆
+        </button>
         ${
           item.deletable
             ? html`<button
@@ -619,8 +656,44 @@ export class RunPage extends LitElement {
     </select>`;
   }
 
-  private renderAdd(kind: "material" | "other", t: Localize) {
-    if (kind === "material") return this.renderAddMaterial(t);
+  private renderAddMaterial(t: Localize) {
+    return html`<div class="add-item">
+      ${
+        this.adding === "material"
+          ? html`<form class="material" @submit=${this.onAdd}>
+              <select name="material_id" class="label" required aria-label=${t("item.material")}>
+                ${this.pickable(null).map(
+                  (material) => html`<option value=${material.id}>${material.name}</option>`,
+                )}
+              </select>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                name="quantity"
+                required
+                aria-label=${t("item.quantity")}
+              />
+              <select name="unit" aria-label=${t("item.unit")}>
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+              </select>
+              <div class="row">
+                <button class="btn" type="submit">${t("item.add")}</button>
+                <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+                  ${t("item.cancel")}
+                </button>
+              </div>
+            </form>`
+          : html`<button class="btn small add-material" @click=${() => (this.adding = "material")}>
+              ${t("item.add_material")}
+            </button>`
+      }
+    </div>`;
+  }
+
+  private renderAdd(run: RunDetail, t: Localize, format: Format) {
+    if (this.adding === "template") return this.renderAddTemplate(run, t, format);
     return html`<div class="add-item">
       ${
         this.adding === "other"
@@ -649,52 +722,76 @@ export class RunPage extends LitElement {
                 aria-label=${t("item.unit_price")}
               />
               <p class="muted small">${t("item.negative_hint")}</p>
-              ${this.renderFormButtons(t)}
+              <div class="row">
+                <button class="btn" type="submit">${t("item.add")}</button>
+                <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+                  ${t("item.cancel")}
+                </button>
+              </div>
             </form>`
-          : html`<button class="btn small add-other" @click=${() => (this.adding = "other")}>
-              ${t("item.add_other")}
-            </button>`
+          : html`<div class="row">
+              <button class="btn small add-other" @click=${() => (this.adding = "other")}>
+                ${t("item.add_other")}
+              </button>
+              ${
+                this.templates.length
+                  ? html`<button
+                      class="btn small add-template"
+                      @click=${() => (this.adding = "template")}
+                    >
+                      ${t("item.add_template")}
+                    </button>`
+                  : nothing
+              }
+            </div>`
       }
     </div>`;
   }
 
-  private renderAddMaterial(t: Localize) {
+  private renderAddTemplate(run: RunDetail, t: Localize, format: Format) {
+    const template =
+      this.templates.find((candidate) => candidate.id === this.templateId) ?? this.templates[0];
+    if (!template) return nothing;
     return html`<div class="add-item">
-      ${
-        this.adding === "material"
-          ? html`<form class="material" @submit=${this.onAdd}>
-              <select name="material_id" class="label" required aria-label=${t("item.material")}>
-                ${this.pickable(null).map(
-                  (material) => html`<option value=${material.id}>${material.name}</option>`,
-                )}
-              </select>
-              <input
+      <form class="template" @submit=${(event: SubmitEvent) => this.onAddTemplate(event, template)}>
+        <select
+          name="template"
+          class="label"
+          aria-label=${t("item.template")}
+          @change=${(event: Event) => (this.templateId = (event.target as HTMLSelectElement).value)}
+        >
+          ${this.templates.map(
+            (option) =>
+              html`<option value=${option.id} ?selected=${option.id === template.id}>
+                ${`${option.label} · ${format.unitPrice(option.unit_price)}${option.unit ? `/${option.unit}` : ""}`}
+              </option>`,
+          )}
+        </select>
+        ${
+          template.basis === "running_hours"
+            ? html`<p class="muted small">
+                ${t("item.running_hours_hint", {
+                  hours: format.quantity(run.running_seconds / 3600, "h"),
+                })}
+              </p>`
+            : html`<input
                 type="number"
                 step="any"
                 min="0"
                 name="quantity"
-                required
+                placeholder=${t("item.default_quantity", {
+                  quantity: format.toNumberInput(template.default_quantity, 4),
+                })}
                 aria-label=${t("item.quantity")}
-              />
-              <select name="unit" aria-label=${t("item.unit")}>
-                <option value="g">g</option>
-                <option value="ml">ml</option>
-              </select>
-              ${this.renderFormButtons(t)}
-            </form>`
-          : html`<button class="btn small add-material" @click=${() => (this.adding = "material")}>
-              ${t("item.add_material")}
-            </button>`
-      }
-    </div>`;
-  }
-
-  private renderFormButtons(t: Localize) {
-    return html`<div class="row">
-      <button class="btn" type="submit">${t("item.add")}</button>
-      <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
-        ${t("item.cancel")}
-      </button>
+              />`
+        }
+        <div class="row">
+          <button class="btn" type="submit">${t("item.add")}</button>
+          <button class="btn" type="button" @click=${() => (this.adding = undefined)}>
+            ${t("item.cancel")}
+          </button>
+        </div>
+      </form>
     </div>`;
   }
 
@@ -715,29 +812,6 @@ export class RunPage extends LitElement {
       }
       :host([narrow]) .grid {
         grid-template-columns: 1fr;
-      }
-      .cover {
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 12px;
-      }
-      .strip {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 12px;
-      }
-      figure {
-        margin: 0;
-        width: 96px;
-        text-align: center;
-        font-size: 11px;
-        color: var(--secondary-text-color);
-      }
-      figure wattbill-run-image {
-        border-radius: 6px;
-        overflow: hidden;
-        margin-bottom: 2px;
       }
       .fields {
         display: grid;
@@ -833,7 +907,7 @@ export class RunPage extends LitElement {
       }
       .item {
         display: grid;
-        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 52px;
+        grid-template-columns: minmax(120px, 1fr) 140px 96px 96px 76px;
         gap: 6px;
         align-items: start;
         padding: 6px 4px;
@@ -849,7 +923,7 @@ export class RunPage extends LitElement {
         padding-left: 10px;
       }
       :host([narrow]) .item {
-        grid-template-columns: 1fr 1fr 1fr 52px;
+        grid-template-columns: 1fr 1fr 1fr 76px;
       }
       :host([narrow]) .item .label {
         grid-column: 1 / -1;
@@ -907,8 +981,15 @@ export class RunPage extends LitElement {
         grid-column: 1 / -1;
         margin: 0;
       }
+      .add-item form.template {
+        grid-template-columns: 1fr 140px;
+      }
       :host([narrow]) .add-item form {
         grid-template-columns: 1fr 1fr;
+      }
+      .saved {
+        color: var(--success-color, #43a047);
+        margin: 0;
       }
       :host([narrow]) .add-item form .label {
         grid-column: 1 / -1;

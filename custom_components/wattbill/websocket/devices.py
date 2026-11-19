@@ -9,6 +9,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
 from custom_components.wattbill.device_settings import (
+    AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
     TAGS_FOR_NEW_RUNS,
 )
@@ -57,8 +58,8 @@ async def _update_settings(
 ) -> None:
     """Change the named panel settings; returns all of the Device's panel settings.
 
-    Naming a Tag that doesn't exist yet creates it; the default Material must
-    exist and not be archived.
+    Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
+    the default Material must exist and not be archived.
     """
     if msg["device_id"] not in wattbill.settings:
         connection.send_error(
@@ -73,6 +74,12 @@ async def _update_settings(
     if (material_id := changes.get(DEFAULT_MATERIAL)) is not None and not pickable(
         connection, msg, wattbill, material_id
     ):
+        return
+    templates = changes.get(AUTOMATIC_TEMPLATES, [])
+    if len(wattbill.catalog.find_templates(templates)) < len(templates):
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "No Line Item Template with this id"
+        )
         return
     if TAGS_FOR_NEW_RUNS in changes:
         changes[TAGS_FOR_NEW_RUNS] = await wattbill.catalog.async_add_tags(

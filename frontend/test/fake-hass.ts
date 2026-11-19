@@ -7,22 +7,31 @@ import type {
   Catalog,
   Device,
   Drop,
+  LineItemTemplate,
   MaterialType,
   RunChange,
   RunDetail,
+  RunImage,
   RunSummary,
 } from "../src/api";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import imagesDelete from "./fixtures/backend/images-delete.json";
+import imagesSetCover from "./fixtures/backend/images-set-cover.json";
+import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
+import imagesUpload from "./fixtures/backend/images-upload.json";
 import lineItemsAdd from "./fixtures/backend/line-items-add.json";
 import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
 import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
+import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
+import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
 import tagsRename from "./fixtures/backend/tags-rename.json";
+import templatesUpdate from "./fixtures/backend/templates-update.json";
 
 const [snapshot, ...changes] = runsSubscribe;
 const found = <T>(value: T | undefined, what: string) => {
@@ -36,12 +45,20 @@ export const recorded = {
   /** Then the Run "print-live" is started, updated (45 min in) and ended. */
   changes: changes as { change: RunChange; run: RunSummary }[],
   /** `wattbill/runs/get` for every recorded Run; "print-live" while still open, with its
-   * measured Material ("print-live-material") locked. "benchy" has a Thumbnail and a
-   * Snapshot and its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and
-   * a measured length without Material ("helmet-filament"). */
+   * measured Material ("print-live-material") locked and its automatic template
+   * "print-live-wear" counting running hours. "benchy" has a Thumbnail and a Snapshot and
+   * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
+   * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
+  /** The upload of one photo to "benchy", and of ten more, refused. */
+  upload: imagesUpload as { images: RunImage[] },
+  uploadTooMany: imagesUploadTooMany,
+  /** `wattbill/images/set_cover`: "benchy" with that upload picked as Cover Image. */
+  setCover: imagesSetCover.run as RunDetail,
+  /** `wattbill/images/delete` of that upload: "benchy" without it again. */
+  deleteImage: imagesDelete.run as RunDetail,
   /** `wattbill/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
   lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
   /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
@@ -51,14 +68,22 @@ export const recorded = {
   lineItemsMaterial: lineItemsMaterial as { run: RunDetail },
   /** `wattbill/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
   lineItemsAddMaterial: lineItemsAddMaterial as { run: RunDetail },
-  /** `wattbill/devices/list`: only "device-kobra" (Material used input in mm, default
-   * Material "pla-black"); "device-mini" (Runs only) was removed. */
+  /** `wattbill/line_items/save_as_template`: Benchy's "Nozzle wear" as "template-nozzle". */
+  saveAsTemplate: lineItemsSaveAsTemplate as { template: LineItemTemplate },
+  /** `wattbill/line_items/add_template`: 2 × "template-nozzle" added to Benchy ("benchy-nozzle"). */
+  lineItemsAddTemplate: lineItemsAddTemplate as { run: RunDetail },
+  /** `wattbill/templates/update`: "template-packaging" repriced to 0.60. */
+  templateUpdate: templatesUpdate as { template: LineItemTemplate },
+  /** `wattbill/devices/list`: only "device-kobra" (automatic template "template-wear",
+   * Material used input in mm, default Material "pla-black"); "device-mini" (Runs only)
+   * was removed. */
   devices: devicesList.devices as Device[],
   /**
    * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
-   * Resin grey), "material-3" (PLA red, archived) and the Tags "Cosplay helmet", "Gift"
-   * and "Spare parts".
+   * Resin grey), "material-3" (PLA red, archived), the Tags "Cosplay helmet", "Gift"
+   * and "Spare parts" and the templates "template-wear" (running hours),
+   * "template-inserts" and "template-packaging".
    */
   catalog: {
     empty: catalogSubscribe[0] as Catalog,
@@ -97,11 +122,14 @@ export class WsError extends Error {
 export class FakeBackend {
   /** Every message the panel sent (`callWS` and subscriptions), in order. */
   readonly calls: Message[] = [];
-  /** Every path the panel fetched with `fetchWithAuth`, in order. */
+  /** Every path the panel fetched with `fetchWithAuth`, in order; uploads aside. */
   readonly fetches: string[] = [];
+  /** Every multipart upload the panel posted, with its `file` parts. */
+  readonly uploads: { path: string; files: File[] }[] = [];
   hass: HomeAssistant;
   private readonly files = new Map<string, Blob>();
   private readonly replies = new Map<string, Reply>();
+  private readonly posts = new Map<string, (files: File[]) => [number, unknown]>();
   private readonly initialEvents = new Map<string, Reply>();
   private readonly listeners = new Map<string, Set<Listener>>();
 
@@ -115,7 +143,16 @@ export class FakeBackend {
         if (!reply) throw new WsError("unknown_command");
         return (await reply(msg)) as T;
       },
-      fetchWithAuth: async (path: string) => {
+      fetchWithAuth: async (path: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          const files = (init.body as FormData).getAll("file") as File[];
+          this.uploads.push({ path, files });
+          const [status, body] = this.posts.get(path)?.(files) ?? [404, { code: "not_found" }];
+          return new Response(JSON.stringify(body), {
+            status,
+            headers: { "content-type": "application/json" },
+          });
+        }
         this.fetches.push(path);
         const file = this.files.get(path);
         return file ? new Response(file) : new Response(null, { status: 404 });
@@ -155,6 +192,12 @@ export class FakeBackend {
     return this;
   }
 
+  /** Answer a POST to `path` with `[status, json]`. */
+  post(path: string, reply: (files: File[]) => [number, unknown]) {
+    this.posts.set(path, reply);
+    return this;
+  }
+
   /** Send an event to every open subscription to `type`. */
   push(type: string, event: unknown) {
     for (const listener of this.listeners.get(type) ?? []) listener(event);
@@ -172,7 +215,7 @@ export class FakeBackend {
 }
 
 /** Every image the recorded Runs refer to. */
-const recordedImages = recorded.runs.flatMap((run) =>
+const recordedImages = [...recorded.runs, recorded.setCover].flatMap((run) =>
   run.images.flatMap((image) => [image.url, image.tile_url]),
 );
 

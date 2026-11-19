@@ -85,7 +85,7 @@ describe("Run page", () => {
       ["Other €0.00"],
     ]);
     const [, , other] = queryAll(panel, ".kind").map(text);
-    expect(other).toBe("Other €0.00 None + Add Other Line Item");
+    expect(other).toBe("Other €0.00 None + Add Other Line Item + From template");
   });
 
   it("lists each price segment under the electricity evidence", async () => {

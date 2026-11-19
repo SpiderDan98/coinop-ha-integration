@@ -5,6 +5,8 @@ import type { HomeAssistant, Message } from "./hass";
 export type Outcome = "completed" | "cancelled" | "failed" | "unknown";
 export type Kind = "electricity" | "material" | "other";
 export type Method = "measured" | "from_history" | "estimated" | "entered";
+/** Running hours are the Run's running time without pauses. */
+export type QuantityBasis = "entered" | "running_hours";
 
 /** Fetched with `hass.fetchWithAuth`: the image views need authentication. */
 export interface RunImage {
@@ -44,6 +46,10 @@ export interface LineItem {
   unit_price: number;
   amount: number;
   method: Method | null;
+  /** The Line Item Template it was copied from; the template may be gone since. */
+  template_id: string | null;
+  /** Running hours make the quantity computed, live until the Run is final. */
+  basis: QuantityBasis | null;
   segments: { start: string; end: string; kwh: number; unit_price: number }[];
   /** Material Line Items: their Material, and a copy of it as it was when priced. */
   material_id: string | null;
@@ -102,7 +108,11 @@ export interface Device {
         };
   };
   /** WattBill's own settings for the Device, set in the Devices tab. */
-  settings: { tags_for_new_runs: string[]; default_material: string | null };
+  settings: {
+    tags_for_new_runs: string[];
+    automatic_templates: string[];
+    default_material: string | null;
+  };
 }
 
 export type RunChange = "started" | "updated" | "ended" | "deleted";
@@ -146,6 +156,32 @@ export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
 export const endRun = (hass: HomeAssistant, runId: string) =>
   runResult(hass, { type: "wattbill/runs/end", run_id: runId });
 
+export const UPLOAD_LIMIT = 10;
+export const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Multipart, as the websocket caps messages; a refusal throws its `code`. */
+export const uploadImages = async (hass: HomeAssistant, runId: string, files: File[]) => {
+  const body = new FormData();
+  for (const file of files) body.append("file", file);
+  const response = await hass.fetchWithAuth(`/api/wattbill/runs/${runId}/images`, {
+    method: "POST",
+    body,
+  });
+  const result = (await response.json().catch(() => ({}))) as {
+    images?: RunImage[];
+    code?: string;
+  };
+  if (!response.ok || !result.images) throw new Error(result.code ?? "failed");
+  return result.images;
+};
+
+/** Until that image is deleted; then the Cover Image falls back to the rule. */
+export const setCover = (hass: HomeAssistant, runId: string, imageId: string) =>
+  runResult(hass, { type: "wattbill/images/set_cover", run_id: runId, image_id: imageId });
+
+export const deleteImage = (hass: HomeAssistant, runId: string, imageId: string) =>
+  runResult(hass, { type: "wattbill/images/delete", run_id: runId, image_id: imageId });
+
 type Entered = Partial<
   Pick<LineItem, "label" | "unit" | "quantity" | "unit_price" | "amount" | "material_id">
 >;
@@ -174,6 +210,36 @@ export const addLineItem = (
   runId: string,
   item: Entered & { kind: Exclude<Kind, "electricity"> },
 ) => runResult(hass, { type: "wattbill/line_items/add", run_id: runId, ...item });
+
+/** A copy of the template; `quantity` replaces an entered default quantity. */
+export const addTemplateLineItem = (
+  hass: HomeAssistant,
+  runId: string,
+  templateId: string,
+  quantity?: number,
+) =>
+  runResult(hass, {
+    type: "wattbill/line_items/add_template",
+    run_id: runId,
+    template_id: templateId,
+    ...(quantity === undefined ? {} : { quantity }),
+  });
+
+/** Computed Line Items have no label of their own, so they need `label`. */
+export const saveAsTemplate = async (
+  hass: HomeAssistant,
+  runId: string,
+  lineItemId: string,
+  label?: string,
+) =>
+  (
+    await hass.callWS<{ template: LineItemTemplate }>({
+      type: "wattbill/line_items/save_as_template",
+      run_id: runId,
+      line_item_id: lineItemId,
+      ...(label === undefined ? {} : { label }),
+    })
+  ).template;
 
 export const deleteLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
   runResult(hass, { type: "wattbill/line_items/delete", run_id: runId, line_item_id: lineItemId });
@@ -238,9 +304,21 @@ export interface MaterialType {
   density: number;
 }
 
+export interface LineItemTemplate {
+  id: string;
+  label: string;
+  unit: string;
+  unit_price: number;
+  /** Not used with running hours. */
+  default_quantity: number;
+  basis: QuantityBasis;
+}
+
+export type TemplateFields = Omit<LineItemTemplate, "id">;
+
 /** Every catalogue in the first event; afterwards only the one that changed. */
 /** Tags are alphabetical; Runs and Devices name them. */
-export type Catalog = { materials: Material[]; tags: string[] };
+export type Catalog = { materials: Material[]; tags: string[]; templates: LineItemTemplate[] };
 
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
   hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });
@@ -282,3 +360,25 @@ export const deleteMaterial = async (hass: HomeAssistant, materialId: string) =>
       material_id: materialId,
     })
   ).deleted;
+
+export const createTemplate = (hass: HomeAssistant, template: TemplateFields) =>
+  hass.callWS<{ template: LineItemTemplate }>({ type: "wattbill/templates/create", template });
+
+/** Runs keep their copies; only Line Items added afterwards follow. */
+export const updateTemplate = (
+  hass: HomeAssistant,
+  templateId: string,
+  template: Partial<TemplateFields>,
+) =>
+  hass.callWS<{ template: LineItemTemplate }>({
+    type: "wattbill/templates/update",
+    template_id: templateId,
+    template,
+  });
+
+/** Runs keep their copies; Devices stop adding it automatically. */
+export const deleteTemplate = (hass: HomeAssistant, templateId: string) =>
+  hass.callWS<Record<string, never>>({
+    type: "wattbill/templates/delete",
+    template_id: templateId,
+  });

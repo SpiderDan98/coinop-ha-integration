@@ -14,6 +14,11 @@ from .test_persistence import restart
 from .websocket import PanelClient
 
 SETTINGS = "wattbill.device_settings"
+NO_SETTINGS: dict[str, Any] = {
+    "tags_for_new_runs": [],
+    "automatic_templates": [],
+    "default_material": None,
+}
 
 
 async def test_each_device_lists_its_ha_side_settings(
@@ -62,13 +67,13 @@ async def test_each_device_lists_its_ha_side_settings(
                 },
                 "price": {"source": "fixed", "value": 0.30},
             },
-            "settings": {"tags_for_new_runs": [], "default_material": None},
+            "settings": NO_SETTINGS,
         },
         {
             "id": mini.subentry_id,
             "name": "Mini",
             "ha_settings": result["devices"][1]["ha_settings"],
-            "settings": {"tags_for_new_runs": [], "default_material": None},
+            "settings": NO_SETTINGS,
         },
     ]
     assert result["devices"][1]["ha_settings"]["status"]["entity_id"] == (
@@ -82,7 +87,7 @@ async def test_a_panel_setting_is_kept_across_restarts(
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"] == {"tags_for_new_runs": [], "default_material": None}
+    assert listed["settings"] == NO_SETTINGS
 
     result = await panel.call(
         "wattbill/devices/update_settings",
@@ -91,9 +96,9 @@ async def test_a_panel_setting_is_kept_across_restarts(
     )
     await restart(hass, entry)
 
-    assert result["settings"]["tags_for_new_runs"] == ["Workshop"]
+    assert result == {"settings": NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}}
     [listed] = (await panel.call("wattbill/devices/list"))["devices"]
-    assert listed["settings"]["tags_for_new_runs"] == ["Workshop"]
+    assert listed["settings"] == NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}
 
 
 async def test_an_update_leaves_settings_it_does_not_name_alone(
@@ -111,7 +116,7 @@ async def test_an_update_leaves_settings_it_does_not_name_alone(
         "wattbill/devices/update_settings", device_id=kobra.subentry_id, settings={}
     )
 
-    assert result["settings"]["tags_for_new_runs"] == ["Workshop"]
+    assert result == {"settings": NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}}
 
 
 async def test_an_unknown_setting_or_value_is_rejected(

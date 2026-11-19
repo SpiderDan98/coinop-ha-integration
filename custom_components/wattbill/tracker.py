@@ -39,7 +39,12 @@ from .device_inputs import (
     price_reading,
     usage_reading,
 )
-from .device_settings import DEFAULT_MATERIAL, TAGS_FOR_NEW_RUNS, DeviceSettings
+from .device_settings import (
+    AUTOMATIC_TEMPLATES,
+    DEFAULT_MATERIAL,
+    TAGS_FOR_NEW_RUNS,
+    DeviceSettings,
+)
 from .images import DeviceImages
 from .materials import Material, MaterialForm
 from .models import (
@@ -53,6 +58,7 @@ from .models import (
 )
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
+from .templates import add_templates, count_running_hours
 
 LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
@@ -403,6 +409,7 @@ class DeviceTracker:
         return input_value(state, self._config.job_attribute) or None
 
     def _open(self, at: datetime, job_name: str | None) -> None:
+        settings = self._settings.get(self._config.device_id)
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
@@ -414,7 +421,7 @@ class DeviceTracker:
             line_items=[],
             consumption=dict(self._config.consumption),
             cost_source=dict(self._config.price),
-            tags=self._settings.get(self._config.device_id)[TAGS_FOR_NEW_RUNS],
+            tags=settings[TAGS_FOR_NEW_RUNS],
         )
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
@@ -422,6 +429,9 @@ class DeviceTracker:
         self._record_usage(run, self._usage_state())
         self._open_prices(run, at)
         self._refresh(run, at)
+        add_templates(
+            run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
+        )
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
 
@@ -649,5 +659,6 @@ class DeviceTracker:
                 if i.kind is not LineItemKind.ELECTRICITY and not i.measured
             ),
         ]
+        count_running_hours(run.line_items, run, until)
         if price_gap(run.started, until, run.prices):
             self._flag(run, Flag.PRICE_GAP)

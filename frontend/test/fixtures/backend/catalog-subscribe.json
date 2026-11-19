@@ -1,7 +1,8 @@
 [
   {
     "materials": [],
-    "tags": []
+    "tags": [],
+    "templates": []
   },
   {
     "materials": [
@@ -67,6 +68,32 @@
       "Cosplay helmet",
       "Gift",
       "Spare parts"
+    ],
+    "templates": [
+      {
+        "id": "template-wear",
+        "label": "Wear Kobra",
+        "unit": "h",
+        "unit_price": 0.15,
+        "default_quantity": 1.0,
+        "basis": "running_hours"
+      },
+      {
+        "id": "template-inserts",
+        "label": "Threaded inserts",
+        "unit": "pcs",
+        "unit_price": 0.08,
+        "default_quantity": 8.0,
+        "basis": "entered"
+      },
+      {
+        "id": "template-packaging",
+        "label": "Packaging",
+        "unit": "",
+        "unit_price": 0.6,
+        "default_quantity": 1.0,
+        "basis": "entered"
+      }
     ]
   }
 ]

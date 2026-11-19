@@ -59,6 +59,8 @@
           "material": null,
           "measured": false,
           "length": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.2833333333333333,
           "unit": "kWh",
           "unit_price": 0.31176470588235294,
@@ -81,6 +83,24 @@
           "computed": null
         },
         {
+          "id": "01KF0000000000000000000I11",
+          "kind": "other",
+          "label": "Wear Kobra",
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "template_id": "01KF0000000000000000000T01",
+          "basis": "running_hours",
+          "quantity": 2.25,
+          "unit": "h",
+          "unit_price": 0.15,
+          "amount": 0.3375,
+          "method": null,
+          "segments": [],
+          "computed": null
+        },
+        {
           "id": "01KF0000000000000000000I02",
           "kind": "material",
           "label": null,
@@ -94,6 +114,8 @@
           },
           "measured": true,
           "length": 4000.0,
+          "template_id": null,
+          "basis": null,
           "quantity": 11.9302,
           "unit": "g",
           "unit_price": 0.01999,
@@ -103,7 +125,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     },
     {
       "id": "01KF0000000000000000000002",
@@ -150,6 +173,8 @@
           "material": null,
           "measured": false,
           "length": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.04,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -166,7 +191,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     }
   ],
   "live": [
@@ -225,6 +251,8 @@
           "material": null,
           "measured": false,
           "length": null,
+          "template_id": null,
+          "basis": null,
           "quantity": 0.06,
           "unit": "kWh",
           "unit_price": 0.3,
@@ -241,7 +269,8 @@
           "computed": null
         }
       ],
-      "images": []
+      "images": [],
+      "cover_id": null
     }
   ],
   "catalog": {
@@ -285,6 +314,16 @@
     ],
     "tags": [
       "Gift"
+    ],
+    "templates": [
+      {
+        "id": "01KF0000000000000000000T01",
+        "label": "Wear Kobra",
+        "unit": "h",
+        "unit_price": 0.15,
+        "default_quantity": 1,
+        "basis": "running_hours"
+      }
     ]
   }
 }

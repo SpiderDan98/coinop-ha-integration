@@ -40,6 +40,13 @@ class LineItemKind(StrEnum):
     OTHER = "other"
 
 
+class QuantityBasis(StrEnum):
+    """Where a Line Item Template's quantity comes from."""
+
+    ENTERED = "entered"
+    RUNNING_HOURS = "running_hours"
+
+
 class ElectricityMethod(StrEnum):
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
@@ -153,9 +160,11 @@ class LineItem:
     output language. Material Line Items reference their Material by
     `material_id`, which keeps it from being deleted, and keep a copy of it in
     `material`; their unit is g or ml. A `measured` one follows the Material used
-    input, whose length (mm) it keeps. Quantity, unit price and amount are what
-    counts; once the user overrides a computed one, `computed` keeps what
-    WattBill computed.
+    input, whose length (mm) it keeps. A Line Item copied from a Line Item
+    Template keeps only `template_id` as its origin and the template's `basis`;
+    with running hours WattBill computes its quantity. Quantity, unit price and
+    amount are what counts; once the user overrides a computed one, `computed`
+    keeps what WattBill computed.
     """
 
     id: str
@@ -169,6 +178,8 @@ class LineItem:
     material: MaterialCopy | None = None
     measured: bool = False
     length: float | None = None
+    template_id: str | None = None
+    basis: QuantityBasis | None = None
     method: ElectricityMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
@@ -177,7 +188,11 @@ class LineItem:
     @property
     def is_computed(self) -> bool:
         """WattBill computes its values, live while the Run is open."""
-        return self.kind is LineItemKind.ELECTRICITY or self.measured
+        return (
+            self.kind is LineItemKind.ELECTRICITY
+            or self.measured
+            or self.basis is QuantityBasis.RUNNING_HOURS
+        )
 
     @property
     def grams(self) -> float:
@@ -213,6 +228,20 @@ class LineItem:
         else:
             self.amount = self.quantity * self.unit_price
 
+    def recompute(self, quantity: float) -> None:
+        """A new computed quantity at the computed unit price; overrides still count."""
+        unit_price = (self.computed or self.values())["unit_price"] or 0.0
+        values: dict[str, float | None] = {
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "amount": quantity * unit_price,
+        }
+        if self.computed is None:
+            for name, value in values.items():
+                setattr(self, name, value)
+        else:
+            self.computed = values
+
     def reset(self) -> None:
         """Back to the computed values."""
         for name, value in (self.computed or {}).items():
@@ -228,6 +257,8 @@ class LineItem:
             "material": None if self.material is None else self.material.as_dict(),
             "measured": self.measured,
             "length": self.length,
+            "template_id": self.template_id,
+            "basis": self.basis,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -249,6 +280,8 @@ class LineItem:
             else MaterialCopy.from_dict(material),
             measured=data.get("measured", False),
             length=data.get("length"),
+            template_id=data.get("template_id"),
+            basis=None if data.get("basis") is None else QuantityBasis(data["basis"]),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],
@@ -318,6 +351,7 @@ class Run:
     price entity had no value, kept until finalised. `average_powers` are the
     (since, running W, paused W) the Run's consumption model used. `usage` is what
     the Material used input last reported during the Run: its measured total.
+    `cover_id` is the image the user picked as Cover Image.
     """
 
     id: str
@@ -346,6 +380,7 @@ class Run:
     )
     images: list[RunImage] = field(default_factory=list)
     usage: Usage | None = None
+    cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -369,7 +404,9 @@ class Run:
 
     @property
     def cover(self) -> RunImage | None:
-        return next(iter(self.images_in_order), None)
+        """The picked image, else the first in order; a deleted pick falls back."""
+        picked = (image for image in self.images if image.id == self.cover_id)
+        return next(picked, None) or next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
@@ -403,6 +440,7 @@ class Run:
             "usage": None if self.usage is None else self.usage.as_dict(),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
+            "cover_id": self.cover_id,
         }
 
     @classmethod
@@ -446,5 +484,6 @@ class Run:
             else Usage.from_dict(usage),
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
+            cover_id=data.get("cover_id"),
             unknown=unknown_fields(cls, data),
         )

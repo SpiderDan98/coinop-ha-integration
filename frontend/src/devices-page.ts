@@ -2,7 +2,7 @@
 // Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { updateDeviceSettings, type Device, type Material } from "./api";
+import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
@@ -46,6 +46,8 @@ export class DevicesPage extends LitElement {
   @property({ attribute: false }) tags: string[] = [];
   /** The Materials catalogue, archived ones included. */
   @property({ attribute: false }) materials: Material[] = [];
+  /** Every Line Item Template there is, to pick automatic ones from. */
+  @property({ attribute: false }) templates: LineItemTemplate[] = [];
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   /** Settings saved since the Devices were loaded, by Device id. */
@@ -170,7 +172,46 @@ export class DevicesPage extends LitElement {
         ></wattbill-tag-input>
         <p class="muted small">${t("device.tags_hint")}</p>
       </div>
+      ${this.renderAutomatic(id, current.automatic_templates, t)}
       ${this.failed === id ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+    </div>`;
+  }
+
+  private renderAutomatic(deviceId: string, chosen: string[], t: Localize) {
+    const picked = chosen.flatMap((id) => this.templates.filter((template) => template.id === id));
+    const save = (ids: string[]) => this.save(deviceId, { automatic_templates: ids });
+    return html`<div class="automatic-templates">
+      <h4>${t("device.automatic_templates")}</h4>
+      <div class="row">
+        ${picked.map(
+          ({ id, label }) =>
+            html`<span class="template-chip"
+              ><span class="template-name">${label}</span
+              ><button
+                class="remove"
+                aria-label=${t("device.remove_template", { template: label })}
+                title=${t("device.remove_template", { template: label })}
+                @click=${() => save(chosen.filter((own) => own !== id))}
+              >
+                ×
+              </button></span
+            >`,
+        )}
+        <select
+          aria-label=${t("device.add_template")}
+          @change=${(event: Event) => {
+            const select = event.target as HTMLSelectElement;
+            if (select.value) void save([...chosen, select.value]);
+            select.value = "";
+          }}
+        >
+          <option value="">${t("device.add_template")}</option>
+          ${this.templates
+            .filter((template) => !chosen.includes(template.id))
+            .map((template) => html`<option value=${template.id}>${template.label}</option>`)}
+        </select>
+      </div>
+      <p class="muted small">${t("device.templates_hint")}</p>
     </div>`;
   }
 
@@ -205,7 +246,8 @@ export class DevicesPage extends LitElement {
       p {
         margin: 0 0 8px;
       }
-      .setting {
+      .setting,
+      .automatic-templates {
         margin-top: 16px;
         padding-top: 12px;
         border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
@@ -214,8 +256,25 @@ export class DevicesPage extends LitElement {
         margin: 0 0 6px;
         font-weight: 500;
       }
-      .setting p {
+      .setting p,
+      .automatic-templates p {
         margin: 6px 0 0;
+      }
+      .template-chip {
+        display: inline-flex;
+        align-items: center;
+        font-size: 12px;
+        padding: 1px 8px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--wattbill-other) 14%, transparent);
+      }
+      .template-chip .remove {
+        border: 0;
+        background: none;
+        color: inherit;
+        padding: 0 0 0 4px;
+        cursor: pointer;
+        font: inherit;
       }
       select {
         font: inherit;
@@ -223,8 +282,11 @@ export class DevicesPage extends LitElement {
         background: var(--card-background-color, #fff);
         border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
         border-radius: 6px;
-        padding: 6px 8px;
+        padding: 3px 6px;
+      }
+      .default-material select {
         width: 100%;
+        padding: 6px 8px;
         box-sizing: border-box;
       }
       .error {

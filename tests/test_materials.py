@@ -379,7 +379,7 @@ async def test_every_open_panel_sees_catalogue_changes(
     entry = await add_hub(hass)
     other = connect_panel(hass_admin_user)
     await other.subscribe("wattbill/catalog/subscribe")
-    assert await other.event() == {"materials": [], "tags": []}
+    assert await other.event() == {"materials": [], "tags": [], "templates": []}
 
     created = await create(panel, **PLA)
     assert await other.event() == {"materials": [created]}

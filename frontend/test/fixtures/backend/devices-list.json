@@ -56,6 +56,9 @@
         "tags_for_new_runs": [
           "Batch 7"
         ],
+        "automatic_templates": [
+          "template-wear"
+        ],
         "default_material": "pla-black"
       }
     }
