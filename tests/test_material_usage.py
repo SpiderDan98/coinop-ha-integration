@@ -222,6 +222,31 @@ async def test_a_value_from_before_the_run_is_not_its_usage(
     assert run["flags"] == ["usage_missing"]
 
 
+async def test_the_next_runs_usage_never_counts_for_the_previous_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"))
+    await add_measuring_device(hass, panel)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=10)
+    await set_usage(hass, 5000)
+    await clock.advance(minutes=1)
+    await set_status(hass, "cancelled")
+    await clock.advance(minutes=2)
+
+    await set_status(hass, "printing")
+    await clock.advance(minutes=1)
+    await set_usage(hass, 100)
+    await clock.advance(minutes=10)
+
+    [cancelled] = stored_runs(hass_storage)
+    [item] = material_items(cancelled)
+    assert item["length"] == 5000
+    [running] = live_runs(hass_storage)
+    [item] = material_items(running)
+    assert item["length"] == 100
+
+
 async def test_a_mass_is_taken_as_grams(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

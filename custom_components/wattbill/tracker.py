@@ -286,6 +286,11 @@ class DeviceTracker:
             self._refresh(run, run.ended or dt_util.utcnow())
             self._book.async_update(run)
 
+    def _next_started(self, run: Run, at: datetime) -> bool:
+        return any(
+            run.started < other.started <= at for other in self._unfinalised_runs()
+        )
+
     def _usage_state(self) -> State | None:
         usage = self._config.material
         return None if usage is None else self._hass.states.get(usage["entity_id"])
@@ -298,8 +303,9 @@ class DeviceTracker:
             return
         changed = input_time(state, usage["attribute"])
         late = run.ended is not None and changed > run.ended + FINAL_REPORT_WAIT
-        # A value from before the Run is still the previous job's.
-        if changed < run.started or late:
+        # A value from before the Run is still the previous job's, one from after
+        # the next Run's start already that job's.
+        if changed < run.started or late or self._next_started(run, changed):
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
 
