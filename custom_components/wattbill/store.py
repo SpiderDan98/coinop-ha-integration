@@ -58,7 +58,6 @@ def files_path(hass: HomeAssistant) -> Path:
 
 class WattBillStore(Store[dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, name: str) -> None:
-        self.name = name
         self.schema = SCHEMAS[name]
         super().__init__(
             hass,
@@ -68,7 +67,7 @@ class WattBillStore(Store[dict[str, Any]]):
             minor_version=self.schema.minor_version,
         )
 
-    def backup(self, version: int = 1, minor_version: int = 1) -> Store[dict[str, Any]]:
+    def bak(self, version: int = 1, minor_version: int = 1) -> Store[dict[str, Any]]:
         """The copy kept from before the latest major migration."""
         return Store(self.hass, version, f"{self.key}.bak", minor_version=minor_version)
 
@@ -78,7 +77,7 @@ class WattBillStore(Store[dict[str, Any]]):
     ) -> dict[str, Any]:
         if old_major_version == self.version:
             return dict(old_data)
-        await self.backup(old_major_version, old_minor_version).async_save(old_data)
+        await self.bak(old_major_version, old_minor_version).async_save(old_data)
         data: dict[str, Any] = old_data
         for version in range(old_major_version, self.version):
             data = self.schema.migrations[version](data)
@@ -144,7 +143,7 @@ class WattBillStores:
         """Delete every Store, its `.bak` copy and the file folder."""
         for store in self._stores.values():
             await store.async_remove()
-            await store.backup().async_remove()
+            await store.bak().async_remove()
         await self._hass.async_add_executor_job(
             shutil.rmtree, files_path(self._hass), True
         )
