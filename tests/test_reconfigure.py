@@ -211,6 +211,38 @@ async def test_a_new_status_entity_applies_to_the_open_run(
     assert value(hass, RUNS) == 1
 
 
+async def test_a_new_status_entitys_end_from_before_the_run_is_ignored(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    other = "sensor.other_status"
+    hass.states.async_set(other, "finished")
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry)
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+
+    await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "status"},
+        {"entity_id": other},
+        MAPPING,
+    )
+
+    assert "wattbill.runs" not in hass_storage
+    [run] = live_runs(hass_storage)
+    hass.states.async_set(other, "printing")
+    await clock.advance(minutes=5)
+    hass.states.async_set(other, "finished")
+    await hass.async_block_till_done()
+    [ended] = stored_runs(hass_storage)
+    assert ended["id"] == run["id"]
+    assert ended["outcome"] == "completed"
+    assert ended["ended"] == clock.now().isoformat()
+
+
 async def test_ended_runs_never_change(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:

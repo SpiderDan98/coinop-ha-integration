@@ -86,6 +86,9 @@ class DeviceTracker:
             return
         returned, self._status_lost = self._status_lost, False
         at = input_time(state, attribute)
+        if run is not None and at < run.started:
+            # E.g. a Status entity picked during the Run still shows an older end.
+            return
         target = self._config.target(value)
         job_name = self._job_name()
         if (
