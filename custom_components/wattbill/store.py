@@ -70,9 +70,7 @@ class WattBillStore(Store[dict[str, Any]]):
 
     def backup(self, version: int = 1, minor_version: int = 1) -> Store[dict[str, Any]]:
         """The copy kept from before the latest major migration."""
-        return Store(
-            self.hass, version, f"{self.key}.bak", minor_version=minor_version
-        )
+        return Store(self.hass, version, f"{self.key}.bak", minor_version=minor_version)
 
     @override
     async def _async_migrate_func(
@@ -154,9 +152,7 @@ class WattBillStores:
 
 def async_start_fresh(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Accept missing Stores: the next setup starts them empty."""
-    hass.config_entries.async_update_entry(
-        entry, data={**entry.data, CONF_STORES: []}
-    )
+    hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_STORES: []})
 
 
 def _payload(runs: Iterable[Run]) -> dict[str, Any]:
