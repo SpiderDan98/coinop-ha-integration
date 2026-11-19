@@ -11,7 +11,9 @@ const withLinked = {
 };
 const filamentRows = (panel: Element) => queryAll(panel, "tr.filament").map(text);
 const button = (root: Element, label: string) => {
-  const found = queryAll(root, "ha-button, button").find((candidate) => text(candidate) === label);
+  const found = queryAll(root, "ha-button, ha-icon-button, button").find(
+    (candidate) => text(candidate) === label || (candidate as { label?: string }).label === label,
+  );
   if (!found) throw new Error(`no button "${label}"`);
   return found;
 };
@@ -67,7 +69,7 @@ describe("Spoolman in the Materials tab", () => {
     const panel = await mountPanel(spoolmanBackend(), { path: "/materials" });
 
     expect(text(row(panel, "tr.material", "PLA black"))).toBe(
-      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm From Spoolman €20.00 / kg Edit Archive Delete",
+      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm From Spoolman €20.00 / kg",
     );
   });
 

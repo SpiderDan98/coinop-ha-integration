@@ -6,6 +6,7 @@ const STACK_HEIGHT = 120;
 const STACK_WIDTH = 28;
 const GAP = 2;
 const RADIUS = 4;
+const ALL_VALUES_UP_TO = 6;
 
 /** A bar segment with rounded top corners, anchored to the baseline below. */
 const roundedTop = (y: number, height: number, width: number) => {
@@ -31,6 +32,9 @@ export function stackedColumns(
   const height = (segments: Segment[]) =>
     segments.reduce((sum, segment) => sum + Math.max(segment.amount, 0), 0);
   const max = Math.max(...columns.map((column) => height(column.segments)), 0) || 1;
+  // Beyond a few columns their values would overlap, so only the tallest keeps one.
+  const valued = (column: (typeof columns)[number]) =>
+    columns.length <= ALL_VALUES_UP_TO || column.on || height(column.segments) === max;
   return html`<div class="columns">
     ${columns.map((column) => {
       let top = STACK_HEIGHT;
@@ -50,9 +54,7 @@ export function stackedColumns(
         title=${[column.title, ...column.segments.map((segment) => segment.title)].join("\n")}
         @click=${() => pick(column.key)}
       >
-        <span class="value"
-          >${column.on || height(column.segments) === max ? column.value : ""}</span
-        >
+        <span class="value">${valued(column) ? column.value : ""}</span>
         <svg
           width=${STACK_WIDTH}
           height=${STACK_HEIGHT}

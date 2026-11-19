@@ -12,12 +12,31 @@ import "./tag-input";
 
 export const RECONFIGURE = "/config/integrations/integration/wattbill";
 
-const input = (
-  { entity_id, attribute }: { entity_id: string | null; attribute: string | null },
-  t: Localize,
-) => (entity_id ? [entity_id, attribute].filter(Boolean).join(" · ") : t("device.not_used"));
+type Input = { entity_id: string | null; attribute?: string | null };
+
+const entityName = (hass: HomeAssistant, entityId: string) =>
+  hass.states[entityId]?.attributes.friendly_name ?? entityId;
+
+/** One line for an input: its entity's name and attribute. */
+const input = (hass: HomeAssistant, { entity_id, attribute }: Input, t: Localize) =>
+  entity_id
+    ? [entityName(hass, entity_id), attribute].filter(Boolean).join(" · ")
+    : t("device.not_used");
+
+/** An input's entity by name, with its entity id and any details below. */
+const entity = (
+  hass: HomeAssistant,
+  entityId: string,
+  ...details: (string | null | undefined)[]
+) => {
+  const name = entityName(hass, entityId);
+  const below = [name !== entityId && entityId, ...details].filter(Boolean).join(" · ");
+  return html`<div>${name}</div>
+    ${below ? html`<div class="muted small">${below}</div>` : nothing}`;
+};
 
 const consumptionDetails = (
+  hass: HomeAssistant,
   { consumption }: Device["ha_settings"],
   t: Localize,
   format: Format,
@@ -32,7 +51,7 @@ const consumptionDetails = (
             t("consumption.paused", { power: format.quantity(consumption.paused_power, "W") }),
         ]
       : [
-          input(consumption, t),
+          input(hass, consumption, t),
           consumption.source === "power" && running(consumption.running_power),
         ];
   return details.filter(Boolean).join(" · ");
@@ -98,60 +117,19 @@ export class DevicesPage extends LitElement {
       <h3>${name}</h3>
       <dl>
         <dt>${t("device.status")}</dt>
-        <dd>${input(ha.status, t)}</dd>
-        <dt>${t("device.job")}</dt>
-        <dd>${input(ha.job, t)}</dd>
-        <dt>${t("device.material")}</dt>
-        <dd class="material-used">
-          ${
-            ha.job.material
-              ? [input(ha.job.material, t), ha.job.material.unit].filter(Boolean).join(" · ")
-              : t("device.not_used")
-          }
-        </dd>
-        <dt>${t("device.slots")}</dt>
-        <dd class="slots">
-          ${
-            ha.job.slots?.length
-              ? html`<ol>
-                    ${ha.job.slots.map((slot) => html`<li>${slot}</li>`)}
-                  </ol>
-                  <div class="muted small">
-                    ${[
-                      ha.job.colour_attribute &&
-                        t("device.slot_colour", { attribute: ha.job.colour_attribute }),
-                      ha.job.loaded_slot && t("device.loaded_slot", { entity: ha.job.loaded_slot }),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </div>`
-              : t("device.not_used")
-          }
-        </dd>
-        <dt>${t("device.thumbnail")}</dt>
-        <dd>${ha.images?.thumbnail ?? t("device.not_used")}</dd>
-        <dt>${t("device.camera")}</dt>
-        <dd>
-          ${
-            ha.images?.camera
-              ? html`<div>${ha.images.camera}</div>
-                  <div class="muted small">
-                    ${t(ha.images.snapshot ? "device.snapshot_on" : "device.snapshot_off")}
-                  </div>`
-              : t("device.not_used")
-          }
-        </dd>
+        <dd>${entity(this.hass, ha.status.entity_id, ha.status.attribute)}</dd>
+        ${this.renderOptionalInputs(ha, t)}
         <dt>${t("device.consumption")}</dt>
         <dd class="consumption">
           <div>${t(`consumption.${ha.consumption.source}`)}</div>
-          <div class="muted small">${consumptionDetails(ha, t, format)}</div>
+          <div class="muted small">${consumptionDetails(this.hass, ha, t, format)}</div>
         </dd>
         <dt>${t("device.price")}</dt>
         <dd>
           ${
             ha.price.source === "fixed"
               ? t("price.fixed", { price: format.unitPrice(ha.price.value) })
-              : t("price.entity", { entity: input(ha.price, t) })
+              : t("price.entity", { entity: input(this.hass, ha.price, t) })
           }
         </dd>
       </dl>
@@ -186,6 +164,62 @@ export class DevicesPage extends LitElement {
       ${this.renderAutomatic(id, current.automatic_templates, t)}
       ${this.failed === id ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
     </div>`;
+  }
+
+  /** The Device Inputs it has, then the ones it doesn't use in one line. */
+  private renderOptionalInputs({ job, images }: Device["ha_settings"], t: Localize) {
+    const hass = this.hass;
+    const rows = [
+      ["job", t("device.job"), job.entity_id && entity(hass, job.entity_id, job.attribute)],
+      [
+        "material-used",
+        t("device.material"),
+        job.material &&
+          entity(hass, job.material.entity_id, job.material.attribute, job.material.unit),
+      ],
+      [
+        "slots",
+        t("device.slots"),
+        job.slots?.length &&
+          html`<ol>
+              ${job.slots.map((slot) => html`<li>${entityName(hass, slot)}</li>`)}
+            </ol>
+            <div class="muted small">
+              ${[
+                job.colour_attribute &&
+                  t("device.slot_colour", { attribute: job.colour_attribute }),
+                job.loaded_slot &&
+                  t("device.loaded_slot", { entity: entityName(hass, job.loaded_slot) }),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>`,
+      ],
+      ["thumbnail", t("device.thumbnail"), images?.thumbnail && entity(hass, images.thumbnail)],
+      [
+        "camera",
+        t("device.camera"),
+        images?.camera &&
+          entity(
+            hass,
+            images.camera,
+            t(images.snapshot ? "device.snapshot_on" : "device.snapshot_off"),
+          ),
+      ],
+    ] as const;
+    const unused = rows.filter(([, , shown]) => !shown).map(([, label]) => label);
+    return html`${rows.map(([name, label, shown]) =>
+      shown
+        ? html`<dt>${label}</dt>
+            <dd class=${name}>${shown}</dd>`
+        : nothing,
+    )}
+    ${
+      unused.length
+        ? html`<dt>${t("device.not_used")}</dt>
+            <dd class="unused muted">${unused.join(", ")}</dd>`
+        : nothing
+    }`;
   }
 
   private renderDefaultMaterial(

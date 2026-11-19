@@ -145,7 +145,6 @@ export class Overview extends LitElement {
     return html`
       ${this.renderStats(t, format)}
       <wattbill-run-gallery
-        class=${selected.length ? "with-basket" : ""}
         .hass=${this.hass}
         .runs=${[...this.runs.values()]}
         .devices=${this.devices}
@@ -326,7 +325,7 @@ export class Overview extends LitElement {
 
   private renderBasket(runs: RunSummary[], t: Localize, format: Format) {
     return html`<aside class="basket card" aria-label=${t("basket.title")}>
-      <div class="row between">
+      <div class="summary">
         <b>${runCount(runs.length, t)}</b>
         <b class="num"
           >${this.basketTotal.cost === undefined ? nothing : format.money(this.basketTotal.cost)}</b
@@ -338,19 +337,19 @@ export class Overview extends LitElement {
           ${t("basket.statement")}
         </ha-button>
         <ha-button
-          class="small delete"
-          appearance="plain"
-          variant="danger"
-          @click=${this.confirmDelete}
-        >
-          ${t("basket.delete")}
-        </ha-button>
-        <ha-button
           class="small clear"
           appearance="plain"
           @click=${() => (this.selected = new Set())}
         >
           ${t("basket.clear")}
+        </ha-button>
+        <ha-button
+          class="small delete end"
+          appearance="plain"
+          variant="danger"
+          @click=${this.confirmDelete}
+        >
+          ${t("basket.delete")}
         </ha-button>
       </div>
       ${this.deleteFailed ? html`<p class="error small">${t("basket.delete_failed")}</p>` : nothing}
@@ -418,32 +417,39 @@ export class Overview extends LitElement {
         margin-top: 6px;
         font-variant-numeric: tabular-nums;
       }
-      .with-basket {
-        display: block;
-        padding-bottom: 160px;
-      }
+      /* Sticks to the bottom while the gallery scrolls and rests below its last row. */
       .basket {
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
+        position: sticky;
+        bottom: 16px;
         z-index: 4;
-        width: min(320px, calc(100vw - 32px));
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 4px 16px;
         border: 2px solid var(--primary-color);
         box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
       }
       :host([narrow]) .basket {
-        right: 16px;
-        bottom: 16px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .summary {
+        display: flex;
+        gap: 8px;
       }
       .names {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        white-space: nowrap;
         overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .basket .actions {
+        flex-wrap: nowrap;
+      }
+      .basket .end {
+        margin-inline-start: auto;
+      }
+      .basket .error {
+        grid-column: 1 / -1;
       }
       .error {
         color: var(--error-color, #db4437);

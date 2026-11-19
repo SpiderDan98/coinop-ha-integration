@@ -49,7 +49,7 @@ describe("Cost Statement export", () => {
   it("is the basket's first action", async () => {
     const panel = await openDialog();
 
-    expect(text(query(panel, ".basket .actions"))).toBe("Cost Statement… Delete Clear");
+    expect(text(query(panel, ".basket .actions"))).toBe("Cost Statement… Clear Delete");
   });
 
   it("downloads the selected Runs, by start, with the hub's default Markup", async () => {

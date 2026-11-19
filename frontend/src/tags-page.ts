@@ -1,5 +1,6 @@
 // The Tags tab: each Tag with its Run count and total cost, renamed (or merged into
 // another by its name) and deleted here. The catalogue follows by subscription.
+import { mdiDelete, mdiPencil } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { deleteTag, getAggregates, renameTag, type RunSummary } from "./api";
@@ -130,28 +131,25 @@ export class TagsPage extends LitElement {
           ${t("tags.cancel")}
         </ha-button>`;
     }
-    return html`<ha-button
-        class="small"
-        appearance="plain"
+    return html`<ha-icon-button
+        class="rename"
+        .label=${t("tags.rename")}
+        .path=${mdiPencil}
         @click=${() => {
           this.renaming = { tag, name: tag };
           this.confirming = undefined;
           this.focusRename = true;
         }}
-      >
-        ${t("tags.rename")}
-      </ha-button>
-      <ha-button
-        class="small"
-        appearance="plain"
-        variant="danger"
+      ></ha-icon-button>
+      <ha-icon-button
+        class="delete"
+        .label=${t("tags.delete")}
+        .path=${mdiDelete}
         @click=${() => {
           this.confirming = tag;
           this.renaming = undefined;
         }}
-      >
-        ${t("tags.delete")}
-      </ha-button>`;
+      ></ha-icon-button>`;
   }
 
   private async rename() {
@@ -211,6 +209,11 @@ export class TagsPage extends LitElement {
       .actions {
         text-align: right;
         white-space: nowrap;
+      }
+      .actions ha-icon-button {
+        --ha-icon-button-size: 36px;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
       }
       .delete-hint {
         white-space: normal;

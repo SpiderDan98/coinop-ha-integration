@@ -5,7 +5,9 @@ import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } fr
 
 const chips = (root: Element) => queryAll(root, ".tag-chip .tag-name").map(text);
 const button = (root: Element, label: string) => {
-  const found = queryAll(root, "ha-button, button").find((candidate) => text(candidate) === label);
+  const found = queryAll(root, "ha-button, ha-icon-button, button").find(
+    (candidate) => text(candidate) === label || (candidate as { label?: string }).label === label,
+  );
   if (!found) throw new Error(`no button "${label}"`);
   return found;
 };
@@ -54,11 +56,7 @@ describe("Tags tab", () => {
   it("lists each Tag with its Run count and total cost", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/tags" });
 
-    expect(rows(panel)).toEqual([
-      "Cosplay helmet 1 €0.30 Rename Delete",
-      "Gift 2 €1.16 Rename Delete",
-      "Spare parts 0 €0.00 Rename Delete",
-    ]);
+    expect(rows(panel)).toEqual(["Cosplay helmet 1 €0.30", "Gift 2 €1.16", "Spare parts 0 €0.00"]);
   });
 
   it("renames a Tag, saying when the new name merges it into another", async () => {
@@ -122,7 +120,7 @@ describe("Tags tab", () => {
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/tags" });
 
-    expect(rows(panel)[1]).toBe("Gift 2 1,16 € Umbenennen Löschen");
+    expect(rows(panel)[1]).toBe("Gift 2 1,16 €");
   });
 });
 

@@ -497,14 +497,14 @@ export class RunPage extends LitElement {
           .value=${values.name}
           placeholder=${run.job_name ?? t("run.untitled")}
       /></label>
-      <label
+      <label class="wide"
         >${t("run.started")}<input
           type="datetime-local"
           name="started"
           .value=${values.started}
           ?disabled=${locked}
       /></label>
-      <label
+      <label class="wide"
         >${t("run.ended")}<input
           type="datetime-local"
           name="ended"

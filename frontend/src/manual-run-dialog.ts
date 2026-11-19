@@ -61,20 +61,24 @@ export class ManualRunDialog extends LitElement {
       <div class="manual-dialog dialog card">
         <h2>${t("manual.title")}</h2>
         <p class="muted small">${t("manual.hint")}</p>
-        <label
-          >${t("run.device")}<select
-            name="device"
-            @change=${(event: Event) => {
-              this.deviceId = input(event);
-              this.runTags = undefined;
-            }}
-          >
-            ${this.devices.map(
-              ({ id, name }) =>
-                html`<option value=${id} ?selected=${id === device?.id}>${name}</option>`,
-            )}
-          </select></label
-        >
+        ${
+          this.devices.length > 1
+            ? html`<label
+                >${t("run.device")}<select
+                  name="device"
+                  @change=${(event: Event) => {
+                    this.deviceId = input(event);
+                    this.runTags = undefined;
+                  }}
+                >
+                  ${this.devices.map(
+                    ({ id, name }) =>
+                      html`<option value=${id} ?selected=${id === device?.id}>${name}</option>`,
+                  )}
+                </select></label
+              >`
+            : nothing
+        }
         <label
           >${t("run.name")}<input
             name="name"

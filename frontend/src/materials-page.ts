@@ -1,7 +1,16 @@
 // The Materials tab: the global catalogue, edited in place. The list itself comes
 // from the panel's catalogue subscription, so every open panel shows each change.
 // Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
-import { mdiClose, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
+import {
+  mdiArchiveArrowUpOutline,
+  mdiArchiveOutline,
+  mdiClose,
+  mdiDelete,
+  mdiPencil,
+  mdiPlus,
+  mdiStar,
+  mdiStarOutline,
+} from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -353,34 +362,26 @@ export class MaterialsPage extends LitElement {
           ${t("materials.cancel")}
         </ha-button>`;
     }
-    const remove = html`<ha-button
-      class="small"
-      appearance="plain"
-      variant="danger"
-      @click=${() => (this.confirming = material.id)}
-    >
-      ${t("materials.delete")}
-    </ha-button>`;
+    const action = (name: string, label: string, path: string, run: () => void) =>
+      html`<ha-icon-button
+        class=${name}
+        .label=${label}
+        .path=${path}
+        @click=${run}
+      ></ha-icon-button>`;
+    const remove = action("delete", t("materials.delete"), mdiDelete, () => {
+      this.confirming = material.id;
+    });
     return material.archived
-      ? html`<ha-button
-            class="small"
-            appearance="plain"
-            @click=${() => this.act(() => restoreMaterial(this.hass, material.id))}
-          >
-            ${t("materials.restore")}
-          </ha-button>
-          ${remove}`
-      : html`<ha-button class="small" appearance="plain" @click=${() => this.open(material)}>
-            ${t("materials.edit")}
-          </ha-button>
-          <ha-button
-            class="small"
-            appearance="plain"
-            @click=${() => this.act(() => archiveMaterial(this.hass, material.id))}
-          >
-            ${t("materials.archive")}
-          </ha-button>
-          ${remove}`;
+      ? html`${action("restore", t("materials.restore"), mdiArchiveArrowUpOutline, () =>
+          this.act(() => restoreMaterial(this.hass, material.id)),
+        )}${remove}`
+      : html`${action("edit", t("materials.edit"), mdiPencil, () => this.open(material))}${action(
+          "archive",
+          t("materials.archive"),
+          mdiArchiveOutline,
+          () => this.act(() => archiveMaterial(this.hass, material.id)),
+        )}${remove}`;
   }
 
   private renderForm(draft: Draft, t: Localize) {
@@ -714,6 +715,11 @@ export class MaterialsPage extends LitElement {
       .actions {
         white-space: nowrap;
         text-align: right;
+      }
+      .actions ha-icon-button {
+        --ha-icon-button-size: 36px;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
       }
       .swatch {
         width: 14px;

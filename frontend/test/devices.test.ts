@@ -34,10 +34,8 @@ describe("Devices tab", () => {
       "Kobra " +
         "Print status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
-        "Material used sensor.kobra_filament_used · mm " +
-        "Slots Not used " +
-        "Thumbnail Not used " +
-        "Camera Not used " +
+        "Material used sensor.kobra_filament_used mm " +
+        "Not used Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
         "Electricity price €0.30 per kWh " +
         "Device Inputs, consumption source and price are changed in Home Assistant. " +
@@ -73,12 +71,8 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Print status event.kobra_print · event_type " +
-        "Print job Not used " +
-        "Material used Not used " +
-        "Slots Not used " +
-        "Thumbnail Not used " +
-        "Camera Not used " +
+      "Print status event.kobra_print event_type " +
+        "Not used Print job, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
     );
@@ -96,11 +90,24 @@ describe("Devices tab", () => {
 
     const on = await mountPanel(withImages(true), { path: "/devices" });
     expect(text(query(on, ".device dl"))).toContain(
-      "Thumbnail image.kobra_preview Camera camera.kobra Snapshot when a Run ends Consumption",
+      "Thumbnail image.kobra_preview Camera camera.kobra Snapshot when a Run ends Not used Slots",
     );
     on.remove();
     const off = await mountPanel(withImages(false), { path: "/devices" });
-    expect(text(query(off, ".device dl"))).toContain("Camera camera.kobra No Snapshot Consumption");
+    expect(text(query(off, ".device dl"))).toContain(
+      "Camera camera.kobra No Snapshot Not used Slots",
+    );
+  });
+
+  it("names each input's entity by its friendly name, its entity id below", async () => {
+    const backend = recordedBackend();
+    backend.hass.states = {
+      "sensor.kobra_status": { attributes: { friendly_name: "Kobra Print status" } },
+    };
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device dd"))).toBe("Kobra Print status sensor.kobra_status");
   });
 
   it("shows no images for a Device added before they existed", async () => {
@@ -111,7 +118,7 @@ describe("Devices tab", () => {
 
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    expect(text(query(panel, ".device dl"))).toContain("Thumbnail Not used Camera Not used");
+    expect(text(query(panel, ".device dl"))).toContain("Not used Slots, Thumbnail, Camera");
   });
 
   it("names the Slots in order with their colour attribute and the Loaded slot", async () => {
@@ -227,10 +234,8 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Druckstatus sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
-        "Materialverbrauch sensor.kobra_filament_used · mm " +
-        "Fächer Nicht verwendet " +
-        "Vorschaubild Nicht verwendet " +
-        "Kamera Nicht verwendet " +
+        "Materialverbrauch sensor.kobra_filament_used mm " +
+        "Nicht verwendet Fächer, Vorschaubild, Kamera " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +
         "Strompreis 0,30 € pro kWh",
     );

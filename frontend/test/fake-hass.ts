@@ -177,6 +177,7 @@ export class FakeBackend {
     this.hass = {
       language,
       config: { currency, time_zone: timeZone },
+      states: {},
       callWS: async <T>(msg: Message) => {
         this.calls.push(msg);
         const reply = this.replies.get(msg.type);
