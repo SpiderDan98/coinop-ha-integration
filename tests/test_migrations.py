@@ -3,8 +3,8 @@
 `fixtures/storage/<major>.<minor>/` holds the Store files exactly as that
 version wrote them, the hub entry's data (`entry.json`) and the Runs as the
 current version stores them after migrating (`current.json`). Add a folder for
-every released schema version; never change an existing one except
-`current.json`.
+every released schema version; once released, never change it except
+`current.json`. Until then it follows what the code writes.
 """
 
 import json
@@ -71,7 +71,7 @@ async def test_fields_added_by_a_newer_minor_version_are_kept(
     newer = read(FIXTURES / "1.1" / "wattbill.runs")
     newer["minor_version"] = 99
     [run, _] = newer["data"]["runs"]
-    run["part_count"] = 4
+    run["customer"] = "Lena"
     run["line_items"][0]["override"] = {"amount": 0.1}
     run["line_items"][0]["segments"][0]["source"] = "sensor.price"
     hass_storage["wattbill.runs"] = newer

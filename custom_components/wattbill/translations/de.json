@@ -50,6 +50,18 @@
             "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn der Drucker nur „druckt / druckt nicht“ meldet."
           }
         },
+        "job": {
+          "title": "Druckauftrag",
+          "description": "Wähle optional die Entität, die den Namen des aktuellen Druckauftrags meldet. Ein Lauf wird nach seinem Auftrag benannt, und ein Druck, der mit demselben Auftragsnamen wieder startet, z. B. nach einem Stromausfall, setzt denselben Lauf fort.",
+          "data": {
+            "entity_id": "Auftragsname-Entität (optional)",
+            "attribute": "Attribut (optional)"
+          },
+          "data_description": {
+            "entity_id": "Ohne Auftragsnamen setzt ein Druck, der bei offenem Lauf wieder startet, immer diesen Lauf fort.",
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Druckereignis-Entität."
+          }
+        },
         "consumption": {
           "title": "Stromverbrauch",
           "description": "Wie soll WattBill den Strom bestimmen, den ein Lauf verbraucht?",
@@ -86,9 +98,49 @@
     }
   },
   "entity": {
+    "event": {
+      "run": {
+        "name": "Lauf",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Gestartet",
+              "ended": "Beendet"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "total_cost": {
         "name": "Gesamtkosten"
+      },
+      "electricity_cost": {
+        "name": "Stromkosten"
+      },
+      "material_cost": {
+        "name": "Materialkosten"
+      },
+      "other_cost": {
+        "name": "Sonstige Kosten"
+      },
+      "material_used": {
+        "name": "Materialverbrauch"
+      },
+      "energy_in_runs": {
+        "name": "Energie in Läufen"
+      },
+      "running_time": {
+        "name": "Laufzeit"
+      },
+      "current_run_cost": {
+        "name": "Kosten aktueller Lauf"
+      },
+      "last_run_cost": {
+        "name": "Kosten letzter Lauf"
+      },
+      "flagged_runs": {
+        "name": "Läufe mit Hinweisen"
       },
       "runs": {
         "name": "Läufe"

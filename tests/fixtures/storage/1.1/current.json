@@ -5,9 +5,12 @@
       "device_id": "01KF00000000000000000DEV01",
       "device_name": "Kobra",
       "name": null,
+      "job_name": null,
       "started": "2026-01-10T08:00:00+00:00",
+      "last_seen": "2026-01-10T10:30:00+00:00",
       "ended": "2026-01-10T10:30:00+00:00",
       "outcome": "completed",
+      "end_reconstructed": false,
       "finalised": true,
       "pauses": [
         {
@@ -16,6 +19,7 @@
         }
       ],
       "flags": [],
+      "part_count": 1,
       "line_items": [
         {
           "id": "01KF0000000000000000000I01",
@@ -48,12 +52,16 @@
       "device_id": "01KF00000000000000000DEV01",
       "device_name": "Kobra",
       "name": null,
+      "job_name": null,
       "started": "2026-01-12T14:00:00+00:00",
+      "last_seen": "2026-01-12T14:20:00+00:00",
       "ended": "2026-01-12T14:20:00+00:00",
       "outcome": "cancelled",
+      "end_reconstructed": false,
       "finalised": true,
       "pauses": [],
       "flags": [],
+      "part_count": 1,
       "line_items": [
         {
           "id": "01KF0000000000000000000I02",
@@ -82,17 +90,21 @@
       "device_id": "01KF00000000000000000DEV02",
       "device_name": "Prusa",
       "name": null,
+      "job_name": null,
       "started": "2026-01-15T09:00:00+00:00",
+      "last_seen": "2026-01-15T09:30:00+00:00",
       "ended": null,
       "outcome": null,
+      "end_reconstructed": false,
       "finalised": false,
       "pauses": [
         {
-          "start": "2026-01-15T09:40:00+00:00",
+          "start": "2026-01-15T09:20:00+00:00",
           "end": null
         }
       ],
       "flags": [],
+      "part_count": 1,
       "line_items": [
         {
           "id": "01KF0000000000000000000I03",

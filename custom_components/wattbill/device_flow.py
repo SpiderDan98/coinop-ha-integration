@@ -87,7 +87,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 errors["base"] = error
             else:
                 self._data["mapping"] = mapping
-                return await self.async_step_consumption()
+                return await self.async_step_job()
         status = self._data["status"]
         values = SelectSelector(
             SelectSelectorConfig(
@@ -103,6 +103,25 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             step_id="mapping",
             data_schema=self.add_suggested_values_to_schema(schema, user_input),
             errors=errors,
+        )
+
+    async def async_step_job(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            self._data["job"] = {
+                "entity_id": user_input.get("entity_id"),
+                "attribute": user_input.get("attribute") or None,
+            }
+            return await self.async_step_consumption()
+        return self.async_show_form(
+            step_id="job",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional("entity_id"): EntitySelector(),
+                    vol.Optional("attribute"): TextSelector(),
+                }
+            ),
         )
 
     async def async_step_consumption(
