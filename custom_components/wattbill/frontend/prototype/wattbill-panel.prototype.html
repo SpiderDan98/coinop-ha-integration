@@ -804,12 +804,16 @@ function bInsights() {
 }
 
 // ---------- Variant C: overview dashboard, gallery, full-page Run with edit mode ----------
+const D_TABS = [['analysis', 'Analysis', aAnalysis], ['materials', 'Materials', renderMaterials], ['templates', 'Line Item Templates', renderTemplates], ['devices', 'Devices', renderDevices]];
 function renderC() {
-  const p = U.C.page, r = $run(U.C.id);
+  const p = U.C.page, r = $run(U.C.id), isD = current === 'D', tab = isD && D_TABS.find(t => t[0] === p);
   const home = html`<button class="link" style="font-size:20px" @click=${act(() => { U.C.page = 'home'; U.C.draft = null; })}>WattBill</button>`;
-  const title = p === 'home' ? 'WattBill' : html`${home}<span class="muted"> › </span>${p === 'run' ? r?.name : 'Catalogues'}`;
-  return chrome(title, html`<button class="btn" @click=${act(() => S.dialog = { kind: 'new-run' })}>+ Manual Run</button><button class="btn" @click=${act(() => { U.C.page = 'settings'; U.C.draft = null; })}>⚙ Catalogues</button>`,
-    html`<div class="page">${p === 'run' && r ? cRun(r) : p === 'settings' ? cSettings() : cHome()}</div>${p === 'home' && S.sel.size ? cBasket() : nothing}`);
+  const title = p === 'home' ? 'WattBill' : html`${home}<span class="muted"> › </span>${p === 'run' ? r?.name : tab ? tab[1] : 'Catalogues'}`;
+  const tools = isD
+    ? html`<div class="seg">${D_TABS.map(([k, l]) => html`<button class=${p === k ? 'on' : ''} @click=${act(() => U.C.page = p === k ? 'home' : k)}>${l}</button>`)}</div><button class="btn" @click=${act(() => S.dialog = { kind: 'new-run' })}>+ Manual Run</button>`
+    : html`<button class="btn" @click=${act(() => S.dialog = { kind: 'new-run' })}>+ Manual Run</button><button class="btn" @click=${act(() => { U.C.page = 'settings'; U.C.draft = null; })}>⚙ Catalogues</button>`;
+  const body = p === 'run' && r ? cRun(r) : tab ? tab[2]() : p === 'settings' && !isD ? cSettings() : cHome();
+  return chrome(title, tools, html`<div class="page">${body}</div>${p === 'home' && S.sel.size ? cBasket() : nothing}`);
 }
 function cHome() {
   const all = stats(), nov = S.runs.filter(r => monthKey(r.start) === '2026-11'), flagged = S.runs.filter(r => openFlags(r).length), live = S.runs.find(isOpen);
@@ -855,11 +859,12 @@ function cSave() {
   toast(delta ? `Saved. The Device cost sensors change by ${delta > 0 ? '+' : ''}${money(delta)} now (in this month's statistics).` : 'Saved. No cost change.');
 }
 function cRun(orig) {
-  const editing = !!U.C.draft, r = U.C.draft ?? orig, hint = splitHint(r);
-  return html`<div class=${editing ? 'editing' : ''}>
-    ${editing ? html`<div class="banner">Editing: changes apply when you save. Computed values you change become manual and can be reset.</div>` : nothing}
+  const isD = current === 'D', editing = isD || !!U.C.draft, r = isD ? orig : U.C.draft ?? orig, hint = splitHint(r);
+  return html`<div class=${editing && !isD ? 'editing' : ''}>
+    ${editing && !isD ? html`<div class="banner">Editing: changes apply when you save. Computed values you change become manual and can be reset.</div>` : nothing}
     <div class="c-runbar">${outcomeChip(r)}${r.manualRun ? html`<span class="tag">manual Run</span>` : nothing}<span class="muted">${$dev(r.deviceId).name} · ${fmtDT(r.start)}</span><div class="spacer"></div>
-      ${editing ? html`<button class="btn" @click=${act(() => U.C.draft = null)}>Cancel</button><button class="btn primary" @click=${act(cSave)}>Save changes</button>`
+      ${isD ? html`<span class="muted small">Every change saves at once; the Device sensors take the difference at edit time.</span>${isOpen(r) ? html`<button class="btn" @click=${act(() => endRunNow(r))}>End Run now</button>` : nothing}<button class="btn danger" @click=${act(() => S.dialog = { kind: 'delete', ids: [r.id] })}>Delete</button>`
+      : editing ? html`<button class="btn" @click=${act(() => U.C.draft = null)}>Cancel</button><button class="btn primary" @click=${act(cSave)}>Save changes</button>`
         : html`${isOpen(r) ? html`<button class="btn" @click=${act(() => endRunNow(r))}>End Run now</button>` : nothing}<button class="btn danger" @click=${act(() => S.dialog = { kind: 'delete', ids: [r.id] })}>Delete</button><button class="btn primary" @click=${act(() => U.C.draft = structuredClone(orig))}>Edit</button>`}</div>
     <div class="c-grid">
       <div class="card c-left">${r.images[0] ? html`<img class="big" src=${r.images[0].src} alt="">` : html`<div class="noimg">No image</div>`}${imageStrip(r)}
@@ -889,9 +894,9 @@ function cSettings() {
 }
 
 // ---------- switcher, live ticker, element ----------
-const VARIANTS = [['A', 'Tabs + table + drawer'], ['B', 'Rail + split view + dialogs'], ['C', 'Overview + gallery + pages']];
+const VARIANTS = [['A', 'Tabs + table + drawer'], ['B', 'Rail + split view + dialogs'], ['C', 'Overview + gallery + pages'], ['D', 'Chosen: C, edit in place, toolbar tabs']];
 let current = new URLSearchParams(location.search).get('variant')?.toUpperCase();
-if (!VARIANTS.some(v => v[0] === current)) current = 'A';
+if (!VARIANTS.some(v => v[0] === current)) current = 'D';
 function go(delta) {
   const i = VARIANTS.findIndex(v => v[0] === current);
   current = VARIANTS[(i + delta + VARIANTS.length) % VARIANTS.length][0];
