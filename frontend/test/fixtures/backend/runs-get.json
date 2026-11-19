@@ -184,7 +184,7 @@
       "consumption": {
         "source": "estimate",
         "running_power": 120.0,
-        "paused_power": null
+        "paused_power": 8.0
       },
       "line_items": [
         {

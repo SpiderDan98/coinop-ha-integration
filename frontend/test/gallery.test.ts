@@ -11,7 +11,7 @@ describe("Run gallery", () => {
     const panel = await mountPanel(recordedBackend());
 
     expect(tiles(panel)).toEqual([
-      "No image Untitled Run Mini · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
+      "No image Untitled Run Mini (removed) · Jan 14, 2026 · 0 h 30 min Cancelled €0.07",
       "No image Helmet Kobra · Jan 13, 2026 · 9 h 0 min Failed €0.30",
       "No image Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86",
     ]);
@@ -42,14 +42,14 @@ describe("Run gallery", () => {
     expect(tiles(panel)).toHaveLength(3);
   });
 
-  it("subscribes once and never polls", async () => {
+  it("subscribes once, loads the Devices once and never polls", async () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend);
 
     panel.hass = backend.update({});
     await settle(panel);
 
-    expect(backend.calls).toEqual([{ type: SUBSCRIBE }]);
+    expect(backend.calls).toEqual([{ type: SUBSCRIBE }, { type: "wattbill/devices/list" }]);
   });
 
   it("stops listening when HA removes the panel", async () => {

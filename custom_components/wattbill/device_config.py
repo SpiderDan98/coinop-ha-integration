@@ -42,6 +42,8 @@ class DeviceConfig:
     # The consumption section as Add Device wrote it.
     consumption: Mapping[str, Any]
     price: float
+    # The subentry data as the flow wrote it: the Device's HA-side settings.
+    flow_data: Mapping[str, Any]
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
@@ -62,6 +64,7 @@ class DeviceConfig:
             job_attribute=job.get("attribute"),
             consumption=data["consumption"],
             price=data["price"]["value"],
+            flow_data=data,
         )
 
     def target(self, value: str) -> Target:

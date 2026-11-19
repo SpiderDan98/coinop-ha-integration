@@ -2,11 +2,11 @@
 // Refetches the Run whenever its summary changes, so it follows live updates.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { KINDS, getRun, type LineItem, type RunDetail, type RunSummary } from "./api";
+import { KINDS, getRun, type Device, type LineItem, type RunDetail, type RunSummary } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import { outcomeChip, runName } from "./run-parts";
+import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 
 const evidence = (item: LineItem, t: Localize) =>
@@ -23,6 +23,8 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) runId = "";
   /** The Run's entry in the live list; a new object means the Run changed. */
   @property({ attribute: false }) summary?: RunSummary;
+  /** Current Devices; any other Device is shown as removed. */
+  @property({ attribute: false }) devices?: Device[];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
@@ -57,10 +59,11 @@ export class RunPage extends LitElement {
     if (!this.run) return html`<p class="muted">${t("run.loading")}</p>`;
     const run = this.run;
     const format = formatter(this.hass);
+    const device = deviceName(run, this.devices, t);
     return html`
       <div class="runbar row">
         ${outcomeChip(run, t)}
-        <span class="muted">${run.device_name} · ${format.dateTime(run.started)}</span>
+        <span class="muted">${device} · ${format.dateTime(run.started)}</span>
       </div>
       <div class="grid">
         <div class="card facts">
@@ -68,7 +71,7 @@ export class RunPage extends LitElement {
           <h1>${runName(run, t)}</h1>
           <dl>
             <dt>${t("run.device")}</dt>
-            <dd>${run.device_name}</dd>
+            <dd>${device}</dd>
             <dt>${t("run.started")}</dt>
             <dd>${format.dateTime(run.started)}</dd>
             <dt>${t("run.ended")}</dt>

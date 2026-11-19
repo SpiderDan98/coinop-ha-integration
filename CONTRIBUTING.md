@@ -16,19 +16,20 @@
 - `cost/`: the pure cost core (no HA imports): `consumption.py` (kWh between two moments: estimate, energy meter interpolated between readings, power sensor by the left rule), `electricity.py` (price segments and the Electricity Line Item), `running_time.py` (running time without pauses), `totals.py` (per-Device totals advanced by deltas).
 - `tracker.py`: the Run engine for one Device (Status input → open, pause, end Run; reconciling after an outage; job changes; meter readings with gap and reset Flags; live refresh every minute, finalisation). A metered Run waits up to five minutes after its end for the meter's next report; `_end` returns a future done once the Run is finalised. On start, `async_start` fills each unfinalised metered Run's missed reports from recorder history before applying the Status input.
 - `run_book.py`: all Runs in memory; every change goes through it so Stores, totals and listeners (`async_listen`) stay in step.
+- `device_settings.py`: a Device's panel settings (WattBill's own per-Device settings, set in the Devices tab), kept in the `device_settings` Store. A new setting is one entry in `FIELDS` (default and the schema a new value must pass); it then appears in `wattbill/devices/list` and can be changed with `wattbill/devices/update_settings`. Settings of removed Devices are dropped at setup.
 - `store.py`: every Store (registered in `SCHEMAS`) and the file folder (`files_path`). `WattBillStores` loads them together at setup (failing on missing or newer-major data), copies a Store to `<key>.bak` before a major migration and deletes everything when the hub entry is removed; `RunStore` writes Runs to `runs` and `live`. A new Store or file kind only registers there.
 - `repairs.py`: the fix flow for missing data (restore guidance or a deliberate fresh start). `backup.py`: writes pending delayed saves before a backup.
 - `ha_device.py`: WattBill's own HA device per Device (registered at setup, linked to the printer's HA device), its `device_info`, and renames from the HA device page. Removing a Device ends its open Run as Unknown in `__init__.py` before the reload; `Run.device_name` always holds the Device's current name.
 - `entity.py`: `DeviceEntity`, the base of every per-Device entity (device info, re-read on any change to one of the Device's Runs). `sensor.py`: totals, Current and Last Run cost, Flagged Runs. `event.py`: the Run event (`started`, and `ended` only from finalisation).
 - `cost/rounding.py`: amounts rounded to the currency's decimals; subtotals and totals are sums of rounded amounts.
 - `panel.py`: registers the admin-only panel while the hub entry is loaded and serves the bundle at a URL that changes with its content.
-- `websocket/`: the panel's backend API, one module per area (`runs.py`, ...). See [Websocket commands](#websocket-commands).
+- `websocket/`: the panel's backend API, one module per area (`runs.py`, `devices.py`, ...). See [Websocket commands](#websocket-commands).
 
 ### Panel modules
 
-- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription and routes by `route.path` (`""` gallery, `/run/<id>` Run page).
+- `src/wattbill-panel.ts`: the element HA creates. It receives only `hass`, `narrow`, `route` and `panel`, keeps the Runs subscription, loads the Devices (again when the Devices tab opens or a Run of an unlisted Device changes) and routes by `route.path` (`""` gallery, `/run/<id>` Run page, `/<tab>` for each toolbar tab in `TABS`). A Run whose `device_id` is not among the loaded Devices belongs to a removed Device (`deviceName` in `run-parts.ts`).
 - `src/api.ts`: the websocket commands and the shapes they return. `src/hass.ts`: the part of `hass` the panel uses, plus `navigate` / `followLink` for in-app links.
-- `src/run-gallery.ts`, `src/run-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
+- `src/run-gallery.ts`, `src/run-page.ts`, `src/devices-page.ts`: the views. `src/run-parts.ts`: pieces both show. `src/styles.ts`: shared styles on HA's theme variables.
 - `src/localize.ts` with `src/translations/{en,de}.json` (flat keys): panel strings, chosen by `hass.language`, falling back to English. `src/format.ts`: money, dates and durations.
 
 ## Setup
