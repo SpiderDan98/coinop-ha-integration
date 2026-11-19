@@ -14,9 +14,11 @@ from .store import WattBillStore
 from .tags import retag, tag_name
 
 TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
+AUTOMATIC_TEMPLATES = "automatic_templates"
 
 FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
+    AUTOMATIC_TEMPLATES: ([], vol.All([str], vol.Unique())),
 }
 
 
@@ -70,6 +72,18 @@ class DeviceSettings:
         for settings in tagged:
             settings[TAGS_FOR_NEW_RUNS] = retag(settings[TAGS_FOR_NEW_RUNS], tag, new)
         if tagged:
+            await self._save()
+
+    async def async_drop_template(self, template_id: str) -> None:
+        """Take a deleted template out of every Device's automatic templates."""
+        using = [
+            settings
+            for settings in self._devices.values()
+            if template_id in settings.get(AUTOMATIC_TEMPLATES, [])
+        ]
+        for settings in using:
+            settings[AUTOMATIC_TEMPLATES].remove(template_id)
+        if using:
             await self._save()
 
     async def async_prune(self) -> None:

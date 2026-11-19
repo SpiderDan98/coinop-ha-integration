@@ -27,16 +27,17 @@ from homeassistant.helpers.recorder import get_instance
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
+from .catalog import Catalog
 from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
 from .device_config import ConsumptionSource, DeviceConfig, Target
 from .device_inputs import input_time, input_value, meter_reading, price_reading
-from .device_settings import TAGS_FOR_NEW_RUNS, DeviceSettings
+from .device_settings import AUTOMATIC_TEMPLATES, TAGS_FOR_NEW_RUNS, DeviceSettings
 from .images import DeviceImages
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
-from .templates import count_running_hours
+from .templates import add_templates, count_running_hours
 
 LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
@@ -65,12 +66,14 @@ class DeviceTracker:
         config: DeviceConfig,
         settings: DeviceSettings,
         images: DeviceImages,
+        catalog: Catalog,
     ) -> None:
         self._hass = hass
         self._book = book
         self._config = config
         self._settings = settings
         self._images = images
+        self._catalog = catalog
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
@@ -337,6 +340,7 @@ class DeviceTracker:
         return input_value(state, self._config.job_attribute) or None
 
     def _open(self, at: datetime, job_name: str | None) -> None:
+        settings = self._settings.get(self._config.device_id)
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
@@ -348,13 +352,16 @@ class DeviceTracker:
             line_items=[],
             consumption=dict(self._config.consumption),
             cost_source=dict(self._config.price),
-            tags=self._settings.get(self._config.device_id)[TAGS_FOR_NEW_RUNS],
+            tags=settings[TAGS_FOR_NEW_RUNS],
         )
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
         self._follow_average_power(run, at)
         self._open_prices(run, at)
         self._refresh(run, at)
+        add_templates(
+            run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
+        )
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
 

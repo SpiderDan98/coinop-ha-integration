@@ -95,6 +95,7 @@ async def _delete(
     """Also leaves every Device's automatic templates; Runs keep their copies."""
     if template := _found(connection, msg, wattbill):
         await wattbill.catalog.async_delete_template(template)
+        await wattbill.settings.async_drop_template(template.id)
         connection.send_result(msg["id"], {})
 
 

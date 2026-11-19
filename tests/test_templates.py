@@ -3,15 +3,17 @@
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_hub
+from .devices import add_device, add_hub
 from .stored import place_runs, stored_run
 from .test_line_items import OTHER_COST, add_other, open_run, printed
 from .test_persistence import restart
-from .test_runs import set_status, value
+from .test_runs import set_status, stored_runs, value
+from .test_sensors import CURRENT, print_runs
 from .websocket import PanelClient
 
 WEAR = {
@@ -299,6 +301,133 @@ async def test_a_line_item_without_a_label_needs_one_to_be_saved(
 
     assert [error["code"] for error in errors] == ["invalid_format"] * 2
     assert missing["code"] == "not_found"
+
+
+async def set_automatic(
+    panel: PanelClient, device: ConfigSubentry, *templates: dict[str, Any]
+) -> Any:
+    result = await panel.call(
+        "wattbill/devices/update_settings",
+        device_id=device.subentry_id,
+        settings={"automatic_templates": [t["id"] for t in templates]},
+    )
+    return result["settings"]["automatic_templates"]
+
+
+def other_items(hass_storage: dict[str, Any]) -> list[list[tuple[Any, ...]]]:
+    """Per stored Run: (label, quantity, amount) of its Other Line Items."""
+    return [
+        [
+            (i["label"], round(i["quantity"], 6), round(i["amount"], 6))
+            for i in run["line_items"]
+            if i["kind"] == "other"
+        ]
+        for run in stored_runs(hass_storage)
+    ]
+
+
+async def test_automatic_templates_are_added_at_run_start_and_count_live(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, running_power=100, price=1)
+    wear = await create(panel, **WEAR)
+    inserts = await create(panel, **INSERTS)
+    assert await set_automatic(panel, kobra, wear, inserts) == [
+        wear["id"],
+        inserts["id"],
+    ]
+
+    await set_status(hass, "printing")
+    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    started = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    assert [
+        (i["label"], i["quantity"], i["locked"], i["template_id"])
+        for i in started["line_items"][1:]
+    ] == [
+        ("Wear Kobra", 0, True, wear["id"]),
+        ("Threaded inserts", 8, False, inserts["id"]),
+    ]
+    await clock.advance(hours=1)
+    assert (await wear_of(panel, run["id"]))["quantity"] == pytest.approx(1)
+    assert value(hass, CURRENT) == pytest.approx(0.1 + 0.15 + 0.64)
+
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await clock.advance(hours=1)
+
+    assert other_items(hass_storage) == [
+        [("Wear Kobra", 2, 0.3), ("Threaded inserts", 8, 0.64)]
+    ]
+
+
+async def test_changing_automatic_templates_affects_only_future_runs(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry, running_power=100, price=1)
+    wear = await create(panel, **WEAR)
+    inserts = await create(panel, **INSERTS)
+    await set_automatic(panel, kobra, wear)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+
+    await set_automatic(panel, kobra, inserts)
+    await panel.call(
+        "wattbill/templates/update",
+        template_id=wear["id"],
+        template={"label": "Nozzle", "unit_price": 1},
+    )
+    await set_status(hass, "finished")
+    await print_runs(hass, clock, [1])
+
+    assert other_items(hass_storage) == [
+        [("Wear Kobra", 1, 0.15)],
+        [("Threaded inserts", 8, 0.64)],
+    ]
+
+
+async def test_a_deleted_template_leaves_every_devices_automatic_templates(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry)
+    mini = await add_device(hass, entry, name="Mini", status="sensor.mini_status")
+    wear = await create(panel, **WEAR)
+    inserts = await create(panel, **INSERTS)
+    await set_automatic(panel, kobra, wear, inserts)
+    await set_automatic(panel, mini, wear)
+
+    await panel.call("wattbill/templates/delete", template_id=wear["id"])
+
+    devices = (await panel.call("wattbill/devices/list"))["devices"]
+    assert [d["settings"]["automatic_templates"] for d in devices] == [
+        [inserts["id"]],
+        [],
+    ]
+
+
+async def test_automatic_templates_must_exist(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    kobra = await add_device(hass, entry)
+    wear = await create(panel, **WEAR)
+
+    errors = [
+        await panel.error(
+            "wattbill/devices/update_settings",
+            device_id=kobra.subentry_id,
+            settings={"automatic_templates": ids},
+        )
+        for ids in (["nope"], [wear["id"], wear["id"]], wear["id"])
+    ]
+
+    assert [error["code"] for error in errors] == [
+        "not_found",
+        "invalid_format",
+        "invalid_format",
+    ]
 
 
 async def test_a_template_is_added_only_to_runs_and_from_templates_that_exist(
