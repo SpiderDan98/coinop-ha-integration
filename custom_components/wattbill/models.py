@@ -189,7 +189,10 @@ class LineItem:
     def is_computed(self) -> bool:
         """WattBill computes its values, live while the Run is open."""
         return (
-            self.kind is LineItemKind.ELECTRICITY
+            (
+                self.kind is LineItemKind.ELECTRICITY
+                and self.method is not ElectricityMethod.ENTERED
+            )
             or self.measured
             or self.basis is QuantityBasis.RUNNING_HOURS
         )

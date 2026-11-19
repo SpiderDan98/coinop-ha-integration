@@ -295,6 +295,32 @@ async def test_record_line_item_corrections(
     )
 
 
+async def test_record_a_manual_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, running_power=120, price=0.30)
+
+    created = await panel.call(
+        "wattbill/runs/create",
+        device_id=subentry.subentry_id,
+        name="Bracket",
+        started=(CLOCK_START - DAY / 4).isoformat(),
+        ended=(CLOCK_START - DAY / 6).isoformat(),
+        outcome="completed",
+        tags=["Batch 7"],
+    )
+
+    [power, material] = created["run"]["line_items"]
+    ids = {
+        created["run"]["id"]: "manual",
+        power["id"]: "manual-electricity",
+        material["id"]: "manual-material",
+        subentry.subentry_id: "device-kobra",
+    }
+    assert_recorded("runs-create", stable_ids(created, ids))
+
+
 async def test_record_what_deleting_a_run_drops(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
