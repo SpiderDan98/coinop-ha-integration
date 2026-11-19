@@ -9,7 +9,7 @@ A single tracked appliance, such as one specific 3D printer.
 _Avoid_: Machine, appliance, printer (as the generic term)
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, …), which determines which Line Items a Run gets by default.
+The kind of Device (3D printer, washing machine, …), which determines which computed Line Items, such as electricity and material, its Runs get.
 _Avoid_: Category, device class
 
 **Device Input**:
@@ -31,6 +31,10 @@ _Avoid_: Job, session, cycle, print
 **Outcome**:
 How a Run ended: Completed, Cancelled, Failed or Unknown; a Run still going has no Outcome yet.
 _Avoid_: Result, status (for the ending)
+
+**Part Count**:
+The number of usable parts a Run produced, which its total cost is divided by to give the cost per part.
+_Avoid_: Quantity, pieces, copies
 
 **Flag**:
 A marker on a Run pointing out something the user may want to check, such as a reported fault or a gap in price or consumption data.
