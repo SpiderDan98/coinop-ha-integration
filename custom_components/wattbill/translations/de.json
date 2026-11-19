@@ -13,9 +13,20 @@
     "device": {
       "entry_type": "Gerät",
       "initiate_flow": {
-        "user": "Gerät hinzufügen"
+        "user": "Gerät hinzufügen",
+        "reconfigure": "Gerät neu konfigurieren"
       },
       "step": {
+        "reconfigure": {
+          "title": "Gerät neu konfigurieren",
+          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie.",
+          "menu_options": {
+            "status": "Status & Zuordnung",
+            "consumption": "Verbrauchsquelle",
+            "price": "Strompreis",
+            "save": "Speichern"
+          }
+        },
         "user": {
           "title": "Gerät hinzufügen",
           "description": "Füge einen 3D-Drucker hinzu, dessen Läufe WattBill erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer.",
@@ -93,6 +104,9 @@
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
         "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Druckstatus. Jeder Druck würde doppelt erfasst."
+      },
+      "abort": {
+        "reconfigure_successful": "Das Gerät wurde gespeichert."
       }
     }
   },

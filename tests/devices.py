@@ -2,7 +2,12 @@
 
 from typing import Any
 
-from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigSubentry
+from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
+    SOURCE_USER,
+    ConfigEntry,
+    ConfigSubentry,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
@@ -112,3 +117,28 @@ async def add_device(
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+async def start_reconfigure(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry
+) -> Any:
+    """Open the Device's reconfigure menu."""
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id},
+    )
+    assert result["type"] is FlowResultType.MENU, result
+    return result
+
+
+async def reconfigure(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry, *inputs: Any
+) -> Any:
+    """Submit `inputs` in turn from the reconfigure menu, then Save."""
+    result = await start_reconfigure(hass, entry, subentry)
+    for user_input in inputs:
+        result = await configure(hass, result, user_input)
+    assert result["step_id"] == "reconfigure", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+    return result
