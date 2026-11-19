@@ -69,7 +69,7 @@ describe("Run images", () => {
 
     expect(shown(query(panel, ".cover"))).toEqual([expect.stringMatching(/^blob:/)]);
     expect(backend.fetches).toContain(cover("benchy").url);
-    expect(queryAll(panel, ".strip figure").map(text)).toEqual(["Thumbnail", "Snapshot"]);
+    expect(queryAll(panel, ".strip figcaption").map(text)).toEqual(["Thumbnail", "Snapshot"]);
     expect(backend.fetches).toEqual(
       expect.arrayContaining(benchy.images.map((image) => image.tile_url)),
     );
@@ -79,7 +79,7 @@ describe("Run images", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/cancelled" });
 
     expect(shown(query(panel, ".facts"))).toEqual([]);
-    expect(text(query(panel, ".facts"))).toMatch(/^No image Name /);
+    expect(text(query(panel, ".facts"))).toMatch(/^No image \+ Upload photos /);
     expect(queryAll(panel, ".strip")).toEqual([]);
   });
 
@@ -100,6 +100,6 @@ describe("Run images", () => {
       path: "/run/benchy",
     });
 
-    expect(queryAll(panel, ".strip figure").map(text)).toEqual(["Vorschaubild", "Kamerabild"]);
+    expect(queryAll(panel, ".strip figcaption").map(text)).toEqual(["Vorschaubild", "Kamerabild"]);
   });
 });

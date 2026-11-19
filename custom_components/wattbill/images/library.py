@@ -5,7 +5,7 @@ A Run's file folder goes when the Run is deleted; files no Run refers
 to are removed at startup.
 """
 
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from pathlib import Path
 import shutil
 
@@ -22,6 +22,12 @@ from .encode import encode
 VARIANTS = {"full": ".webp", "tile": ".tile.webp"}
 # A Run has at most one of these; a new one replaces it.
 SINGLE_KINDS = frozenset({ImageKind.THUMBNAIL, ImageKind.SNAPSHOT})
+UPLOAD_LIMIT = 10
+UPLOAD_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
+
+
+class UploadLimit(Exception):
+    """The upload would take the Run past `UPLOAD_LIMIT` uploads."""
 
 
 class ImageLibrary:
@@ -42,15 +48,62 @@ class ImageLibrary:
         None if the Run is gone or WattBill unloaded while the image was stored.
         """
         image = RunImage(ulid_now(), kind, dt_util.utcnow())
-        await self._hass.async_add_executor_job(self._write, run, image, data)
-        if self._closed or self._book.run(run.id) is not run:
-            await self._hass.async_add_executor_job(self._delete, run, [image])
+        if not await self._async_write(run, [(image, data)]):
             return None
         replaced = [i for i in run.images if kind in SINGLE_KINDS and i.kind is kind]
         run.images = [i for i in run.images if i not in replaced] + [image]
         await self._book.async_correct(run)
         await self._hass.async_add_executor_job(self._delete, run, replaced)
         return image
+
+    def upload_room(self, run: Run) -> int:
+        """How many more photos the Run takes."""
+        return UPLOAD_LIMIT - sum(i.kind is ImageKind.UPLOAD for i in run.images)
+
+    async def async_upload(self, run: Run, files: list[bytes]) -> list[RunImage] | None:
+        """Store uploaded photos, all or none; raises `InvalidImage` or `UploadLimit`.
+
+        None if the Run is gone or WattBill unloaded while they were stored.
+        """
+        if len(files) > self.upload_room(run):
+            raise UploadLimit
+        images = [
+            RunImage(ulid_now(), ImageKind.UPLOAD, dt_util.utcnow()) for _ in files
+        ]
+        if not await self._async_write(
+            run, list(zip(images, files, strict=True)), UPLOAD_FORMATS
+        ):
+            return None
+        # Another upload may have finished while these were encoded.
+        if len(images) > self.upload_room(run):
+            await self._hass.async_add_executor_job(self._delete, run, images)
+            raise UploadLimit
+        run.images = [*run.images, *images]
+        await self._book.async_correct(run)
+        return images
+
+    async def async_delete(self, run: Run, image: RunImage) -> None:
+        """Delete one image; a picked Cover Image falls back to the rule."""
+        run.images = [i for i in run.images if i.id != image.id]
+        if run.cover_id == image.id:
+            run.cover_id = None
+        await self._book.async_correct(run)
+        await self._hass.async_add_executor_job(self._delete, run, [image])
+
+    async def _async_write(
+        self,
+        run: Run,
+        images: list[tuple[RunImage, bytes]],
+        formats: Collection[str] | None = None,
+    ) -> bool:
+        """Write the images' files; False (and nothing kept) if the Run is gone."""
+        await self._hass.async_add_executor_job(self._write, run, images, formats)
+        if self._closed or self._book.run(run.id) is not run:
+            await self._hass.async_add_executor_job(
+                self._delete, run, [image for image, _ in images]
+            )
+            return False
+        return True
 
     @callback
     def async_close(self) -> None:
@@ -76,12 +129,19 @@ class ImageLibrary:
         }
         await self._hass.async_add_executor_job(self._remove_orphans, referenced)
 
-    def _write(self, run: Run, image: RunImage, data: bytes) -> None:
-        full, tile = encode(data)
+    def _write(
+        self,
+        run: Run,
+        images: list[tuple[RunImage, bytes]],
+        formats: Collection[str] | None,
+    ) -> None:
+        # All are encoded first, so one bad image leaves no files behind.
+        encoded = [(image, encode(data, formats)) for image, data in images]
         folder = self._root / run.id
         folder.mkdir(parents=True, exist_ok=True)
-        for variant, content in (("full", full), ("tile", tile)):
-            self.path(run, image, variant).write_bytes(content)
+        for image, (full, tile) in encoded:
+            for variant, content in (("full", full), ("tile", tile)):
+                self.path(run, image, variant).write_bytes(content)
 
     def _delete(self, run: Run, images: Iterable[RunImage]) -> None:
         for image in images:

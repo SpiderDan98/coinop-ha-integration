@@ -102,6 +102,7 @@
         "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
       }
     ],
+    "cover_id": null,
     "running_seconds": 4500,
     "total": 0.91,
     "cost_per_part": 0.23,

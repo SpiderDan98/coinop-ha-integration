@@ -264,7 +264,8 @@ class Run:
     value, kept until finalised. `cost_source` is the Device's price section the
     Run follows; `prices` its (since, price per kWh) timeline, None while the
     price entity had no value, kept until finalised. `average_powers` are the
-    (since, running W, paused W) the Run's consumption model used.
+    (since, running W, paused W) the Run's consumption model used. `cover_id` is
+    the image the user picked as Cover Image.
     """
 
     id: str
@@ -292,6 +293,7 @@ class Run:
         default_factory=list
     )
     images: list[RunImage] = field(default_factory=list)
+    cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
@@ -315,7 +317,9 @@ class Run:
 
     @property
     def cover(self) -> RunImage | None:
-        return next(iter(self.images_in_order), None)
+        """The picked image, else the first in order; a deleted pick falls back."""
+        picked = (image for image in self.images if image.id == self.cover_id)
+        return next(picked, None) or next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {
@@ -348,6 +352,7 @@ class Run:
             ],
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
+            "cover_id": self.cover_id,
         }
 
     @classmethod
@@ -388,5 +393,6 @@ class Run:
             ],
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
+            cover_id=data.get("cover_id"),
             unknown=unknown_fields(cls, data),
         )

@@ -11,7 +11,7 @@ from custom_components.wattbill.models import Run, RunImage
 from .library import VARIANTS
 
 if TYPE_CHECKING:
-    from custom_components.wattbill.runtime import WattBillConfigEntry
+    from custom_components.wattbill.runtime import WattBill, WattBillConfigEntry
 
 URL = f"/api/{DOMAIN}/runs/{{run_id}}/images/{{image_id}}"
 # An image id never gets other content, so a browser may keep it.
@@ -31,6 +31,11 @@ def image_info(run: Run, image: RunImage) -> dict[str, Any]:
     }
 
 
+def loaded_wattbill(request: web.Request) -> WattBill | None:
+    entries = request.app[KEY_HASS].config_entries.async_loaded_entries(DOMAIN)
+    return cast("WattBillConfigEntry", entries[0]).runtime_data if entries else None
+
+
 class RunImageView(HomeAssistantView):
     url = URL
     name = f"api:{DOMAIN}:run_image"
@@ -42,11 +47,9 @@ class RunImageView(HomeAssistantView):
     async def get(
         self, request: web.Request, run_id: str, image_id: str, variant: str = "full"
     ) -> web.StreamResponse:
-        hass = request.app[KEY_HASS]
-        entries = hass.config_entries.async_loaded_entries(DOMAIN)
-        if not entries or variant not in VARIANTS:
+        wattbill = loaded_wattbill(request)
+        if wattbill is None or variant not in VARIANTS:
             raise web.HTTPNotFound
-        wattbill = cast("WattBillConfigEntry", entries[0]).runtime_data
         run = wattbill.book.run(run_id)
         image = next((i for i in run.images if i.id == image_id), None) if run else None
         if run is None or image is None:

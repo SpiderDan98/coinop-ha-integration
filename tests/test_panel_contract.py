@@ -2,6 +2,8 @@
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -10,6 +12,8 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
 from .devices import STATUS, add_device, add_hub
+from .http import HttpClient
+from .images import picture
 from .stored import electricity, line_item, place_runs, place_tags, stored_run
 from .websocket import PanelClient
 
@@ -221,6 +225,36 @@ async def test_record_what_deleting_a_run_drops(
     preview = await panel.call("wattbill/runs/delete_preview", run_ids=["helmet"])
 
     assert_recorded("runs-delete-preview", preview)
+
+
+async def test_record_what_the_image_commands_answer(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    panel: PanelClient,
+    http: HttpClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    place_runs(hass_storage, *history())
+    await add_hub(hass)
+    path = "/api/wattbill/runs/benchy/images"
+
+    status, uploaded = await http.upload(path, picture("green"))
+    refused = await http.upload(path, *[picture()] * 10)
+    [upload] = uploaded["images"]
+    cover = await panel.call(
+        "wattbill/images/set_cover", run_id="benchy", image_id=upload["id"]
+    )
+    deleted = await panel.call(
+        "wattbill/images/delete", run_id="benchy", image_id=upload["id"]
+    )
+
+    assert (status, refused[0]) == (HTTPStatus.OK, HTTPStatus.CONFLICT)
+    ids = {upload["id"]: "benchy-upload"}
+    assert_recorded("images-upload", stable_ids(uploaded, ids))
+    assert_recorded("images-upload-too-many", refused[1])
+    assert_recorded("images-set-cover", stable_ids(cover, ids))
+    assert_recorded("images-delete", deleted)
 
 
 async def test_record_the_catalogue_the_panel_shows(
