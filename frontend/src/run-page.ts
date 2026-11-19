@@ -22,7 +22,7 @@ import {
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { isKey, localize, type Localize } from "./localize";
-import "./run-image";
+import "./run-images";
 import { deviceName, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
 
@@ -131,6 +131,11 @@ export class RunPage extends LitElement {
     void this.save(updateRun(this.hass, this.runId, changes), undo);
   }
 
+  private onImagesChanged(event: CustomEvent<RunDetail>) {
+    ++this.request;
+    this.run = event.detail;
+  }
+
   private async confirmDelete() {
     this.failed = false;
     try {
@@ -186,27 +191,11 @@ export class RunPage extends LitElement {
       </div>
       <div class="grid">
         <div class="card facts">
-          <wattbill-run-image
-            class="cover"
+          <wattbill-run-images
             .hass=${this.hass}
-            .src=${run.cover?.url}
-          ></wattbill-run-image>
-          ${
-            run.images.length
-              ? html`<div class="strip">
-                  ${run.images.map(
-                    (image) =>
-                      html`<figure>
-                        <wattbill-run-image
-                          .hass=${this.hass}
-                          .src=${image.tile_url}
-                        ></wattbill-run-image>
-                        <figcaption>${t(`image.${image.kind}`)}</figcaption>
-                      </figure>`,
-                  )}
-                </div>`
-              : nothing
-          }
+            .run=${run}
+            @run-changed=${this.onImagesChanged}
+          ></wattbill-run-images>
           ${this.renderFields(run, t, format)}
           <dl>
             <dt>${t("run.device")}</dt>
@@ -396,29 +385,6 @@ export class RunPage extends LitElement {
       }
       :host([narrow]) .grid {
         grid-template-columns: 1fr;
-      }
-      .cover {
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 12px;
-      }
-      .strip {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 12px;
-      }
-      figure {
-        margin: 0;
-        width: 96px;
-        text-align: center;
-        font-size: 11px;
-        color: var(--secondary-text-color);
-      }
-      figure wattbill-run-image {
-        border-radius: 6px;
-        overflow: hidden;
-        margin-bottom: 2px;
       }
       .fields {
         display: grid;

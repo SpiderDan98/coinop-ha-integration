@@ -128,6 +128,32 @@ export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
 export const endRun = (hass: HomeAssistant, runId: string) =>
   runResult(hass, { type: "wattbill/runs/end", run_id: runId });
 
+export const UPLOAD_LIMIT = 10;
+export const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Multipart, as the websocket caps messages; a refusal throws its `code`. */
+export const uploadImages = async (hass: HomeAssistant, runId: string, files: File[]) => {
+  const body = new FormData();
+  for (const file of files) body.append("file", file);
+  const response = await hass.fetchWithAuth(`/api/wattbill/runs/${runId}/images`, {
+    method: "POST",
+    body,
+  });
+  const result = (await response.json().catch(() => ({}))) as {
+    images?: RunImage[];
+    code?: string;
+  };
+  if (!response.ok || !result.images) throw new Error(result.code ?? "failed");
+  return result.images;
+};
+
+/** Until that image is deleted; then the Cover Image falls back to the rule. */
+export const setCover = (hass: HomeAssistant, runId: string, imageId: string) =>
+  runResult(hass, { type: "wattbill/images/set_cover", run_id: runId, image_id: imageId });
+
+export const deleteImage = (hass: HomeAssistant, runId: string, imageId: string) =>
+  runResult(hass, { type: "wattbill/images/delete", run_id: runId, image_id: imageId });
+
 export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
   (await hass.callWS<{ drop: Drop }>({ type: "wattbill/runs/delete_preview", run_ids: runIds }))
     .drop;
