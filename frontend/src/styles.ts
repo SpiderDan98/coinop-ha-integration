@@ -68,18 +68,7 @@ export const shared = css`
   ha-button.small {
     --ha-button-height: 32px;
   }
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 5;
-    display: grid;
-    place-items: center;
-    padding: 16px;
-    background: rgba(0, 0, 0, 0.4);
-  }
   .dialog {
-    width: min(480px, 100%);
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 10px;

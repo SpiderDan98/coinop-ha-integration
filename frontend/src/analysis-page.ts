@@ -38,7 +38,8 @@ function table(
     rows,
     foot,
     hint,
-  }: { head: string[]; rows: (string | number)[][]; foot?: string[]; hint?: string },
+    empty,
+  }: { head: string[]; rows: (string | number)[][]; foot?: string[]; hint?: string; empty: string },
 ) {
   const cells = (row: (string | number)[], tag: "th" | "td") =>
     row.map((value, index) =>
@@ -58,12 +59,18 @@ function table(
         </tr>
       </thead>
       <tbody>
-        ${rows.map(
-          (row) =>
-            html`<tr>
-              ${cells(row, "td")}
-            </tr>`,
-        )}
+        ${
+          rows.length
+            ? rows.map(
+                (row) =>
+                  html`<tr>
+                    ${cells(row, "td")}
+                  </tr>`,
+              )
+            : html`<tr class="empty">
+                <td colspan=${head.length} class="muted">${empty}</td>
+              </tr>`
+        }
       </tbody>
       ${
         foot
@@ -110,16 +117,18 @@ export class AnalysisPage extends LitElement {
       ${
         aggregates === null
           ? html`<p class="muted">${t("overview.error")}</p>`
-          : aggregates
-            ? html`<div class="tables">
-                ${this.renderKinds(aggregates, t, format)}
-                ${this.renderDevices(aggregates, t, format)}
-                ${this.renderMonths(aggregates, t, format)}
-                ${this.renderMaterials(aggregates, t, format)}
-                ${this.renderOutcomes(aggregates, t, format)}
-                ${this.renderTags(aggregates, t, format)}
-              </div>`
-            : nothing
+          : !aggregates
+            ? html`<p class="muted">${t("analysis.loading")}</p>`
+            : !this.runs.size
+              ? html`<p class="muted">${t("runs.empty")}</p>`
+              : html`<div class="tables">
+                  ${this.renderKinds(aggregates, t, format)}
+                  ${this.renderDevices(aggregates, t, format)}
+                  ${this.renderMonths(aggregates, t, format)}
+                  ${this.renderMaterials(aggregates, t, format)}
+                  ${this.renderOutcomes(aggregates, t, format)}
+                  ${this.renderTags(aggregates, t, format)}
+                </div>`
       }
     `;
   }
@@ -132,6 +141,7 @@ export class AnalysisPage extends LitElement {
         return [t(`kind.${key}`), format.money(amount), share(amount, cost, format)];
       }),
       foot: [t("run.total"), format.money(cost), ""],
+      empty: "",
     });
   }
 
@@ -151,6 +161,7 @@ export class AnalysisPage extends LitElement {
         format.quantity(group.energy_kwh, "kWh"),
         format.money(group.cost),
       ]),
+      empty: t("analysis.empty"),
     });
   }
 
@@ -171,6 +182,7 @@ export class AnalysisPage extends LitElement {
           format.money(group.cost),
         ]),
       hint: t("analysis.month_hint"),
+      empty: t("analysis.empty"),
     });
   }
 
@@ -185,6 +197,7 @@ export class AnalysisPage extends LitElement {
           format.money(group.cost),
           group.material_grams > 0 ? format.money((group.cost / group.material_grams) * 1000) : "–",
         ]),
+      empty: t("overview.no_material_cost"),
     });
   }
 
@@ -201,6 +214,7 @@ export class AnalysisPage extends LitElement {
           format.money(group.cost),
           share(group.cost, cost, format),
         ]),
+      empty: t("analysis.empty"),
     });
   }
 
@@ -213,6 +227,7 @@ export class AnalysisPage extends LitElement {
         format.money(group.cost),
       ]),
       hint: t("analysis.tag_overlap"),
+      empty: t("tags.empty"),
     });
   }
 
@@ -279,6 +294,9 @@ export class AnalysisPage extends LitElement {
         text-align: right;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
+      }
+      tr.empty td {
+        text-align: left;
       }
       tbody tr:last-child td {
         border-bottom: 0;

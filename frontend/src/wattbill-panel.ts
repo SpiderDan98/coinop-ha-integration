@@ -158,15 +158,25 @@ export class WattbillPanel extends LitElement {
               >`,
           )}
         </nav>
-        <ha-button
-          class="manual-run"
-          appearance="plain"
-          ?disabled=${!this.devices?.length}
-          @click=${() => (this.manualRun = true)}
-        >
-          <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-          ${t("manual.open")}
-        </ha-button>
+        ${
+          this.narrow
+            ? html`<ha-icon-button
+                class="manual-run"
+                .label=${t("manual.open")}
+                .path=${mdiPlus}
+                ?disabled=${!this.devices}
+                @click=${() => (this.manualRun = true)}
+              ></ha-icon-button>`
+            : html`<ha-button
+                class="manual-run"
+                appearance="plain"
+                ?disabled=${!this.devices}
+                @click=${() => (this.manualRun = true)}
+              >
+                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+                ${t("manual.open")}
+              </ha-button>`
+        }
       </header>
       <main>
         ${cache(
@@ -226,6 +236,7 @@ export class WattbillPanel extends LitElement {
         .tags=${this.catalog?.tags ?? []}
         .materials=${this.catalog?.materials ?? []}
         .templates=${this.catalog?.templates ?? []}
+        .basePath=${this.route.prefix}
         ?narrow=${this.narrow}
       ></wattbill-devices-page>`;
     }

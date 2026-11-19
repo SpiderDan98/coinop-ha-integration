@@ -9,6 +9,7 @@ import {
 } from "./api";
 import { download, type HomeAssistant } from "./hass";
 import { localize, panelLanguage } from "./localize";
+import "./dialog";
 import { shared } from "./styles";
 
 type Options = Omit<Parameters<typeof createStatement>[2], "title" | "note">;
@@ -101,15 +102,13 @@ export class StatementDialog extends LitElement {
     const set = (changes: Partial<Options>) => {
       if (options) this.options = { ...options, ...changes };
     };
-    return html`<div class="scrim">
-      <div class="statement-dialog card" role="dialog" aria-modal="true">
-        <h2>
-          ${
-            this.runIds.length === 1
-              ? t("statement.dialog_title_one")
-              : t("statement.dialog_title", { count: this.runIds.length })
-          }
-        </h2>
+    const title =
+      this.runIds.length === 1
+        ? t("statement.dialog_title_one")
+        : t("statement.dialog_title", { count: this.runIds.length });
+    return html`<wattbill-dialog .label=${title} @cancel=${this.close}>
+      <div class="statement-dialog dialog card">
+        <h2>${title}</h2>
         <p class="muted small">${t("statement.hint")}</p>
         <label
           >${t("statement.title")}<input
@@ -189,7 +188,7 @@ export class StatementDialog extends LitElement {
           </ha-button>
         </div>
       </div>
-    </div>`;
+    </wattbill-dialog>`;
   }
 
   private async download() {
@@ -222,16 +221,8 @@ export class StatementDialog extends LitElement {
   static override styles = [
     shared,
     css`
-      .statement-dialog {
-        width: min(520px, 100%);
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .statement-dialog p,
-      .statement-dialog h2 {
-        margin: 0;
+      wattbill-dialog {
+        --wattbill-dialog-width: 520px;
       }
       .options {
         flex-wrap: wrap;

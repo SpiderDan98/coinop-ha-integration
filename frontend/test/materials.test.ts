@@ -152,11 +152,67 @@ describe("Materials tab", () => {
     });
     const panel = await mountPanel(backend, { path: "/materials" });
     await click(panel, button(panel, "New Material"));
+    await fill(panel, field(panel, "name"), "PLA");
+    await fill(panel, field(panel, "type"), "PLA");
+    await fill(panel, field(panel, "pack_price"), "20");
 
     await click(panel, button(panel, "Save"));
 
+    expect(lastCall(backend)?.type).toBe("wattbill/materials/create");
     expect(text(query(panel, "form.material"))).toContain(
-      "Check the fields: name, type, density and pack size are required",
+      "Check the fields: name, type, density, pack price and pack size are required",
+    );
+  });
+
+  it("marks what is missing instead of saving an empty pack price as free", async () => {
+    const backend = catalogBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+    await fill(panel, field(panel, "name"), "PLA");
+    await fill(panel, field(panel, "colour"), "red");
+
+    await click(panel, button(panel, "Save"));
+
+    expect(backend.sent("wattbill/materials/create")).toEqual([]);
+    const marked = queryAll(panel, 'form.material [aria-invalid="true"]').map((input) =>
+      input.getAttribute("name"),
+    );
+    expect(marked).toEqual(["type", "density", "colour", "pack_price"]);
+    await fill(panel, field(panel, "type"), "PLA");
+    await fill(panel, field(panel, "colour"), "");
+    await fill(panel, field(panel, "pack_price"), "0");
+    expect(queryAll(panel, 'form.material [aria-invalid="true"]')).toHaveLength(0);
+  });
+
+  it("picks a colour with the colour picker, kept in sync with its field", async () => {
+    const panel = await mountPanel(catalogBackend(), { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+    const picker = query(panel, "input.colour-picker") as HTMLInputElement;
+    expect(picker.type).toBe("color");
+
+    await fill(panel, picker, "#ff8800");
+    expect((field(panel, "colour") as HTMLInputElement).value).toBe("#ff8800");
+    await fill(panel, field(panel, "colour"), "#00AA11");
+    expect((query(panel, "input.colour-picker") as HTMLInputElement).value).toBe("#00aa11");
+
+    await click(panel, query(panel, "ha-icon-button.clear-colour"));
+    expect((field(panel, "colour") as HTMLInputElement).value).toBe("");
+    expect(queryAll(panel, "ha-icon-button.clear-colour")).toHaveLength(0);
+  });
+
+  it("says so when every Material is archived", async () => {
+    const backend = recordedBackend().subscription(CATALOG, () => [
+      {
+        ...recorded.catalog.empty,
+        materials: [{ ...recorded.material("material-1"), archived: true }],
+      },
+    ]);
+
+    const panel = await mountPanel(backend, { path: "/materials" });
+
+    expect(queryAll(panel, ".card.active")).toHaveLength(0);
+    expect(text(query(panel, ".none-active"))).toBe(
+      "Every Material is archived. Restore one below or create a new one.",
     );
   });
 

@@ -279,3 +279,18 @@ describe("Runs of removed Devices", () => {
     expect(tiles(panel)[0]).toContain("Untitled Run Kobra ·");
   });
 });
+
+describe("Device settings without a catalogue", () => {
+  it("link to the Materials and Line Item Templates tabs instead of empty selects", async () => {
+    const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
+      recorded.catalog.empty,
+    ]);
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".default-material select")).toEqual([]);
+    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/wattbill/materials");
+    expect(queryAll(panel, ".automatic-templates select")).toEqual([]);
+    expect(query(panel, ".no-templates a").getAttribute("href")).toBe("/wattbill/templates");
+  });
+});

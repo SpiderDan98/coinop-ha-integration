@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, fill, mountPanel, query, queryAll, text } from "./render";
+import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
 const CREATE = "wattbill/runs/create";
 const SUBSCRIBE = "wattbill/runs/subscribe";
@@ -114,5 +114,73 @@ describe("A manual Run", () => {
 
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
     expect(backend.calls.some((call) => call.type === CREATE)).toBe(false);
+  });
+});
+
+describe("The Manual Run dialog", () => {
+  it("pre-fills the end with now and points out an end before the start", async () => {
+    const panel = await mountPanel(creating());
+    const dialog = await open(panel);
+    expect(field(dialog, "ended").value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(field(dialog, "ended").max).toBe(field(dialog, "ended").value);
+
+    await fill(panel, field(dialog, "started"), "2026-01-15T04:00");
+    await fill(panel, field(dialog, "ended"), "2026-01-15T03:00");
+
+    expect(text(query(dialog, ".times-problem"))).toBe("The end must come after the start.");
+    expect((query(dialog, "ha-button.create") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("refuses times in the future", async () => {
+    const panel = await mountPanel(creating());
+    const dialog = await open(panel);
+
+    await fill(panel, field(dialog, "started"), "2099-01-15T04:00");
+    await fill(panel, field(dialog, "ended"), "2099-01-15T06:00");
+
+    expect(text(query(dialog, ".times-problem"))).toBe("A Run can't start or end in the future.");
+    expect((query(dialog, "ha-button.create") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("is cancelled with Escape or a click on the backdrop", async () => {
+    const panel = await mountPanel(creating());
+    await open(panel);
+
+    query(panel, "wattbill-dialog dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
+    await settle(panel);
+    expect(queryAll(panel, ".manual-dialog")).toEqual([]);
+
+    await open(panel);
+    await click(panel, query(panel, "wattbill-dialog dialog"));
+    expect(queryAll(panel, ".manual-dialog")).toEqual([]);
+  });
+
+  it("opens as a modal dialog with the name focused", async () => {
+    const panel = await mountPanel(creating());
+    const dialog = await open(panel);
+
+    expect((query(panel, "wattbill-dialog dialog") as HTMLDialogElement).open).toBe(true);
+    expect(dialog.getRootNode()).toHaveProperty("activeElement", field(dialog, "name"));
+  });
+
+  it("explains how to add a Device when there is none", async () => {
+    const backend = creating().reply("wattbill/devices/list", () => ({ devices: [] }));
+    const panel = await mountPanel(backend);
+
+    const dialog = await open(panel);
+
+    expect(text(dialog)).toContain("No Devices yet.");
+    expect(query(dialog, "a").getAttribute("href")).toBe(
+      "/config/integrations/integration/wattbill",
+    );
+    expect(queryAll(dialog, "ha-button.create")).toEqual([]);
+  });
+
+  it("is an icon button on a narrow screen", async () => {
+    const panel = await mountPanel(creating(), { narrow: true });
+
+    await click(panel, query(panel, "ha-icon-button.manual-run"));
+
+    expect(queryAll(panel, ".manual-dialog")).toHaveLength(1);
   });
 });

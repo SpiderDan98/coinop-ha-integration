@@ -104,7 +104,8 @@ describe("Overview", () => {
     await click(panel, queryAll(panel, ".per-month .column")[1]);
     expect(names(panel)).toHaveLength(3);
     await click(panel, queryAll(panel, ".per-month .column")[1]);
-    expect((query(panel, ".month-filter") as HTMLSelectElement).value).toBe("");
+    // Every Run is from January, so the month filter shows only while it filters.
+    expect(queryAll(panel, ".month-filter")).toHaveLength(0);
   });
 
   it("charts the cost by Material", async () => {
@@ -205,12 +206,8 @@ describe("Gallery filters", () => {
     expect(names(panel)).toEqual(["Helmet"]);
     await fill(panel, query(panel, ".flagged-filter input"), "off");
 
-    expect(queryAll(panel, ".month-filter option").map(text)).toEqual([
-      "All months",
-      "January 2026",
-    ]);
-    await fill(panel, query(panel, ".month-filter"), "2026-01");
-    expect(names(panel)).toHaveLength(3);
+    // Every Run is from January: a month filter would choose nothing.
+    expect(queryAll(panel, ".month-filter")).toHaveLength(0);
   });
 
   it("offers the Runs in progress as an Outcome", async () => {

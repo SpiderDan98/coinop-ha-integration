@@ -1,7 +1,7 @@
 // The Materials tab: the global catalogue, edited in place. The list itself comes
 // from the panel's catalogue subscription, so every open panel shows each change.
 // Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
-import { mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
+import { mdiClose, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
@@ -80,6 +80,28 @@ const linkOf = (draft: Draft) => ({
 const filamentName = (filament: Filament) =>
   [filament.vendor, filament.name].filter(Boolean).join(" ") || filament.type || `#${filament.id}`;
 
+const COLOUR = /^#[0-9a-f]{6}$/i;
+
+/** The fields of a draft that the backend would refuse, so they can be marked. */
+function problems(draft: Draft) {
+  const positive = (value: string) => value.trim() !== "" && Number(value) > 0;
+  if (draft.price_source === "spoolman")
+    return new Set([
+      ...(draft.name.trim() ? [] : ["name"]),
+      ...(draft.filament_id ? [] : ["filament_id"]),
+    ]);
+  const checks = {
+    name: draft.name.trim() !== "",
+    type: draft.type.trim() !== "",
+    density: positive(draft.density),
+    diameter: draft.form !== "filament" || draft.diameter.trim() === "" || positive(draft.diameter),
+    colour: draft.colour.trim() === "" || COLOUR.test(draft.colour.trim()),
+    pack_price: draft.pack_price.trim() !== "" && Number(draft.pack_price) >= 0,
+    pack_size: positive(draft.pack_size),
+  };
+  return new Set(Object.keys(checks).filter((name) => !checks[name as keyof typeof checks]));
+}
+
 const fieldsOf = (draft: Draft): MaterialFields => ({
   name: draft.name,
   form: draft.form,
@@ -108,12 +130,24 @@ export class MaterialsPage extends LitElement {
   /** The form's values, while creating (no `editing`) or editing a Material. */
   @state() private draft?: Draft;
   @state() private editing?: string;
+  /** The backend refused the last save. */
   @state() private invalid = false;
+  /** Set once the user tried to save: the form marks what is missing or wrong from then on. */
+  @state() private checked = false;
   @state() private confirming?: string;
   @state() private notice?: string;
   /** Undefined until read, or when the backend couldn't answer. */
   @state() private spoolman?: Filaments;
   private typesRequested = false;
+  private focusForm = false;
+
+  protected override updated() {
+    if (!this.focusForm) return;
+    this.focusForm = false;
+    const form = this.renderRoot.querySelector("form.material");
+    form?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    form?.querySelector<HTMLInputElement>("[name=name]")?.focus({ preventScroll: true });
+  }
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("hass") && this.hass && !this.typesRequested) {
@@ -148,7 +182,13 @@ export class MaterialsPage extends LitElement {
       ${
         this.materials.length
           ? html`
-              <div class="card flush active">${this.renderTable(active, t, format)}</div>
+              ${
+                active.length
+                  ? html`<div class="card flush active">
+                      ${this.renderTable(active, t, format)}
+                    </div>`
+                  : html`<p class="muted none-active">${t("materials.all_archived")}</p>`
+              }
               ${
                 archived.length
                   ? html`<details class="archived">
@@ -215,7 +255,17 @@ export class MaterialsPage extends LitElement {
           : rows.length
             ? html`<div class="card flush">
                 <table>
-                  ${rows}
+                  <thead>
+                    <tr>
+                      <th>${t("spoolman.filament")}</th>
+                      <th>${t("materials.type")}</th>
+                      <th class="num">${t("materials.price_per_gram")}</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows}
+                  </tbody>
                 </table>
               </div>`
             : html`<p class="muted">${t("spoolman.empty")}</p>`
@@ -226,55 +276,71 @@ export class MaterialsPage extends LitElement {
   private renderTable(materials: Material[], t: Localize, format: Format) {
     const number = (value: number) => value.toLocaleString(this.hass.language);
     return html`<table>
-      ${materials.map(
-        (material) =>
-          html`<tr class="material">
-            <td class="name">
-              <div class="row">
-                <span class="swatch" style="background: ${material.colour ?? "transparent"}"></span>
-                <div>
-                  <div class="strong">${material.name}</div>
-                  ${material.vendor ? html`<div class="muted small">${material.vendor}</div>` : nothing}
+      <thead>
+        <tr>
+          <th>${t("materials.name")}</th>
+          <th>${t("materials.form_type")}</th>
+          <th>${t("materials.properties")}</th>
+          <th>${t("materials.pack")}</th>
+          <th class="num">${t("materials.price_per_gram")}</th>
+          <th class="star-head">${t("materials.default")}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${materials.map(
+          (material) =>
+            html`<tr class="material">
+              <td class="name">
+                <div class="row">
+                  <span
+                    class="swatch"
+                    style="background: ${material.colour ?? "transparent"}"
+                  ></span>
+                  <div>
+                    <div class="strong">${material.name}</div>
+                    ${material.vendor ? html`<div class="muted small">${material.vendor}</div>` : nothing}
+                  </div>
                 </div>
-              </div>
-            </td>
-            <td>${t(`form.${material.form}`)} · ${material.type}</td>
-            <td class="small">
-              ${number(material.density)}
-              g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
-            </td>
-            <td class="small">
-              ${
-                material.price.source === "fixed"
-                  ? `${format.money(material.price.pack_price)} / ${format.quantity(
-                      material.price.pack_size,
-                      material.price.pack_unit,
-                    )}`
-                  : t("materials.from_spoolman")
-              }
-            </td>
-            <td class="num">${format.unitPrice(material.price_per_gram)} / g</td>
-            <td>
-              ${
-                material.archived
-                  ? nothing
-                  : html`<ha-icon-button
-                      class="star"
-                      .label=${t("materials.default_for", { type: material.type })}
-                      .path=${material.default_for_type ? mdiStar : mdiStarOutline}
-                      .selected=${material.default_for_type}
-                      @click=${() =>
-                        this.act(() =>
-                          updateMaterial(this.hass, material.id, {
-                            default_for_type: !material.default_for_type,
-                          }),
-                        )}
-                    ></ha-icon-button>`
-              }
-            </td>
-            <td class="actions">${this.renderActions(material, t)}</td>
-          </tr>`,
-      )}
+              </td>
+              <td>${t(`form.${material.form}`)} · ${material.type}</td>
+              <td class="small">
+                ${number(material.density)}
+                g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
+              </td>
+              <td class="small">
+                ${
+                  material.price.source === "fixed"
+                    ? `${format.money(material.price.pack_price)} / ${format.quantity(
+                        material.price.pack_size,
+                        material.price.pack_unit,
+                      )}`
+                    : t("materials.from_spoolman")
+                }
+              </td>
+              <td class="num">${format.unitPrice(material.price_per_gram)} / g</td>
+              <td>
+                ${
+                  material.archived
+                    ? nothing
+                    : html`<ha-icon-button
+                        class="star"
+                        .label=${t("materials.default_for", { type: material.type })}
+                        .path=${material.default_for_type ? mdiStar : mdiStarOutline}
+                        .selected=${material.default_for_type}
+                        @click=${() =>
+                          this.act(() =>
+                            updateMaterial(this.hass, material.id, {
+                              default_for_type: !material.default_for_type,
+                            }),
+                          )}
+                      ></ha-icon-button>`
+                }
+              </td>
+              <td class="actions">${this.renderActions(material, t)}</td>
+            </tr>`,
+        )}
+      </tbody>
     </table>`;
   }
 
@@ -319,12 +385,16 @@ export class MaterialsPage extends LitElement {
 
   private renderForm(draft: Draft, t: Localize) {
     const set = (changes: Partial<Draft>) => (this.draft = { ...draft, ...changes });
-    const text = (name: "name" | "vendor" | "colour", label: string, placeholder = "") =>
+    const wrong = this.checked ? problems(draft) : new Set<string>();
+    const marked = (name: string) => (wrong.has(name) ? "true" : "false");
+    const required = (name: string) => !["vendor", "colour", "diameter"].includes(name);
+    const text = (name: "name" | "vendor", label: string) =>
       html`<label
         >${label}<input
           name=${name}
+          ?required=${required(name)}
+          aria-invalid=${marked(name)}
           .value=${draft[name]}
-          placeholder=${placeholder}
           @input=${(event: Event) => set({ [name]: (event.target as HTMLInputElement).value })}
       /></label>`;
     const number = (name: "density" | "diameter" | "pack_price" | "pack_size", label: string) =>
@@ -334,9 +404,12 @@ export class MaterialsPage extends LitElement {
           type="number"
           step="any"
           min="0"
+          ?required=${required(name)}
+          aria-invalid=${marked(name)}
           .value=${draft[name]}
           @input=${(event: Event) => set({ [name]: (event.target as HTMLInputElement).value })}
       /></label>`;
+    const colour = draft.colour.trim();
     const known = [
       ...new Set([
         ...this.types.map((entry) => entry.type),
@@ -364,6 +437,8 @@ export class MaterialsPage extends LitElement {
         >${t("materials.type")}<input
           name="type"
           list="material-types"
+          required
+          aria-invalid=${marked("type")}
           .value=${draft.type}
           @input=${(event: Event) => this.setType((event.target as HTMLInputElement).value)}
         /><datalist id="material-types">
@@ -372,7 +447,37 @@ export class MaterialsPage extends LitElement {
       >
       ${number("density", t("materials.density"))}
       ${draft.form === "filament" ? number("diameter", t("materials.diameter")) : nothing}
-      ${text("vendor", t("materials.vendor"))} ${text("colour", t("materials.colour"), "#rrggbb")}
+      ${text("vendor", t("materials.vendor"))}
+      <div class="label colour">
+        ${t("materials.colour")}
+        <div class="colour-row">
+          <input
+            type="color"
+            class="colour-picker"
+            aria-label=${t("materials.pick_colour")}
+            .value=${COLOUR.test(colour) ? colour.toLowerCase() : "#000000"}
+            @input=${(event: Event) => set({ colour: (event.target as HTMLInputElement).value })}
+          />
+          <input
+            name="colour"
+            aria-label=${t("materials.colour")}
+            aria-invalid=${marked("colour")}
+            placeholder="#rrggbb"
+            .value=${draft.colour}
+            @input=${(event: Event) => set({ colour: (event.target as HTMLInputElement).value })}
+          />
+          ${
+            colour
+              ? html`<ha-icon-button
+                  class="clear-colour"
+                  .label=${t("materials.clear_colour")}
+                  .path=${mdiClose}
+                  @click=${() => set({ colour: "" })}
+                ></ha-icon-button>`
+              : nothing
+          }
+        </div>
+      </div>
       ${number("pack_price", t("materials.pack_price"))}
       <div class="pack">
         ${number("pack_size", t("materials.pack_size"))}
@@ -388,7 +493,7 @@ export class MaterialsPage extends LitElement {
           )}
         </select>
       </div>`;
-    return html`<form class="card material" @submit=${this.save}>
+    return html`<form class="card material" novalidate @submit=${this.save}>
       <h3>${this.editing ? t("materials.edit_title") : t("materials.new_title")}</h3>
       <div class="fields">
         ${text("name", t("materials.name"))} ${this.renderCostSource(draft, set, t)}
@@ -404,7 +509,7 @@ export class MaterialsPage extends LitElement {
         >
       </div>
       ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}
-      ${this.invalid ? html`<p class="error">${t("materials.invalid")}</p>` : nothing}
+      ${this.invalid || wrong.size ? html`<p class="error">${t("materials.invalid")}</p>` : nothing}
       <div class="row">
         <ha-button type="submit">${t("materials.save")}</ha-button>
         <ha-button appearance="plain" @click=${this.close}>${t("materials.cancel")}</ha-button>
@@ -432,6 +537,7 @@ export class MaterialsPage extends LitElement {
           ? html`<label
               >${t("materials.filament")}<select
                 name="filament_id"
+                aria-invalid=${this.checked && !draft.filament_id ? "true" : "false"}
                 @change=${(event: Event) => set({ filament_id: pick(event) })}
               >
                 <option value="" disabled ?selected=${!draft.filament_id}>
@@ -499,13 +605,14 @@ export class MaterialsPage extends LitElement {
   private open(material?: Material) {
     this.draft = material ? draftOf(material) : blankDraft();
     this.editing = material?.id;
-    this.invalid = false;
+    this.invalid = this.checked = false;
     this.notice = undefined;
+    this.focusForm = true;
   }
 
   private close = () => {
     this.draft = this.editing = undefined;
-    this.invalid = false;
+    this.invalid = this.checked = false;
   };
 
   private save = async (event: Event) => {
@@ -513,10 +620,9 @@ export class MaterialsPage extends LitElement {
     if (!this.draft) return;
     const draft = this.draft;
     const linking = draft.price_source === "spoolman";
-    if (linking && !draft.filament_id) {
-      this.invalid = true;
-      return;
-    }
+    this.checked = true;
+    this.invalid = false;
+    if (problems(draft).size) return;
     try {
       await (this.editing
         ? updateMaterial(this.hass, this.editing, linking ? linkOf(draft) : fieldsOf(draft))
@@ -563,12 +669,47 @@ export class MaterialsPage extends LitElement {
         width: 100%;
         border-collapse: collapse;
       }
+      th,
       td {
         padding: 8px 12px;
         border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
       }
-      tr:first-child td {
+      th {
         border-top: 0;
+        text-align: left;
+        font-weight: 500;
+        font-size: 12px;
+        color: var(--secondary-text-color);
+        white-space: nowrap;
+      }
+      th.num {
+        text-align: right;
+      }
+      th.star-head {
+        text-align: center;
+      }
+      .colour-row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .colour-row input[name="colour"] {
+        flex: 1;
+      }
+      .colour-picker {
+        flex: none;
+        width: 36px;
+        height: 32px;
+        padding: 2px;
+        cursor: pointer;
+      }
+      .clear-colour {
+        --ha-icon-button-size: 32px;
+        --mdc-icon-size: 18px;
+        color: var(--secondary-text-color);
+      }
+      [aria-invalid="true"] {
+        border-color: var(--error-color, #db4437);
       }
       .actions {
         white-space: nowrap;
@@ -612,7 +753,8 @@ export class MaterialsPage extends LitElement {
         gap: 10px 14px;
         margin: 12px 0;
       }
-      label {
+      label,
+      .label {
         display: flex;
         flex-direction: column;
         gap: 4px;

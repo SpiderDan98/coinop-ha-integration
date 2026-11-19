@@ -10,7 +10,7 @@ import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
 import "./tag-input";
 
-const RECONFIGURE = "/config/integrations/integration/wattbill";
+export const RECONFIGURE = "/config/integrations/integration/wattbill";
 
 const input = (
   { entity_id, attribute }: { entity_id: string | null; attribute: string | null },
@@ -49,6 +49,8 @@ export class DevicesPage extends LitElement {
   @property({ attribute: false }) materials: Material[] = [];
   /** Every Line Item Template there is, to pick automatic ones from. */
   @property({ attribute: false }) templates: LineItemTemplate[] = [];
+  /** Where the panel lives, for links to its other tabs. */
+  @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   /** Settings saved since the Devices were loaded, by Device id. */
@@ -157,27 +159,16 @@ export class DevicesPage extends LitElement {
       <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
       <div class="setting default-material">
         <h4>${t("device.default_material")}</h4>
-        <select
-          aria-label=${t("device.default_material")}
-          @change=${(event: Event) =>
-            this.save(id, {
-              default_material: (event.target as HTMLSelectElement).value || null,
-            })}
-        >
-          <option value="" ?selected=${defaultMaterial === null}>
-            ${t("device.no_default_material")}
-          </option>
-          ${defaults.map(
-            (material) =>
-              html`<option value=${material.id} ?selected=${material.id === defaultMaterial}>
-                ${
-                  material.archived
-                    ? t("materials.archived_name", { name: material.name })
-                    : material.name
-                }
-              </option>`,
-          )}
-        </select>
+        ${
+          defaults.length
+            ? this.renderDefaultMaterial(id, defaults, defaultMaterial, t)
+            : html`<p class="muted small no-materials">
+                ${t("device.no_materials")}
+                <a href="${this.basePath}/materials" @click=${followLink}
+                  >${t("item.to_materials")}</a
+                >
+              </p>`
+        }
         <p class="muted small">${t("device.default_material_hint")}</p>
       </div>
       <div class="setting new-run-tags">
@@ -197,9 +188,39 @@ export class DevicesPage extends LitElement {
     </div>`;
   }
 
+  private renderDefaultMaterial(
+    id: string,
+    defaults: Material[],
+    defaultMaterial: string | null,
+    t: Localize,
+  ) {
+    return html`<select
+      aria-label=${t("device.default_material")}
+      @change=${(event: Event) =>
+        this.save(id, {
+          default_material: (event.target as HTMLSelectElement).value || null,
+        })}
+    >
+      <option value="" ?selected=${defaultMaterial === null}>
+        ${t("device.no_default_material")}
+      </option>
+      ${defaults.map(
+        (material) =>
+          html`<option value=${material.id} ?selected=${material.id === defaultMaterial}>
+            ${
+              material.archived
+                ? t("materials.archived_name", { name: material.name })
+                : material.name
+            }
+          </option>`,
+      )}
+    </select>`;
+  }
+
   private renderAutomatic(deviceId: string, chosen: string[], t: Localize) {
     const picked = chosen.flatMap((id) => this.templates.filter((template) => template.id === id));
     const save = (ids: string[]) => this.save(deviceId, { automatic_templates: ids });
+    const addable = this.templates.filter((template) => !chosen.includes(template.id));
     return html`<div class="automatic-templates">
       <h4>${t("device.automatic_templates")}</h4>
       <div class="row">
@@ -215,20 +236,34 @@ export class DevicesPage extends LitElement {
               ></ha-icon-button
             ></span>`,
         )}
-        <select
-          aria-label=${t("device.add_template")}
-          @change=${(event: Event) => {
-            const select = event.target as HTMLSelectElement;
-            if (select.value) void save([...chosen, select.value]);
-            select.value = "";
-          }}
-        >
-          <option value="">${t("device.add_template")}</option>
-          ${this.templates
-            .filter((template) => !chosen.includes(template.id))
-            .map((template) => html`<option value=${template.id}>${template.label}</option>`)}
-        </select>
+        ${
+          addable.length
+            ? html`<select
+                aria-label=${t("device.add_template")}
+                @change=${(event: Event) => {
+                  const select = event.target as HTMLSelectElement;
+                  if (select.value) void save([...chosen, select.value]);
+                  select.value = "";
+                }}
+              >
+                <option value="">${t("device.add_template")}</option>
+                ${addable.map(
+                  (template) => html`<option value=${template.id}>${template.label}</option>`,
+                )}
+              </select>`
+            : nothing
+        }
       </div>
+      ${
+        this.templates.length
+          ? nothing
+          : html`<p class="muted small no-templates">
+              ${t("device.no_templates")}
+              <a href="${this.basePath}/templates" @click=${followLink}
+                >${t("device.to_templates")}</a
+              >
+            </p>`
+      }
       <p class="muted small">${t("device.templates_hint")}</p>
     </div>`;
   }

@@ -68,6 +68,21 @@ export class RunGallery extends LitElement {
   private all: RunSummary[] = [];
   private shown: RunSummary[] = [];
 
+  override connectedCallback() {
+    super.connectedCallback();
+    document.addEventListener("click", this.closeTagFilter);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener("click", this.closeTagFilter);
+  }
+
+  private closeTagFilter = (event: Event) => {
+    const details = this.renderRoot.querySelector<HTMLDetailsElement>("details.tag-filter");
+    if (details?.open && !event.composedPath().includes(details)) details.open = false;
+  };
+
   protected override willUpdate(changed: PropertyValues<this>) {
     if (!changed.has("runs") && !changed.has("filter") && !changed.has("hass")) return;
     const t = localize(this.hass);
@@ -224,22 +239,32 @@ export class RunGallery extends LitElement {
         .value=${this.filter.name}
         @input=${(event: Event) => this.setFilter({ name: value(event) })}
       />
-      <select
-        class="device-filter"
-        aria-label=${t("runs.filter_device")}
-        @change=${(event: Event) => this.setFilter({ deviceId: value(event) })}
-      >
-        <option value="">${t("runs.all_devices")}</option>
-        ${[...devices].map(([id, name]) => html`<option value=${id}>${name}</option>`)}
-      </select>
-      <select
-        class="month-filter"
-        aria-label=${t("runs.filter_month")}
-        @change=${(event: Event) => this.setFilter({ month: value(event) })}
-      >
-        <option value="">${t("runs.all_months")}</option>
-        ${months.map((month) => html`<option value=${month}>${format.monthName(month)}</option>`)}
-      </select>
+      ${
+        devices.size > 1 || this.filter.deviceId
+          ? html`<select
+              class="device-filter"
+              aria-label=${t("runs.filter_device")}
+              @change=${(event: Event) => this.setFilter({ deviceId: value(event) })}
+            >
+              <option value="">${t("runs.all_devices")}</option>
+              ${[...devices].map(([id, name]) => html`<option value=${id}>${name}</option>`)}
+            </select>`
+          : nothing
+      }
+      ${
+        months.length > 1 || this.filter.month
+          ? html`<select
+              class="month-filter"
+              aria-label=${t("runs.filter_month")}
+              @change=${(event: Event) => this.setFilter({ month: value(event) })}
+            >
+              <option value="">${t("runs.all_months")}</option>
+              ${months.map(
+                (month) => html`<option value=${month}>${format.monthName(month)}</option>`,
+              )}
+            </select>`
+          : nothing
+      }
       <select
         class="outcome-filter"
         aria-label=${t("runs.filter_outcome")}
@@ -278,6 +303,7 @@ export class RunGallery extends LitElement {
 
   private renderTagFilter(runs: RunSummary[], t: Localize) {
     const tags = sortTags([...new Set([...this.tags, ...runs.flatMap((run) => run.tags)])]);
+    if (!tags.length && !this.filter.untagged) return nothing;
     const chosen = [
       ...(this.filter.untagged ? [t("runs.no_tag")] : []),
       ...tags.filter((tag) => this.filter.tags.includes(tag)),
@@ -292,7 +318,13 @@ export class RunGallery extends LitElement {
             : this.filter.tags.filter((tag) => tag !== box.value),
         });
     };
-    return html`<details class="tag-filter" aria-label=${t("runs.filter_tags")}>
+    return html`<details
+      class="tag-filter"
+      aria-label=${t("runs.filter_tags")}
+      @keydown=${(event: KeyboardEvent) => {
+        if (event.key === "Escape") (event.currentTarget as HTMLDetailsElement).open = false;
+      }}
+    >
       <summary>${chosen.length ? chosen.join(", ") : t("runs.all_tags")}</summary>
       <div class="options" @change=${toggle}>
         <label

@@ -181,8 +181,12 @@ export class Overview extends LitElement {
 
   private renderStats(t: Localize, format: Format) {
     if (this.aggregates === null) return html`<p class="muted">${t("overview.error")}</p>`;
-    if (!this.aggregates) return nothing;
-    const { total, month } = this.aggregates;
+    // Until the totals arrive the tiles hold their place with dashes.
+    const aggregates = this.aggregates;
+    const { total, month } = aggregates ?? { total: undefined, month: [] };
+    const money = (amount: number | undefined) =>
+      aggregates && amount !== undefined ? format.money(amount) : "–";
+    const runs = (count: number | undefined) => (aggregates ? runCount(count ?? 0, t) : "");
     const now = format.month(new Date().toISOString());
     const thisMonth = month.find((group) => group.month === now);
     const failed = [...this.runs.values()].filter(failedOrCancelled).length;
@@ -193,13 +197,13 @@ export class Overview extends LitElement {
       <div class="stats">
         <div class="stat card this-month">
           <div class="muted small">${format.monthName(now)}</div>
-          <div class="value">${format.money(thisMonth?.cost ?? 0)}</div>
-          <div class="muted small">${runCount(thisMonth?.runs ?? 0, t)}</div>
+          <div class="value">${money(thisMonth?.cost ?? 0)}</div>
+          <div class="muted small">${runs(thisMonth?.runs)}</div>
         </div>
         <div class="stat card all-time">
           <div class="muted small">${t("overview.all_time")}</div>
-          <div class="value">${format.money(total?.cost ?? 0)}</div>
-          <div class="muted small">${runCount(total?.runs ?? 0, t)}</div>
+          <div class="value">${money(total?.cost ?? 0)}</div>
+          <div class="muted small">${runs(total?.runs)}</div>
         </div>
         <button
           class="stat card failed ${failedOn ? "on" : ""}"
@@ -225,16 +229,20 @@ export class Overview extends LitElement {
           @click=${() => this.setFilter({ flagged: !this.filter.flagged })}
         >
           <div class="muted small">${t("sensor.flagged_runs")}</div>
-          <div class="value">⚑ ${flagged}</div>
+          <div class="value">⚑ ${aggregates ? flagged : "–"}</div>
           <div class="muted small">
             ${t(this.filter.flagged ? "overview.filtering" : "overview.click_to_filter")}
           </div>
         </button>
       </div>
-      <div class="charts">
-        ${this.renderMonths(this.aggregates, now, t, format)}
-        ${this.renderMaterials(this.aggregates, t, format)} ${this.renderRunning(t, format)}
-      </div>
+      ${
+        aggregates
+          ? html`<div class="charts">
+              ${this.renderMonths(aggregates, now, t, format)}
+              ${this.renderMaterials(aggregates, t, format)} ${this.renderRunning(t, format)}
+            </div>`
+          : nothing
+      }
     `;
   }
 

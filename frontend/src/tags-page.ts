@@ -23,6 +23,15 @@ export class TagsPage extends LitElement {
   /** Each Tag's total cost as the backend sums it; undefined until read. */
   @state() private costs?: Map<string | null | undefined, number>;
   private request = 0;
+  private focusRename = false;
+
+  protected override updated() {
+    if (!this.focusRename) return;
+    this.focusRename = false;
+    const input = this.renderRoot.querySelector<HTMLInputElement>("input.rename");
+    input?.focus();
+    input?.select();
+  }
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runs")) void this.load();
@@ -127,6 +136,7 @@ export class TagsPage extends LitElement {
         @click=${() => {
           this.renaming = { tag, name: tag };
           this.confirming = undefined;
+          this.focusRename = true;
         }}
       >
         ${t("tags.rename")}
