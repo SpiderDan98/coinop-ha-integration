@@ -33,6 +33,7 @@ from custom_components.wattbill.run_book import RunBook, RunChange
 from custom_components.wattbill.runtime import WattBill
 from custom_components.wattbill.schema import vol
 from custom_components.wattbill.tags import tag_name
+from custom_components.wattbill.tracker import DeviceTracker
 
 from .command import command
 
@@ -239,6 +240,47 @@ async def _update(
 
 @command(
     {
+        vol.Required("type"): "wattbill/runs/create",
+        vol.Required("device_id"): str,
+        vol.Optional("name"): vol.Any(None, str),
+        vol.Required("started"): _moment,
+        vol.Required("ended"): _moment,
+        vol.Required("outcome"): vol.Coerce(Outcome),
+        vol.Optional("tags"): [tag_name],
+    }
+)
+async def _create(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+) -> None:
+    """A manual Run, e.g. for a print made while Home Assistant was down."""
+    tracker = _tracker(wattbill, msg["device_id"])
+    if tracker is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "No Device with this id"
+        )
+        return
+    if not msg["started"] < msg["ended"] <= dt_util.utcnow():
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_INVALID_FORMAT,
+            "A manual Run ends after it starts, and not in the future",
+        )
+        return
+    run = await tracker.async_create_run(
+        msg["started"],
+        msg["ended"],
+        msg["outcome"],
+        _text(msg.get("name")),
+        await wattbill.catalog.async_add_tags(msg["tags"]) if "tags" in msg else None,
+    )
+    _send_run(hass, connection, msg["id"], run)
+
+
+@command(
+    {
         vol.Required("type"): "wattbill/runs/clear_flag",
         vol.Required("run_id"): str,
         vol.Required("flag"): str,
@@ -258,6 +300,17 @@ async def _clear_flag(
     _send_run(hass, connection, msg["id"], run)
 
 
+def _tracker(wattbill: WattBill, device_id: str) -> DeviceTracker | None:
+    return next(
+        (
+            tracker
+            for device, tracker in zip(wattbill.devices, wattbill.trackers, strict=True)
+            if device.device_id == device_id
+        ),
+        None,
+    )
+
+
 @command({vol.Required("type"): "wattbill/runs/end", vol.Required("run_id"): str})
 def _end(
     hass: HomeAssistant,
@@ -268,14 +321,7 @@ def _end(
     """End Run now: the open Run ends as Unknown, finalised like any other end."""
     if (run := _find(connection, msg, wattbill)) is None:
         return
-    tracker = next(
-        (
-            tracker
-            for device, tracker in zip(wattbill.devices, wattbill.trackers, strict=True)
-            if device.device_id == run.device_id
-        ),
-        None,
-    )
+    tracker = _tracker(wattbill, run.device_id)
     if run.ended is not None or tracker is None:
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run is not open"
@@ -360,6 +406,7 @@ COMMANDS = (
     _subscribe,
     _get,
     _update,
+    _create,
     _clear_flag,
     _end,
     _delete_preview,

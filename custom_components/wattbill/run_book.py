@@ -19,6 +19,7 @@ from .tags import retag
 
 class RunChange(StrEnum):
     STARTED = "started"
+    CREATED = "created"
     UPDATED = "updated"
     ENDED = "ended"
     DELETED = "deleted"
@@ -68,6 +69,12 @@ class RunBook:
     def async_start(self, run: Run) -> None:
         self._runs[run.id] = run
         self._changed(RunChange.STARTED, run)
+
+    async def async_add(self, run: Run) -> None:
+        """Record a finalised Run made by hand; announced as CREATED, never ENDED."""
+        self._runs[run.id] = run
+        await self._save(run)
+        self._announce(RunChange.CREATED, run)
 
     @callback
     def async_update(self, run: Run) -> None:

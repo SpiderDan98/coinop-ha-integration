@@ -31,6 +31,7 @@ import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
+import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -56,6 +57,9 @@ export const recorded = {
    * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
+  /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
+   * estimated from average power. */
+  manualRun: runsCreate.run as RunDetail,
   /** `wattbill/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Drop },
   /** The upload of one photo to "benchy", and of ten more, refused. */

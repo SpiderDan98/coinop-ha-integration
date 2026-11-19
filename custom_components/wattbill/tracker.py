@@ -27,6 +27,7 @@ from homeassistant.helpers.recorder import get_instance
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
+from . import recorded
 from .catalog import Catalog
 from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
@@ -50,6 +51,7 @@ from .materials import Material, MaterialForm, SpoolmanPrice
 from .models import (
     ElectricityMethod,
     Flag,
+    LineItem,
     LineItemKind,
     Outcome,
     Pause,
@@ -439,6 +441,100 @@ class DeviceTracker:
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
 
+    async def async_create_run(
+        self,
+        started: datetime,
+        ended: datetime,
+        outcome: Outcome,
+        name: str | None,
+        tags: list[str] | None,
+    ) -> Run:
+        """A Run made by hand, final at once: no Snapshot, no `started` or `ended`.
+
+        Without `tags` it gets the Device's Tags for new Runs.
+        """
+        settings = self._settings.get(self._config.device_id)
+        run = Run(
+            id=ulid_now(),
+            device_id=self._config.device_id,
+            device_name=self._config.name,
+            name=name,
+            started=started,
+            ended=ended,
+            outcome=outcome,
+            finalised=True,
+            line_items=[],
+            consumption=dict(self._config.consumption),
+            cost_source=dict(self._config.price),
+            tags=settings[TAGS_FOR_NEW_RUNS] if tags is None else tags,
+        )
+        covered = await recorded.async_covers(self._hass, started, ended)
+        await self._async_past_prices(run, covered)
+        run.line_items = [await self._async_past_electricity(run, covered)]
+        run.readings, run.prices = [], []
+        self._settle_material(run, measuring=False)
+        add_templates(
+            run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), ended
+        )
+        await self._book.async_add(run)
+        return run
+
+    async def _async_past_prices(self, run: Run, covered: bool) -> None:
+        """A past Run's price timeline from history, flagged where it has none."""
+        assert run.ended is not None
+        if (entity_id := self._config.price_entity_id) is None:
+            self._add_price(run, run.started, self._current_price())
+            return
+        states = await recorded.async_states(
+            self._hass, entity_id, run.started, run.ended
+        )
+        if not any(self._price_time(state) <= run.started for state in states):
+            self._add_price(run, run.started, None)
+        for state in states:
+            self._record_price(run, state)
+        if not covered or price_gap(run.started, run.ended, run.prices):
+            # Without the recorder, the last price it knew may be outdated.
+            self._flag(run, Flag.PRICE_GAP)
+
+    async def _async_past_electricity(self, run: Run, covered: bool) -> LineItem:
+        """From the meter's history if it covers the Run, else estimated from the
+        average running power, else left for the user to enter.
+        """
+        assert run.ended is not None
+        start, end, prices = run.started, run.ended, run.prices
+        meter = _meter(run.consumption)
+        if covered and meter:
+            states = await recorded.async_states(
+                self._hass, meter["entity_id"], start, end
+            )
+            before = [state for state in states if state.last_updated <= start]
+            if before and meter_reading(before[-1], meter) is not None:
+                for state in states[len(before) - 1 :]:
+                    self._record(run, state)
+                self._follow_average_power(run, start)
+                return electricity_line_item(
+                    ulid_now(),
+                    start,
+                    end,
+                    self._kwh(run),
+                    prices,
+                    ElectricityMethod.FROM_HISTORY,
+                )
+        if (running := self._config.consumption.get("running_power")) is not None:
+            return electricity_line_item(
+                ulid_now(),
+                start,
+                end,
+                consumption.estimate(running, running, []),
+                prices,
+                ElectricityMethod.ESTIMATED,
+            )
+        item = electricity_line_item(
+            ulid_now(), start, end, lambda _, __: 0.0, prices, ElectricityMethod.ENTERED
+        )
+        item.quantity, item.segments = None, []
+        return item
+
     def _open_prices(self, run: Run, at: datetime) -> None:
         """The price at Run start; without one, the last valid price before it."""
         if (entity_id := self._config.price_entity_id) is None:
@@ -536,11 +632,12 @@ class DeviceTracker:
             and (material := self._catalog.material(item.material_id))
         )
 
-    def _settle_material(self, run: Run) -> None:
-        """Flag missing usage or Material; without a Material used input, add a
-        Material Line Item to fill in unless the user already added one."""
+    def _settle_material(self, run: Run, *, measuring: bool = True) -> None:
+        """Flag missing usage or Material; without a Material used input (or a
+        measurement, as on a manual Run), add a Material Line Item to fill in
+        unless the user already added one."""
         items = [i for i in run.line_items if i.measured]
-        if self._config.material is None and not any(
+        if not (measuring and self._config.material) and not any(
             i.kind is LineItemKind.MATERIAL for i in run.line_items
         ):
             material = self._material()

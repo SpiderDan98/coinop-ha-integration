@@ -103,8 +103,13 @@ async def _update(
         return
     run, item = found
     material_item = item.kind is LineItemKind.MATERIAL
+    electricity_item = item.kind is LineItemKind.ELECTRICITY
     for field, refused, message in (
-        ("unit", item.is_computed or material_item, "WattBill sets this unit"),
+        (
+            "unit",
+            item.is_computed or material_item or electricity_item,
+            "WattBill sets this unit",
+        ),
         ("material_id", not material_item, "Only Material Line Items have one"),
     ):
         if field in msg and refused:
