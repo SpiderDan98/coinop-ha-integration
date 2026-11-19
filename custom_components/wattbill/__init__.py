@@ -10,7 +10,7 @@ from .catalog import Catalog
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .device_settings import DeviceSettings
-from .images import DeviceImages, ImageLibrary, RunImageView
+from .images import DeviceImages, ImageLibrary, RunImageView, RunUploadView
 from .run_book import RunBook
 from .runtime import WattBill, WattBillConfigEntry
 from .store import RunStore, WattBillStores
@@ -23,6 +23,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     websocket.async_setup(hass)
     hass.http.register_view(RunImageView())
+    hass.http.register_view(RunUploadView())
     return True
 
 

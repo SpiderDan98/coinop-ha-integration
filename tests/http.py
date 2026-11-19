@@ -2,8 +2,9 @@
 
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
+from typing import Any
 
-from aiohttp import web
+from aiohttp import FormData, web
 from aiohttp.test_utils import TestClient
 from homeassistant.auth.models import User
 from homeassistant.core import HomeAssistant
@@ -20,11 +21,30 @@ class HttpClient:
         self._connect = connect
         self._client: TestClient[web.Request, web.Application] | None = None
 
-    async def get(self, path: str) -> tuple[int, bytes]:
+    async def _session(self) -> TestClient[web.Request, web.Application]:
         if self._client is None:
             self._client = await self._connect()
-        response = await self._client.get(path)
+        return self._client
+
+    async def get(self, path: str) -> tuple[int, bytes]:
+        response = await (await self._session()).get(path)
         return response.status, await response.read()
+
+    async def upload(
+        self, path: str, *files: bytes | tuple[bytes, str]
+    ) -> tuple[int, Any]:
+        """POST files as the panel's upload does: each a `file` part, JPEG unless typed."""
+        form = FormData()
+        for n, file in enumerate(files):
+            content, content_type = (
+                file if isinstance(file, tuple) else (file, "image/jpeg")
+            )
+            form.add_field(
+                "file", content, filename=f"photo-{n}", content_type=content_type
+            )
+        response = await (await self._session()).post(path, data=form)
+        is_json = response.content_type == "application/json"
+        return response.status, await (response.json() if is_json else response.read())
 
     async def content(self, path: str) -> bytes:
         status, body = await self.get(path)

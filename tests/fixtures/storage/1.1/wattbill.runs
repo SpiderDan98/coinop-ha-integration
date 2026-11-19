@@ -73,7 +73,8 @@
             ]
           }
         ],
-        "images": []
+        "images": [],
+        "cover_id": null
       },
       {
         "id": "01KF0000000000000000000002",
@@ -130,7 +131,8 @@
             ]
           }
         ],
-        "images": []
+        "images": [],
+        "cover_id": null
       }
     ]
   }
