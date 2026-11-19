@@ -1,8 +1,10 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
+import asyncio
 from bisect import bisect_right
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -25,8 +27,8 @@ from homeassistant.util.ulid import ulid_now
 from .cost import consumption
 from .cost.electricity import electricity_line_item
 from .device_config import ConsumptionSource, DeviceConfig, Target
-from .device_inputs import input_value, meter_reading
-from .models import ElectricityMethod, Flag, Outcome, Run
+from .device_inputs import input_time, input_value, meter_reading
+from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 
 LIVE_INTERVAL = timedelta(minutes=1)
@@ -38,6 +40,13 @@ OUTCOMES = {
 }
 
 
+def _meter(section: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """The section's Energy or Power meter; None for an estimate."""
+    if section is None or section["source"] == ConsumptionSource.ESTIMATE:
+        return None
+    return section
+
+
 class DeviceTracker:
     def __init__(
         self, hass: HomeAssistant, book: RunBook, config: DeviceConfig
@@ -46,7 +55,10 @@ class DeviceTracker:
         self._book = book
         self._config = config
         self._unsubscribe: list[CALLBACK_TYPE] = []
+        # Until WattBill has seen the Status input, it may have missed the end.
+        self._status_lost = True
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
+        self._finalised: dict[str, asyncio.Future[None]] = {}
 
     @callback
     def async_start(self) -> None:
@@ -56,11 +68,19 @@ class DeviceTracker:
             ),
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
         ]
-        if meter := self._config.meter_entity_id:
+        sections = [run.consumption for run in self._unfinalised_runs()]
+        if meters := {
+            meter["entity_id"]
+            for section in [*sections, self._config.consumption]
+            if (meter := _meter(section))
+        }:
             self._unsubscribe += [
-                async_track_state_change_event(self._hass, meter, self._on_meter),
-                async_track_state_report_event(self._hass, meter, self._on_meter),
+                async_track_state_change_event(self._hass, meters, self._on_meter),
+                async_track_state_report_event(self._hass, meters, self._on_meter),
             ]
+        for run in self._unfinalised_runs():
+            if run.ended is not None:
+                self._await_final_report(run)
         self._apply(self._hass.states.get(self._config.status_entity_id))
 
     @callback
@@ -80,6 +100,9 @@ class DeviceTracker:
     ) -> None:
         state = event.data["new_state"]
         for run in self._unfinalised_runs():
+            meter = _meter(run.consumption)
+            if meter is None or meter["entity_id"] != event.data["entity_id"]:
+                continue
             self._record(run, state)
             if run.ended is None:
                 self._refresh(run, dt_util.utcnow())
@@ -91,63 +114,127 @@ class DeviceTracker:
     @callback
     def _on_tick(self, now: datetime) -> None:
         if run := self._book.open_run(self._config.device_id):
-            self._refresh(run, dt_util.utcnow())
+            now = dt_util.utcnow()
+            if not self._status_lost:
+                run.last_seen = now
+            self._refresh(run, now)
             self._book.async_update(run)
 
     def _apply(self, state: State | None) -> None:
-        value = input_value(state, self._config.status_attribute)
-        if state is None or value is None:
-            return
-        at = (
-            state.last_changed
-            if self._config.status_attribute is None
-            else state.last_updated
-        )
-        target = self._config.target(value)
+        attribute = self._config.status_attribute
+        value = input_value(state, attribute)
         run = self._book.open_run(self._config.device_id)
-        if target is Target.RUNNING and run is None:
-            self._open(at)
-        elif target in OUTCOMES and run is not None:
-            self._end(run, at, OUTCOMES[target])
+        if state is None or value is None:
+            if run is not None and not self._status_lost:
+                run.last_seen = (
+                    dt_util.utcnow() if state is None else state.last_changed
+                )
+                self._book.async_update(run)
+            self._status_lost = True
+            return
+        returned, self._status_lost = self._status_lost, False
+        at = input_time(state, attribute)
+        if run is not None and at < run.started:
+            # E.g. a Status entity picked during the Run still shows an older end.
+            return
+        target = self._config.target(value)
+        job_name = self._job_name()
+        if (
+            run is not None
+            and target is Target.RUNNING
+            and None not in (job_name, run.job_name)
+            and job_name != run.job_name
+        ):
+            run.end_reconstructed = True
+            self._end(run, run.last_seen or run.started, Outcome.UNKNOWN)
+            run = None
+        if run is None:
+            if target is Target.RUNNING:
+                self._open(at, job_name)
+            return
+        if target in OUTCOMES:
+            outcome = OUTCOMES[target]
+            if outcome is Outcome.CANCELLED and Flag.FAULT in run.flags:
+                outcome = Outcome.FAILED
+            run.end_reconstructed = returned
+            self._end(run, at, outcome)
+        else:
+            self._continue(run, target, at, job_name)
 
-    def _open(self, at: datetime) -> None:
+    def _continue(
+        self, run: Run, target: Target, at: datetime, job_name: str | None
+    ) -> None:
+        run.last_seen = max(run.last_seen or run.started, at)
+        if target in (Target.PAUSED, Target.FAULT):
+            if target is Target.FAULT and Flag.FAULT not in run.flags:
+                run.flags.append(Flag.FAULT)
+            if not run.pauses or run.pauses[-1].end is not None:
+                run.pauses.append(Pause(at))
+        elif target is Target.RUNNING:
+            if run.pauses and run.pauses[-1].end is None:
+                run.pauses[-1].end = at
+            if run.job_name is None:
+                run.job_name = job_name
+                run.name = run.name or job_name
+        self._book.async_update(run)
+
+    def _job_name(self) -> str | None:
+        if (entity_id := self._config.job_entity_id) is None:
+            return None
+        state = self._hass.states.get(entity_id)
+        return input_value(state, self._config.job_attribute) or None
+
+    def _open(self, at: datetime, job_name: str | None) -> None:
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
             device_name=self._config.name,
+            name=job_name,
+            job_name=job_name,
             started=at,
+            last_seen=at,
             line_items=[],
+            consumption=dict(self._config.consumption),
         )
-        if meter := self._config.meter_entity_id:
-            self._record(run, self._hass.states.get(meter))
+        if meter := _meter(run.consumption):
+            self._record(run, self._hass.states.get(meter["entity_id"]))
         self._refresh(run, at)
         self._book.async_start(run)
 
-    def _end(self, run: Run, at: datetime, outcome: Outcome) -> None:
+    async def async_end_run(self) -> None:
+        """End the open Run now as Unknown, e.g. because its Device is removed."""
+        if run := self._book.open_run(self._config.device_id):
+            await self._end(run, dt_util.utcnow(), Outcome.UNKNOWN)
+
+    def _end(self, run: Run, at: datetime, outcome: Outcome) -> asyncio.Future[None]:
+        """End the Run now; the result is done once it is finalised."""
         run.ended = at
+        if run.pauses and run.pauses[-1].end is None:
+            run.pauses[-1].end = at
         run.outcome = outcome
         self._refresh(run, at)
-        if self._config.source is ConsumptionSource.ESTIMATE or self._has_final_report(
-            run
-        ):
-            self._finish(run)
-            return
-        self._book.async_update(run)
-        self._await_final_report(run)
+        if _meter(run.consumption):
+            self._book.async_update(run)
+        return self._await_final_report(run)
 
-    def _await_final_report(self, run: Run) -> None:
+    def _await_final_report(self, run: Run) -> asyncio.Future[None]:
         """Freeze the Run at the meter's next report, at the latest after the wait."""
+        finalised = self._finalised.setdefault(run.id, self._hass.loop.create_future())
         assert run.ended is not None
-        due = run.ended + FINAL_REPORT_WAIT - dt_util.utcnow()
+        if not _meter(run.consumption) or self._has_final_report(run):
+            self._finish(run)
+            return finalised
 
         @callback
         def waited(now: datetime) -> None:
             self._final_waits.pop(run.id, None)
             self._finish(run)
 
+        due = run.ended + FINAL_REPORT_WAIT - dt_util.utcnow()
         self._final_waits[run.id] = async_call_later(
             self._hass, max(due, timedelta()), waited
         )
+        return finalised
 
     def _finish(self, run: Run) -> None:
         if cancel := self._final_waits.pop(run.id, None):
@@ -155,7 +242,12 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         run.readings = []
-        self._hass.async_create_task(self._book.async_finalise(run))
+        self._hass.async_create_task(self._async_finalise(run))
+
+    async def _async_finalise(self, run: Run) -> None:
+        await self._book.async_finalise(run)
+        if finalised := self._finalised.pop(run.id, None):
+            finalised.set_result(None)
 
     def _unfinalised_runs(self) -> list[Run]:
         return [
@@ -172,7 +264,9 @@ class DeviceTracker:
 
     def _record(self, run: Run, state: State | None) -> None:
         """Add the meter's report to the Run's readings and flag gaps and resets."""
-        value = meter_reading(state, self._config)
+        meter = _meter(run.consumption)
+        assert meter is not None
+        value = meter_reading(state, meter)
         if state is None:
             self._add_reading(run, dt_util.utcnow(), None)
         elif value is None:
@@ -205,7 +299,8 @@ class DeviceTracker:
             if run.ended is None or at < run.ended:
                 self._flag(run, Flag.CONSUMPTION_GAP)
         elif (
-            self._config.source is ConsumptionSource.ENERGY
+            (meter := _meter(run.consumption))
+            and meter["source"] == ConsumptionSource.ENERGY
             and previous is not None
             and value < previous[1]
             and (run.ended is None or previous[0] < run.ended)
@@ -218,16 +313,24 @@ class DeviceTracker:
             run.flags.append(flag)
 
     def _kwh(self, run: Run) -> Callable[[datetime, datetime], float]:
-        config = self._config
-        if config.source is ConsumptionSource.ENERGY:
-            return consumption.energy(run.readings)
-        if config.source is ConsumptionSource.POWER:
-            return consumption.power(run.readings, config.running_power)
-        running_power = config.running_power or 0.0
-        paused_power = (
-            running_power if config.paused_power is None else config.paused_power
+        # Average power applies at once, unless the Device changed its source since.
+        current = self._config.consumption
+        pinned = run.consumption
+        powers = (
+            current if not pinned or pinned["source"] == current["source"] else pinned
         )
-        return consumption.estimate(running_power, paused_power, run.pauses)
+        running_power: float | None = powers.get("running_power")
+        meter = _meter(pinned)
+        if meter is None:
+            paused_power = powers.get("paused_power")
+            return consumption.estimate(
+                running_power or 0.0,
+                running_power or 0.0 if paused_power is None else paused_power,
+                run.pauses,
+            )
+        if meter["source"] == ConsumptionSource.ENERGY:
+            return consumption.energy(run.readings)
+        return consumption.power(run.readings, running_power)
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
@@ -237,8 +340,8 @@ class DeviceTracker:
             until,
             self._kwh(run),
             [(run.started, self._config.price)],
-            ElectricityMethod.ESTIMATED
-            if self._config.source is ConsumptionSource.ESTIMATE
-            else ElectricityMethod.MEASURED,
+            ElectricityMethod.MEASURED
+            if _meter(run.consumption)
+            else ElectricityMethod.ESTIMATED,
         )
         run.line_items = [item] + [i for i in run.line_items if i.kind is not item.kind]

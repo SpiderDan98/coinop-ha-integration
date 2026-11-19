@@ -12,7 +12,7 @@ from .const import DOMAIN
 from .models import Run
 
 STORAGE_VERSION = 1
-STORAGE_MINOR_VERSION = 2
+STORAGE_MINOR_VERSION = 1
 LIVE_SAVE_DELAY = timedelta(seconds=60)
 
 

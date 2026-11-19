@@ -1,6 +1,9 @@
 """Reading Device Inputs from Home Assistant's state machine and entity registry."""
 
+from collections.abc import Mapping
+from datetime import datetime
 import math
+from typing import Any
 
 from homeassistant.components.event import ATTR_EVENT_TYPE, ATTR_EVENT_TYPES
 from homeassistant.components.sensor import ATTR_OPTIONS
@@ -15,9 +18,10 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
 
-from .device_config import ConsumptionSource, DeviceConfig
+from .device_config import ConsumptionSource
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
 # Readings are kept in kWh (energy) or W (power).
@@ -36,6 +40,13 @@ def input_value(state: State | None, attribute: str | None) -> str | None:
         attribute = ATTR_EVENT_TYPE
     value = state.state if attribute is None else state.attributes.get(attribute)
     return None if value is None else str(value)
+
+
+def input_time(state: State, attribute: str | None) -> datetime:
+    """When the input took its current value."""
+    if state.domain == "event" and (fired := dt_util.parse_datetime(state.state)):
+        return fired
+    return state.last_changed if attribute is None else state.last_updated
 
 
 def offered_values(
@@ -77,9 +88,9 @@ def unit_scale(source: ConsumptionSource, unit: str | None) -> float | None:
     return converter.get_unit_ratio(canonical, unit)
 
 
-def meter_reading(state: State | None, config: DeviceConfig) -> float | None:
+def meter_reading(state: State | None, meter: Mapping[str, Any]) -> float | None:
     """The meter's current reading in kWh or W, or None while it has none."""
-    value = input_value(state, config.meter_attribute)
+    value = input_value(state, meter["attribute"])
     if state is None or value is None:
         return None
     try:
@@ -88,12 +99,13 @@ def meter_reading(state: State | None, config: DeviceConfig) -> float | None:
         return None
     reported_unit = (
         state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
-        if config.meter_attribute is None
+        if meter["attribute"] is None
         else None
     )
+    source = ConsumptionSource(meter["source"])
     scale = (
-        unit_scale(config.source, reported_unit)
-        or unit_scale(config.source, config.meter_unit)
-        or config.meter_factor
+        unit_scale(source, reported_unit)
+        or unit_scale(source, meter["unit"])
+        or meter["factor"]
     )
     return None if scale is None or not math.isfinite(number) else number * scale

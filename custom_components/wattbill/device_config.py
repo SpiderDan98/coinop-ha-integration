@@ -33,25 +33,24 @@ ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 class DeviceConfig:
     device_id: str
     name: str
+    printer_device_id: str | None
     status_entity_id: str
     status_attribute: str | None
     mapping: Mapping[str, Target]
-    source: ConsumptionSource
-    meter_entity_id: str | None
-    meter_attribute: str | None
-    meter_unit: str | None
-    meter_factor: float | None
-    running_power: float | None
-    paused_power: float | None
+    job_entity_id: str | None
+    job_attribute: str | None
+    # The consumption section as Add Device wrote it.
+    consumption: Mapping[str, Any]
     price: float
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> DeviceConfig:
         data: Mapping[str, Any] = subentry.data
-        consumption = data["consumption"]
+        job = data.get("job", {})
         return cls(
             device_id=subentry.subentry_id,
             name=subentry.title,
+            printer_device_id=data["printer_device_id"],
             status_entity_id=data["status"]["entity_id"],
             status_attribute=data["status"]["attribute"],
             mapping={
@@ -59,13 +58,9 @@ class DeviceConfig:
                 for target, values in data["mapping"].items()
                 for value in values
             },
-            source=ConsumptionSource(consumption["source"]),
-            meter_entity_id=consumption.get("entity_id"),
-            meter_attribute=consumption.get("attribute"),
-            meter_unit=consumption.get("unit"),
-            meter_factor=consumption.get("factor"),
-            running_power=consumption.get("running_power"),
-            paused_power=consumption.get("paused_power"),
+            job_entity_id=job.get("entity_id"),
+            job_attribute=job.get("attribute"),
+            consumption=data["consumption"],
             price=data["price"]["value"],
         )
 

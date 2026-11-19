@@ -13,12 +13,34 @@
     "device": {
       "entry_type": "Device",
       "initiate_flow": {
-        "user": "Add Device"
+        "user": "Add Device",
+        "reconfigure": "Reconfigure Device"
       },
       "step": {
+        "reconfigure": {
+          "title": "Reconfigure Device",
+          "description": "Pick a section to change. Nothing is saved until you choose Save. Changes apply to an open Run at once; a new consumption source applies from the next Run. Ended Runs never change.",
+          "menu_options": {
+            "status": "Status & mapping",
+            "job": "Job & Material",
+            "consumption": "Consumption source",
+            "price": "Electricity price",
+            "save": "Save"
+          }
+        },
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs WattBill records.",
+          "description": "Add a 3D printer whose Runs WattBill records. Pick the printer's Home Assistant device to take over its name, or leave it empty.",
+          "data": {
+            "device": "Printer's Home Assistant device (optional)"
+          },
+          "data_description": {
+            "device": "WattBill's own device for this printer is linked to it. Entity pickers in the next steps still offer every entity."
+          }
+        },
+        "name": {
+          "title": "Name",
+          "description": "Name of the Device. You can rename it later on its Home Assistant device page.",
           "data": {
             "name": "Name"
           }
@@ -48,6 +70,18 @@
           },
           "data_description": {
             "ended": "Ends the Run with Outcome Unknown, e.g. when the printer only reports printing / not printing."
+          }
+        },
+        "job": {
+          "title": "Print job",
+          "description": "Optionally pick the entity that reports the name of the current print job. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
+          "data": {
+            "entity_id": "Job name entity (optional)",
+            "attribute": "Attribute (optional)"
+          },
+          "data_description": {
+            "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
+            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity."
           }
         },
         "consumption": {
@@ -134,14 +168,58 @@
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
-        "unknown_unit": "WattBill does not recognise this unit. Enter a conversion factor, or pick another entity."
+        "unknown_unit": "WattBill does not recognise this unit. Enter a conversion factor, or pick another entity.",
+        "status_already_used": "Another Device already uses this entity as its print status. Each print would be recorded twice."
+      },
+      "abort": {
+        "reconfigure_successful": "The Device was saved."
       }
     }
   },
   "entity": {
+    "event": {
+      "run": {
+        "name": "Run",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Started",
+              "ended": "Ended"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "total_cost": {
         "name": "Total cost"
+      },
+      "electricity_cost": {
+        "name": "Electricity cost"
+      },
+      "material_cost": {
+        "name": "Material cost"
+      },
+      "other_cost": {
+        "name": "Other cost"
+      },
+      "material_used": {
+        "name": "Material used"
+      },
+      "energy_in_runs": {
+        "name": "Energy in Runs"
+      },
+      "running_time": {
+        "name": "Running time"
+      },
+      "current_run_cost": {
+        "name": "Current Run cost"
+      },
+      "last_run_cost": {
+        "name": "Last Run cost"
+      },
+      "flagged_runs": {
+        "name": "Flagged Runs"
       },
       "runs": {
         "name": "Runs"

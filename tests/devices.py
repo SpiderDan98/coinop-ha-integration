@@ -2,9 +2,15 @@
 
 from typing import Any
 
-from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigSubentry
+from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
+    SOURCE_USER,
+    ConfigEntry,
+    ConfigSubentry,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.wattbill.const import DOMAIN
@@ -29,10 +35,30 @@ async def add_hub(hass: HomeAssistant) -> ConfigEntry:
     return entry
 
 
-async def start_add_device(hass: HomeAssistant, entry: ConfigEntry) -> Any:
-    return await hass.config_entries.subentries.async_init(
+def add_printer(hass: HomeAssistant, name: str = "Kobra S1") -> dr.DeviceEntry:
+    """A printer's HA device, as its own integration registers it."""
+    printer_entry = MockConfigEntry(domain="printer_integration")
+    printer_entry.add_to_hass(hass)
+    return dr.async_get(hass).async_get_or_create(
+        config_entry_id=printer_entry.entry_id,
+        identifiers={("printer_integration", name)},
+        name=name,
+    )
+
+
+async def start_add_device(
+    hass: HomeAssistant, entry: ConfigEntry, *, printer: str | None = None
+) -> Any:
+    """Open Add Device and pick the printer's HA device (or none); returns the name form."""
+    result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
+    assert result["step_id"] == "user"
+    result = await configure(
+        hass, result, {} if printer is None else {"device": printer}
+    )
+    assert result["step_id"] == "name", result.get("errors")
+    return result
 
 
 async def configure(hass: HomeAssistant, result: Any, user_input: Any) -> Any:
@@ -46,10 +72,13 @@ async def walk_to_mapping(
     entry: ConfigEntry,
     *,
     name: str = "Kobra",
+    printer: str | None = None,
     status: str = STATUS,
     attribute: str | None = None,
 ) -> Any:
-    result = await configure(hass, await start_add_device(hass, entry), {"name": name})
+    result = await configure(
+        hass, await start_add_device(hass, entry, printer=printer), {"name": name}
+    )
     assert result["step_id"] == "status"
     status_input = {"entity_id": status} | (
         {"attribute": attribute} if attribute else {}
@@ -61,6 +90,8 @@ async def walk_to_mapping(
 
 async def walk_to_consumption(hass: HomeAssistant, entry: ConfigEntry) -> Any:
     result = await configure(hass, await walk_to_mapping(hass, entry), MAPPING)
+    assert result["step_id"] == "job", result.get("errors")
+    result = await configure(hass, result, {})
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     return result
 
@@ -70,11 +101,14 @@ async def add_device(
     entry: ConfigEntry,
     *,
     name: str = "Kobra",
+    printer: str | None = None,
     status: str = STATUS,
     attribute: str | None = None,
     mapping: dict[str, list[str]] = MAPPING,
     source: str = "estimate",
     meter: dict[str, Any] | None = None,
+    job: str | None = None,
+    job_attribute: str | None = None,
     running_power: float = 120,
     paused_power: float | None = None,
     price: float = 0.30,
@@ -84,9 +118,14 @@ async def add_device(
     `source` picks the consumption source; Energy and Power take `meter` as input.
     """
     result = await walk_to_mapping(
-        hass, entry, name=name, status=status, attribute=attribute
+        hass, entry, name=name, printer=printer, status=status, attribute=attribute
     )
     result = await configure(hass, result, mapping)
+    assert result["step_id"] == "job", result.get("errors")
+    job_input = ({"entity_id": job} if job else {}) | (
+        {"attribute": job_attribute} if job_attribute else {}
+    )
+    result = await configure(hass, result, job_input)
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     if source == "estimate":
@@ -103,3 +142,28 @@ async def add_device(
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+async def start_reconfigure(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry
+) -> Any:
+    """Open the Device's reconfigure menu."""
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"),
+        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id},
+    )
+    assert result["type"] is FlowResultType.MENU, result
+    return result
+
+
+async def reconfigure(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry, *inputs: Any
+) -> Any:
+    """Submit `inputs` in turn from the reconfigure menu, then Save."""
+    result = await start_reconfigure(hass, entry, subentry)
+    for user_input in inputs:
+        result = await configure(hass, result, user_input)
+    assert result["step_id"] == "reconfigure", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+    return result
