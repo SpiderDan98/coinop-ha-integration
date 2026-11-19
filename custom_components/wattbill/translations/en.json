@@ -1,0 +1,12 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "WattBill records what each print of your 3D printers costs. After setup, add each printer as a Device."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "WattBill is already set up. Add more printers as Devices to the existing entry."
+    }
+  }
+}

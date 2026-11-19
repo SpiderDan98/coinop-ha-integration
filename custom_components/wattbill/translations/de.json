@@ -1,0 +1,12 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "WattBill erfasst, was jeder Druck deiner 3D-Drucker kostet. Füge nach der Einrichtung jeden Drucker als Gerät hinzu."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "WattBill ist bereits eingerichtet. Füge weitere Drucker als Geräte zum bestehenden Eintrag hinzu."
+    }
+  }
+}
