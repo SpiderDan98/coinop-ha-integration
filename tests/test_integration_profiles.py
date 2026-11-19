@@ -10,7 +10,16 @@ from homeassistant.util import dt as dt_util
 
 from .anycubic import Printer, add_anycubic_cloud, add_anycubic_local
 from .clock import Clock
-from .devices import add_hub, add_printer, configure, start_add_device
+from .devices import (
+    ENERGY,
+    PRICE,
+    add_device,
+    add_hub,
+    add_printer,
+    configure,
+    start_add_device,
+    start_reconfigure,
+)
 from .test_device_flow import suggested
 from .test_runs import stored_runs
 
@@ -150,7 +159,10 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
     # The Material used entity reports mm itself, so no unit step.
     assert shown == ["status", "mapping", "job", "images"]
     data = subentry.data
-    assert data["status"] == {"entity_id": "sensor.kobra_s1_job_state", "attribute": None}
+    assert data["status"] == {
+        "entity_id": "sensor.kobra_s1_job_state",
+        "attribute": None,
+    }
     assert data["mapping"] == {
         "running": ["printing", "preheating", "levelling"],
         "paused": ["paused"],
@@ -235,6 +247,146 @@ async def test_renamed_entities_are_still_found(
     _, subentry = await walk_pre_filled(hass, entry, printer)
 
     assert subentry.data["status"]["entity_id"] == "sensor.my_printer_state"
+
+
+async def test_detect_again_is_offered_for_a_known_integration(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_local(hass)
+    entry = await add_hub(hass)
+    _, subentry = await walk_pre_filled(hass, entry, printer)
+
+    result = await start_reconfigure(hass, entry, subentry)
+
+    assert result["menu_options"] == [
+        "status",
+        "job",
+        "images",
+        "consumption",
+        "price",
+        "detect",
+        "save",
+    ]
+
+
+async def test_detect_again_is_not_offered_otherwise(hass: HomeAssistant) -> None:
+    printer = add_printer(hass)
+    entry = await add_hub(hass)
+    without_printer = await add_device(hass, entry, name="Plain")
+    unknown = await add_device(
+        hass, entry, name="Other", printer=printer.id, status="sensor.other_status"
+    )
+
+    for subentry in (without_printer, unknown):
+        result = await start_reconfigure(hass, entry, subentry)
+        assert "detect" not in result["menu_options"]
+
+
+async def test_detect_again_repairs_the_mapping_in_one_go(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    printer = add_anycubic_local(hass)
+    entry = await add_hub(hass)
+    _, subentry = await walk_pre_filled(hass, entry, printer)
+    # An update of the integration renamed its entities.
+    renamed = {
+        key: entity_registry.async_update_entity(
+            printer[key], new_entity_id=printer[key].replace("anycubic_kobra_s1", "s1")
+        ).entity_id
+        for key in ("print_event", "filename", "filament_used", "camera")
+    }
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    result = await configure(hass, menu, {"next_step_id": "detect"})
+    shown = []
+    while result["type"] is FlowResultType.FORM:
+        shown.append(result["step_id"])
+        result = await configure(hass, result, accepted(result))
+    assert shown == ["status", "mapping", "job", "material_unit", "images"]
+    assert result["step_id"] == "reconfigure"
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["status"]["entity_id"] == renamed["print_event"]
+    assert data["job"]["entity_id"] == renamed["filename"]
+    assert data["job"]["material"]["entity_id"] == renamed["filament_used"]
+    assert data["images"]["camera"] == renamed["camera"]
+
+
+async def test_detect_again_pre_fills_the_profiles_values(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_cloud(hass)
+    entry = await add_hub(hass)
+    subentry = await add_device(
+        hass,
+        entry,
+        printer=printer.device.id,
+        status="sensor.something_else",
+        mapping={"running": ["on"], "ended": ["off"]},
+        colour_attribute="colour",
+    )
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    status = await configure(hass, menu, {"next_step_id": "detect"})
+    assert suggested(status, "entity_id") == printer["job_state"]
+    mapping = await configure(hass, status, accepted(status))
+    assert suggested(mapping, "running") == ["printing", "preheating", "levelling"]
+    assert suggested(mapping, "ended") == ["idle"]
+    job = await configure(hass, mapping, accepted(mapping))
+    assert suggested(job, "colour_attribute") == "color_hex"
+    assert suggested(job, "loaded_slot") == printer["ace_loaded_slot"]
+    images = await configure(hass, job, accepted(job))
+    assert suggested(images, "thumbnail") == printer["job_image_url"]
+
+
+async def test_detect_again_leaves_consumption_and_price_alone(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_cloud(hass)
+    hass.states.async_set(ENERGY, "1", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(PRICE, "0.25", {"unit_of_measurement": "EUR/kWh"})
+    entry = await add_hub(hass)
+    subentry = await add_device(
+        hass,
+        entry,
+        printer=printer.device.id,
+        source="energy",
+        meter={"entity_id": ENERGY},
+        price={"entity_id": PRICE},
+    )
+    before = dict(entry.subentries[subentry.subentry_id].data)
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    result = await configure(hass, menu, {"next_step_id": "detect"})
+    while result["type"] is FlowResultType.FORM:
+        result = await configure(hass, result, accepted(result))
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["status"]["entity_id"] == printer["job_state"]
+    assert data["consumption"] == before["consumption"]
+    assert data["price"] == before["price"]
+
+
+async def test_an_input_the_profile_cant_find_keeps_its_value(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_cloud(hass, cloud=False)
+    entry = await add_hub(hass)
+    subentry = await add_device(
+        hass, entry, printer=printer.device.id, thumbnail="image.my_thumbnail"
+    )
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    result = await configure(hass, menu, {"next_step_id": "detect"})
+    while result["step_id"] != "images":
+        result = await configure(hass, result, accepted(result))
+
+    assert suggested(result, "thumbnail") == "image.my_thumbnail"
+    assert suggested(result, "camera") == printer["camera"]
 
 
 async def test_an_unknown_integration_pre_fills_nothing(hass: HomeAssistant) -> None:

@@ -81,6 +81,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._meter: dict[str, Any] = {}
         self._price: dict[str, Any] = {}
         self._job: dict[str, Any] = {}
+        # The profile's sections while Detect again walks them.
+        self._detecting: dict[str, Any] = {}
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
         """Each section's first step, in Add Device order."""
@@ -93,11 +95,15 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
 
     async def _section_done(self, section: str) -> SubentryFlowResult:
-        if self.source == SOURCE_RECONFIGURE:
-            return await self.async_step_reconfigure()
         sections = self._sections()
         names = list(sections)
-        if following := names[names.index(section) + 1 :]:
+        following = names[names.index(section) + 1 :]
+        if self.source == SOURCE_RECONFIGURE and not (
+            following and following[0] in self._detecting
+        ):
+            self._detecting = {}
+            return await self.async_step_reconfigure()
+        if following:
             return await sections[following[0]]()
         return self.async_create_entry(title=self._name, data=self._data)
 
@@ -106,9 +112,23 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         if not self._data:
             self._data = dict(self._get_reconfigure_subentry().data)
+        detect_again = ["detect"] if self._detected() else []
         return self.async_show_menu(
-            step_id="reconfigure", menu_options=[*self._sections(), "save"]
+            step_id="reconfigure",
+            menu_options=[*self._sections(), *detect_again, "save"],
         )
+
+    def _detected(self) -> dict[str, Any] | None:
+        return detect(self.hass, self._data.get("printer_device_id"))
+
+    async def async_step_detect(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Walk the sections the profile fills, pre-filled with what it finds now."""
+        self._detecting = self._detected() or {}
+        for section, values in self._detecting.items():
+            self._data[section] = (self._data.get(section) or {}) | values
+        return await self.async_step_status()
 
     async def async_step_save(
         self, user_input: dict[str, Any] | None = None

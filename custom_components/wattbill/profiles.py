@@ -9,8 +9,7 @@ from itertools import takewhile
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .device_config import Target
 
@@ -122,19 +121,23 @@ def detect(hass: HomeAssistant, device_id: str | None) -> dict[str, Any] | None:
     printer = devices.async_get(device_id) if device_id else None
     if printer is None:
         return None
-    domains = {
-        config_entry.domain
-        for entry_id in printer.config_entries
-        if (config_entry := hass.config_entries.async_get_entry(entry_id))
-    }
-    domain = next((domain for domain in PROFILES if domain in domains), None)
-    if domain is None:
+    config_entry = next(
+        (
+            config_entry
+            for entry_id in printer.config_entries
+            if (config_entry := hass.config_entries.async_get_entry(entry_id))
+            and config_entry.domain in PROFILES
+        ),
+        None,
+    )
+    if config_entry is None:
         return None
+    domain = config_entry.domain
     # A multi-material unit is its own HA device, linked to the printer's.
-    device_ids = [printer.id] + [
+    device_ids = [
         device.id
-        for device in devices.devices.values()
-        if device.via_device_id == printer.id
+        for device in dr.async_entries_for_config_entry(devices, config_entry.entry_id)
+        if printer.id in (device.id, device.via_device_id)
     ]
     entities = er.async_get(hass)
     candidates = [

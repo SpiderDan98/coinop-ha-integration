@@ -5,10 +5,10 @@ the ACE unit is its own HA device linked to the printer with `via_device_id`.
 """
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 LOCAL_EVENT_TYPES = [
@@ -45,7 +45,7 @@ def _add(
     object_id: str,
     *,
     ace: bool = False,
-    **kwargs: object,
+    **kwargs: Any,
 ) -> None:
     entry = er.async_get(hass).async_get_or_create(
         platform,
@@ -54,7 +54,7 @@ def _add(
         config_entry=config_entry,
         device_id=(printer.ace if ace else printer.device).id,
         suggested_object_id=object_id,
-        **kwargs,  # type: ignore[arg-type]
+        **kwargs,
     )
     printer.entities[key] = entry.entity_id
 
@@ -87,7 +87,7 @@ def add_anycubic_local(
     )
     printer = Printer(device, ace)
 
-    def add(platform: str, key: str, object_id: str, **kwargs: object) -> None:
+    def add(platform: str, key: str, object_id: str, **kwargs: Any) -> None:
         _add(
             hass,
             printer,
@@ -165,7 +165,7 @@ def add_anycubic_cloud(
     prefix = name.lower().replace(" ", "_")
 
     def add(
-        platform: str, key: str, object_id: str, *, ace: bool = False, **kwargs: object
+        platform: str, key: str, object_id: str, *, ace: bool = False, **kwargs: Any
     ) -> None:
         _add(
             hass,
