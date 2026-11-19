@@ -1,6 +1,6 @@
 // Pieces of a Run shown on both the gallery and the Run page.
 import { html } from "lit";
-import type { Device, RunSummary, Totals } from "./api";
+import type { Device, Group, RunSummary, Totals } from "./api";
 import type { Format } from "./format";
 import type { Localize } from "./localize";
 
@@ -11,11 +11,15 @@ export const outcomeChip = (run: RunSummary, t: Localize) => {
   return html`<span class="outcome ${outcome}">${t(`outcome.${outcome}`)}</span>`;
 };
 
-/** While the Devices are unknown, no Run counts as one of a removed Device. */
-export const deviceName = (run: RunSummary, devices: Device[] | undefined, t: Localize) =>
-  !devices || devices.some((device) => device.id === run.device_id)
-    ? run.device_name
-    : t("device.removed", { name: run.device_name });
+/** While the Devices are unknown, no Run (or group) counts as one of a removed Device. */
+export const deviceName = (
+  { device_id, device_name = "" }: Pick<Group, "device_id" | "device_name">,
+  devices: Device[] | undefined,
+  t: Localize,
+) =>
+  !devices || devices.some((device) => device.id === device_id)
+    ? device_name
+    : t("device.removed", { name: device_name });
 
 /** Confirms deleting Runs, saying how much the sensor totals drop. */
 export const deleteDialog = (

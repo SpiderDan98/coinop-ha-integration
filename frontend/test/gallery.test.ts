@@ -54,7 +54,7 @@ describe("Run gallery", () => {
       { type: SUBSCRIBE },
       { type: CATALOG },
       { type: "wattbill/devices/list" },
-      ...recorded.aggregates.map(({ group_by }) => ({
+      ...[[], ["month"], ["month", "kind"], ["outcome"], ["kind", "material"]].map((group_by) => ({
         type: "wattbill/aggregates/get",
         group_by,
       })),
