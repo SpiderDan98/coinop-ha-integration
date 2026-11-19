@@ -46,7 +46,7 @@ from .device_settings import (
     DeviceSettings,
 )
 from .images import DeviceImages
-from .materials import Material, MaterialForm
+from .materials import Material, MaterialForm, SpoolmanPrice
 from .models import (
     ElectricityMethod,
     Flag,
@@ -57,6 +57,7 @@ from .models import (
     Usage,
 )
 from .run_book import RunBook
+from .spoolman import Spoolman
 from .store import LIVE_SAVE_DELAY
 from .templates import add_templates, count_running_hours
 
@@ -88,6 +89,7 @@ class DeviceTracker:
         settings: DeviceSettings,
         images: DeviceImages,
         catalog: Catalog,
+        spoolman: Spoolman,
     ) -> None:
         self._hass = hass
         self._book = book
@@ -95,11 +97,13 @@ class DeviceTracker:
         self._settings = settings
         self._images = images
         self._catalog = catalog
+        self._spoolman = spoolman
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Until WattBill has seen the Status input, it may have missed the end.
         self._status_lost = True
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
+        self._finishing: set[str] = set()
         # The price entity's last valid report, for a Run starting while it has none.
         self._last_price: tuple[datetime, float] | None = None
 
@@ -507,12 +511,30 @@ class DeviceTracker:
     def _finish(self, run: Run) -> None:
         if cancel := self._final_waits.pop(run.id, None):
             cancel()
+        if run.id not in self._finishing:
+            self._finishing.add(run.id)
+            self._hass.async_create_task(self._async_finish(run))
+
+    async def _async_finish(self, run: Run) -> None:
+        """Freeze the Run's values, with Material prices as Spoolman has them now."""
+        read = await self._spoolman.async_update_prices()
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
+        if not read and self._uses_spoolman(run):
+            self._flag(run, Flag.SPOOLMAN_UNREACHABLE)
         run.readings = []
         run.prices = []
-        self._hass.async_create_task(self._async_finalise(run))
+        await self._async_finalise(run)
+        self._finishing.discard(run.id)
+
+    def _uses_spoolman(self, run: Run) -> bool:
+        return any(
+            isinstance(material.price, SpoolmanPrice)
+            for item in run.line_items
+            if item.material_id
+            and (material := self._catalog.material(item.material_id))
+        )
 
     def _settle_material(self, run: Run) -> None:
         """Flag missing usage or Material; without a Material used input, add a

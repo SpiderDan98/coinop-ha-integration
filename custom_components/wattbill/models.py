@@ -25,6 +25,7 @@ class Flag(StrEnum):
     PRICE_GAP = "price_gap"
     USAGE_MISSING = "usage_missing"
     MATERIAL_MISSING = "material_missing"
+    SPOOLMAN_UNREACHABLE = "spoolman_unreachable"
 
 
 class UsageUnit(StrEnum):

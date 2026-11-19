@@ -1,8 +1,8 @@
 """Materials: what a Device uses up, priced per gram from a Cost Source.
 
 Free of Home Assistant types; `as_dict` / `from_dict` give the catalog Store's
-JSON shape. A Cost Source is one entry of `PRICE_SOURCES` (only "fixed" so far)
-with a `per_gram(density)` price.
+JSON shape. A Cost Source is one entry of `PRICE_SOURCES` ("fixed" or
+"spoolman") with a `per_gram(density)` price.
 """
 
 from dataclasses import dataclass, field
@@ -80,10 +80,35 @@ class FixedPrice:
         return cls(data["pack_price"], data["pack_size"], PackUnit(data["pack_unit"]))
 
 
-PRICE_SOURCES = {"fixed": FixedPrice}
+@dataclass
+class SpoolmanPrice:
+    """Spoolman Cost Source: the linked Filament and the last price per gram read."""
+
+    filament_id: int
+    last_read: float | None = None
+
+    def per_gram(self, density: float) -> float:
+        return self.last_read or 0.0
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "source": "spoolman",
+            "filament_id": self.filament_id,
+            "per_gram": self.last_read,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SpoolmanPrice:
+        return cls(data["filament_id"], data.get("per_gram"))
 
 
-def price_from_dict(data: dict[str, Any]) -> FixedPrice:
+PRICE_SOURCES: dict[str, type[FixedPrice] | type[SpoolmanPrice]] = {
+    "fixed": FixedPrice,
+    "spoolman": SpoolmanPrice,
+}
+
+
+def price_from_dict(data: dict[str, Any]) -> FixedPrice | SpoolmanPrice:
     return PRICE_SOURCES[data["source"]].from_dict(data)
 
 
@@ -96,7 +121,7 @@ class Material:
     form: MaterialForm
     type: str
     density: float
-    price: FixedPrice
+    price: FixedPrice | SpoolmanPrice
     vendor: str | None = None
     colour: str | None = None
     diameter: float | None = None

@@ -10,7 +10,13 @@ from typing import Any
 from homeassistant.core import CALLBACK_TYPE, callback
 from homeassistant.util.ulid import ulid_now
 
-from .materials import DEFAULT_DIAMETER, Material, MaterialForm, PackUnit
+from .materials import (
+    DEFAULT_DIAMETER,
+    Material,
+    MaterialForm,
+    PackUnit,
+    SpoolmanPrice,
+)
 from .store import WattBillStore
 from .tags import TAGS, sort_tags
 from .templates import TEMPLATES, LineItemTemplate
@@ -24,6 +30,7 @@ def _material(data: dict[str, Any]) -> Material:
     pack_unit = PackUnit.MILLILITRE if resin else PackUnit.GRAM
     diameter = None if resin else data.get("diameter") or DEFAULT_DIAMETER
     colour = data.get("colour")
+    price = data["price"]
     return Material.from_dict(
         {
             "vendor": None,
@@ -32,7 +39,9 @@ def _material(data: dict[str, Any]) -> Material:
             **data,
             "colour": colour and colour.lower(),
             "diameter": diameter,
-            "price": {"pack_unit": pack_unit} | data["price"],
+            "price": {"pack_unit": pack_unit} | price
+            if price["source"] == "fixed"
+            else price,
         }
     )
 
@@ -169,6 +178,26 @@ class Catalog:
         del self._materials[material.id]
         await self._save_materials()
         return True
+
+    async def async_sync_spoolman(self, synced: dict[int, dict[str, Any]]) -> None:
+        """Give each linked Material what Spoolman read for its Filament.
+
+        Without a price in Spoolman the last price read stays.
+        """
+        changed = False
+        for material in self.materials():
+            price = material.price
+            if not isinstance(price, SpoolmanPrice) or price.filament_id not in synced:
+                continue
+            fields = synced[price.filament_id]
+            if fields["price"]["per_gram"] is None:
+                fields = fields | {"price": price.as_dict()}
+            updated = _material(material.as_dict() | fields)
+            if updated != material:
+                self._materials[material.id] = updated
+                changed = True
+        if changed:
+            await self._save_materials()
 
     async def _save_materials(self, changed: Material | None = None) -> None:
         if changed is not None and changed.default_for_type:

@@ -9,12 +9,28 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     ConfigSubentryFlow,
     FlowType,
+    OptionsFlow,
     SubentryFlowContext,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .const import DOMAIN, NAME, SUBENTRY_DEVICE
 from .device_flow import DeviceSubentryFlow
+from .schema import vol
+from .spoolman import CONF_SPOOLMAN_URL, SpoolmanUnreachable, async_check
+
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_SPOOLMAN_URL): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.URL)
+        ),
+    }
+)
 
 
 class WattBillConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -27,6 +43,12 @@ class WattBillConfigFlow(ConfigFlow, domain=DOMAIN):
         cls, config_entry: ConfigEntry
     ) -> dict[str, type[ConfigSubentryFlow]]:
         return {SUBENTRY_DEVICE: DeviceSubentryFlow}
+
+    @staticmethod
+    @callback
+    @override
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return WattBillOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -43,3 +65,37 @@ class WattBillConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         result["next_flow"] = (FlowType.CONFIG_SUBENTRIES_FLOW, add_device["flow_id"])
         return result
+
+
+async def _async_validate(
+    hass: HomeAssistant, user_input: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """The options to save, or the errors to show."""
+    options, errors = dict(user_input), {}
+    if url := options.pop(CONF_SPOOLMAN_URL, "").strip().rstrip("/"):
+        try:
+            await async_check(hass, url)
+        except SpoolmanUnreachable:
+            errors[CONF_SPOOLMAN_URL] = "cannot_connect"
+        options[CONF_SPOOLMAN_URL] = url
+    return options, errors
+
+
+class WattBillOptionsFlow(OptionsFlow):
+    """The hub's integration-wide options."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            options, errors = await _async_validate(self.hass, user_input)
+            if not errors:
+                return self.async_create_entry(data=options)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                OPTIONS_SCHEMA, user_input or self.config_entry.options
+            ),
+            errors=errors,
+        )
