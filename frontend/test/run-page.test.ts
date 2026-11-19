@@ -69,7 +69,9 @@ describe("Run page", () => {
     expect(cards(panel)).toEqual([
       [
         "Electricity €0.30",
-        "Electricity Estimated from average power · 2 price segments 1.08 kWh × 0.2778 = 0.30",
+        "Electricity Estimated from average power · 2 price segments " +
+          "10:00 AM – 4:00 PM · 0.6 kWh × €0.30 4:00 – 7:00 PM · 0.48 kWh × €0.25 " +
+          "1.08 kWh × 0.2778 = 0.30",
       ],
       ["Material €0.00"],
       ["Other €0.00"],
@@ -77,6 +79,15 @@ describe("Run page", () => {
     const [, material, other] = queryAll(panel, ".kind").map(text);
     expect(material).toBe("Material €0.00 None");
     expect(other).toBe("Other €0.00 None + Add Other Line Item");
+  });
+
+  it("lists each price segment under the electricity evidence", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/run/helmet" });
+
+    expect(queryAll(panel, ".segments li").map(text)).toEqual([
+      "10:00 AM – 4:00 PM · 0.6 kWh × €0.30",
+      "4:00 – 7:00 PM · 0.48 kWh × €0.25",
+    ]);
   });
 
   it("leads back to all Runs", async () => {

@@ -1,12 +1,21 @@
 // The WattBill sidebar panel. HA sets `hass`, `narrow`, `route` and `panel`; the
-// panel keeps one Runs subscription open while it is shown, loads the Devices, and
-// routes by `route.path`.
+// panel keeps the Runs and the catalogue subscription open while it is shown, loads
+// the Devices, and routes by `route.path`.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { listDevices, subscribeRuns, type Device, type RunSummary, type RunsEvent } from "./api";
+import {
+  listDevices,
+  subscribeCatalog,
+  subscribeRuns,
+  type Catalog,
+  type Device,
+  type RunSummary,
+  type RunsEvent,
+} from "./api";
 import { followLink, type HomeAssistant, type PanelInfo, type PanelRoute } from "./hass";
 import { localize } from "./localize";
 import "./devices-page";
+import "./materials-page";
 import "./run-gallery";
 import "./run-page";
 import { runName } from "./run-parts";
@@ -14,7 +23,7 @@ import { shared } from "./styles";
 
 const MENU_ICON = "M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z";
 
-const TABS = ["devices"] as const;
+const TABS = ["materials", "devices"] as const;
 
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
@@ -33,9 +42,12 @@ export class WattbillPanel extends LitElement {
   /** Undefined until the first snapshot arrives. */
   @state() private runs?: Map<string, RunSummary>;
   @state() private failed = false;
+  /** Undefined until the first catalogue event arrives. */
+  @state() private catalog?: Catalog;
+  @state() private catalogFailed = false;
   /** Undefined until loaded, null if loading failed. */
   @state() private devices?: Device[] | null;
-  private unsubscribe?: Promise<() => Promise<void>>;
+  private unsubscribe?: Promise<() => Promise<void>>[];
   private devicesRequest = 0;
 
   override connectedCallback() {
@@ -45,7 +57,7 @@ export class WattbillPanel extends LitElement {
 
   override disconnectedCallback() {
     super.disconnectedCallback();
-    void this.unsubscribe?.then((unsubscribe) => unsubscribe());
+    for (const unsubscribe of this.unsubscribe ?? []) void unsubscribe.then((stop) => stop());
     this.unsubscribe = undefined;
   }
 
@@ -68,11 +80,19 @@ export class WattbillPanel extends LitElement {
   }
 
   private subscribe() {
-    this.failed = false;
-    this.unsubscribe = subscribeRuns(this.hass, (event) => this.apply(event)).catch(() => {
-      this.failed = true;
-      return async () => {};
-    });
+    this.failed = this.catalogFailed = false;
+    this.unsubscribe = [
+      subscribeRuns(this.hass, (event) => this.apply(event)).catch(() => {
+        this.failed = true;
+        return async () => {};
+      }),
+      subscribeCatalog(this.hass, (event) => {
+        this.catalog = { ...this.catalog, ...event } as Catalog;
+      }).catch(() => {
+        this.catalogFailed = true;
+        return async () => {};
+      }),
+    ];
     void this.loadDevices();
   }
 
@@ -144,6 +164,15 @@ export class WattbillPanel extends LitElement {
 
   private renderPage(current: ReturnType<typeof page>, run: RunSummary | undefined) {
     const t = localize(this.hass);
+    if (current.name === "materials") {
+      return this.catalogFailed
+        ? html`<p class="muted">${t("catalog.error")}</p>`
+        : html`<wattbill-materials-page
+            .hass=${this.hass}
+            .materials=${this.catalog?.materials}
+            ?narrow=${this.narrow}
+          ></wattbill-materials-page>`;
+    }
     if (current.name === "devices") {
       return html`<wattbill-devices-page
         .hass=${this.hass}

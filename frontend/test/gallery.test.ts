@@ -3,6 +3,7 @@ import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
 import { mountPanel, query, queryAll, settle, text } from "./render";
 
 const SUBSCRIBE = "wattbill/runs/subscribe";
+const CATALOG = "wattbill/catalog/subscribe";
 const tiles = (panel: Element) => queryAll(panel, ".tile").map(text);
 const [started, updated, ended] = recorded.changes;
 
@@ -42,14 +43,18 @@ describe("Run gallery", () => {
     expect(tiles(panel)).toHaveLength(3);
   });
 
-  it("subscribes once, loads the Devices once and never polls", async () => {
+  it("subscribes once to Runs and catalogue, loads the Devices once and never polls", async () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend);
 
     panel.hass = backend.update({});
     await settle(panel);
 
-    expect(backend.calls).toEqual([{ type: SUBSCRIBE }, { type: "wattbill/devices/list" }]);
+    expect(backend.calls).toEqual([
+      { type: SUBSCRIBE },
+      { type: CATALOG },
+      { type: "wattbill/devices/list" },
+    ]);
   });
 
   it("stops listening when HA removes the panel", async () => {
@@ -60,6 +65,7 @@ describe("Run gallery", () => {
     await settle(panel);
 
     expect(backend.openSubscriptions(SUBSCRIBE)).toBe(0);
+    expect(backend.openSubscriptions(CATALOG)).toBe(0);
   });
 
   it("says when there are no Runs yet", async () => {

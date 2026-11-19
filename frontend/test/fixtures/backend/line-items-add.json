@@ -18,11 +18,15 @@
     "part_count": 1,
     "note": null,
     "consumption": null,
+    "cost_source": null,
+    "prices": [],
+    "average_powers": [],
     "line_items": [
       {
         "id": "electricity",
         "kind": "electricity",
         "label": null,
+        "material_id": null,
         "quantity": 1.08,
         "unit": "kWh",
         "unit_price": 0.27777777777777773,
@@ -50,6 +54,7 @@
         "id": "helmet-refund",
         "kind": "other",
         "label": "Refund for the failed print",
+        "material_id": null,
         "quantity": 1.0,
         "unit": "",
         "unit_price": -2.0,

@@ -28,9 +28,9 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
 from .cost import consumption
-from .cost.electricity import electricity_line_item
+from .cost.electricity import electricity_line_item, price_gap
 from .device_config import ConsumptionSource, DeviceConfig, Target
-from .device_inputs import input_time, input_value, meter_reading
+from .device_inputs import input_time, input_value, meter_reading, price_reading
 from .models import ElectricityMethod, Flag, Outcome, Pause, Run
 from .run_book import RunBook
 from .store import LIVE_SAVE_DELAY
@@ -66,6 +66,8 @@ class DeviceTracker:
         self._status_lost = True
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
+        # The price entity's last valid report, for a Run starting while it has none.
+        self._last_price: tuple[datetime, float] | None = None
 
     async def async_start(self) -> None:
         self._unsubscribe = [
@@ -74,6 +76,13 @@ class DeviceTracker:
             ),
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
         ]
+        if price_entity_id := self._config.price_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(
+                    self._hass, price_entity_id, self._on_price
+                )
+            )
+            self._remember_price(self._hass.states.get(price_entity_id))
         sections = [run.consumption for run in self._unfinalised_runs()]
         if meters := {
             meter["entity_id"]
@@ -84,11 +93,46 @@ class DeviceTracker:
                 async_track_state_change_event(self._hass, meters, self._on_meter),
                 async_track_state_report_event(self._hass, meters, self._on_meter),
             ]
+        if run := self._book.open_run(self._config.device_id):
+            await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
         self._apply(self._hass.states.get(self._config.status_entity_id))
+
+    async def _async_follow_device(self, run: Run) -> None:
+        """Apply the Device's price and average power to the open Run from now on.
+
+        The same price entity as before only catches up on missed reports.
+        """
+        now = dt_util.utcnow()
+        self._follow_average_power(run, now)
+        price = dict(self._config.price)
+        if run.cost_source != price:
+            # A Run stored before it had a Cost Source followed this one from start.
+            since = run.started if run.cost_source is None else now
+            run.cost_source = price
+            self._add_price(run, since, self._current_price())
+        elif entity_id := self._config.price_entity_id:
+            since = run.prices[-1][0] if run.prices else run.started
+            for state in await self._async_history(entity_id, since, now):
+                self._record_price(run, state)
+            self._record_price(run, self._hass.states.get(entity_id))
+        self._book.async_update(run)
+
+    def _follow_average_power(self, run: Run, at: datetime) -> None:
+        # Unless the Device changed its consumption source since the Run started.
+        current = self._config.consumption
+        pinned = run.consumption
+        section = (
+            current if not pinned or pinned["source"] == current["source"] else pinned
+        )
+        powers = (section.get("running_power"), section.get("paused_power"))
+        if not run.average_powers:
+            run.average_powers = [(run.started, *powers)]
+        elif run.average_powers[-1][1:] != powers:
+            run.average_powers.append((at, *powers))
 
     async def _async_catch_up(self, run: Run) -> None:
         """Add the meter reports missed while WattBill wasn't running."""
@@ -158,6 +202,47 @@ class DeviceTracker:
                 self._finish(run)
                 continue
             self._book.async_update(run)
+
+    @callback
+    def _on_price(self, event: Event[EventStateChangedData]) -> None:
+        state = event.data["new_state"]
+        self._remember_price(state)
+        if run := self._book.open_run(self._config.device_id):
+            self._record_price(run, state)
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _price_of(self, state: State | None) -> float | None:
+        return price_reading(state, self._config.price, self._hass.config.currency)
+
+    def _current_price(self) -> float | None:
+        if (entity_id := self._config.price_entity_id) is None:
+            value: float = self._config.price["value"]
+            return value
+        return self._price_of(self._hass.states.get(entity_id))
+
+    def _remember_price(self, state: State | None) -> None:
+        if state is not None and (price := self._price_of(state)) is not None:
+            self._last_price = (self._price_time(state), price)
+
+    def _price_time(self, state: State) -> datetime:
+        return input_time(state, self._config.price.get("attribute"))
+
+    def _record_price(self, run: Run, state: State | None) -> None:
+        """Add the price entity's report to the Run's price timeline."""
+        if state is None:
+            self._add_price(run, dt_util.utcnow(), None)
+        else:
+            self._add_price(run, self._price_time(state), self._price_of(state))
+
+    @staticmethod
+    def _add_price(run: Run, at: datetime, price: float | None) -> None:
+        prices = run.prices
+        index = bisect_right(prices, at, key=lambda entry: entry[0])
+        if index and prices[index - 1][0] == at:
+            prices[index - 1] = (at, price)
+        elif not index or prices[index - 1][1] != price:
+            prices.insert(index, (at, price))
 
     @callback
     def _on_tick(self, now: datetime) -> None:
@@ -243,11 +328,27 @@ class DeviceTracker:
             last_seen=at,
             line_items=[],
             consumption=dict(self._config.consumption),
+            cost_source=dict(self._config.price),
         )
         if meter := _meter(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
+        self._follow_average_power(run, at)
+        self._open_prices(run, at)
         self._refresh(run, at)
         self._book.async_start(run)
+
+    def _open_prices(self, run: Run, at: datetime) -> None:
+        """The price at Run start; without one, the last valid price before it."""
+        if (entity_id := self._config.price_entity_id) is None:
+            self._add_price(run, at, self._current_price())
+            return
+        state = self._hass.states.get(entity_id)
+        if self._price_of(state) is None and self._last_price:
+            self._add_price(run, *self._last_price)
+        if state is None:
+            self._add_price(run, at, None)
+        else:
+            self._record_price(run, state)
 
     @callback
     def async_end_run(self) -> asyncio.Future[None]:
@@ -298,6 +399,7 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         run.readings = []
+        run.prices = []
         self._hass.async_create_task(self._async_finalise(run))
 
     async def _async_finalise(self, run: Run) -> None:
@@ -369,24 +471,24 @@ class DeviceTracker:
             run.flags.append(flag)
 
     def _kwh(self, run: Run) -> Callable[[datetime, datetime], float]:
-        # Average power applies at once, unless the Device changed its source since.
-        current = self._config.consumption
-        pinned = run.consumption
-        powers = (
-            current if not pinned or pinned["source"] == current["source"] else pinned
-        )
-        running_power: float | None = powers.get("running_power")
-        meter = _meter(pinned)
-        if meter is None:
-            paused_power = powers.get("paused_power")
-            return consumption.estimate(
-                running_power or 0.0,
-                running_power or 0.0 if paused_power is None else paused_power,
-                run.pauses,
-            )
-        if meter["source"] == ConsumptionSource.ENERGY:
+        meter = _meter(run.consumption)
+        if meter and meter["source"] == ConsumptionSource.ENERGY:
             return consumption.energy(run.readings)
-        return consumption.power(run.readings, running_power)
+        return consumption.piecewise(
+            [
+                (
+                    since,
+                    consumption.power(run.readings, running)
+                    if meter
+                    else consumption.estimate(
+                        running or 0.0,
+                        running or 0.0 if paused is None else paused,
+                        run.pauses,
+                    ),
+                )
+                for since, running, paused in run.average_powers
+            ]
+        )
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
@@ -395,9 +497,11 @@ class DeviceTracker:
             run.started,
             until,
             self._kwh(run),
-            [(run.started, self._config.price)],
+            run.prices,
             ElectricityMethod.MEASURED
             if _meter(run.consumption)
             else ElectricityMethod.ESTIMATED,
         )
         run.line_items = [item] + [i for i in run.line_items if i.kind is not item.kind]
+        if price_gap(run.started, until, run.prices):
+            self._flag(run, Flag.PRICE_GAP)

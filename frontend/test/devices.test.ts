@@ -19,7 +19,7 @@ describe("Devices tab", () => {
   it("opens from the toolbar, and the title leads back to the Runs", async () => {
     const panel = await mountPanel(recordedBackend());
 
-    await click(panel, query(panel, "a.tab"));
+    await click(panel, query(panel, `a.tab[href$="/devices"]`));
 
     expect(location.pathname).toBe("/wattbill/devices");
     expect(cards(panel)).toHaveLength(1);
@@ -68,6 +68,28 @@ describe("Devices tab", () => {
         "Print job Not used " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
+    );
+  });
+
+  it("names the price entity of a dynamic tariff", async () => {
+    const [kobra] = recorded.devices;
+    const price = { attribute: "current", unit: "ct/kWh", factor: null };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        {
+          ...kobra,
+          ha_settings: {
+            ...kobra.ha_settings,
+            price: { ...price, source: "entity", entity_id: "sensor.electricity_price" },
+          },
+        },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(text(query(panel, ".device dl"))).toContain(
+      "Electricity price From sensor.electricity_price · current",
     );
   });
 
