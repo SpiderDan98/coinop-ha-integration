@@ -83,8 +83,9 @@ def add_anycubic_local(
         manufacturer="Anycubic",
         name="ACE Pro",
         model="ACE Pro",
-        via_device_id=device.id,
     )
+    # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
+    devices.async_update_device(ace.id, via_device_id=device.id)
     printer = Printer(device, ace)
 
     def add(platform: str, key: str, object_id: str, **kwargs: Any) -> None:
@@ -159,8 +160,9 @@ def add_anycubic_cloud(
         manufacturer="Anycubic",
         name=f"{name} ACE Pro",
         model="ACE Pro",
-        via_device_id=device.id,
     )
+    # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
+    devices.async_update_device(ace.id, via_device_id=device.id)
     printer = Printer(device, ace)
     prefix = name.lower().replace(" ", "_")
 

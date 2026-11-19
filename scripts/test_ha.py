@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
 from typing import Any
 import urllib.request
 
@@ -84,7 +85,14 @@ def main(target: str, pytest_args: list[str]) -> int:
 
     venv = ROOT / f".venv-{target}"
     subprocess.run(["uv", "venv", "--quiet", "--allow-existing", venv], check=True)
-    requirements = [f"{HARNESS}=={version}", *manifest["requirements"]]
+    # The test group's pins follow the locked HA; each target's HA pins its own.
+    test_group = {
+        Requirement(line).name
+        for line in tomllib.loads((ROOT / "pyproject.toml").read_text())[
+            "dependency-groups"
+        ]["test"]
+    } - {HARNESS}
+    requirements = [f"{HARNESS}=={version}", *manifest["requirements"], *test_group]
     subprocess.run(
         ["uv", "pip", "install", "--quiet", "--python", venv, *requirements],
         check=True,
