@@ -253,21 +253,30 @@ async def start_job(hass: HomeAssistant, job: str) -> None:
     await set_status(hass, "printing")
 
 
+@pytest.mark.parametrize(
+    ("job", "name"),
+    [
+        ("Gear_Set_PETG.gcode.3mf", "Gear Set PETG"),
+        ("benchy.GCODE", "benchy"),
+        ("plate_2.bgcode", "plate 2"),
+        ("cube.gco", "cube"),
+        ("vase.3MF", "vase"),
+        ("notes.txt", "notes.txt"),
+        (".gcode", ".gcode"),
+    ],
+)
 async def test_a_run_is_named_after_its_job(
-    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], job: str, name: str
 ) -> None:
     entry = await add_hub(hass)
     await add_device(hass, entry, job=JOB)
 
-    await start_job(hass, "Gear_Set_PETG.gcode.3mf")
+    await start_job(hass, job)
     await clock.advance(minutes=30)
     await set_status(hass, "finished")
 
     [run] = stored_runs(hass_storage)
-    assert (run["name"], run["job_name"]) == (
-        "Gear Set PETG",
-        "Gear_Set_PETG.gcode.3mf",
-    )
+    assert (run["name"], run["job_name"]) == (name, job)
 
 
 async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(

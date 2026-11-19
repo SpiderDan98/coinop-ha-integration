@@ -88,11 +88,16 @@ export class RunImages extends LitElement {
         ?disabled=${full || this.busy}
         @change=${this.onFiles}
       />
-      ${full ? html`<p class="muted small">${t("images.limit", rules)}</p>` : nothing}
+      ${
+        full
+          ? html`<p class="images-full muted small">${t("images.error.too_many", rules)}</p>`
+          : nothing
+      }
       ${
         this.error
           ? html`<p class="images-error small">
               ${t(isKey(errorKey) ? errorKey : "images.error.failed", rules)}
+              <span class="muted">${t("images.limit", rules)}</span>
             </p>`
           : nothing
       }

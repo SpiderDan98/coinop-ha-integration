@@ -628,7 +628,7 @@ export class RunPage extends LitElement {
             : html`<span class="unit muted small">${item.unit}</span>`
         }
       </div>
-      <div class="quantity">
+      <div class="quantity price">
         ${number("unit_price")}<span class="unit per muted small"
           >${`${format.currencySymbol}/${item.unit || "–"}`}</span
         >
@@ -1031,9 +1031,17 @@ export class RunPage extends LitElement {
         padding-block: 2px 0;
         text-align: right;
       }
-      :host([narrow]) .item-head > :first-child,
-      :host([narrow]) .unit.per {
+      :host([narrow]) .item-head > :first-child {
         display: none;
+      }
+      :host([narrow]) .quantity.price {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+      }
+      :host([narrow]) .quantity.price .unit {
+        flex: none;
+        text-align: right;
       }
       .item .label > div:first-child {
         padding-top: 6px;

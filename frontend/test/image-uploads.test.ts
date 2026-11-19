@@ -70,16 +70,17 @@ describe("Run images on the Run page", () => {
       errors.push(text(query(panel, ".images-error")));
     }
 
+    const limits = "Up to 10 photos per Run: JPEG, PNG or WebP, up to 20 MB each.";
     expect(errors).toEqual([
-      "A Run keeps up to 10 uploaded photos.",
-      "A photo may have up to 20 MB.",
-      "Only JPEG, PNG and WebP photos can be uploaded.",
-      "The images could not be changed.",
+      `A Run keeps up to 10 uploaded photos. ${limits}`,
+      `A photo may have up to 20 MB. ${limits}`,
+      `Only JPEG, PNG and WebP photos can be uploaded. ${limits}`,
+      `The images could not be changed. ${limits}`,
     ]);
     expect(captions(panel)).toEqual(["Thumbnail", "Snapshot"]);
   });
 
-  it("take no more photos once the Run has 10 uploads", async () => {
+  it("take no more photos once the Run has 10 uploads, and say so", async () => {
     const full = {
       ...benchy(),
       images: Array.from({ length: 10 }, (_, n) => ({ ...upload, id: `upload-${n}` })),
@@ -90,6 +91,7 @@ describe("Run images on the Run page", () => {
     );
 
     expect((query(panel, "input[type=file]") as HTMLInputElement).disabled).toBe(true);
+    expect(text(query(panel, ".images-full"))).toBe("A Run keeps up to 10 uploaded photos.");
   });
 
   it("mark the Cover Image and pick another with “Set as cover”", async () => {
