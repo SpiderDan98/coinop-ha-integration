@@ -193,6 +193,24 @@ async def test_a_falling_reading_is_a_meter_reset_counting_from_zero(
     assert run["flags"] == ["meter_reset", *NO_MATERIAL]
 
 
+async def test_a_drop_reported_in_the_wait_after_the_end_is_a_meter_reset(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    await add_metered_device(hass)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.4)
+    await clock.advance(minutes=1)
+    await set_status(hass, "finished")
+    await clock.advance(minutes=2)
+    await set_meter(hass, 0.1)
+
+    [run] = stored_runs(hass_storage)
+    assert electricity(run)["quantity"] == pytest.approx(0.4 + 0.1 / 3)
+    assert run["flags"] == ["meter_reset", *NO_MATERIAL]
+
+
 async def test_a_small_dip_counts_nothing_and_is_flagged(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:

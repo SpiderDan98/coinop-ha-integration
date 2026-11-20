@@ -20,7 +20,7 @@ from homeassistant.util.ulid import ulid_now
 from . import recorded
 from .cost.consumption import Model, spread
 from .cost.pricing import price_gap, priced_line_item
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .device_inputs import input_time, meter_reading, price_reading
 from .models import ConsumptionMethod, Flag, LineItem, Run, Timeline
 from .quantities import Quantity
@@ -66,6 +66,7 @@ class Metering:
         self._hass = hass
         self.quantity = quantity
         self._silent_meter_falls_back = silent_meter_falls_back
+        self._restarts_after_end = Capability.PER_RUN_METERS in config.capabilities
         self._source: Mapping[str, Any] = config.flow_data[quantity.source_key]
         # Without a source there may be no price section.
         self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
@@ -188,8 +189,14 @@ class Metering:
         elif value is None:
             add_reading(self.quantity, run, state.last_updated, None)
         else:
-            add_reading(self.quantity, run, state.last_updated, value)
-            add_reading(self.quantity, run, state.last_reported, value)
+            for at in (state.last_updated, state.last_reported):
+                add_reading(
+                    self.quantity,
+                    run,
+                    at,
+                    value,
+                    restarts_after_end=self._restarts_after_end,
+                )
 
     def awaits_report(self, run: Run) -> bool:
         """Whether the meter may still report the ended Run's end."""

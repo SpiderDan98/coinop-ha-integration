@@ -6,6 +6,7 @@
       "type": "washing_machine",
       "capabilities": [
         "doses",
+        "per_run_meters",
         "program",
         "program_consumption",
         "water"

@@ -240,7 +240,10 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
     devices = (await panel.call("coinop/devices/list"))["devices"]
 
     assert [(d["type"], d["capabilities"]) for d in devices] == [
-        ("washing_machine", ["doses", "program", "program_consumption", "water"]),
+        (
+            "washing_machine",
+            ["doses", "per_run_meters", "program", "program_consumption", "water"],
+        ),
         ("3d_printer", ["average_power", "images", "job", "material", "part_count"]),
     ]
     assert devices[0]["ha_settings"] == {

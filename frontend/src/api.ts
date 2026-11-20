@@ -109,6 +109,7 @@ export interface Device {
     | "doses"
     | "water"
     | "program_consumption"
+    | "per_run_meters"
   )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {

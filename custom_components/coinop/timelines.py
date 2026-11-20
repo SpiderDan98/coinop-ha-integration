@@ -37,9 +37,18 @@ def add_price(timeline: Timeline, at: datetime, price: float | None) -> None:
 
 
 def add_reading(
-    quantity: Quantity, run: Run, at: datetime, value: float | None
+    quantity: Quantity,
+    run: Run,
+    at: datetime,
+    value: float | None,
+    *,
+    restarts_after_end: bool = False,
 ) -> None:
-    """Add a reading (None while it had no value) and flag gaps and resets."""
+    """Add a reading (None while it had no value) and flag gaps and resets.
+
+    With `restarts_after_end`, the meter counts each Run from 0 (e.g. Miele's
+    per-cycle counters): a drop reported after the end is no reset.
+    """
     timeline = run.timelines[quantity.kind]
     readings = timeline.readings
     index = bisect_right(readings, at, key=lambda reading: reading[0])
@@ -49,10 +58,8 @@ def add_reading(
         readings[-1] = (at, value)
         return
     readings.insert(index, (at, value))
-    # A drop reported after the end is no reset within the Run, e.g. a per-cycle
-    # counter going back to 0; it counts nothing (`consumption.counted`).
-    within = run.ended is None or at <= run.ended
-    if run.ended is not None and not within:
+    after_end = run.ended is not None and at > run.ended
+    if run.ended is not None and after_end:
         # Only the stretch up to the end belongs to the Run.
         at = run.ended
     previous = next(
@@ -71,7 +78,8 @@ def add_reading(
         and meter["source"] == quantity.total_source
         and previous is not None
         and value < previous[1]
-        and within
+        and (run.ended is None or previous[0] < run.ended)
+        and not (restarts_after_end and after_end)
     ):
         add_flag(run, Flag.METER_RESET)
 

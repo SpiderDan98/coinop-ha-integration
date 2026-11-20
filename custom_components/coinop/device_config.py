@@ -56,6 +56,9 @@ class Capability(StrEnum):
     WATER = "water"
     # Electricity and water from the Program Defaults' kWh and litres when not measured.
     PROGRAM_CONSUMPTION = "program_consumption"
+    # Meters may count each Run from 0, such as per-cycle counters: a drop after
+    # the end is no reset.
+    PER_RUN_METERS = "per_run_meters"
 
 
 CAPABILITIES = {
@@ -74,6 +77,7 @@ CAPABILITIES = {
             Capability.DOSES,
             Capability.WATER,
             Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
         }
     ),
 }
