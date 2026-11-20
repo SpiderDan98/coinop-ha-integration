@@ -367,5 +367,13 @@
   "device.default_amount": "Default amount of {dose}",
   "device.program_defaults_hint": "Amounts per Run in the Material's unit. An empty cell means not dosed.",
   "flag.ended_early_defaults": "The Run ended early but was charged defaults for a whole cycle: check the amounts",
-  "dose_source.default_row": "From the Default row"
+  "dose_source.default_row": "From the Default row",
+  "device.measured_by": "measured by {entity}",
+  "device.stock_input": "Stock input of {dose}",
+  "device.no_stock_input": "No stock input",
+  "device.stock_attribute": "Stock attribute of {dose}",
+  "device.stock_state": "State",
+  "device.stock_unit": "Stock unit of {dose}",
+  "flag.stock_input_unavailable": "A Dose's stock input reported nothing usable: its default was charged",
+  "dose_source.stock_input": "From the stock input"
 }

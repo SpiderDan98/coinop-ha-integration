@@ -68,7 +68,8 @@ async def _update_settings(
 
     Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
     the default Material and a new Dose's Material must exist and not be archived,
-    and only a Device Type with Doses has a Dose list.
+    and only a Device Type with Doses has a Dose list. Only a Dose counted in g or
+    ml can have a stock input.
     """
     device_id = msg["device_id"]
     device = next((d for d in coinop.devices if d.device_id == device_id), None)
@@ -97,6 +98,17 @@ async def _update_settings(
     if (material_id := changes.get(DEFAULT_MATERIAL)) is not None:
         picked.append(material_id)
     if not all(pickable(connection, msg, coinop, id_) for id_ in picked):
+        return
+    if any(
+        (material := coinop.catalog.material(dose["material_id"])) and material.by_piece
+        for dose in changes.get(DOSES, [])
+        if "stock" in dose
+    ):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_ALLOWED,
+            "A Dose counted in pieces has no stock input",
+        )
         return
     templates = changes.get(AUTOMATIC_TEMPLATES, [])
     complete = len(coinop.catalog.find_templates(templates)) == len(templates)

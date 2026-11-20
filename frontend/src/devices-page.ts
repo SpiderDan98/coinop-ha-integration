@@ -60,6 +60,23 @@ type Settings = Device["settings"];
 const unitOf = (material?: Material) =>
   material?.price.source === "fixed" ? material.price.pack_unit : "g";
 
+type Stock = NonNullable<Settings["doses"][number]["stock"]>;
+
+// HA's mass and volume units, as its unit converters know them.
+const STOCK_UNITS = new Set(
+  ["μg", "mg", "g", "kg", "oz", "lb", "st"].concat([
+    "mL",
+    "L",
+    "fl. oz.",
+    "gal",
+    "m³",
+    "ft³",
+    "CCF",
+    "MCF",
+  ]),
+);
+const ATTRIBUTE_UNITS = ["g", "kg", "mL", "L"];
+
 /** Unique enough per Device; `crypto.randomUUID` needs a secure context HA may not have. */
 const newDoseId = () => `dose-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -220,7 +237,7 @@ export class DevicesPage extends LitElement {
         ${
           doses.length
             ? html`<ul>
-                ${doses.map(({ id, material_id }) => {
+                ${doses.map(({ id, material_id, stock }) => {
                   const amount = amounts[id];
                   return html`<li>
                     <span class="dose-name">${this.doseName(material_id, t)}</span>
@@ -231,6 +248,16 @@ export class DevicesPage extends LitElement {
                           : format.quantity(amount, unitOf(this.material(material_id)))
                       }</span
                     >
+                    ${
+                      stock
+                        ? html`<span class="muted small stock"
+                            >·
+                            ${entity(this.hass, stock.entity_id, [], (name) =>
+                              t("device.measured_by", { entity: name }),
+                            )}</span
+                          >`
+                        : nothing
+                    }
                   </li>`;
                 })}
               </ul>`
@@ -432,11 +459,20 @@ export class DevicesPage extends LitElement {
     return html`<div class="field doses">
         <span class="label">${t("device.doses")}</span>
         <ol class="dose-list">
-          ${doses.map(({ material_id }, index) => {
-            const name = this.doseName(material_id, t);
+          ${doses.map((dose, index) => {
+            const name = this.doseName(dose.material_id, t);
+            const unit = unitOf(this.material(dose.material_id));
+            const setStock = (stock?: Stock) => {
+              const { id, material_id } = dose;
+              setDoses(
+                doses.map((other, at) =>
+                  at === index ? { id, material_id, ...(stock && { stock }) } : other,
+                ),
+              );
+            };
             return html`<li>
               <span class="dose-name">${name}</span>
-              <span class="muted small">${unitOf(this.material(material_id))}</span>
+              <span class="muted small">${unit}</span>
               <ha-icon-button
                 class="up"
                 .label=${t("device.move_dose_up", { dose: name })}
@@ -457,6 +493,7 @@ export class DevicesPage extends LitElement {
                 .path=${mdiClose}
                 @click=${() => setDoses(doses.filter((_, other) => other !== index))}
               ></ha-icon-button>
+              ${unit === "pcs" ? nothing : this.renderStock(dose.stock, name, unit, setStock, t)}
             </li>`;
           })}
         </ol>
@@ -522,6 +559,80 @@ export class DevicesPage extends LitElement {
             </div>`
           : nothing
       }`;
+  }
+
+  /** A native select over the mass and volume entities (ADR 0007), an optional attribute and its unit. */
+  private renderStock(
+    stock: Stock | undefined,
+    dose: string,
+    unit: string,
+    change: (stock?: Stock) => void,
+    t: Localize,
+  ) {
+    const states = this.hass.states;
+    const entities = Object.keys(states)
+      .filter(
+        (id) =>
+          id === stock?.entity_id ||
+          STOCK_UNITS.has(states[id]?.attributes.unit_of_measurement ?? ""),
+      )
+      .sort((a, b) => entityName(this.hass, a).localeCompare(entityName(this.hass, b)));
+    const attributes = Object.entries(states[stock?.entity_id ?? ""]?.attributes ?? {})
+      .filter(([name, value]) => name === stock?.attribute || Number.isFinite(value))
+      .map(([name]) => name);
+    return html`<div class="stock row">
+      <select
+        aria-label=${t("device.stock_input", { dose })}
+        @change=${(event: Event) => {
+          const entity_id = (event.target as HTMLSelectElement).value;
+          change(entity_id ? { entity_id, attribute: null, unit: null } : undefined);
+        }}
+      >
+        <option value="" ?selected=${!stock}>${t("device.no_stock_input")}</option>
+        ${entities.map(
+          (id) =>
+            html`<option value=${id} ?selected=${id === stock?.entity_id}>
+              ${entityName(this.hass, id)}
+            </option>`,
+        )}
+      </select>
+      ${
+        stock
+          ? html`<select
+              aria-label=${t("device.stock_attribute", { dose })}
+              @change=${(event: Event) => {
+                const attribute = (event.target as HTMLSelectElement).value || null;
+                const fallback = unit === "ml" ? "mL" : unit;
+                change({ ...stock, attribute, unit: attribute ? (stock.unit ?? fallback) : null });
+              }}
+            >
+              <option value="" ?selected=${!stock.attribute}>${t("device.stock_state")}</option>
+              ${attributes.map(
+                (name) =>
+                  html`<option value=${name} ?selected=${name === stock.attribute}>
+                    ${name}
+                  </option>`,
+              )}
+            </select>`
+          : nothing
+      }
+      ${
+        stock?.attribute
+          ? html`<select
+              aria-label=${t("device.stock_unit", { dose })}
+              @change=${(event: Event) =>
+                change({ ...stock, unit: (event.target as HTMLSelectElement).value })}
+            >
+              ${ATTRIBUTE_UNITS.map(
+                (option) =>
+                  html`<option value=${option} ?selected=${option === stock.unit}>
+                    ${option}
+                  </option>`,
+              )}
+            </select>`
+          : nothing
+      }
+    </div>`;
   }
 
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
@@ -683,8 +794,17 @@ export class DevicesPage extends LitElement {
       }
       .dose-list li {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 6px;
+      }
+      .dose-list .stock {
+        flex-basis: 100%;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .dose-list .stock select {
+        min-width: 0;
       }
       .dose-list .dose-name {
         flex: 1;

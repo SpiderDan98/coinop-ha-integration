@@ -367,5 +367,13 @@
   "device.default_amount": "Standardmenge von {dose}",
   "device.program_defaults_hint": "Mengen pro Lauf in der Einheit des Materials. Ein leeres Feld heißt nicht dosiert.",
   "flag.ended_early_defaults": "Der Lauf endete vorzeitig, wurde aber mit Vorgaben für einen ganzen Durchgang berechnet: Mengen prüfen",
-  "dose_source.default_row": "Aus der Standardzeile"
+  "dose_source.default_row": "Aus der Standardzeile",
+  "device.measured_by": "gemessen von {entity}",
+  "device.stock_input": "Bestandssensor von {dose}",
+  "device.no_stock_input": "Kein Bestandssensor",
+  "device.stock_attribute": "Bestandsattribut von {dose}",
+  "device.stock_state": "Zustand",
+  "device.stock_unit": "Bestandseinheit von {dose}",
+  "flag.stock_input_unavailable": "Der Bestandssensor einer Dosierung meldete nichts Verwertbares: ihre Vorgabe wurde berechnet",
+  "dose_source.stock_input": "Vom Bestandssensor"
 }
