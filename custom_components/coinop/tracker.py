@@ -621,6 +621,10 @@ class DeviceTracker:
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
 
+    @property
+    def has_programs(self) -> bool:
+        return Capability.PROGRAM in self._config.capabilities
+
     async def async_create_run(
         self,
         started: datetime,
@@ -628,17 +632,20 @@ class DeviceTracker:
         outcome: Outcome,
         name: str | None,
         tags: list[str] | None,
+        program: str | None = None,
     ) -> Run:
         """A Run made by hand, final at once: no Snapshot, no `started` or `ended`.
 
-        Without `tags` it gets the Device's Tags for new Runs.
+        Without `tags` it gets the Device's Tags for new Runs; without a name, its
+        Program's.
         """
         settings = self._settings.get(self._config.device_id)
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
             device_name=self._config.name,
-            name=name,
+            name=name or program,
+            program=program,
             started=started,
             ended=ended,
             outcome=outcome,
@@ -650,13 +657,15 @@ class DeviceTracker:
         for metering in self._meterings:
             metering.pin(run)
         covered = await recorded.async_covers(self._hass, started, ended)
-        run.line_items = [await self._async_past_electricity(run, covered)]
-        for metering in self._meterings[1:]:
+        for metering in self._meterings:
             if item := await self._async_past_quantity(metering, run, covered):
                 run.line_items.append(item)
+        # Stock inputs aren't read for a past Run: its Doses come from its Program's row.
+        run.line_items += self._doses(run)
         for metering in self._meterings:
             metering.finish(run)
         self._settle_material(run, measuring=False)
+        self._flag_defaults(run)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), ended
         )
@@ -666,43 +675,35 @@ class DeviceTracker:
     def _part_count(self) -> int | None:
         return 1 if Capability.PART_COUNT in self._config.capabilities else None
 
-    async def _async_past_electricity(self, run: Run, covered: bool) -> LineItem:
-        """From the meter's history if it covers the Run, else estimated from the
-        average running power, else left for the user to enter.
-        """
+    async def _async_past_quantity(
+        self, metering: Metering, run: Run, covered: bool
+    ) -> LineItem | None:
+        """From the meter's history if it covers the Run, else from the Program
+        Defaults (electricity: the average running power), else left for the
+        user to enter; None with neither a meter nor a fallback."""
         assert run.ended is not None
-        metering = self._electricity
+        electricity = metering is self._electricity
+        per_program = self._per_program and metering.counts(run)
+        if not (electricity or per_program or metering.meter(run)):
+            return None
         await metering.async_past_prices(run, covered)
         if await metering.async_past_readings(run, covered):
-            self._follow_average_power(run, run.started)
+            if electricity:
+                self._follow_average_power(run, run.started)
             return metering.priced(
                 run, run.ended, metering.model(run), ConsumptionMethod.FROM_HISTORY
             )
-        if (running := self._config.consumption.get("running_power")) is not None:
+        if per_program:
+            return metering.fallen_back(run, run.ended)
+        if (
+            electricity
+            and (running := self._config.consumption.get("running_power")) is not None
+        ):
             return metering.priced(
                 run,
                 run.ended,
                 estimate(running, running, []),
                 ConsumptionMethod.ESTIMATED,
-            )
-        item = metering.priced(
-            run, run.ended, lambda _, __: 0.0, ConsumptionMethod.ENTERED
-        )
-        item.quantity, item.segments = None, []
-        return item
-
-    async def _async_past_quantity(
-        self, metering: Metering, run: Run, covered: bool
-    ) -> LineItem | None:
-        """From the meter's history if it covers the Run, else left for the user to
-        enter; None without a meter."""
-        assert run.ended is not None
-        if metering.meter(run) is None:
-            return None
-        await metering.async_past_prices(run, covered)
-        if await metering.async_past_readings(run, covered):
-            return metering.priced(
-                run, run.ended, metering.model(run), ConsumptionMethod.FROM_HISTORY
             )
         item = metering.priced(
             run, run.ended, lambda _, __: 0.0, ConsumptionMethod.ENTERED
@@ -800,15 +801,7 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
-        if any(
-            item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
-            for item in run.line_items
-        ):
-            add_flag(run, Flag.DEFAULT_MISSING)
-        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
-            item.from_defaults for item in run.line_items
-        ):
-            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+        self._flag_defaults(run)
         if any(
             self._stock_used(run, dose, material) is None
             for dose, material in self._dose_materials()
@@ -826,6 +819,18 @@ class DeviceTracker:
         run.stocks = {}
         await self._async_finalise(run)
         self._finishing.discard(run.id)
+
+    @staticmethod
+    def _flag_defaults(run: Run) -> None:
+        if any(
+            item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
+            for item in run.line_items
+        ):
+            add_flag(run, Flag.DEFAULT_MISSING)
+        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+            item.from_defaults for item in run.line_items
+        ):
+            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
 
     def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
         """The Cost Sources of the Run's Materials linked to Spoolman."""

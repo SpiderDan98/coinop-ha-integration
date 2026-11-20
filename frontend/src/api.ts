@@ -267,7 +267,8 @@ export const updateRun = (
 /** A Run made by hand, final at once. */
 export const createRun = (
   hass: HomeAssistant,
-  run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags">,
+  run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags"> &
+    Partial<Pick<RunDetail, "program">>,
 ) => runResult(hass, { type: "coinop/runs/create", ...run });
 
 export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>

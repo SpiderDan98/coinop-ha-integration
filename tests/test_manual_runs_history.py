@@ -3,6 +3,7 @@
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
@@ -16,6 +17,7 @@ from .devices import ENERGY, POWER, add_device, add_hub, add_washing_machine
 from .test_dynamic_price import PRICE_ENTITY, segments, set_price
 from .test_manual_runs import at, create
 from .test_measured import add_metered_device, electricity, set_meter
+from .test_program_consumption import approx, consumed
 from .test_runs import NO_MATERIAL
 from .test_washing_machines import set_energy
 from .test_water import set_water, water
@@ -181,23 +183,93 @@ async def test_a_manual_wash_takes_its_water_from_history(
     assert item["amount"] == pytest.approx(0.12)
 
 
-async def test_without_water_history_a_manual_wash_gets_water_to_enter(
+async def metered_washer(hass: HomeAssistant, panel: PanelClient) -> ConfigSubentry:
+    """A washing machine on energy and water meters, with Program Defaults."""
+    await set_energy(hass, 100)
+    await set_water(hass, 1000)
+    washer = await add_washing_machine(
+        hass, await add_hub(hass), water="meter", water_price=4.0
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=washer.subentry_id,
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}},
+                "programs": {"Cotton 60°": {"doses": {}, "kwh": 1.5, "litres": 60}},
+            }
+        },
+    )
+    return washer
+
+
+async def test_a_manual_wash_takes_history_over_its_programs_defaults(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
-    await set_water(hass, 1000)
-    await set_energy(hass, 100)
-    entry = await add_hub(hass)
-    washer = await add_washing_machine(hass, entry, water="meter")
+    washer = await metered_washer(hass, panel)
+    await clock.advance(hours=1)
+    await set_energy(hass, 101)
+    await set_water(hass, 1040)
+    await clock.advance(hours=1)
+    await set_energy(hass, 102)
+    await set_water(hass, 1060)
     await history_until(hass, clock, 5)
 
-    run = await create(panel, washer.subentry_id, started=at(-3), ended=at(-2))
-
-    item = water(run)
-    assert (item["method"], item["quantity"], item["deletable"]) == (
-        "entered",
-        None,
-        True,
+    run = await create(
+        panel,
+        washer.subentry_id,
+        started=at(0.5),
+        ended=at(1.5),
+        program="Cotton 60°",
     )
+
+    # 100.5 kWh and 1020 L at 10:30, 101.5 kWh and 1050 L at 11:30.
+    assert consumed(run) == approx(
+        [
+            ("electricity", "from_history", 1.0, "kWh", 0.30),
+            ("water", "from_history", 30, "L", 0.12),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("program", "expected", "flags"),
+    [
+        (
+            "Cotton 60°",
+            [
+                ("electricity", "program_default", 1.5, "kWh", 0.45),
+                ("water", "program_default", 60, "L", 0.24),
+            ],
+            [],
+        ),
+        (
+            None,
+            [
+                ("electricity", "program_default", None, "kWh", 0.0),
+                ("water", "program_default", None, "L", 0.0),
+            ],
+            ["default_missing"],
+        ),
+    ],
+)
+async def test_without_history_a_manual_wash_takes_its_programs_defaults(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    program: str | None,
+    expected: list[tuple[Any, ...]],
+    flags: list[str],
+) -> None:
+    washer = await metered_washer(hass, panel)
+    await history_until(hass, clock, 5)
+
+    run = await create(
+        panel, washer.subentry_id, started=at(-3), ended=at(-2), program=program
+    )
+
+    assert consumed(run) == approx(expected)
+    assert run["flags"] == flags
 
 
 async def test_a_manual_wash_without_a_water_source_has_no_water(
