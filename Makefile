@@ -1,7 +1,16 @@
 # Shortcuts for the dev container (scripts/devenv.py, see CONTRIBUTING.md).
 SCENARIO ?= few-runs
+VERSION ?= 0.0.0
 
-.PHONY: dev dev-build dev-restart dev-scenario dev-logs dev-down
+.PHONY: build dev dev-build dev-restart dev-scenario dev-logs dev-down
+
+# Build the panel and the release asset dist/coinop.zip with $(VERSION) as its version.
+build: frontend/node_modules/.package-lock.json
+	cd frontend && npm run build
+	uv run scripts/release.py $(VERSION) custom_components/coinop dist
+
+frontend/node_modules/.package-lock.json: frontend/package-lock.json
+	cd frontend && npm ci
 
 # Build the panel, (re)start the container, load $(SCENARIO) and show the log;
 # Ctrl+C stops Home Assistant and removes the container.
