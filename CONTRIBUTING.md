@@ -160,7 +160,7 @@ The committed `manifest.json` keeps the placeholder version `0.0.0`; a release g
 2. `.github/workflows/release.yaml` builds the panel, runs `scripts/release.py` (which fails for any other tag) to zip `custom_components/coinop/` with the tag as the manifest's version, and creates a **draft** release with `coinop.zip` and generated notes, marked as a pre-release for `b` / `rc` tags.
 3. Edit the notes (they become the release notes users see in Home Assistant; mention any raise of the minimum HA version) and publish the release. HACS and the Marketplace only offer published releases.
 
-To check an asset locally: build the panel, then `uv run scripts/release.py 1.2.0b1 custom_components/coinop dist`.
+To check an asset locally: `make build VERSION=1.2.0b1` installs the panel's dependencies if `package-lock.json` changed, builds the panel and writes `dist/coinop.zip` (`VERSION` defaults to `0.0.0`).
 
 ## Conventions
 
