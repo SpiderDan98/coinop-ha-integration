@@ -84,6 +84,8 @@ export class WattbillPanel extends LitElement {
   override connectedCallback() {
     super.connectedCallback();
     if (this.hass) this.subscribe();
+    // HA may attach the panel again after the URL changed elsewhere.
+    this.readSearch();
     window.addEventListener("location-changed", this.readSearch);
     window.addEventListener("popstate", this.readSearch);
   }
@@ -213,7 +215,6 @@ export class WattbillPanel extends LitElement {
                 .hass=${this.hass}
                 .runs=${this.runs}
                 .devices=${this.devices ?? undefined}
-                .tags=${this.catalog?.tags ?? []}
                 .basePath=${this.route.prefix}
                 ?narrow=${this.narrow}
               ></wattbill-overview>`

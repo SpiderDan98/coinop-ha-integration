@@ -61,7 +61,6 @@ export class Overview extends LitElement {
   /** Replaced, not changed, whenever a Run changes. */
   @property({ attribute: false }) runs: ReadonlyMap<string, RunSummary> = new Map();
   @property({ attribute: false }) devices?: Device[];
-  @property({ attribute: false }) tags: string[] = [];
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 

@@ -9,9 +9,13 @@ const view = (panel: Element, name: "gallery" | "table") =>
   query(panel, `.view-toggle button.show-${name}`);
 const head = (panel: Element) => queryAll(panel, "wattbill-run-list thead th").map(text);
 const rows = (panel: Element) => queryAll(panel, "wattbill-run-list tbody tr.run").map(text);
-const row = (panel: Element, name: string) =>
-  queryAll(panel, "tr.run").find((candidate) => text(query(candidate, ".name")).startsWith(name)) ??
-  panel;
+const row = (panel: Element, name: string) => {
+  const found = queryAll(panel, "tr.run").find((candidate) =>
+    text(query(candidate, ".name")).startsWith(name),
+  );
+  if (!found) throw new Error(`no row ${name}`);
+  return found;
+};
 const basket = (panel: Element) => text(query(panel, ".basket"));
 
 beforeEach(() => localStorage.clear());
@@ -93,6 +97,7 @@ describe("Runs table", () => {
     await click(panel, view(panel, "table"));
 
     await click(panel, query(row(panel, "Helmet"), "input.pick"));
+    await click(panel, query(row(panel, "Helmet"), ".pick-cell"));
     expect(location.pathname).toBe("/wattbill/runs");
 
     await click(panel, query(row(panel, "Benchy"), ".outcome"));

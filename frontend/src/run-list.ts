@@ -247,12 +247,14 @@ export class RunList extends LitElement {
       }
     </td>`;
     const name = html`<a href=${path} @click=${followLink}>${runName(run, t)}</a>`;
-    // The whole row opens the Run; its link and checkbox act on their own.
+    // The whole row opens the Run; its link and checkbox cell act on their own.
     const open = (event: MouseEvent) => {
       const own = event
         .composedPath()
         .some(
-          (target) => target instanceof HTMLInputElement || target instanceof HTMLAnchorElement,
+          (target) =>
+            target instanceof HTMLAnchorElement ||
+            (target instanceof HTMLElement && target.classList.contains("pick-cell")),
         );
       if (!own) navigate(path);
     };
