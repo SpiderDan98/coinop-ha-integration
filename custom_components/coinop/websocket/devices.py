@@ -24,6 +24,7 @@ from custom_components.coinop.models import (
     Outcome,
     Run,
 )
+from custom_components.coinop.quantities import QUANTITIES
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 
@@ -156,10 +157,6 @@ async def _update_settings(
     connection.send_result(msg["id"], {"settings": settings})
 
 
-# A row's key, the Line Item kind measuring it and the decimals the panel shows.
-_MEASURED = {"kwh": (LineItemKind.ELECTRICITY, 3), "litres": (LineItemKind.WATER, 1)}
-
-
 def _measured(run: Run, kind: LineItemKind) -> float | None:
     """What was measured, also under the user's override."""
     return next(
@@ -208,17 +205,18 @@ def _measured_suggestions(
         rows: list[str | None] = [run.program] if run.program else []
         if run.program not in programs:
             rows.append(None)
-        for key, (kind, _) in _MEASURED.items():
-            if (quantity := _measured(run, kind)) is not None:
+        for quantity in QUANTITIES.values():
+            if (measured := _measured(run, quantity.kind)) is not None:
                 for row in rows:
-                    values.setdefault(row, {}).setdefault(key, []).append(quantity)
+                    values.setdefault(row, {}).setdefault(
+                        quantity.default_key, []
+                    ).append(measured)
+
+    decimals = {q.default_key: q.decimals for q in QUANTITIES.values()}
 
     def means(row: str | None) -> dict[str, Any]:
         return {
-            key: {
-                "mean": round(fmean(measured), _MEASURED[key][1]),
-                "runs": len(measured),
-            }
+            key: {"mean": round(fmean(measured), decimals[key]), "runs": len(measured)}
             for key, measured in values.get(row, {}).items()
         }
 

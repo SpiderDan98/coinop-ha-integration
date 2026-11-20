@@ -39,7 +39,6 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
-from .models import LineItemKind
 from .profiles import METERS, detect
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
@@ -50,10 +49,6 @@ ATTRIBUTE_UNITS: dict[str, list[str]] = {
     ConsumptionSource.POWER: ["W", "kW"],
     WaterSource.METER: ["L", "m³", "gal", "ft³", "CCF"],
     WaterSource.FLOW: ["L/min", "L/h", "m³/h", "gal/min"],
-}
-PRICE_UNITS = {
-    LineItemKind.ELECTRICITY: ["{currency}/kWh", "ct/kWh", "{currency}/MWh"],
-    LineItemKind.WATER: ["{currency}/m³", "{currency}/L", "ct/L"],
 }
 USAGE_UNITS = ["mm", "cm", "m", "g", "kg"]
 FACTOR = NumberSelector(
@@ -804,7 +799,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             ):
                 return await self._price_done(quantity)
             errors["unit"] = "unknown_unit"
-        units = [unit.format(currency=currency) for unit in PRICE_UNITS[quantity.kind]]
+        units = [unit.format(currency=currency) for unit in quantity.price_units]
         schema: dict[Any, Any] = {
             vol.Required("unit"): SelectSelector(
                 SelectSelectorConfig(options=units, custom_value=True)

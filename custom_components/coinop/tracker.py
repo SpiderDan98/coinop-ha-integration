@@ -75,7 +75,7 @@ from .models import (
     Stock,
     Usage,
 )
-from .quantities import ELECTRICITY, WATER
+from .quantities import ELECTRICITY, QUANTITIES, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
 from .templates import add_templates, count_running_hours
@@ -87,9 +87,6 @@ OUTCOMES = {
     Target.CANCELLED: Outcome.CANCELLED,
     Target.ENDED: Outcome.UNKNOWN,
 }
-
-# The Program Defaults' column of each consumed quantity.
-DEFAULT_COLUMNS = {LineItemKind.ELECTRICITY: "kwh", LineItemKind.WATER: "litres"}
 
 PRINT_FILE = re.compile(r"(\.gcode)?\.(gcode|bgcode|gco|3mf)$", re.IGNORECASE)
 
@@ -157,7 +154,7 @@ class DeviceTracker:
         self, run: Run
     ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
         if self._per_program:
-            kwh = self._program_row(run)[0].get("kwh")
+            kwh = self._program_row(run)[0].get(ELECTRICITY.default_key)
             return kwh, ConsumptionMethod.PROGRAM_DEFAULT
         return self._estimate(run), ConsumptionMethod.ESTIMATED
 
@@ -169,7 +166,7 @@ class DeviceTracker:
         source = (timeline.source if timeline else None) or {}
         if not self._per_program or source.get("source") in (None, WaterSource.NONE):
             return None
-        litres = self._program_row(run)[0].get("litres")
+        litres = self._program_row(run)[0].get(WATER.default_key)
         return litres, ConsumptionMethod.PROGRAM_DEFAULT
 
     def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
@@ -457,7 +454,7 @@ class DeviceTracker:
         checked = set(self._defaults_flags(run)) - set(run.flags)
         row, source = self._program_row(run)
         run.line_items = [
-            _reapplied(run, item, row.get(DEFAULT_COLUMNS[item.kind]))
+            _reapplied(run, item, row.get(QUANTITIES[item.kind].default_key))
             if item.method is ConsumptionMethod.PROGRAM_DEFAULT
             and item.computed is None
             else item
