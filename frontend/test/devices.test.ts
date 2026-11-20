@@ -270,6 +270,14 @@ describe("Devices tab", () => {
     expect(text(panel)).toContain("No Devices yet.");
   });
 
+  it("adds a Device from the floating button on the integration's page in HA", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/devices" });
+
+    await click(panel, query(panel, "ha-button.new-device.fab"));
+
+    expect(location.pathname).toBe("/config/integrations/integration/wattbill");
+  });
+
   it("says when the Devices can't be loaded", async () => {
     const backend = recordedBackend().reply(LIST, () => {
       throw new WsError("not_loaded");

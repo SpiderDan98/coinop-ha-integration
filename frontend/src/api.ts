@@ -359,6 +359,10 @@ export const updateDeviceSettings = async (
     })
   ).settings;
 
+/** A name another Tag has, ignoring case, is that Tag; resolves to the resulting Tag. */
+export const createTag = async (hass: HomeAssistant, name: string) =>
+  (await hass.callWS<{ tag: string }>({ type: "wattbill/tags/create", name })).tag;
+
 /** Renaming to another Tag's name merges both; resolves to the resulting Tag. */
 export const renameTag = async (hass: HomeAssistant, tag: string, name: string) =>
   (await hass.callWS<{ tag: string }>({ type: "wattbill/tags/rename", tag, name })).tag;
