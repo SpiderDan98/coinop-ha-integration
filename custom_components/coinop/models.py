@@ -33,6 +33,8 @@ class Flag(StrEnum):
     ENDED_EARLY_DEFAULTS = "ended_early_defaults"
     # A Dose's stock input reported nothing usable: its default was charged.
     STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
+    # A computed Line Item had neither a measurement nor a default.
+    DEFAULT_MISSING = "default_missing"
 
 
 class UsageUnit(StrEnum):
@@ -66,6 +68,7 @@ class ConsumptionMethod(StrEnum):
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
     ESTIMATED = "estimated"
+    PROGRAM_DEFAULT = "program_default"
     ENTERED = "entered"
 
 
@@ -344,6 +347,8 @@ class LineItem:
     @property
     def from_defaults(self) -> bool:
         """Its quantity is a default for a whole cycle, not what was measured."""
+        if self.method is ConsumptionMethod.PROGRAM_DEFAULT:
+            return self.quantity is not None
         return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
@@ -587,6 +592,11 @@ class Run:
                 i.quantity is not None or i.length is not None for i in items
             ),
             Flag.MATERIAL_MISSING: all(i.material_id is not None for i in items),
+            Flag.DEFAULT_MISSING: all(
+                i.quantity is not None
+                for i in self.line_items
+                if i.kind in CONSUMED_KINDS
+            ),
         }
         self.flags = [flag for flag in self.flags if not fixed.get(flag, False)]
 

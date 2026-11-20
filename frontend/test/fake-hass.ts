@@ -24,6 +24,7 @@ import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
@@ -44,6 +45,7 @@ import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
+import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
 import runsGetWater from "./fixtures/backend/runs-get-water.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -126,6 +128,12 @@ export const recorded = {
   /** `coinop/runs/get` of "water-wash" on "device-washer" with a water meter: 50 L measured,
    * 20 L at 4.00 and 30 L at 5.00 per m³ ("water-wash-water"). */
   waterWash: runsGetWater.run as RunDetail,
+  /** `coinop/devices/list` with only "device-washer", a washing machine whose electricity
+   * and water come per Program: the Default row 0.9 kWh and 50 L, "Wool" 0.4 kWh and 45 L. */
+  perProgram: devicesListPerProgram.devices[0] as Device,
+  /** `coinop/runs/get` of its "Wool" Run "wool": 0.4 kWh at 0.30 ("wool-electricity") and
+   * 45 L at 4.00 per m³ ("wool-water") from the Program's row. */
+  perProgramWash: runsGetPerProgram.run as RunDetail,
   /** `coinop/line_items/add`: 60 L at 4.50 per m³ ("basement-wash-water") added by hand to
    * "basement-wash" of "device-basement", a washing machine without water source. */
   lineItemsAddWater: lineItemsAddWater as { run: RunDetail },

@@ -143,7 +143,8 @@
           "menu_options": {
             "energy": "Energiezähler",
             "power": "Leistungssensor",
-            "estimate": "Aus Durchschnittsleistung schätzen"
+            "estimate": "Aus Durchschnittsleistung schätzen",
+            "per_program": "Je Programm (kWh in den Programmvorgaben)"
           }
         },
         "energy": {
@@ -254,6 +255,7 @@
           "menu_options": {
             "water_meter": "Wasserzähler",
             "water_flow": "Durchflusssensor",
+            "water_per_program": "Je Programm (Liter in den Programmvorgaben)",
             "water_none": "Keine"
           }
         },

@@ -233,8 +233,9 @@ async def add_washing_machine(
     """Walk Add Device for a washing machine to the end; by default with its plug's
     energy meter, no Program input and no water source.
 
-    `water` is "meter" (on `WASHER_WATER` unless `water_meter` gives the input),
-    "flow" or "none"; a fixed `water_price` is per m³.
+    `source` "per_program" takes no `meter`. `water` is "meter" (on `WASHER_WATER`
+    unless `water_meter` gives the input), "flow", "per_program" or "none"; a fixed
+    `water_price` is per m³.
     """
     result = await walk_to_mapping(
         hass,
@@ -249,16 +250,18 @@ async def add_washing_machine(
     result = await configure(hass, result, program or {})
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
-    result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
+    if source != "per_program":
+        result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
     assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, price_choice(price))
     result = await configure(hass, result, price_input(price))
     assert result["step_id"] == "water", result.get("errors")
     result = await configure(hass, result, {"next_step_id": f"water_{water}"})
-    if water != "none":
+    if water in ("meter", "flow"):
         result = await configure(
             hass, result, water_meter or {"entity_id": WASHER_WATER}
         )
+    if water != "none":
         assert result["step_id"] == "water_price", result.get("errors")
         result = await configure(
             hass,

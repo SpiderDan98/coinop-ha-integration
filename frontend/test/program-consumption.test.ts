@@ -1,0 +1,111 @@
+import { describe, expect, it } from "vitest";
+import { recorded, recordedBackend } from "./fake-hass";
+import { click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
+
+const LIST = "coinop/devices/list";
+const SETTINGS = "coinop/devices/update_settings";
+const [kobra] = recorded.devices;
+
+const backendWith = (washer = recorded.perProgram) =>
+  recordedBackend()
+    .reply(LIST, () => ({ devices: [kobra, washer] }))
+    .subscription("coinop/catalog/subscribe", () => [
+      {
+        ...recorded.catalog.filled,
+        materials: [...recorded.catalog.filled.materials, ...recorded.laundry],
+      },
+    ])
+    .reply(SETTINGS, (msg) => ({
+      settings: { ...washer.settings, ...(msg.settings as object) },
+    }));
+const washerCard = (panel: Element) => queryAll(panel, ".device")[1] as HTMLElement;
+const openDialog = async (panel: Element) => {
+  await click(panel, iconButton(panel, "Edit settings of Washer"));
+  return query(panel, ".settings-dialog");
+};
+const headers = (dialog: Element) => queryAll(dialog, ".program-defaults th").map(text);
+const input = (root: Element, label: string) =>
+  query(root, `input[aria-label="${label}"]`) as HTMLInputElement;
+
+describe("Electricity and water per Program", () => {
+  it("name the source on the card", async () => {
+    const panel = await mountPanel(backendWith(), { path: "/devices" });
+
+    expect(text(query(washerCard(panel), ".consumption"))).toBe(
+      "Per Program (kWh in the Program Defaults)",
+    );
+  });
+
+  it("have kWh and litres columns in the Program Defaults, Default row included", async () => {
+    const panel = await mountPanel(backendWith(), { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    expect(headers(dialog)).toEqual(["Program", "Electricity (kWh)", "Water (L)"]);
+    expect(input(dialog, "Default kWh").value).toBe("0.9");
+    expect(input(dialog, "Default litres").value).toBe("50");
+    expect(input(dialog, "kWh for Wool").value).toBe("0.4");
+    expect(input(dialog, "Litres for Wool").value).toBe("45");
+  });
+
+  it("store a value entered and drop one cleared", async () => {
+    const backend = backendWith();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await fill(panel, input(dialog, "kWh for Wool"), "0.5");
+    await fill(panel, input(dialog, "Default litres"), "");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      program_defaults: {
+        default: { doses: {}, kwh: 0.9 },
+        programs: { Wool: { doses: {}, kwh: 0.5, litres: 45 } },
+      },
+    });
+  });
+
+  it("leave out litres for a washing machine without water, keeping kWh beside the Doses", async () => {
+    const backend = backendWith(recorded.washer);
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+    expect(headers(dialog)).toEqual([
+      "Program",
+      "Electricity (kWh)",
+      "Liquid detergent (ml)",
+      "Colour pods (pcs)",
+    ]);
+
+    await fill(panel, input(dialog, "kWh for Wool"), "0.6");
+    await fill(panel, input(dialog, "Liquid detergent for Wool"), "45");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toMatchObject({
+      program_defaults: { programs: { Wool: { doses: { "dose-detergent": 45 }, kwh: 0.6 } } },
+    });
+  });
+
+  it("show their method on the Run page", async () => {
+    const backend = backendWith().reply("coinop/runs/get", () => ({
+      run: recorded.perProgramWash,
+    }));
+    const panel = await mountPanel(backend, { path: "/run/wool" });
+
+    expect(queryAll(panel, ".kind .evidence").map(text)).toEqual([
+      "From the Program Defaults",
+      "From the Program Defaults",
+    ]);
+  });
+
+  it("flag a missing default", async () => {
+    const backend = backendWith().reply("coinop/runs/get", () => ({
+      run: { ...recorded.perProgramWash, flags: ["default_missing"] },
+    }));
+    const panel = await mountPanel(backend, { path: "/run/wool" });
+
+    expect(text(panel)).toContain(
+      "Neither a measurement nor a Program default was found: enter the quantity",
+    );
+  });
+});

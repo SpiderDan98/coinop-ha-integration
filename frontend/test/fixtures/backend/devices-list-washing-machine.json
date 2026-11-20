@@ -7,6 +7,7 @@
       "capabilities": [
         "doses",
         "program",
+        "program_consumption",
         "water"
       ],
       "ha_settings": {

@@ -10,7 +10,7 @@ export type Kind = (typeof KINDS)[number];
 export const shownKinds = (water: boolean) => KINDS.filter((kind) => kind !== "water" || water);
 export const hasWater = (devices: Device[] | undefined) =>
   devices?.some((device) => device.capabilities.includes("water")) ?? false;
-export type Method = "measured" | "from_history" | "estimated" | "entered";
+export type Method = "measured" | "from_history" | "estimated" | "program_default" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
 
@@ -100,7 +100,15 @@ export interface Device {
   type: "3d_printer" | "washing_machine";
   /** What its Device Type has; the panel shows a part only for these. */
   capabilities: (
-    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses" | "water"
+    | "job"
+    | "images"
+    | "material"
+    | "part_count"
+    | "average_power"
+    | "program"
+    | "doses"
+    | "water"
+    | "program_consumption"
   )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
@@ -120,6 +128,8 @@ export interface Device {
     images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
       | { source: "estimate"; running_power: number; paused_power: number | null }
+      /** From the Program Defaults' kWh. */
+      | { source: "per_program" }
       | { source: "energy"; entity_id: string; attribute: string | null }
       | {
           source: "power";
@@ -128,6 +138,8 @@ export interface Device {
           /** Fills gaps in the power reports. */
           running_power: number | null;
         };
+    /** Missing for a Device Type without water. */
+    water?: { source: "meter" | "flow" | "per_program" | "none" };
     price:
       | { source: "fixed"; value: number }
       | {
@@ -150,11 +162,12 @@ export interface Device {
       /** An entity reporting how much is left in g or ml; an attribute names its unit. */
       stock?: { entity_id: string; attribute: string | null; unit: string | null };
     }[];
-    /** The amount per Dose id in its Material's unit; a missing one is not dosed. A Run
+    /** The amount per Dose id in its Material's unit; a missing one is not dosed. The
+     * kWh and litres a Run takes when not measured; missing ones are not set. A Run
      * uses the row of its Program, else the Default row. */
     program_defaults: {
-      default: { doses: Record<string, number> };
-      programs: Record<string, { doses: Record<string, number> }>;
+      default: { doses: Record<string, number>; kwh?: number; litres?: number };
+      programs: Record<string, Device["settings"]["program_defaults"]["default"]>;
     };
   };
   /** What its Program input offers, then the other Programs its Runs had. */

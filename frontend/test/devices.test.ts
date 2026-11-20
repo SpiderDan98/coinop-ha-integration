@@ -555,7 +555,7 @@ describe("A washing machine's Doses", () => {
     await open(panel);
     const dialog = query(panel, ".settings-dialog");
     expect(text(query(dialog, ".program-defaults thead"))).toBe(
-      "Program Liquid detergent (ml) Colour pods (pcs)",
+      "Program Electricity (kWh) Liquid detergent (ml) Colour pods (pcs)",
     );
     expect(amount(dialog, "Liquid detergent").value).toBe("75");
     expect(amount(dialog, "Colour pods").value).toBe("");

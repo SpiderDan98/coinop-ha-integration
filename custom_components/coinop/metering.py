@@ -18,7 +18,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
 from . import recorded
-from .cost.consumption import Model
+from .cost.consumption import Model, spread
 from .cost.pricing import price_gap, priced_line_item
 from .device_config import DeviceConfig
 from .device_inputs import input_time, meter_reading, price_reading
@@ -44,8 +44,11 @@ class Metering:
     """One quantity of a Device's Runs.
 
     `gap_rates(run)` are the (since, rate) a rate input's gaps hold, None for its
-    last value; `fallback(run)` is the model and method without measurement, None
-    for none.
+    last value; `fallback(run)` is the method without measurement with a model,
+    an amount for the whole Run (spread evenly over it) or None for no value (an
+    empty quantity), and is None for no Line Item at all. With
+    `silent_meter_falls_back`, a meter without any valid reading up to the Run's
+    end falls back too.
     """
 
     def __init__(
@@ -54,10 +57,15 @@ class Metering:
         quantity: Quantity,
         config: DeviceConfig,
         gap_rates: Callable[[Run], Sequence[tuple[datetime, float | None]]],
-        fallback: Callable[[Run], tuple[Model, ConsumptionMethod] | None],
+        fallback: Callable[
+            [Run], tuple[Model | float | None, ConsumptionMethod] | None
+        ],
+        *,
+        silent_meter_falls_back: bool = False,
     ) -> None:
         self._hass = hass
         self.quantity = quantity
+        self._silent_meter_falls_back = silent_meter_falls_back
         self._source: Mapping[str, Any] = config.flow_data[quantity.source_key]
         # Without a source there may be no price section.
         self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
@@ -142,9 +150,10 @@ class Metering:
             self.record(run, state)
         if current := self._hass.states.get(entity_id):
             self.record(run, current)
+        segments = self._item(run).segments
         watched = max(
             [
-                self._item(run).segments[-1].end,
+                segments[-1].end if segments else run.started,
                 *(state.last_updated for state in missed),
             ]
         )
@@ -272,13 +281,16 @@ class Metering:
         return True
 
     def model(self, run: Run) -> Model:
-        """The Run's consumption model: its meter, else the fallback."""
-        fallback = self._fallback(run)
+        """The Run's consumption model as measured."""
         return model(
-            self.quantity,
-            self.timeline(run),
-            self._gap_rates(run),
-            (lambda _, __: 0.0) if fallback is None else fallback[0],
+            self.quantity, self.timeline(run), self._gap_rates(run), lambda _, __: 0.0
+        )
+
+    def _silent(self, run: Run) -> bool:
+        """Whether the meter had no valid reading up to the Run's end."""
+        return not any(
+            value is not None and (run.ended is None or at <= run.ended)
+            for at, value in self.timeline(run).readings
         )
 
     def priced(
@@ -302,13 +314,26 @@ class Metering:
     def refresh(self, run: Run, until: datetime) -> LineItem | None:
         """The Run's live Line Item up to `until`, flagging a price gap; None
         without measurement and fallback."""
-        if self.meter(run):
-            method = ConsumptionMethod.MEASURED
-        elif fallback := self._fallback(run):
-            method = fallback[1]
+        fallback = self._fallback(run)
+        metered = self.meter(run) is not None
+        if metered and not (
+            self._silent_meter_falls_back and fallback and self._silent(run)
+        ):
+            item = self.priced(run, until, self.model(run), ConsumptionMethod.MEASURED)
+        elif fallback:
+            if metered:
+                add_flag(run, Flag.CONSUMPTION_GAP)
+            value, method = fallback
+            item = self.priced(
+                run,
+                until,
+                value if callable(value) else spread(value or 0.0, run.started, until),
+                method,
+            )
+            if value is None:
+                item.quantity, item.segments = None, []
         else:
             return None
-        item = self.priced(run, until, self.model(run), method)
         if price_gap(run.started, until, self.timeline(run).prices):
             add_flag(run, Flag.PRICE_GAP)
         return item

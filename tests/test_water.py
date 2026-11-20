@@ -120,7 +120,12 @@ async def test_water_comes_from_a_meter_a_flow_sensor_or_nowhere(
     result = await walk_to_water(hass, await add_hub(hass))
 
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["water_meter", "water_flow", "water_none"]
+    assert result["menu_options"] == [
+        "water_meter",
+        "water_flow",
+        "water_per_program",
+        "water_none",
+    ]
 
     result = await configure(hass, result, {"next_step_id": "water_none"})
 

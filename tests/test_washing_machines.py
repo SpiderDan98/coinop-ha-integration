@@ -39,7 +39,7 @@ async def set_washer(hass: HomeAssistant, status: str) -> None:
     await hass.async_block_till_done()
 
 
-async def set_energy(hass: HomeAssistant, kwh: float) -> None:
+async def set_energy(hass: HomeAssistant, kwh: float | str) -> None:
     hass.states.async_set(WASHER_ENERGY, str(kwh), {"unit_of_measurement": "kWh"})
     await hass.async_block_till_done()
 
@@ -68,7 +68,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
     assert result["step_id"] == "program"
     result = await configure(hass, result, {})
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["energy", "power"]
+    assert result["menu_options"] == ["energy", "power", "per_program"]
     result = await configure(hass, result, {"next_step_id": "power"})
     assert fields(result) == ["entity_id", "attribute"]
 
@@ -240,7 +240,7 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
     devices = (await panel.call("coinop/devices/list"))["devices"]
 
     assert [(d["type"], d["capabilities"]) for d in devices] == [
-        ("washing_machine", ["doses", "program", "water"]),
+        ("washing_machine", ["doses", "program", "program_consumption", "water"]),
         ("3d_printer", ["average_power", "images", "job", "material", "part_count"]),
     ]
     assert devices[0]["ha_settings"] == {

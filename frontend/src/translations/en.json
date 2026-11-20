@@ -70,6 +70,7 @@
   "method.water_measured": "Measured by a water meter",
   "method.from_history": "From recorded history",
   "method.estimated": "Estimated from average power",
+  "method.program_default": "From the Program Defaults",
   "method.entered": "Entered by hand",
   "evidence.segments": "{count} price segments",
   "item.label": "Label",
@@ -119,6 +120,7 @@
   "consumption.energy": "Energy meter",
   "consumption.power": "Power sensor",
   "consumption.estimate": "Estimate from average power",
+  "consumption.per_program": "Per Program (kWh in the Program Defaults)",
   "consumption.running": "{power} running",
   "consumption.paused": "{power} paused",
   "price.fixed": "{price} per kWh",
@@ -374,7 +376,7 @@
   "device.program": "Program",
   "device.default_row": "Default",
   "device.default_amount": "Default amount of {dose}",
-  "device.program_defaults_hint": "Amounts per Run in the Material's unit. An empty cell means not dosed. A Run uses the row of its Program, else the Default row.",
+  "device.program_defaults_hint": "Amounts per Run: kWh and litres when nothing measures them, Doses in the Material's unit. An empty cell means not set or not dosed. A Run uses the row of its Program, else the Default row.",
   "flag.ended_early_defaults": "The Run ended early but was charged defaults for a whole cycle: check the amounts",
   "dose_source.default_row": "From the Default row",
   "device.measured_by": "measured by {entity}",
@@ -390,5 +392,12 @@
   "device.program_amount": "{dose} for {program}",
   "device.remove_program": "Remove the row of {program}",
   "device.add_program": "+ Add Program",
-  "dose_source.program_default": "From the Program's defaults"
+  "dose_source.program_default": "From the Program's defaults",
+  "device.kwh_column": "Electricity (kWh)",
+  "device.litres_column": "Water (L)",
+  "device.default_kwh": "Default kWh",
+  "device.default_litres": "Default litres",
+  "device.program_kwh": "kWh for {program}",
+  "device.program_litres": "Litres for {program}",
+  "flag.default_missing": "Neither a measurement nor a Program default was found: enter the quantity"
 }
