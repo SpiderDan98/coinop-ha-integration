@@ -22,6 +22,8 @@ from .test_runs import RUNS, set_status, stored_runs, value
 from .websocket import PanelClient
 
 FIXTURES = Path(__file__).parent / "fixtures" / "storage"
+# The hub entry with its Device subentries as each config entry version stored it.
+ENTRIES = Path(__file__).parent / "fixtures" / "config_entry"
 STORES = ("coinop.catalog", "coinop.runs", "coinop.live")
 
 
@@ -101,3 +103,38 @@ async def test_fields_added_by_a_newer_minor_version_are_kept(
 
     [kept] = [r for r in stored_runs(hass_storage) if r["id"] == run["id"]]
     assert kept == run
+
+
+async def test_devices_stored_before_device_types_become_3d_printers(
+    hass: HomeAssistant, panel: PanelClient
+) -> None:
+    stored = read(ENTRIES / "1.1.json")
+    entry = MockConfigEntry(
+        domain="coinop",
+        title="Coin-op",
+        version=stored["version"],
+        minor_version=stored["minor_version"],
+        data=stored["data"],
+        options=stored["options"],
+        subentries_data=stored["subentries"],
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [
+        (s.subentry_id, s.subentry_type, s.title, s.unique_id, dict(s.data))
+        for s in entry.subentries.values()
+    ] == [
+        (
+            s["subentry_id"],
+            s["subentry_type"],
+            s["title"],
+            s["unique_id"],
+            s["data"] | {"device_type": "3d_printer"},
+        )
+        for s in stored["subentries"]
+    ]
+    assert entry.options == stored["options"]
+    listed = (await panel.call("coinop/devices/list"))["devices"]
+    assert [d["type"] for d in listed] == ["3d_printer", "3d_printer"]
