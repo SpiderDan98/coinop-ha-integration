@@ -43,14 +43,16 @@ describe("Tags tab", () => {
     await click(panel, query(panel, `a.tab[href$="/tags"]`));
 
     expect(location.pathname).toBe("/wattbill/tags");
-    expect(queryAll(panel, "a.tab").map(text)).toEqual([
+    expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
+      "Runs",
       "Analysis",
       "Materials",
       "Line Item Templates",
       "Tags",
       "Devices",
     ]);
-    expect(text(query(panel, "a.tab.on"))).toBe("Tags");
+    expect(query(panel, "a.tab.on").title).toBe("Tags");
+    expect(text(query(panel, ".title"))).toBe("Tags");
   });
 
   it("lists each Tag with its Run count and total cost", async () => {

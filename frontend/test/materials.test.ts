@@ -45,7 +45,8 @@ describe("Materials tab", () => {
     await click(panel, query(panel, `a.tab[href$="/materials"]`));
 
     expect(location.pathname).toBe("/wattbill/materials");
-    expect(text(query(panel, "a.tab.on"))).toBe("Materials");
+    expect(query(panel, "a.tab.on").title).toBe("Materials");
+    expect(text(query(panel, ".title"))).toBe("Materials");
   });
 
   it("lists the catalogue with each Material's price per kg, archived ones apart", async () => {
