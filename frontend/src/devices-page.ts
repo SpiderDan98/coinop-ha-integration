@@ -192,6 +192,17 @@ export class DevicesPage extends LitElement {
               : nothing
           }
           ${device.capabilities.includes("doses") ? this.renderDoseSummary(settings, t, format) : nothing}
+          ${
+            device.capabilities.includes("doses") && device.capabilities.includes("program")
+              ? html`<dt>${t("device.program_rows")}</dt>
+                  <dd class="program-rows">
+                    ${
+                      Object.keys(settings.program_defaults.programs).join(", ") ||
+                      html`<span class="muted">${t("device.none")}</span>`
+                    }
+                  </dd>`
+              : nothing
+          }
           <dt>${t("device.tags_for_new_runs")}</dt>
           <dd class="new-run-tags">
             ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
@@ -330,7 +341,7 @@ export class DevicesPage extends LitElement {
         ></coinop-tag-input>
         <p class="muted small">${t("device.tags_hint")}</p>
       </div>
-      ${device.capabilities.includes("doses") ? this.renderDoses(draft, change, t) : nothing}
+      ${device.capabilities.includes("doses") ? this.renderDoses(device, draft, change, t) : nothing}
       ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
       <p class="muted small ha-settings">
         ${t("device.ha_settings")}
@@ -395,21 +406,39 @@ export class DevicesPage extends LitElement {
     </div>`;
   }
 
-  /** The Dose list and the Program Defaults' Default row, one column per Dose. */
+  /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
+   * column per Dose. Known Programs without a row are suggested; a value stores their row. */
   private renderDoses(
+    { capabilities, known_programs }: Device,
     { doses, program_defaults }: Settings,
     change: (changes: Partial<Settings>) => void,
     t: Localize,
   ) {
-    const amounts = program_defaults.default.doses;
+    const { programs } = program_defaults;
+    /** `program` null is the Default row. */
+    const rowOf = (program: string | null) =>
+      program === null ? program_defaults.default : programs[program];
+    const setRow = (program: string | null, row: Settings["program_defaults"]["default"]) =>
+      change({
+        program_defaults:
+          program === null
+            ? { ...program_defaults, default: row }
+            : { ...program_defaults, programs: { ...programs, [program]: row } },
+      });
+    const setPrograms = (next: typeof programs) =>
+      change({ program_defaults: { ...program_defaults, programs: next } });
     const setDoses = (next: Settings["doses"]) => {
       const kept = new Set(next.map(({ id }) => id));
+      const prune = ({ doses: amounts }: Settings["program_defaults"]["default"]) => ({
+        doses: Object.fromEntries(Object.entries(amounts).filter(([id]) => kept.has(id))),
+      });
       change({
         doses: next,
         program_defaults: {
-          default: {
-            doses: Object.fromEntries(Object.entries(amounts).filter(([id]) => kept.has(id))),
-          },
+          default: prune(program_defaults.default),
+          programs: Object.fromEntries(
+            Object.entries(programs).map(([name, row]) => [name, prune(row)]),
+          ),
         },
       });
     };
@@ -419,15 +448,34 @@ export class DevicesPage extends LitElement {
       if (dose) next.splice(index + by, 0, dose);
       setDoses(next);
     };
-    const setAmount = (id: string, value: string) => {
-      const others = Object.fromEntries(Object.entries(amounts).filter(([own]) => own !== id));
+    const setAmount = (program: string | null, id: string, value: string) => {
+      const row = rowOf(program);
+      const others = Object.fromEntries(
+        Object.entries(row?.doses ?? {}).filter(([own]) => own !== id),
+      );
       const amount = Number(value);
-      change({
-        program_defaults: {
-          default: { doses: value.trim() && amount > 0 ? { ...others, [id]: amount } : others },
-        },
-      });
+      const valid = value.trim() !== "" && amount > 0;
+      if (row || valid) setRow(program, { doses: valid ? { ...others, [id]: amount } : others });
     };
+    const amountCells = (program: string | null, label: (dose: string) => string) =>
+      doses.map(
+        ({ id, material_id }) =>
+          html`<td class="num">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              aria-label=${label(this.doseName(material_id, t))}
+              .value=${String(rowOf(program)?.doses[id] ?? "")}
+              @change=${(event: Event) =>
+                setAmount(program, id, (event.target as HTMLInputElement).value)}
+            />
+          </td>`,
+      );
+    const hasPrograms = capabilities.includes("program");
+    const programNames = hasPrograms
+      ? [...new Set([...known_programs, ...Object.keys(programs)])]
+      : [];
     const addable = this.materials.filter((material) => !material.archived);
     return html`<div class="field doses">
         <span class="label">${t("device.doses")}</span>
@@ -499,25 +547,49 @@ export class DevicesPage extends LitElement {
                   })),
                 ],
                 rows: html`<tr>
-                  <td>${t("device.default_row")}</td>
-                  ${doses.map(
-                    ({ id, material_id }) =>
-                      html`<td class="num">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          aria-label=${t("device.default_amount", {
-                            dose: this.doseName(material_id, t),
-                          })}
-                          .value=${String(amounts[id] ?? "")}
-                          @change=${(event: Event) =>
-                            setAmount(id, (event.target as HTMLInputElement).value)}
-                        />
-                      </td>`,
-                  )}
-                </tr>`,
+                    <td>${t("device.default_row")}</td>
+                    ${amountCells(null, (dose) => t("device.default_amount", { dose }))}
+                  </tr>
+                  ${programNames.map(
+                    (program) =>
+                      html`<tr class="program-row ${programs[program] ? "" : "suggested"}">
+                        <td>
+                          <span class="program-name">${program}</span>
+                          ${
+                            programs[program]
+                              ? html`<ha-icon-button
+                                  class="remove"
+                                  .label=${t("device.remove_program", { program })}
+                                  .path=${mdiClose}
+                                  @click=${() =>
+                                    setPrograms(
+                                      Object.fromEntries(
+                                        Object.entries(programs).filter(([own]) => own !== program),
+                                      ),
+                                    )}
+                                ></ha-icon-button>`
+                              : html`<span class="muted small">${t("device.suggested")}</span>`
+                          }
+                        </td>
+                        ${amountCells(program, (dose) => t("device.program_amount", { dose, program }))}
+                      </tr>`,
+                  )}`,
               })}
+              ${
+                hasPrograms
+                  ? html`<input
+                      class="add-program"
+                      aria-label=${t("device.add_program")}
+                      placeholder=${t("device.add_program")}
+                      @change=${(event: Event) => {
+                        const input = event.target as HTMLInputElement;
+                        const program = input.value.trim();
+                        input.value = "";
+                        if (program && !programs[program]) setRow(program, { doses: {} });
+                      }}
+                    />`
+                  : nothing
+              }
               <p class="muted small">${t("device.program_defaults_hint")}</p>
             </div>`
           : nothing
@@ -693,9 +765,23 @@ export class DevicesPage extends LitElement {
         --ha-icon-button-size: 32px;
         --mdc-icon-size: 18px;
       }
-      .program-defaults input {
+      .program-defaults td input {
         width: 6em;
         text-align: right;
+      }
+      .program-row td:first-child {
+        white-space: nowrap;
+      }
+      .program-row .remove {
+        --ha-icon-button-size: 28px;
+        --mdc-icon-size: 16px;
+        vertical-align: middle;
+      }
+      .program-row.suggested .program-name {
+        color: var(--secondary-text-color);
+      }
+      .add-program {
+        align-self: flex-start;
       }
       .template-chip {
         display: inline-flex;

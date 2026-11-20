@@ -65,6 +65,7 @@ class ConsumptionMethod(StrEnum):
 class DoseSource(StrEnum):
     """Where a Dose Line Item's amount came from."""
 
+    PROGRAM_DEFAULT = "program_default"
     DEFAULT_ROW = "default_row"
 
 
@@ -312,7 +313,7 @@ class LineItem:
     @property
     def from_defaults(self) -> bool:
         """Its quantity is a default for a whole cycle, not what was measured."""
-        return self.dose_source is DoseSource.DEFAULT_ROW
+        return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
     def grams(self) -> float:

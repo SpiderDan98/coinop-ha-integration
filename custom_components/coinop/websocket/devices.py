@@ -8,7 +8,8 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
-from custom_components.coinop.device_config import Capability
+from custom_components.coinop.device_config import Capability, DeviceConfig
+from custom_components.coinop.device_inputs import offered_values
 from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
@@ -20,6 +21,26 @@ from custom_components.coinop.schema import vol
 
 from .command import command, found
 from .materials import pickable
+
+
+def _known_programs(
+    hass: HomeAssistant, coinop: CoinOp, device: DeviceConfig
+) -> list[str]:
+    """The Program input's offered values, then other Programs of its Runs A-Z."""
+    offered = (
+        offered_values(hass, entity_id, device.program_attribute)
+        if (entity_id := device.program_entity_id)
+        else []
+    )
+    ran = sorted(
+        {
+            run.program
+            for run in coinop.book.runs()
+            if run.device_id == device.device_id and run.program
+        },
+        key=str.casefold,
+    )
+    return list(dict.fromkeys(p for v in [*offered, *ran] if (p := v.strip())))
 
 
 @command({vol.Required("type"): "coinop/devices/list"})
@@ -44,6 +65,7 @@ def _list(
                         if key != "device_type"
                     },
                     "settings": coinop.settings.get(device.device_id),
+                    "known_programs": _known_programs(hass, coinop, device),
                 }
                 for device in coinop.devices
             ]

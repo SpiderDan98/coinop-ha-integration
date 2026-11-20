@@ -75,9 +75,11 @@
         "program_defaults": {
           "default": {
             "doses": {}
-          }
+          },
+          "programs": {}
         }
-      }
+      },
+      "known_programs": []
     }
   ]
 }

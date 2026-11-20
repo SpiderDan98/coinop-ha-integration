@@ -51,7 +51,16 @@ FIELDS: dict[str, tuple[Any, Any]] = {
             _unique_ids,
         ),
     ),
-    PROGRAM_DEFAULTS: ({"default": {"doses": {}}}, {vol.Required("default"): _ROW}),
+    PROGRAM_DEFAULTS: (
+        {"default": {"doses": {}}, "programs": {}},
+        {
+            vol.Required("default"): _ROW,
+            # By Program, matched by its exact trimmed text.
+            vol.Optional("programs", default=dict): {
+                vol.All(str, vol.Strip, vol.Length(min=1)): _ROW
+            },
+        },
+    ),
 }
 
 
@@ -60,8 +69,11 @@ def _drop_removed_doses(settings: dict[str, Any]) -> None:
     if PROGRAM_DEFAULTS not in settings:
         return
     ids = {dose["id"] for dose in settings.get(DOSES, [])}
-    row = settings[PROGRAM_DEFAULTS]["default"]
-    row["doses"] = {id_: amount for id_, amount in row["doses"].items() if id_ in ids}
+    defaults = settings[PROGRAM_DEFAULTS]
+    for row in [defaults["default"], *defaults.get("programs", {}).values()]:
+        row["doses"] = {
+            id_: amount for id_, amount in row["doses"].items() if id_ in ids
+        }
 
 
 class DeviceSettings:

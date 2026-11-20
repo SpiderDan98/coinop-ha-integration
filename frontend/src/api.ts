@@ -68,7 +68,7 @@ export interface LineItem {
   share: number | null;
   /** A Dose's Line Item: its Dose and where its amount came from. */
   dose_id?: string;
-  dose_source?: "default_row";
+  dose_source?: "program_default" | "default_row";
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -141,9 +141,15 @@ export interface Device {
     default_material: string | null;
     /** In order; each Dose becomes a Material Line Item on Runs that dose it. */
     doses: { id: string; material_id: string }[];
-    /** The amount per Dose id in its Material's unit; a missing one is not dosed. */
-    program_defaults: { default: { doses: Record<string, number> } };
+    /** The amount per Dose id in its Material's unit; a missing one is not dosed. A Run
+     * uses the row of its Program, else the Default row. */
+    program_defaults: {
+      default: { doses: Record<string, number> };
+      programs: Record<string, { doses: Record<string, number> }>;
+    };
   };
+  /** What its Program input offers, then the other Programs its Runs had. */
+  known_programs: string[];
 }
 
 export type RunChange = "started" | "created" | "updated" | "ended" | "deleted";

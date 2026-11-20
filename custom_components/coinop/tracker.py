@@ -56,6 +56,7 @@ from .materials import Material, MaterialForm, SpoolmanPrice
 from .metering import LIVE_INTERVAL, Metering
 from .models import (
     ConsumptionMethod,
+    DoseSource,
     Flag,
     LineItem,
     LineItemKind,
@@ -307,6 +308,7 @@ class DeviceTracker:
         if (
             run := self._book.open_run(self._config.device_id)
         ) and self._record_program(run):
+            self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
     def _program(self) -> str | None:
@@ -750,15 +752,24 @@ class DeviceTracker:
         )
 
     def _doses(self, run: Run) -> list[LineItem]:
-        """A Line Item per Dose the Default row doses, in Dose list order."""
+        """A Line Item per Dose its Program's row doses, in Dose list order.
+
+        No Program or no row for it means the Default row.
+        """
         if Capability.DOSES not in self._config.capabilities:
             return []
         settings = self._settings.get(self._config.device_id)
-        amounts = settings[PROGRAM_DEFAULTS]["default"]["doses"]
+        defaults = settings[PROGRAM_DEFAULTS]
+        row, source = (
+            (defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT)
+            if run.program in defaults["programs"]
+            else (defaults["default"], DoseSource.DEFAULT_ROW)
+        )
+        amounts = row["doses"]
         ids = {i.dose_id: i.id for i in run.line_items if i.dose_id}
         return [
             dose_line_item(
-                ids.get(dose["id"]) or ulid_now(), dose["id"], material, amount
+                ids.get(dose["id"]) or ulid_now(), dose["id"], material, amount, source
             )
             for dose in settings[DOSES]
             if (amount := amounts.get(dose["id"])) is not None
