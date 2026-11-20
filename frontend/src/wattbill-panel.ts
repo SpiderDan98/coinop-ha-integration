@@ -30,7 +30,7 @@ import "./devices-page";
 import "./manual-run-dialog";
 import "./materials-page";
 import "./overview";
-import { NO_FILTER, filterOf } from "./run-filter";
+import { DEFAULT_SORT, NO_FILTER, filterOf, sortOf } from "./runs-query";
 import "./run-page";
 import "./runs-page";
 import "./tags-page";
@@ -77,6 +77,7 @@ export class WattbillPanel extends LitElement {
   /** The Runs tab's query as last shown, so the way back to it keeps its filter. */
   private runsSearch = "";
   private filter = NO_FILTER;
+  private sort = DEFAULT_SORT;
   private unsubscribe?: Promise<() => Promise<void>>[];
   private devicesRequest = 0;
 
@@ -116,6 +117,7 @@ export class WattbillPanel extends LitElement {
     if (page(this.route).name === "runs" && this.search !== this.runsSearch) {
       this.runsSearch = this.search;
       this.filter = filterOf(this.search);
+      this.sort = sortOf(this.search);
     }
   }
 
@@ -225,6 +227,7 @@ export class WattbillPanel extends LitElement {
                     .tags=${this.catalog?.tags ?? []}
                     .basePath=${this.route.prefix}
                     .filter=${this.filter}
+                    .sort=${this.sort}
                     ?narrow=${this.narrow}
                   ></wattbill-runs-page>
                 </div>`

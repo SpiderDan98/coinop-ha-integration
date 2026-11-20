@@ -8,7 +8,15 @@ import type { Device, RunSummary } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import { NO_FILTER, OUTCOME_FILTERS, matches, selectable, type Filter } from "./run-filter";
+import {
+  DEFAULT_SORT,
+  NO_FILTER,
+  OUTCOME_FILTERS,
+  matches,
+  selectable,
+  sorted,
+  type Filter,
+} from "./runs-query";
 import "./run-image";
 import { deviceName, flagLabel, outcomeChip, runCount, runName } from "./run-parts";
 import { runTile, tileStyles } from "./run-tile";
@@ -41,6 +49,7 @@ export class RunList extends LitElement {
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
   @property({ attribute: false }) filter = NO_FILTER;
+  @property({ attribute: false }) sort = DEFAULT_SORT;
   @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
 
   @state() private view = storedView();
@@ -64,10 +73,11 @@ export class RunList extends LitElement {
   };
 
   protected override willUpdate(changed: PropertyValues<this>) {
-    if (!changed.has("runs") && !changed.has("filter") && !changed.has("hass")) return;
+    const inputs = ["runs", "filter", "sort", "devices", "hass"] as const;
+    if (!inputs.some((name) => changed.has(name))) return;
     const t = localize(this.hass);
     const format = formatter(this.hass);
-    this.all = this.runs.toSorted((a, b) => b.started.localeCompare(a.started));
+    this.all = sorted(this.runs, this.sort, t, this.devices);
     this.shown = this.all.filter((run) => matches(run, this.filter, t, format));
     this.total.load(this.hass, this.shown);
   }
@@ -188,24 +198,29 @@ export class RunList extends LitElement {
   }
 
   private renderTable(runs: RunSummary[], t: Localize, format: Format) {
-    const columns = this.narrow
-      ? [{}, { label: t("run.name") }, { label: t("run.total"), num: true }]
-      : [
-          {},
-          {},
-          { label: t("run.name") },
-          { label: t("run.device") },
-          { label: t("runs.start") },
-          { label: t("runs.duration"), num: true },
-          { label: t("run.outcome") },
-          { label: t("run.tags") },
-          { label: t("runs.flags") },
-          { label: t("run.total"), num: true },
-          { label: t("runs.per_part"), num: true },
-        ];
     return table({
       name: "runs",
-      columns,
+      columns: this.narrow
+        ? [
+            {},
+            { label: t("run.name"), sort: "name" },
+            { label: t("run.total"), num: true, sort: "total" },
+          ]
+        : [
+            {},
+            {},
+            { label: t("run.name"), sort: "name" },
+            { label: t("run.device"), sort: "device" },
+            { label: t("runs.start"), sort: "start" },
+            { label: t("runs.duration"), num: true, sort: "duration" },
+            { label: t("run.outcome") },
+            { label: t("run.tags") },
+            { label: t("runs.flags") },
+            { label: t("run.total"), num: true, sort: "total" },
+            { label: t("runs.per_part"), num: true, sort: "per_part" },
+          ],
+      sort: this.sort,
+      onSort: (sort) => this.dispatchEvent(new CustomEvent("sort-changed", { detail: sort })),
       rows: repeat(
         runs,
         (run) => run.id,

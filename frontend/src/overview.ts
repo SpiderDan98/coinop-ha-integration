@@ -8,7 +8,7 @@ import { barRows, chartStyles, legend, stackedColumns } from "./charts";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import { runsPath } from "./run-filter";
+import { runsPath } from "./runs-query";
 import { deviceName, runCount, runName } from "./run-parts";
 import { runTile, tileStyles } from "./run-tile";
 import { RunsTotal } from "./runs-total";

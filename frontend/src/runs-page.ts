@@ -7,7 +7,14 @@ import { deleteRuns, previewDelete, type Device, type RunSummary, type Totals } 
 import { formatter, type Format } from "./format";
 import { navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import { NO_FILTER, runsPath, selectable, type Filter } from "./run-filter";
+import {
+  DEFAULT_SORT,
+  NO_FILTER,
+  runsPath,
+  selectable,
+  type Filter,
+  type Sort,
+} from "./runs-query";
 import "./run-list";
 import { deleteDialog, runCount, runName } from "./run-parts";
 import { RunsTotal } from "./runs-total";
@@ -25,6 +32,7 @@ export class RunsPage extends LitElement {
   @property({ type: Boolean, reflect: true }) narrow = false;
   /** As the URL has it. */
   @property({ attribute: false }) filter = NO_FILTER;
+  @property({ attribute: false }) sort = DEFAULT_SORT;
 
   @state() private selected: ReadonlySet<string> = new Set();
   /** Set while the delete confirmation is open. */
@@ -50,7 +58,7 @@ export class RunsPage extends LitElement {
       !!this.filter.name &&
       !!filter.name &&
       JSON.stringify({ ...this.filter, name: "" }) === JSON.stringify({ ...filter, name: "" });
-    navigate(runsPath(this.basePath, filter), { replace: typing });
+    navigate(runsPath(this.basePath, filter, this.sort), { replace: typing });
   }
 
   private async confirmDelete() {
@@ -90,9 +98,12 @@ export class RunsPage extends LitElement {
         .tags=${this.tags}
         .basePath=${this.basePath}
         .filter=${this.filter}
+        .sort=${this.sort}
         .selected=${new Set(selected.map((run) => run.id))}
         ?narrow=${this.narrow}
         @filter-changed=${(event: CustomEvent<Filter>) => this.setFilter(event.detail)}
+        @sort-changed=${(event: CustomEvent<Sort>) =>
+          navigate(runsPath(this.basePath, this.filter, event.detail))}
         @selection-changed=${(event: CustomEvent<Set<string>>) => (this.selected = event.detail)}
       ></wattbill-run-list>
       ${selected.length ? this.renderBasket(selected, t, format) : nothing}

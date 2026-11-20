@@ -107,3 +107,81 @@ describe("Runs table", () => {
     expect(rows(panel)[1]).toBe("Helmet Kobra · Jan 13, 2026 €0.30");
   });
 });
+
+describe("Sorting the Runs table", () => {
+  const names = (panel: Element) => queryAll(panel, "tr.run .name a").map(text);
+  const header = (panel: Element, label: string) =>
+    queryAll(panel, "th").find((th) => text(th) === label) ?? panel;
+  const sortBy = (panel: Element, label: string) =>
+    click(panel, query(header(panel, label), "button.sort"));
+  const url = () => location.pathname + location.search;
+  const inTable = async (path = "/runs") => {
+    localStorage.setItem("wattbill-runs-view", "table");
+    return mountPanel(recordedBackend(), { path });
+  };
+
+  it("lists the newest first until a sortable header is clicked", async () => {
+    const panel = await inTable();
+
+    expect(queryAll(panel, "th button.sort").map(text)).toEqual([
+      "Name",
+      "Device",
+      "Start",
+      "Duration",
+      "Total",
+      "Per part",
+    ]);
+    expect(names(panel)).toEqual(["Untitled Run", "Helmet", "Benchy"]);
+    expect(header(panel, "Start").getAttribute("aria-sort")).toBe("descending");
+    expect(header(panel, "Total").getAttribute("aria-sort")).toBe("none");
+  });
+
+  it("sorts by a column, and the other way round on a second click", async () => {
+    const panel = await inTable();
+
+    await sortBy(panel, "Total");
+    expect(names(panel)).toEqual(["Untitled Run", "Helmet", "Benchy"]);
+    expect(header(panel, "Total").getAttribute("aria-sort")).toBe("ascending");
+    expect(header(panel, "Start").getAttribute("aria-sort")).toBe("none");
+    expect(url()).toBe("/wattbill/runs?sort=total&order=asc");
+
+    await sortBy(panel, "Total");
+    expect(names(panel)).toEqual(["Benchy", "Helmet", "Untitled Run"]);
+    expect(header(panel, "Total").getAttribute("aria-sort")).toBe("descending");
+    expect(url()).toBe("/wattbill/runs?sort=total&order=desc");
+  });
+
+  it("sorts by name, Device, start, duration and cost per part", async () => {
+    const panel = await inTable();
+
+    await sortBy(panel, "Name");
+    expect(names(panel)).toEqual(["Benchy", "Helmet", "Untitled Run"]);
+    // The same Device lists its newest Run first.
+    await sortBy(panel, "Device");
+    expect(names(panel)).toEqual(["Helmet", "Benchy", "Untitled Run"]);
+    await sortBy(panel, "Start");
+    expect(names(panel)).toEqual(["Benchy", "Helmet", "Untitled Run"]);
+    await sortBy(panel, "Duration");
+    expect(names(panel)).toEqual(["Untitled Run", "Benchy", "Helmet"]);
+    await sortBy(panel, "Per part");
+    expect(names(panel)).toEqual(["Untitled Run", "Benchy", "Helmet"]);
+  });
+
+  it("is read from the URL together with the filter", async () => {
+    const panel = await inTable("/runs?outcome=failed_cancelled&sort=duration&order=desc");
+
+    expect(names(panel)).toEqual(["Helmet", "Untitled Run"]);
+    expect(header(panel, "Duration").getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("keeps the filter and the selection", async () => {
+    const panel = await inTable("/runs?outcome=failed_cancelled");
+    await fill(panel, query(row(panel, "Helmet"), "input.pick"), "on");
+
+    await sortBy(panel, "Name");
+
+    expect(url()).toBe("/wattbill/runs?outcome=failed_cancelled&sort=name&order=asc");
+    expect(names(panel)).toEqual(["Helmet", "Untitled Run"]);
+    expect(basket(panel)).toMatch(/^1 Run €0.30 Helmet/);
+  });
+});

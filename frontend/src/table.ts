@@ -1,27 +1,56 @@
 // The panel's one table: a native <table> in a card that scrolls sideways when too wide
 // (ADR 0007). Pages render their own <tr>s; cells with class "num" hold figures.
+import { mdiArrowDown, mdiArrowUp } from "@mdi/js";
 import { css, html, nothing } from "lit";
 
-export function table({
+/** Columns with a `sort` key sort by it: a click sorts ascending, the next one reverses. */
+export function table<Key extends string>({
   name = "",
   header,
   columns,
   rows,
   foot,
   empty,
+  sort,
+  onSort,
 }: {
   /** Classes of the card, e.g. to place it; "stacked" turns rows into cards on phones. */
   name?: string;
   /** Shown in the card above the table. */
   header?: unknown;
-  columns: { label?: unknown; num?: boolean; class?: string }[];
+  columns: { label?: unknown; num?: boolean; class?: string; sort?: Key }[];
   /** The <tr>s, as a list or `repeat()`ed. */
   rows: unknown;
   /** The <tr>s of a total row. */
   foot?: unknown;
   /** Shown as the only row when there are no rows. */
   empty?: string;
+  sort?: { by: Key; descending: boolean };
+  onSort?: (sort: { by: Key; descending: boolean }) => void;
 }) {
+  const heading = (column: (typeof columns)[number]) => {
+    const key = column.sort;
+    if (!key || !sort || !onSort) return column.label ?? "";
+    const on = sort.by === key;
+    return html`<button
+      class="sort"
+      @click=${() => onSort({ by: key, descending: on && !sort.descending })}
+    >
+      ${column.label}${
+        on
+          ? html`<ha-svg-icon .path=${sort.descending ? mdiArrowDown : mdiArrowUp}></ha-svg-icon>`
+          : nothing
+      }
+    </button>`;
+  };
+  const ariaSort = (key?: Key) =>
+    !key || !sort
+      ? nothing
+      : sort.by !== key
+        ? "none"
+        : sort.descending
+          ? "descending"
+          : "ascending";
   return html`<div class="table ${name}">
     ${header ?? nothing}
     <table>
@@ -29,8 +58,11 @@ export function table({
         <tr>
           ${columns.map(
             (column) =>
-              html`<th class="${column.num ? "num" : ""} ${column.class ?? ""}">
-                ${column.label ?? ""}
+              html`<th
+                class="${column.num ? "num" : ""} ${column.class ?? ""}"
+                aria-sort=${ariaSort(column.sort)}
+              >
+                ${heading(column)}
               </th>`,
           )}
         </tr>
@@ -83,6 +115,28 @@ export const tableStyles = css`
     font-size: 12px;
     color: var(--secondary-text-color);
     white-space: nowrap;
+  }
+  .table th .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    --mdc-icon-size: 14px;
+  }
+  .table th .sort:hover,
+  .table th[aria-sort="ascending"],
+  .table th[aria-sort="descending"] {
+    color: var(--primary-text-color);
+  }
+  .table th .sort:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .table .num {
     text-align: right;
