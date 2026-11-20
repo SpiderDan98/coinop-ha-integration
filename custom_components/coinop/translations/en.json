@@ -26,6 +26,8 @@
             "images": "Images",
             "consumption": "Consumption source",
             "price": "Electricity price",
+            "water": "Water source",
+            "water_price": "Water price",
             "detect": "Detect again",
             "save": "Save"
           }
@@ -233,6 +235,104 @@
           "data_description": {
             "factor": "Multiply each price by this to get {currency}/kWh."
           }
+        },
+        "water": {
+          "title": "Water consumption",
+          "description": "How should Coin-op determine the water a Run uses?",
+          "menu_options": {
+            "water_meter": "Water meter",
+            "water_flow": "Flow sensor",
+            "water_none": "None"
+          }
+        },
+        "water_meter": {
+          "title": "Water meter",
+          "description": "Pick the entity that counts the Device's water, e.g. the machine's water consumption sensor or a water meter on its supply. It does not need to be available now.",
+          "data": {
+            "entity_id": "Water entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each reading by this to get litres."
+          }
+        },
+        "water_flow": {
+          "title": "Flow sensor",
+          "description": "Pick the entity that reports the Device's water flow. Coin-op integrates it over time. It does not need to be available now.",
+          "data": {
+            "entity_id": "Flow entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each reading by this to get L/min."
+          }
+        },
+        "water_meter_unit": {
+          "title": "Unit of the water attribute",
+          "description": "In which unit does the attribute count water?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get litres."
+          }
+        },
+        "water_flow_unit": {
+          "title": "Unit of the flow attribute",
+          "description": "In which unit does the attribute report the flow?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get L/min."
+          }
+        },
+        "water_price": {
+          "title": "Water price",
+          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so the cost per load is realistic.",
+          "menu_options": {
+            "water_fixed_price": "Fixed price",
+            "water_price_entity": "Price entity"
+          }
+        },
+        "water_fixed_price": {
+          "title": "Fixed water price",
+          "data": {
+            "price": "Price per m³"
+          },
+          "data_description": {
+            "price": "What you pay per m³, in {currency}, including wastewater."
+          }
+        },
+        "water_price_entity": {
+          "title": "Water price entity",
+          "description": "Pick the entity that reports the current water price per m³ or L, in {currency} or a sub-unit like ct, ideally including wastewater. Each litre of a Run is charged at the price that applied when it was used. It does not need to be available now.",
+          "data": {
+            "entity_id": "Price entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each price by this to get {currency}/m³."
+          }
+        },
+        "water_price_unit": {
+          "title": "Unit of the water price attribute",
+          "description": "In which unit does the attribute report the price?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each price by this to get {currency}/m³."
+          }
         }
       },
       "error": {
@@ -287,6 +387,9 @@
       "electricity_cost": {
         "name": "Electricity cost"
       },
+      "water_cost": {
+        "name": "Water cost"
+      },
       "material_cost": {
         "name": "Material cost"
       },
@@ -298,6 +401,9 @@
       },
       "energy_in_runs": {
         "name": "Energy in Runs"
+      },
+      "water_in_runs": {
+        "name": "Water in Runs"
       },
       "running_time": {
         "name": "Running time"

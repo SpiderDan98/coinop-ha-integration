@@ -10,7 +10,6 @@ import {
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
-  KINDS,
   OUTCOMES,
   addLineItem,
   addTemplateLineItem,
@@ -22,6 +21,7 @@ import {
   previewDelete,
   resetLineItem,
   saveAsTemplate,
+  shownKinds,
   updateLineItem,
   updateRun,
   type Device,
@@ -33,7 +33,7 @@ import {
   type RunDetail,
   type RunSummary,
 } from "./api";
-import { formatter, type Format } from "./format";
+import { formatter, priceUnit, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-images";
@@ -56,7 +56,12 @@ const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: For
 
 const evidence = (item: LineItem, t: Localize, format: Format) =>
   [
-    item.method && t(`method.${item.method}`),
+    item.method &&
+      t(
+        item.kind === "water" && item.method === "measured"
+          ? "method.water_measured"
+          : `method.${item.method}`,
+      ),
     item.template_id && t("evidence.template"),
     item.basis === "running_hours" && t("evidence.running_hours"),
     item.segments.length > 1 && t("evidence.segments", { count: item.segments.length }),
@@ -132,7 +137,7 @@ const itemValues = (item: LineItem, format: Format) => ({
   material_id: item.material_id ?? "",
   unit: item.unit,
   quantity: format.toNumberInput(item.quantity, 4),
-  unit_price: format.toNumberInput(item.unit_price, 4),
+  unit_price: format.toNumberInput(item.unit_price * priceUnit(item.unit).factor, 4),
   amount: format.toAmountInput(item.amount),
 });
 
@@ -169,7 +174,8 @@ const shownValue = (
   format: Format,
 ) => {
   if (field === "amount") return format.money(values.amount);
-  if (field === "unit_price") return format.unitPrice(values.unit_price);
+  if (field === "unit_price")
+    return format.unitPrice(values.unit_price * priceUnit(item.unit).factor);
   return values.quantity === null ? "—" : format.quantity(values.quantity, item.unit);
 };
 
@@ -196,8 +202,8 @@ export class RunPage extends LitElement {
   @state() private failed?: "fields" | "items";
   /** Set while the delete confirmation is open. */
   @state() private drop?: Totals;
-  /** Which form for a new Line Item is open: Material, Other by hand or from a template. */
-  @state() private adding?: "material" | "other" | "template";
+  /** Which form for a new Line Item is open: Water, Material, Other by hand or from a template. */
+  @state() private adding?: "water" | "material" | "other" | "template";
   /** The template picked in its form; the first one until the user picks. */
   @state() private templateId?: string;
   /** The label of the Line Item last saved as a template. */
@@ -268,6 +274,7 @@ export class RunPage extends LitElement {
     const undo = () => (input.value = shown);
     const changes = itemChange(field, input.value);
     if (!changes) return undo();
+    if ("unit_price" in changes) changes.unit_price /= priceUnit(item.unit).factor;
     void this.saveItems(updateLineItem(this.hass, this.runId, item.id, changes), undo);
   }
 
@@ -277,6 +284,17 @@ export class RunPage extends LitElement {
     const entered = Object.fromEntries(new FormData(form)) as Record<string, string>;
     const quantity = parseNumber(entered.quantity ?? "");
     if (quantity === undefined) return;
+    if (this.adding === "water") {
+      const price = parseNumber(entered.unit_price ?? "");
+      if (price === undefined || price === null) return;
+      const water = {
+        kind: "water" as const,
+        quantity,
+        unit_price: price / priceUnit("L").factor,
+      };
+      if (await this.saveItems(addLineItem(this.hass, this.runId, water))) this.adding = undefined;
+      return;
+    }
     if (this.adding === "material") {
       if (!entered.material_id) return;
       const material = {
@@ -373,6 +391,10 @@ export class RunPage extends LitElement {
     const run = this.run;
     const format = formatter(this.hass);
     const device = deviceName(run, this.devices, t);
+    const water = this.devices
+      ?.find(({ id }) => id === run.device_id)
+      ?.capabilities.includes("water");
+    const kinds = shownKinds(Boolean(water) || run.line_items.some((i) => i.kind === "water"));
     return html`
       <div class="runbar row">
         ${outcomeChip(run, t)}
@@ -447,7 +469,7 @@ export class RunPage extends LitElement {
                 </p>`
               : nothing
           }
-          ${KINDS.map((kind) => {
+          ${kinds.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
             return html`
               <div class="card kind" style="--kind-color: var(--coinop-${kind})">
@@ -464,6 +486,7 @@ export class RunPage extends LitElement {
                         ${items.map((item) => this.renderItem(item, t, format))}`
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
+                ${kind === "water" && water && !items.length ? this.renderAddWater(t, format) : nothing}
                 ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
                 ${kind === "material" ? splitHint(items, t, format) : nothing}
                 ${kind === "material" ? this.renderAddMaterial(t) : nothing}
@@ -618,8 +641,8 @@ export class RunPage extends LitElement {
                   (segment) =>
                     html`<li>
                       ${format.timeRange(segment.start, segment.end)} ·
-                      ${format.quantity(segment.kwh, "kWh")} ×
-                      ${format.unitPrice(segment.unit_price)}
+                      ${format.quantity(segment.kwh, item.unit)} ×
+                      ${this.priced(segment.unit_price, item.unit, format)}
                     </li>`,
                 )}
               </ul>`
@@ -641,7 +664,7 @@ export class RunPage extends LitElement {
       </div>
       <div class="quantity price">
         ${number("unit_price")}<span class="unit per muted small"
-          >${`${format.currencySymbol}/${item.unit || "–"}`}</span
+          >${`${format.currencySymbol}/${priceUnit(item.unit).unit || "–"}`}</span
         >
       </div>
       ${number("amount")}
@@ -791,6 +814,61 @@ export class RunPage extends LitElement {
             >
               <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
               ${t("item.add_material")}
+            </ha-button>`
+      }
+    </div>`;
+  }
+
+  /** A price per `unit`, per the unit it is shown in when that is another. */
+  private priced(price: number, unit: string, format: Format) {
+    const shown = priceUnit(unit);
+    const per = shown.unit === unit ? "" : `/${shown.unit}`;
+    return `${format.unitPrice(price * shown.factor)}${per}`;
+  }
+
+  private renderAddWater(t: Localize, format: Format) {
+    return html`<div class="add-item">
+      ${
+        this.adding === "water"
+          ? html`<form class="water" @submit=${this.onAdd}>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                name="quantity"
+                required
+                aria-label=${t("item.quantity")}
+              />
+              <span class="unit muted small">L</span>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                name="unit_price"
+                required
+                aria-label=${t("item.unit_price")}
+              />
+              <span class="unit muted small"
+                >${`${format.currencySymbol}/${priceUnit("L").unit}`}</span
+              >
+              <div class="row">
+                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
+                <ha-button
+                  class="small"
+                  appearance="plain"
+                  @click=${() => (this.adding = undefined)}
+                >
+                  ${t("item.cancel")}
+                </ha-button>
+              </div>
+            </form>`
+          : html`<ha-button
+              class="small add-water"
+              appearance="filled"
+              @click=${() => (this.adding = "water")}
+            >
+              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+              ${t("item.add_water")}
             </ha-button>`
       }
     </div>`;

@@ -2,10 +2,12 @@
   "drop": {
     "cost": 0.3,
     "electricity_cost": 0.3,
+    "water_cost": 0.0,
     "material_cost": 0.0,
     "other_cost": 0.0,
     "material_grams": 0.0,
     "energy_kwh": 1.08,
+    "water_litres": 0.0,
     "runs": 1,
     "running_hours": 9.0,
     "flagged_runs": 1

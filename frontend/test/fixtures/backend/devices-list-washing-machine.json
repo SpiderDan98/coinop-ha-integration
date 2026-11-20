@@ -4,7 +4,9 @@
       "id": "device-washer",
       "name": "Washer",
       "type": "washing_machine",
-      "capabilities": [],
+      "capabilities": [
+        "water"
+      ],
       "ha_settings": {
         "printer_device_id": null,
         "status": {
@@ -40,6 +42,9 @@
         "price": {
           "source": "fixed",
           "value": 0.3
+        },
+        "water": {
+          "source": "none"
         }
       },
       "settings": {

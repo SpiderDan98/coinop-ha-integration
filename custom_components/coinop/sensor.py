@@ -8,7 +8,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
@@ -31,11 +31,19 @@ def _cost(key: str, translation_key: str) -> SensorEntityDescription:
     )
 
 
+# Each key names the `Totals` field the sensor shows; some only for a Capability.
 MATERIAL_USED = "material_grams"
-# Each key names the `Totals` field the sensor shows.
+WATER_COST = "water_cost"
+WATER_IN_RUNS = "water_litres"
+NEEDS = {
+    MATERIAL_USED: Capability.MATERIAL,
+    WATER_COST: Capability.WATER,
+    WATER_IN_RUNS: Capability.WATER,
+}
 TOTALS = (
     _cost("cost", "total_cost"),
     _cost("electricity_cost", "electricity_cost"),
+    _cost(WATER_COST, "water_cost"),
     _cost("material_cost", "material_cost"),
     _cost("other_cost", "other_cost"),
     SensorEntityDescription(
@@ -53,6 +61,14 @@ TOTALS = (
         state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=3,
+    ),
+    SensorEntityDescription(
+        key=WATER_IN_RUNS,
+        translation_key="water_in_runs",
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        suggested_display_precision=1,
     ),
     SensorEntityDescription(
         key="runs", translation_key="runs", state_class=SensorStateClass.TOTAL
@@ -94,8 +110,8 @@ async def async_setup_entry(
                 *(
                     TotalSensor(hass, book, device, description)
                     for description in TOTALS
-                    if description.key != MATERIAL_USED
-                    or Capability.MATERIAL in device.capabilities
+                    if description.key not in NEEDS
+                    or NEEDS[description.key] in device.capabilities
                 ),
                 CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
                 LastRunCostSensor(hass, book, device, LAST_RUN_COST),

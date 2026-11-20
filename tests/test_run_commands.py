@@ -67,7 +67,12 @@ async def test_a_run_reads_like_a_receipt_of_rounded_amounts(
 
     run = result["run"]
     assert [item["amount"] for item in run["line_items"]] == [0.07, 0.13, 0.13, 1.01]
-    assert run["subtotals"] == {"electricity": 0.07, "material": 0.26, "other": 1.01}
+    assert run["subtotals"] == {
+        "electricity": 0.07,
+        "water": 0.0,
+        "material": 0.26,
+        "other": 1.01,
+    }
     assert run["total"] == 1.34
     [listed] = (await panel.call("coinop/runs/list"))["runs"]
     assert listed["total"] == 1.34

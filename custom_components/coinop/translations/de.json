@@ -26,6 +26,8 @@
             "images": "Bilder",
             "consumption": "Verbrauchsquelle",
             "price": "Strompreis",
+            "water": "Wasserquelle",
+            "water_price": "Wasserpreis",
             "detect": "Erneut erkennen",
             "save": "Speichern"
           }
@@ -233,6 +235,104 @@
           "data_description": {
             "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
           }
+        },
+        "water": {
+          "title": "Wasserverbrauch",
+          "description": "Wie soll Coin-op das Wasser bestimmen, das ein Lauf verbraucht?",
+          "menu_options": {
+            "water_meter": "Wasserzähler",
+            "water_flow": "Durchflusssensor",
+            "water_none": "Keine"
+          }
+        },
+        "water_meter": {
+          "title": "Wasserzähler",
+          "description": "Wähle die Entität, die das Wasser des Geräts zählt, z. B. den Wasserverbrauchssensor der Maschine oder einen Wasserzähler an ihrem Zulauf. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Wasser-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um Liter zu erhalten."
+          }
+        },
+        "water_flow": {
+          "title": "Durchflusssensor",
+          "description": "Wähle die Entität, die den Wasserdurchfluss des Geräts meldet. Coin-op integriert ihn über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Durchfluss-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um L/min zu erhalten."
+          }
+        },
+        "water_meter_unit": {
+          "title": "Einheit des Wasser-Attributs",
+          "description": "In welcher Einheit zählt das Attribut das Wasser?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um Liter zu erhalten."
+          }
+        },
+        "water_flow_unit": {
+          "title": "Einheit des Durchfluss-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Durchfluss?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um L/min zu erhalten."
+          }
+        },
+        "water_price": {
+          "title": "Wasserpreis",
+          "description": "Zahlst du einen festen Preis pro m³, oder meldet eine Entität den aktuellen Preis? Rechne die Abwassergebühr mit ein, damit die Kosten pro Wäsche realistisch sind.",
+          "menu_options": {
+            "water_fixed_price": "Fester Preis",
+            "water_price_entity": "Preis-Entität"
+          }
+        },
+        "water_fixed_price": {
+          "title": "Fester Wasserpreis",
+          "data": {
+            "price": "Preis pro m³"
+          },
+          "data_description": {
+            "price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser."
+          }
+        },
+        "water_price_entity": {
+          "title": "Wasserpreis-Entität",
+          "description": "Wähle die Entität, die den aktuellen Wasserpreis pro m³ oder L meldet, in {currency} oder einer Untereinheit wie ct, am besten einschließlich Abwasser. Jeder Liter eines Laufs kostet den Preis, der galt, als er verbraucht wurde. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Preis-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/m³ zu erhalten."
+          }
+        },
+        "water_price_unit": {
+          "title": "Einheit des Wasserpreis-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Preis?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/m³ zu erhalten."
+          }
         }
       },
       "error": {
@@ -287,6 +387,9 @@
       "electricity_cost": {
         "name": "Stromkosten"
       },
+      "water_cost": {
+        "name": "Wasserkosten"
+      },
       "material_cost": {
         "name": "Materialkosten"
       },
@@ -298,6 +401,9 @@
       },
       "energy_in_runs": {
         "name": "Energie in Läufen"
+      },
+      "water_in_runs": {
+        "name": "Wasser in Läufen"
       },
       "running_time": {
         "name": "Laufzeit"

@@ -29,6 +29,8 @@ MAPPING = {
 
 WASHER_STATUS = "sensor.washer_status"
 WASHER_ENERGY = "sensor.washer_plug_energy"
+WASHER_WATER = "sensor.washer_water"
+WATER_PRICE = "sensor.water_price"
 WASHER_MAPPING = {
     "running": ["running"],
     "paused": ["paused"],
@@ -223,9 +225,16 @@ async def add_washing_machine(
     source: str = "energy",
     meter: dict[str, Any] | None = None,
     price: float | dict[str, Any] = 0.30,
+    water: str = "none",
+    water_meter: dict[str, Any] | None = None,
+    water_price: float | dict[str, Any] = 4.0,
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
-    energy meter."""
+    energy meter and no water source.
+
+    `water` is "meter" (on `WASHER_WATER` unless `water_meter` gives the input),
+    "flow" or "none"; a fixed `water_price` is per m³.
+    """
     result = await walk_to_mapping(
         hass,
         entry,
@@ -241,6 +250,19 @@ async def add_washing_machine(
     assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, price_choice(price))
     result = await configure(hass, result, price_input(price))
+    assert result["step_id"] == "water", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": f"water_{water}"})
+    if water != "none":
+        result = await configure(
+            hass, result, water_meter or {"entity_id": WASHER_WATER}
+        )
+        assert result["step_id"] == "water_price", result.get("errors")
+        result = await configure(
+            hass,
+            result,
+            {"next_step_id": f"water_{price_choice(water_price)['next_step_id']}"},
+        )
+        result = await configure(hass, result, price_input(water_price))
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]

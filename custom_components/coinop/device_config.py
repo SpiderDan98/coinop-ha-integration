@@ -28,6 +28,12 @@ class ConsumptionSource(StrEnum):
     ESTIMATE = "estimate"
 
 
+class WaterSource(StrEnum):
+    METER = "meter"
+    FLOW = "flow"
+    NONE = "none"
+
+
 class Capability(StrEnum):
     """What a Device Type has; code branches on these, not on the type."""
 
@@ -40,11 +46,21 @@ class Capability(StrEnum):
     PART_COUNT = "part_count"
     # Electricity estimated from average powers when nothing measures it.
     AVERAGE_POWER = "average_power"
+    # A water source and price, and a Water Line Item from them.
+    WATER = "water"
 
 
 CAPABILITIES = {
-    DEVICE_TYPE_3D_PRINTER: frozenset(Capability),
-    DEVICE_TYPE_WASHING_MACHINE: frozenset[Capability](),
+    DEVICE_TYPE_3D_PRINTER: frozenset(
+        {
+            Capability.JOB,
+            Capability.IMAGES,
+            Capability.MATERIAL,
+            Capability.PART_COUNT,
+            Capability.AVERAGE_POWER,
+        }
+    ),
+    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.WATER}),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

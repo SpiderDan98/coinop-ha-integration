@@ -37,6 +37,7 @@ class RunEvent(DeviceEntity, EventEntity):
         super().__init__(book, device, RUN_EVENT.key)
         self.entity_description = RUN_EVENT
         self._material = Capability.MATERIAL in device.capabilities
+        self._water = Capability.WATER in device.capabilities
 
     @callback
     def _on_run_change(self, change: RunChange, run: Run) -> None:
@@ -56,6 +57,7 @@ class RunEvent(DeviceEntity, EventEntity):
                 }
             )
             grams = {"material_grams": totals.material_grams} if self._material else {}
+            litres = {"water_litres": totals.water_litres} if self._water else {}
             self._trigger_event(
                 change,
                 {
@@ -67,6 +69,7 @@ class RunEvent(DeviceEntity, EventEntity):
                     "total_cost": totals.cost,
                     **parts,
                     "energy_kwh": totals.energy_kwh,
+                    **litres,
                     **grams,
                     "has_flags": bool(run.flags),
                     "tags": list(run.tags),
