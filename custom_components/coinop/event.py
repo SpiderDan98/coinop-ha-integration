@@ -36,7 +36,6 @@ class RunEvent(DeviceEntity, EventEntity):
     def __init__(self, book: RunBook, device: DeviceConfig) -> None:
         super().__init__(book, device, RUN_EVENT.key)
         self.entity_description = RUN_EVENT
-        self._material = Capability.MATERIAL in device.capabilities
 
     @callback
     def _on_run_change(self, change: RunChange, run: Run) -> None:
@@ -55,11 +54,21 @@ class RunEvent(DeviceEntity, EventEntity):
                     "part_count": run.part_count,
                 }
             )
-            grams = {"material_grams": totals.material_grams} if self._material else {}
+            grams = (
+                {"material_grams": totals.material_grams}
+                if Capability.MATERIAL in self._capabilities
+                else {}
+            )
+            program = (
+                {"program": run.program}
+                if Capability.PROGRAM in self._capabilities
+                else {}
+            )
             self._trigger_event(
                 change,
                 {
                     "name": run.name,
+                    **program,
                     "outcome": run.outcome,
                     "start": run.started,
                     "end": run.ended,

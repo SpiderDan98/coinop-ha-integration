@@ -32,6 +32,7 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
         "device_id": subentry.subentry_id,
         "device_name": "Kobra",
         "name": None,
+        "program": None,
         "started": CLOCK_START.isoformat(),
         "ended": (CLOCK_START.replace(hour=12)).isoformat(),
         "outcome": "completed",

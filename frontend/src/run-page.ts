@@ -97,6 +97,7 @@ const fieldValues = (run: RunDetail, format: Format) => ({
   ended: run.ended ? format.toInput(run.ended) : "",
   outcome: run.outcome ?? "",
   part_count: String(run.part_count ?? ""),
+  program: run.program ?? "",
 });
 
 type Field = keyof ReturnType<typeof fieldValues>;
@@ -106,6 +107,7 @@ const correction = (field: Field, value: string, format: Format) => {
   switch (field) {
     case "name":
     case "note":
+    case "program":
       return { [field]: value.trim() || null };
     case "started":
     case "ended": {
@@ -494,6 +496,12 @@ export class RunPage extends LitElement {
     `;
   }
 
+  /** A removed Device's Run shows the Program it has. */
+  private hasProgram(run: RunDetail) {
+    const device = this.devices?.find((d) => d.id === run.device_id);
+    return device ? device.capabilities.includes("program") : run.program !== null;
+  }
+
   private renderFields(run: RunDetail, t: Localize, format: Format) {
     const values = fieldValues(run, format);
     const locked = !run.finalised;
@@ -504,6 +512,13 @@ export class RunPage extends LitElement {
           .value=${values.name}
           placeholder=${run.job_name ?? t("run.untitled")}
       /></label>
+      ${
+        this.hasProgram(run)
+          ? html`<label class="wide"
+              >${t("run.program")}<input name="program" .value=${values.program}
+            /></label>`
+          : nothing
+      }
       <label class="wide"
         >${t("run.started")}<input
           type="datetime-local"
