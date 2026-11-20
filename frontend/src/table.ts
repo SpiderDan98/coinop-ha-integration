@@ -15,7 +15,8 @@ export function table({
   /** Shown in the card above the table. */
   header?: unknown;
   columns: { label?: unknown; num?: boolean; class?: string }[];
-  rows: unknown[];
+  /** The <tr>s, as a list or `repeat()`ed. */
+  rows: unknown;
   /** The <tr>s of a total row. */
   foot?: unknown;
   /** Shown as the only row when there are no rows. */
@@ -36,7 +37,7 @@ export function table({
       </thead>
       <tbody>
         ${
-          rows.length || empty === undefined
+          !Array.isArray(rows) || rows.length || empty === undefined
             ? rows
             : html`<tr class="empty">
                 <td colspan=${columns.length} class="muted">${empty}</td>

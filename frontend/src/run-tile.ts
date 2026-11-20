@@ -97,7 +97,7 @@ export const tileStyles = css`
   .pick-tile.selected {
     outline: 3px solid var(--primary-color);
   }
-  .pick {
+  .pick-tile .pick {
     position: absolute;
     top: 8px;
     left: 8px;

@@ -1,19 +1,33 @@
-// The Runs tab's list: filters and the gallery. Filter and selection belong to the Runs
-// tab, which keeps the filter in the URL.
-import { mdiMagnify } from "@mdi/js";
+// The Runs tab's list: filters and the Runs as gallery or table, as this browser last
+// chose. Filter and selection belong to the Runs tab, which keeps the filter in the URL.
+import { mdiMagnify, mdiTableLarge, mdiViewGridOutline } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import type { Device, RunSummary } from "./api";
 import { formatter, type Format } from "./format";
-import type { HomeAssistant } from "./hass";
+import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { NO_FILTER, OUTCOME_FILTERS, matches, selectable, type Filter } from "./run-filter";
-import { deviceName, runCount } from "./run-parts";
+import "./run-image";
+import { deviceName, flagLabel, outcomeChip, runCount, runName } from "./run-parts";
 import { runTile, tileStyles } from "./run-tile";
 import { RunsTotal } from "./runs-total";
 import { shared } from "./styles";
-import { sortTags } from "./tag-input";
+import { table, tableStyles } from "./table";
+import { sortTags, tagChip } from "./tag-input";
+
+const VIEWS = ["gallery", "table"] as const;
+const VIEW_KEY = "wattbill-runs-view";
+
+/** The view this browser last chose; the gallery without one. */
+function storedView() {
+  try {
+    return VIEWS.find((view) => view === localStorage.getItem(VIEW_KEY)) ?? "gallery";
+  } catch {
+    return "gallery";
+  }
+}
 
 @customElement("wattbill-run-list")
 export class RunList extends LitElement {
@@ -29,6 +43,7 @@ export class RunList extends LitElement {
   @property({ attribute: false }) filter = NO_FILTER;
   @property({ attribute: false }) selected: ReadonlySet<string> = new Set();
 
+  @state() private view = storedView();
   private readonly total = new RunsTotal(this);
   private all: RunSummary[] = [];
   private shown: RunSummary[] = [];
@@ -65,6 +80,15 @@ export class RunList extends LitElement {
 
   private select(selected: Set<string>) {
     this.dispatchEvent(new CustomEvent("selection-changed", { detail: selected }));
+  }
+
+  private show(view: (typeof VIEWS)[number]) {
+    this.view = view;
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // Private mode or storage switched off: the choice lasts until the page is left.
+    }
   }
 
   private toggle(run: RunSummary, on: boolean) {
@@ -106,32 +130,151 @@ export class RunList extends LitElement {
     const { all, shown: runs } = this;
     const total = this.total.cost;
     return html`
-      <div class="head muted">
-        ${runCount(runs.length, t)}${total === undefined ? nothing : ` · ${format.money(total)}`}
+      <div class="head row between">
+        <span class="muted"
+          >${runCount(runs.length, t)}${total === undefined ? nothing : ` · ${format.money(total)}`}</span
+        >
+        ${this.renderToggle(t)}
       </div>
       ${all.length ? this.renderFilters(all, runs, t, format) : ""}
       ${
-        runs.length
-          ? html`<div class="gallery">
-              ${repeat(
-                runs,
-                (run) => run.id,
-                (run) =>
-                  runTile(
-                    run,
-                    { hass: this.hass, devices: this.devices, basePath: this.basePath, t, format },
-                    selectable(run)
-                      ? {
-                          selected: this.selected.has(run.id),
-                          toggle: (on) => this.toggle(run, on),
-                        }
-                      : undefined,
-                  ),
-              )}
-            </div>`
-          : html`<p class="muted empty">${t(all.length ? "runs.no_match" : "runs.empty")}</p>`
+        !runs.length
+          ? html`<p class="muted empty">${t(all.length ? "runs.no_match" : "runs.empty")}</p>`
+          : this.view === "table"
+            ? this.renderTable(runs, t, format)
+            : html`<div class="gallery">
+                ${repeat(
+                  runs,
+                  (run) => run.id,
+                  (run) =>
+                    runTile(
+                      run,
+                      {
+                        hass: this.hass,
+                        devices: this.devices,
+                        basePath: this.basePath,
+                        t,
+                        format,
+                      },
+                      selectable(run)
+                        ? {
+                            selected: this.selected.has(run.id),
+                            toggle: (on) => this.toggle(run, on),
+                          }
+                        : undefined,
+                    ),
+                )}
+              </div>`
       }
     `;
+  }
+
+  private renderToggle(t: Localize) {
+    const icons = { gallery: mdiViewGridOutline, table: mdiTableLarge };
+    return html`<div class="view-toggle" role="group" aria-label=${t("runs.view")}>
+      ${VIEWS.map(
+        (view) =>
+          html`<button
+            class="show-${view}"
+            aria-pressed=${this.view === view ? "true" : "false"}
+            aria-label=${t(`runs.view_${view}`)}
+            title=${t(`runs.view_${view}`)}
+            @click=${() => this.show(view)}
+          >
+            <ha-svg-icon .path=${icons[view]}></ha-svg-icon>
+          </button>`,
+      )}
+    </div>`;
+  }
+
+  private renderTable(runs: RunSummary[], t: Localize, format: Format) {
+    const columns = this.narrow
+      ? [{}, { label: t("run.name") }, { label: t("run.total"), num: true }]
+      : [
+          {},
+          {},
+          { label: t("run.name") },
+          { label: t("run.device") },
+          { label: t("runs.start") },
+          { label: t("runs.duration"), num: true },
+          { label: t("run.outcome") },
+          { label: t("run.tags") },
+          { label: t("runs.flags") },
+          { label: t("run.total"), num: true },
+          { label: t("runs.per_part"), num: true },
+        ];
+    return table({
+      name: "runs",
+      columns,
+      rows: repeat(
+        runs,
+        (run) => run.id,
+        (run) => this.renderRow(run, t, format),
+      ),
+    });
+  }
+
+  private renderRow(run: RunSummary, t: Localize, format: Format) {
+    const path = `${this.basePath}/run/${run.id}`;
+    const selected = this.selected.has(run.id);
+    const pick = html`<td class="pick-cell">
+      ${
+        selectable(run)
+          ? html`<input
+              type="checkbox"
+              class="pick"
+              aria-label=${t("runs.select", { name: runName(run, t) })}
+              .checked=${selected}
+              @change=${(event: Event) =>
+                this.toggle(run, (event.target as HTMLInputElement).checked)}
+            />`
+          : nothing
+      }
+    </td>`;
+    const name = html`<a href=${path} @click=${followLink}>${runName(run, t)}</a>`;
+    // The whole row opens the Run; its link and checkbox act on their own.
+    const open = (event: MouseEvent) => {
+      const own = event
+        .composedPath()
+        .some(
+          (target) => target instanceof HTMLInputElement || target instanceof HTMLAnchorElement,
+        );
+      if (!own) navigate(path);
+    };
+    if (this.narrow)
+      return html`<tr class="run ${selected ? "selected" : ""}" @click=${open}>
+        ${pick}
+        <td class="name">
+          <div class="strong">${name}</div>
+          <div class="muted small">
+            ${deviceName(run, this.devices, t)} · ${format.date(run.started)}
+          </div>
+        </td>
+        <td class="num">${format.money(run.total)}</td>
+      </tr>`;
+    return html`<tr class="run ${selected ? "selected" : ""}" @click=${open}>
+      ${pick}
+      <td class="cover">
+        <wattbill-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></wattbill-run-image>
+      </td>
+      <td class="name strong">${name}</td>
+      <td>${deviceName(run, this.devices, t)}</td>
+      <td class="nowrap">${format.dateTime(run.started)}</td>
+      <td class="num">${format.duration(run.running_seconds)}</td>
+      <td>${outcomeChip(run, t)}</td>
+      <td><div class="tags">${run.tags.map(tagChip)}</div></td>
+      <td class="nowrap">
+        ${
+          run.flags.length
+            ? html`<span title=${run.flags.map((flag) => flagLabel(flag, t)).join("\n")}
+                >⚑ ${run.flags.length}</span
+              >`
+            : nothing
+        }
+      </td>
+      <td class="num">${format.money(run.total)}</td>
+      <td class="num">${run.part_count > 1 ? format.money(run.cost_per_part) : nothing}</td>
+    </tr>`;
   }
 
   private renderFilters(runs: RunSummary[], shown: RunSummary[], t: Localize, format: Format) {
@@ -268,9 +411,70 @@ export class RunList extends LitElement {
   static override styles = [
     shared,
     tileStyles,
+    tableStyles,
     css`
       .head {
         margin: 0 0 12px;
+      }
+      .view-toggle {
+        display: flex;
+        border: 1px solid var(--outline-color, var(--divider-color, rgba(0, 0, 0, 0.12)));
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .view-toggle button {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        cursor: pointer;
+        color: var(--secondary-text-color);
+        background: var(--card-background-color, #fff);
+        --mdc-icon-size: 20px;
+      }
+      .view-toggle button[aria-pressed="true"] {
+        color: var(--primary-color);
+        background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+      }
+      .view-toggle button:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: -2px;
+      }
+      tr.run {
+        cursor: pointer;
+      }
+      tr.run:hover td {
+        background: var(--secondary-background-color, #ededed);
+      }
+      tr.run.selected td {
+        background: color-mix(in srgb, var(--primary-color, #03a9f4) 10%, transparent);
+      }
+      tr.run a {
+        color: inherit;
+      }
+      .pick-cell {
+        width: 20px;
+      }
+      .pick-cell .pick {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        cursor: pointer;
+      }
+      .cover wattbill-run-image {
+        width: 56px;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      .runs .tags {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
       }
       .select-all {
         margin-left: auto;

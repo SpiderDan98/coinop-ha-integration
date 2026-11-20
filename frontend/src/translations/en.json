@@ -339,5 +339,12 @@
   "tab.overview": "Overview",
   "tab.runs": "Runs",
   "overview.recent": "Recent Runs",
-  "overview.all_runs": "All Runs"
+  "overview.all_runs": "All Runs",
+  "runs.start": "Start",
+  "runs.duration": "Duration",
+  "runs.flags": "Flags",
+  "runs.per_part": "Per part",
+  "runs.view": "View",
+  "runs.view_gallery": "Gallery",
+  "runs.view_table": "Table"
 }

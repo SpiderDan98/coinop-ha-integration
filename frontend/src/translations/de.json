@@ -339,5 +339,12 @@
   "tab.overview": "Übersicht",
   "tab.runs": "Läufe",
   "overview.recent": "Neueste Läufe",
-  "overview.all_runs": "Alle Läufe"
+  "overview.all_runs": "Alle Läufe",
+  "runs.start": "Start",
+  "runs.duration": "Dauer",
+  "runs.flags": "Hinweise",
+  "runs.per_part": "Pro Teil",
+  "runs.view": "Ansicht",
+  "runs.view_gallery": "Galerie",
+  "runs.view_table": "Tabelle"
 }
