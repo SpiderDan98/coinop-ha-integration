@@ -11,14 +11,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .clock import Clock
-from .devices import add_device
+from .devices import ENERGY, add_device, add_hub
+from .test_dynamic_price import PRICE_ENTITY, segments, set_price
+from .test_lifecycle import at, start_coinop, stop_coinop
+from .test_measured import electricity, set_meter
 from .test_persistence import live_runs
-from .test_runs import RUNS, set_status, stored_runs, value
+from .test_runs import NO_MATERIAL, RUNS, set_status, stored_runs, value
 from .websocket import PanelClient
 
 FIXTURES = Path(__file__).parent / "fixtures" / "storage"
@@ -101,3 +105,103 @@ async def test_fields_added_by_a_newer_minor_version_are_kept(
 
     [kept] = [r for r in stored_runs(hass_storage) if r["id"] == run["id"]]
     assert kept == run
+
+
+def stored(key: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"version": 1, "minor_version": 1, "key": key, "data": {"runs": runs}}
+
+
+def open_metered_run(device: ConfigSubentry) -> dict[str, Any]:
+    """An open Run on an energy meter and a price entity, as version 1.1 stored it."""
+    return {
+        "id": "01KF0000000000000000000004",
+        "device_id": device.subentry_id,
+        "device_name": device.title,
+        "name": None,
+        "job_name": None,
+        "started": at(minutes=-30),
+        "last_seen": at(minutes=-1),
+        "ended": None,
+        "outcome": None,
+        "end_reconstructed": False,
+        "finalised": False,
+        "pauses": [],
+        "flags": [],
+        "part_count": 1,
+        "note": None,
+        "tags": [],
+        "consumption": dict(device.data["consumption"]),
+        "readings": [[at(minutes=-30), 10.0], [at(minutes=-10), 10.2]],
+        "cost_source": dict(device.data["price"]),
+        "prices": [[at(minutes=-30), 0.2], [at(minutes=-15), 0.4]],
+        "average_powers": [[at(minutes=-30), None, None]],
+        "usage": None,
+        "loaded_slots": [],
+        "line_items": [
+            {
+                "id": "01KF0000000000000000000I04",
+                "kind": "electricity",
+                "label": None,
+                "material_id": None,
+                "material": None,
+                "measured": False,
+                "length": None,
+                "slots": [],
+                "share": None,
+                "template_id": None,
+                "basis": None,
+                "quantity": 0.2225,
+                "unit": "kWh",
+                "unit_price": 0.08,
+                "amount": 0.08,
+                "method": "measured",
+                "segments": [
+                    {
+                        "start": at(minutes=-30),
+                        "end": at(minutes=-15),
+                        "kwh": 0.15,
+                        "unit_price": 0.2,
+                    },
+                    {
+                        "start": at(minutes=-15),
+                        "end": at(minutes=-1),
+                        "kwh": 0.0725,
+                        "unit_price": 0.4,
+                    },
+                ],
+                "computed": None,
+            }
+        ],
+        "images": [],
+        "cover_id": None,
+    }
+
+
+async def test_an_open_metered_run_of_1_1_resumes_and_finalises_alike(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.25)
+    await set_price(hass, 0.4)
+    entry = await add_hub(hass)
+    device = await add_device(
+        hass, entry, source="energy", meter={"entity_id": ENERGY}, price=PRICE_ENTITY
+    )
+    await set_status(hass, "printing")
+    await stop_coinop(hass, entry)
+    hass_storage["coinop.runs"] = stored("coinop.runs", [])
+    hass_storage["coinop.live"] = stored("coinop.live", [open_metered_run(device)])
+
+    await start_coinop(hass, entry)
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.6)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert run["id"] == "01KF0000000000000000000004"
+    assert electricity(run)["quantity"] == pytest.approx(0.6)
+    assert electricity(run)["amount"] == pytest.approx(0.15 * 0.2 + 0.45 * 0.4)
+    assert segments(run) == [
+        (at(minutes=-30), at(minutes=-15), 0.15, 0.2),
+        (at(minutes=-15), at(minutes=30), 0.45, 0.4),
+    ]
+    assert run["flags"] == NO_MATERIAL

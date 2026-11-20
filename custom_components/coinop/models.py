@@ -51,7 +51,9 @@ class QuantityBasis(StrEnum):
     RUNNING_HOURS = "running_hours"
 
 
-class ElectricityMethod(StrEnum):
+class ConsumptionMethod(StrEnum):
+    """Where a consumed quantity's Line Item (electricity) came from."""
+
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
     ESTIMATED = "estimated"
@@ -81,11 +83,14 @@ def unknown_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
 
 @dataclass
 class PriceSegment:
-    """Evidence on the Electricity Line Item: energy used while one price applied."""
+    """Evidence on a consumed quantity's Line Item: what was used while one price applied.
+
+    Stored as `kwh`, the unit of the first quantity it was written for.
+    """
 
     start: datetime
     end: datetime
-    kwh: float
+    quantity: float
     unit_price: float
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -93,7 +98,7 @@ class PriceSegment:
         return self.unknown | {
             "start": _iso(self.start),
             "end": _iso(self.end),
-            "kwh": self.kwh,
+            "kwh": self.quantity,
             "unit_price": self.unit_price,
         }
 
@@ -102,8 +107,48 @@ class PriceSegment:
         return cls(
             start=_time(data["start"]),
             end=_time(data["end"]),
-            kwh=data["kwh"],
+            quantity=data["kwh"],
             unit_price=data["unit_price"],
+            unknown=unknown_fields(cls, {k: v for k, v in data.items() if k != "kwh"}),
+        )
+
+
+def _timeline(entries: list[Any]) -> list[tuple[datetime, float | None]]:
+    return [(_time(at), value) for at, value in entries]
+
+
+@dataclass
+class Timeline:
+    """What a Run follows for one consumed quantity, such as electricity.
+
+    `source` is the Device's source section when the Run started (a meter, a
+    rate input or a fallback), `cost_source` the Device's price section the Run
+    follows. `readings` are the meter's (time, value) reports and `prices` the
+    (since, price per unit) timeline, None while they had no value; both are
+    kept until finalised.
+    """
+
+    source: dict[str, Any] | None = None
+    cost_source: dict[str, Any] | None = None
+    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
+    prices: list[tuple[datetime, float | None]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def as_dict(self) -> dict[str, Any]:
+        return self.unknown | {
+            "source": self.source,
+            "cost_source": self.cost_source,
+            "readings": [[_iso(at), value] for at, value in self.readings],
+            "prices": [[_iso(at), price] for at, price in self.prices],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Timeline:
+        return cls(
+            source=data["source"],
+            cost_source=data["cost_source"],
+            readings=_timeline(data["readings"]),
+            prices=_timeline(data["prices"]),
             unknown=unknown_fields(cls, data),
         )
 
@@ -232,7 +277,7 @@ class LineItem:
     share: float | None = None
     template_id: str | None = None
     basis: QuantityBasis | None = None
-    method: ElectricityMethod | None = None
+    method: ConsumptionMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -243,7 +288,7 @@ class LineItem:
         return (
             (
                 self.kind is LineItemKind.ELECTRICITY
-                and self.method is not ElectricityMethod.ENTERED
+                and self.method is not ConsumptionMethod.ENTERED
             )
             or self.measured
             or self.basis is QuantityBasis.RUNNING_HOURS
@@ -345,7 +390,7 @@ class LineItem:
             amount=data["amount"],
             method=None
             if data["method"] is None
-            else ElectricityMethod(data["method"]),
+            else ConsumptionMethod(data["method"]),
             segments=[PriceSegment.from_dict(s) for s in data["segments"]],
             computed=data.get("computed"),
             unknown=unknown_fields(cls, data),
@@ -402,12 +447,9 @@ class Run:
     `job_name` is the job the Device reported, kept apart from the editable name;
     `last_seen` is the last time the Status input was seen running during the
     open Run.
-    `consumption` is the Device's consumption section when the Run started;
-    `readings` are its meter's (time, kWh or W) reports, None while it had no
-    value, kept until finalised. `cost_source` is the Device's price section the
-    Run follows; `prices` its (since, price per kWh) timeline, None while the
-    price entity had no value, kept until finalised. `average_powers` are the
-    (since, running W, paused W) the Run's consumption model used. `usage` is what
+    `timelines` are what it follows for each consumed quantity, by its Line Item
+    kind. `average_powers` are the (since, running W, paused W) its electricity
+    estimate used. `usage` is what
     the Material used input last reported during the Run: its measured total.
     `loaded_slots` is the timeline of the Slot it printed from, kept until
     finalised.
@@ -431,10 +473,7 @@ class Run:
     part_count: int = 1
     note: str | None = None
     tags: list[str] = field(default_factory=list)
-    consumption: dict[str, Any] | None = None
-    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
-    cost_source: dict[str, Any] | None = None
-    prices: list[tuple[datetime, float | None]] = field(default_factory=list)
+    timelines: dict[str, Timeline] = field(default_factory=dict)
     average_powers: list[tuple[datetime, float | None, float | None]] = field(
         default_factory=list
     )
@@ -485,6 +524,10 @@ class Run:
         return next(picked, None) or next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
+        # A Run stored without timelines (by an older or newer minor version) keeps that shape.
+        timelines = {
+            kind: timeline.as_dict() for kind, timeline in self.timelines.items()
+        }
         return self.unknown | {
             "id": self.id,
             "device_id": self.device_id,
@@ -505,10 +548,7 @@ class Run:
             "part_count": self.part_count,
             "note": self.note,
             "tags": list(self.tags),
-            "consumption": self.consumption,
-            "readings": [[_iso(at), value] for at, value in self.readings],
-            "cost_source": self.cost_source,
-            "prices": [[_iso(at), price] for at, price in self.prices],
+            **({"timelines": timelines} if timelines else {}),
             "average_powers": [
                 [_iso(at), running, paused]
                 for at, running, paused in self.average_powers
@@ -539,10 +579,10 @@ class Run:
             part_count=data["part_count"],
             note=data.get("note"),
             tags=list(data.get("tags", [])),
-            consumption=data.get("consumption"),
-            readings=[(_time(at), value) for at, value in data.get("readings", [])],
-            cost_source=data.get("cost_source"),
-            prices=[(_time(at), price) for at, price in data.get("prices", [])],
+            timelines={
+                kind: Timeline.from_dict(timeline)
+                for kind, timeline in data.get("timelines", {}).items()
+            },
             average_powers=[
                 (_time(at), running, paused)
                 for at, running, paused in data.get("average_powers", [])

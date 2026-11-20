@@ -32,6 +32,7 @@ from .device_inputs import (
     usage_scale,
 )
 from .profiles import detect
+from .quantities import ELECTRICITY
 from .schema import vol
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
@@ -405,7 +406,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 )
             self._meter["unit"] = entity_unit(self.hass, self._meter["entity_id"])
             if self._understood(
-                self._meter, unit_scale(source, self._meter["unit"]), user_input
+                self._meter,
+                unit_scale(ELECTRICITY, source, self._meter["unit"]),
+                user_input,
             ):
                 return await self._meter_done()
             errors["entity_id"] = "unknown_unit"
@@ -432,7 +435,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             self._meter["unit"] = user_input["unit"]
             if self._understood(
-                self._meter, unit_scale(source, self._meter["unit"]), user_input
+                self._meter,
+                unit_scale(ELECTRICITY, source, self._meter["unit"]),
+                user_input,
             ):
                 return await self._meter_done()
             errors["unit"] = "unknown_unit"
@@ -545,7 +550,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 return await self.async_step_price_unit()
             self._price["unit"] = entity_unit(self.hass, self._price["entity_id"])
             if self._understood(
-                self._price, price_scale(self._price["unit"], currency), user_input
+                self._price,
+                price_scale(ELECTRICITY, self._price["unit"], currency),
+                user_input,
             ):
                 return await self._price_done()
             errors["entity_id"] = "unknown_unit"
@@ -572,7 +579,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             self._price["unit"] = user_input["unit"]
             if self._understood(
-                self._price, price_scale(self._price["unit"], currency), user_input
+                self._price,
+                price_scale(ELECTRICITY, self._price["unit"], currency),
+                user_input,
             ):
                 return await self._price_done()
             errors["unit"] = "unknown_unit"
