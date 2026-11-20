@@ -67,14 +67,15 @@ Reload the browser after a rebuild; the bundle URL changes with its content when
 A Home Assistant in Docker with WattBill and test data, logged in without a password (trusted networks; the port is bound to localhost only). It runs the HA version of `.venv` and keeps its config in `.dev/` (gitignored).
 
 ```sh
-uv run scripts/devenv.py up [scenario]    # build the panel, (re)start, load a Scenario (default: few-runs)
+uv run scripts/devenv.py up [scenario]    # build the panel, (re)start, load a Scenario (default: few-runs),
+                                          # then show HA's log until Ctrl+C stops it (--detach: keep running)
 uv run scripts/devenv.py build            # rebuild the panel and reload WattBill
 uv run scripts/devenv.py restart          # after a change to the Python code
 uv run scripts/devenv.py scenario long-history
 uv run scripts/devenv.py logs | down
 ```
 
-The `Makefile` has the same as `make dev`, `make dev-build`, `make dev-restart`, `make dev-scenario`, `make dev-logs` and `make dev-down`; `SCENARIO=long-history` picks the Scenario for `dev` and `dev-scenario`.
+The `Makefile` has the same as `make dev`, `make dev-build`, `make dev-restart`, `make dev-scenario`, `make dev-logs` and `make dev-down`; `SCENARIO=long-history` picks the Scenario for `dev` and `dev-scenario`. While `make dev` runs in one terminal, the others go in a second one; a `dev-restart` doesn't end it.
 
 Then open http://localhost:8124/wattbill. The round flask button at the panel's bottom left (shown only when the `wattbill_dev` integration is loaded) switches Scenarios too.
 
