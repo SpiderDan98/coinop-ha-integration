@@ -97,7 +97,7 @@ Install [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`). It
 
 The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs. Values the input reports while it knows no program (a placeholder such as `detecting...`) can be listed as values to ignore: they count as no Program.
 
-You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values and Doses measured by a stock input stay as they are, and saving the same Program again changes nothing.
+You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values, Doses measured by a stock input (also when it measured nothing used) and Doses you gave another Material stay as they are, a Flag you marked as checked stays checked, and saving the same Program again changes nothing.
 
 ### Program Defaults and Doses
 

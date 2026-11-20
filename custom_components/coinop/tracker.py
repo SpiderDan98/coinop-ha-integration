@@ -454,6 +454,8 @@ class DeviceTracker:
         if not run.finalised:
             self._refresh(run, run.ended)
             return
+        # One the defaults called for already but the Run lacks was marked as checked.
+        checked = set(self._defaults_flags(run)) - set(run.flags)
         row, source = self._program_row(run)
         run.line_items = [
             _reapplied(run, item, row.get(DEFAULT_COLUMNS[item.kind]))
@@ -463,7 +465,9 @@ class DeviceTracker:
             for item in run.line_items
         ]
         self._reapply_doses(run, row, source)
-        self._flag_defaults(run)
+        for flag in self._defaults_flags(run):
+            if flag not in checked:
+                add_flag(run, flag)
         run.drop_fixed_flags()
 
     def _reapply_doses(self, run: Run, row: dict[str, Any], source: DoseSource) -> None:
@@ -900,16 +904,28 @@ class DeviceTracker:
         self._finishing.discard(run.id)
 
     @staticmethod
-    def _flag_defaults(run: Run) -> None:
-        if any(
+    def _defaults_flags(run: Run) -> list[Flag]:
+        """The Flags the Run's defaults call for."""
+        missing = any(
             item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
             for item in run.line_items
-        ):
-            add_flag(run, Flag.DEFAULT_MISSING)
-        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+        )
+        early = run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
             item.from_defaults for item in run.line_items
-        ):
-            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+        )
+        return [
+            flag
+            for flag, raised in (
+                (Flag.DEFAULT_MISSING, missing),
+                (Flag.ENDED_EARLY_DEFAULTS, early),
+            )
+            if raised
+        ]
+
+    @classmethod
+    def _flag_defaults(cls, run: Run) -> None:
+        for flag in cls._defaults_flags(run):
+            add_flag(run, flag)
 
     def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
         """The Cost Sources of the Run's Materials linked to Spoolman."""

@@ -394,3 +394,41 @@ async def test_a_dose_whose_material_the_user_changed_stays_as_they_left_it(
     after = next(i for i in corrected["line_items"] if i["id"] == liquid["id"])
     assert after == before
     assert (after["material_id"], after["quantity"]) == ("whitener", 60)
+
+
+async def test_a_flag_marked_as_checked_is_not_raised_again(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer)
+    await washed(hass, clock, "Cotton 40°", outcome="cancelled")
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["ended_early_defaults"]
+    await panel.call(
+        "coinop/runs/clear_flag", run_id=run["id"], flag="ended_early_defaults"
+    )
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert corrected["flags"] == []
+
+
+async def test_a_correction_raises_a_flag_it_newly_calls_for(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer, ROWS | {"default": {"doses": {}}})
+    await washed(hass, clock, "Unlisted", outcome="cancelled")
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["default_missing"]
+    await panel.call("coinop/runs/clear_flag", run_id=run["id"], flag="default_missing")
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert corrected["flags"] == ["ended_early_defaults"]
