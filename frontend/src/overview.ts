@@ -3,14 +3,7 @@
 // aggregates are read afresh whenever a Run changes.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import {
-  getAggregates,
-  getGroupings,
-  hasWater,
-  shownKinds,
-  type Device,
-  type RunSummary,
-} from "./api";
+import { getAggregates, getGroupings, shownKinds, type Device, type RunSummary } from "./api";
 import { barRows, chartStyles, legend, stackedColumns } from "./charts";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
@@ -183,9 +176,7 @@ export class Overview extends LitElement {
       (latest, group) => (group.month && group.month > latest ? group.month : latest),
       now,
     );
-    const kinds = shownKinds(
-      hasWater(this.devices) || monthKind.some((group) => group.kind === "water"),
-    );
+    const kinds = shownKinds(this.devices, monthKind);
     const columns = monthsBetween(first, last)
       .slice(-MONTHS_SHOWN)
       .map((key) => ({

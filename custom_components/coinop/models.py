@@ -29,7 +29,7 @@ class Flag(StrEnum):
     SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
-    # A Cancelled or Failed Run charged defaults meant for a whole cycle.
+    # A Cancelled or Failed Run charged water or Dose defaults meant for a whole Run.
     ENDED_EARLY_DEFAULTS = "ended_early_defaults"
     # A Dose's stock input reported nothing usable: its default was charged.
     STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
@@ -346,9 +346,10 @@ class LineItem:
 
     @property
     def from_defaults(self) -> bool:
-        """Its quantity is a default for a whole cycle, not what was measured."""
+        """Its Water or Dose quantity is a default for a whole Run, not what was
+        measured; Program-default electricity doesn't count."""
         if self.method is ConsumptionMethod.PROGRAM_DEFAULT:
-            return self.quantity is not None
+            return self.kind is LineItemKind.WATER and self.quantity is not None
         return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
@@ -526,6 +527,8 @@ class Run:
     the Material used input last reported during the Run: its measured total.
     `loaded_slots` is the timeline of the Slot it printed from, kept until
     finalised; `stocks` what each Dose's stock input reported, by Dose id, too.
+    `measured_doses` are the Doses whose stock input measured the Run (nothing used
+    included), kept from finalisation on for a Program correction.
     `cover_id` is the image the user picked as Cover Image.
     """
 
@@ -544,7 +547,6 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
-    # None for a Device Type without Part Count.
     part_count: int | None = 1
     note: str | None = None
     tags: list[str] = field(default_factory=list)
@@ -556,6 +558,7 @@ class Run:
     usage: Usage | None = None
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
     stocks: dict[str, Stock] = field(default_factory=dict)
+    measured_doses: list[str] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -652,6 +655,11 @@ class Run:
                 if self.stocks
                 else {}
             ),
+            **(
+                {"measured_doses": list(self.measured_doses)}
+                if self.measured_doses
+                else {}
+            ),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
             "cover_id": self.cover_id,
@@ -695,6 +703,7 @@ class Run:
                 id_: Stock.from_dict(stock)
                 for id_, stock in data.get("stocks", {}).items()
             },
+            measured_doses=list(data.get("measured_doses", [])),
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             cover_id=data.get("cover_id"),

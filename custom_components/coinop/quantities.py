@@ -27,8 +27,11 @@ class Quantity:
     A meter (source `total_source`) reports a running total, a rate input
     (`rate_source`) a rate, of which 1 held for `unit_seconds` makes one `unit`.
     Readings are kept in `unit` and `rate_unit`, prices per `unit`; the user
-    enters and reads prices per `price_unit`. The Device keeps its sections under
-    `source_key` and `price_key`.
+    enters and reads prices per `price_unit`, and a price entity's unit is one of
+    `price_units` (`{currency}` stands for the currency) or converted by a factor.
+    The Device keeps its sections under `source_key` and `price_key`; a Program
+    Defaults row its amount per Run under `default_key`. Means are shown to
+    `decimals`.
     """
 
     kind: LineItemKind
@@ -42,6 +45,9 @@ class Quantity:
     source_key: str
     price_key: str
     price_unit: str
+    price_units: tuple[str, ...]
+    default_key: str
+    decimals: int
 
     def units(self, source: str) -> tuple[type[BaseUnitConverter], str]:
         """The converter and the unit readings of `source` are kept in."""
@@ -66,6 +72,9 @@ ELECTRICITY = Quantity(
     source_key="consumption",
     price_key="price",
     price_unit=UnitOfEnergy.KILO_WATT_HOUR,
+    price_units=("{currency}/kWh", "ct/kWh", "{currency}/MWh"),
+    default_key="kwh",
+    decimals=3,
 )
 
 WATER = Quantity(
@@ -80,4 +89,9 @@ WATER = Quantity(
     source_key="water",
     price_key="water_price",
     price_unit=UnitOfVolume.CUBIC_METERS,
+    price_units=("{currency}/m³", "{currency}/L", "ct/L"),
+    default_key="litres",
+    decimals=1,
 )
+
+QUANTITIES = {quantity.kind: quantity for quantity in (ELECTRICITY, WATER)}

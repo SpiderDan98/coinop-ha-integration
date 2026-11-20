@@ -6,7 +6,6 @@ import {
   OUTCOMES,
   getAggregates,
   getGroupings,
-  hasWater,
   shownKinds,
   type Device,
   type Group,
@@ -139,7 +138,7 @@ export class AnalysisPage extends LitElement {
 
   /** Water only once a Device has it or a Run counts it. */
   private kinds({ kind }: Aggregates) {
-    return shownKinds(hasWater(this.devices) || kind.some((group) => group.kind === "water"));
+    return shownKinds(this.devices, kind);
   }
 
   private renderKinds(aggregates: Aggregates, t: Localize, format: Format) {

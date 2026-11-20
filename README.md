@@ -95,9 +95,9 @@ Install [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`). It
 
 ### Program
 
-The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs.
+The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs. Values the input reports while it knows no program (a placeholder such as `detecting...`) can be listed as values to ignore: they count as no Program.
 
-You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values and Doses measured by a stock input stay as they are, and saving the same Program again changes nothing.
+You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values, Doses measured by a stock input (also when it measured nothing used) and Doses you gave another Material stay as they are, a Flag you marked as checked stays checked, and saving the same Program again changes nothing.
 
 ### Program Defaults and Doses
 
@@ -133,7 +133,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Flags on washing machine Runs
 
-- **Ended early with defaults**: a Cancelled or Failed Run was charged defaults for a whole cycle. Lower the water or Doses if it stopped early.
+- **Ended early with defaults**: a Cancelled or Failed Run was charged water or Dose defaults meant for a whole Run. Lower them if it stopped early.
 - **Default missing**: neither a measurement nor a Program Default gave a quantity; enter it on the Run.
 - **Stock input unavailable**: a Dose's stock input reported nothing usable, so its default was charged.
 - A meter that reported nothing during a load (and has no recorder history for it) falls back to the Program's kWh or litres and marks the Run with a consumption gap.
@@ -155,7 +155,7 @@ When you add a washing machine and pick its Home Assistant device from one of th
 | [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle | Water consumption sensor of the current cycle |
 | [Home Connect](https://www.home-assistant.io/integrations/home_connect/) (`home_connect`) | Operation state sensor | Active program select | chosen by you | chosen by you |
 
-- WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor may report a placeholder value, which the open Run shows as its Program until the real one arrives.
+- WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor reports placeholders such as `detecting...`; the profile fills them in as values to ignore (Program step), so they never become a Run's Program or a suggested Program row.
 - Miele's consumption sensors count the current cycle and drop to 0 afterwards. Coin-op keeps the reading at the load's end, so that drop is neither lost nor counted twice.
 - **Detect again** in the reconfigure menu re-applies the Status, the mapping and the Program, and leaves electricity, water and prices as they are.
 

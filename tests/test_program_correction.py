@@ -3,18 +3,16 @@
 from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_hub, add_washing_machine
-from .stored import place_materials
-from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, set_scale
+from .test_doses import SCALE, set_scale
 from .test_manual_runs import create
-from .test_programs import WASHER_PROGRAM, set_program
 from .test_runs import stored_runs, value
-from .test_washing_machines import set_washer
 from .test_water import set_water
+from .washing import DOSES, add_washer, set_program, set_washer, washed
 from .websocket import PanelClient
 
 # 0.30 per kWh, 0.004 per L; 0.006 per ml of liquid, 0.004 per g of whitener.
@@ -31,30 +29,14 @@ ROWS = {
 }
 
 
-async def add_washer(
-    hass: HomeAssistant, hass_storage: dict[str, Any], water: str = "per_program"
-) -> ConfigSubentry:
-    """A washing machine with electricity per Program, a Program input and the
-    laundry Materials."""
-    hass.config.currency = "EUR"
-    place_materials(hass_storage, LIQUID, PODS, WHITENER)
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    return await add_washing_machine(
-        hass,
-        await add_hub(hass),
-        program={"entity_id": WASHER_PROGRAM},
-        source="per_program",
-        water=water,
-    )
-
-
 @pytest.fixture
 async def washer(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> ConfigSubentry:
-    """Water per Program too."""
-    return await add_washer(hass, hass_storage)
+    """Electricity and water per Program, with the laundry Materials."""
+    return await add_washer(
+        hass, hass_storage, source="per_program", water="per_program"
+    )
 
 
 async def set_rows(
@@ -65,15 +47,6 @@ async def set_rows(
         device_id=washer.subentry_id,
         settings={"doses": DOSES, "program_defaults": rows},
     )
-
-
-async def washed(
-    hass: HomeAssistant, clock: Clock, program: str, outcome: str = "finished"
-) -> None:
-    await set_program(hass, program)
-    await set_washer(hass, "running")
-    await clock.advance(minutes=90)
-    await set_washer(hass, outcome)
 
 
 async def correct(panel: PanelClient, run_id: str, program: str | None) -> Any:
@@ -122,7 +95,7 @@ async def test_measured_water_and_an_overridden_dose_stay_as_they_were(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     await set_water(hass, 1000)
-    washer = await add_washer(hass, hass_storage, water="meter")
+    washer = await add_washer(hass, hass_storage, source="per_program", water="meter")
     await set_rows(panel, washer)
     await set_program(hass, "Cotton 40°")
     await set_washer(hass, "running")
@@ -310,3 +283,124 @@ async def test_correcting_a_manual_runs_program_re_applies_its_defaults(
         ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
         ("dose-whitener", "program_default", 20, pytest.approx(0.08)),
     ]
+
+
+async def weigh_whitener(panel: PanelClient, washer: ConfigSubentry) -> None:
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=washer.subentry_id,
+        settings={
+            "doses": [*DOSES[:2], DOSES[2] | {"stock": {"entity_id": SCALE}}],
+            "program_defaults": ROWS,
+        },
+    )
+
+
+async def test_a_stocked_dose_without_a_reading_takes_the_new_programs_amount(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_scale(hass, STATE_UNAVAILABLE)
+    await weigh_whitener(panel, washer)
+    await washed(hass, clock, "Cotton 40°")
+    await clock.advance(minutes=5)
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["stock_input_unavailable"]
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert costs(corrected)[2:] == [
+        ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
+        ("dose-whitener", "program_default", 20, pytest.approx(0.08)),
+    ]
+
+
+async def test_a_stocked_dose_that_measured_nothing_used_stays_without_one(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_scale(hass, 1000)
+    await weigh_whitener(panel, washer)
+    await set_program(hass, "Cotton 40°")
+    await set_washer(hass, "running")
+    await set_scale(hass, 1000)
+    await clock.advance(minutes=90)
+    await set_washer(hass, "finished")
+    await set_scale(hass, 1000)
+    [run] = stored_runs(hass_storage)
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert costs(corrected)[2:] == [
+        ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
+    ]
+
+
+async def test_a_dose_whose_material_the_user_changed_stays_as_they_left_it(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer)
+    await washed(hass, clock, "Cotton 40°")
+    [run] = stored_runs(hass_storage)
+    liquid = next(i for i in run["line_items"] if i.get("dose_id") == "dose-liquid")
+    changed = await panel.call(
+        "coinop/line_items/update",
+        run_id=run["id"],
+        line_item_id=liquid["id"],
+        material_id="whitener",
+    )
+    before = next(i for i in changed["run"]["line_items"] if i["id"] == liquid["id"])
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    after = next(i for i in corrected["line_items"] if i["id"] == liquid["id"])
+    assert after == before
+    assert (after["material_id"], after["quantity"]) == ("whitener", 60)
+
+
+async def test_a_flag_marked_as_checked_is_not_raised_again(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer)
+    await washed(hass, clock, "Cotton 40°", outcome="cancelled")
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["ended_early_defaults"]
+    await panel.call(
+        "coinop/runs/clear_flag", run_id=run["id"], flag="ended_early_defaults"
+    )
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert corrected["flags"] == []
+
+
+async def test_a_correction_raises_a_flag_it_newly_calls_for(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer, ROWS | {"default": {"doses": {}}})
+    await washed(hass, clock, "Unlisted", outcome="cancelled")
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["default_missing"]
+    await panel.call("coinop/runs/clear_flag", run_id=run["id"], flag="default_missing")
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert corrected["flags"] == ["ended_early_defaults"]

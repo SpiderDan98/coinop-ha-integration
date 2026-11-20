@@ -185,6 +185,7 @@ def _section(
     details = [
         run.device_name,
         text.date(run.started),
+        *([text("program", program=run.program)] if run.program else []),
         text("running_time", duration=text.duration(running_time(run, now))),
     ]
     if (count := run.part_count) is not None:
@@ -236,20 +237,37 @@ def _compact(pdf: _Document, runs: list[Run]) -> None:
             return "", ""
         return str(count), text.money(_per_part(run, count, decimals))
 
-    # Without any Run that has a Part Count, its columns are left out.
+    # Without any Run that has a Program or Part Count, its columns are left out.
+    with_programs = any(run.program for run in runs)
     with_parts = any(run.part_count is not None for run in runs)
+    programs = ("program",) if with_programs else ()
     columns = ("part_count", "cost_per_part") if with_parts else ()
     pdf.rows(
-        (32, 20, 16, *((8, 12) if with_parts else ()), 12),
-        ("LEFT", "LEFT", "LEFT", *(("RIGHT",) * len(columns)), "RIGHT"),
+        (
+            32,
+            20,
+            *((18,) if with_programs else ()),
+            16,
+            *((8, 12) if with_parts else ()),
+            12,
+        ),
+        (
+            "LEFT",
+            "LEFT",
+            *(("LEFT",) * len(programs)),
+            "LEFT",
+            *(("RIGHT",) * len(columns)),
+            "RIGHT",
+        ),
         [
             text(f"column.{column}")
-            for column in ("run", "device", "started", *columns, "total")
+            for column in ("run", "device", *programs, "started", *columns, "total")
         ],
         [
             (
                 name(run),
                 run.device_name,
+                *((run.program or "",) if with_programs else ()),
                 text.date(run.started),
                 *(parts(run) if with_parts else ()),
                 text.money(_total(run, decimals)),

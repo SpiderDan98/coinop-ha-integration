@@ -56,6 +56,9 @@ class Capability(StrEnum):
     WATER = "water"
     # Electricity and water from the Program Defaults' kWh and litres when not measured.
     PROGRAM_CONSUMPTION = "program_consumption"
+    # Meters may count each Run from 0, such as per-cycle counters: a drop after
+    # the end is no reset.
+    PER_RUN_METERS = "per_run_meters"
 
 
 CAPABILITIES = {
@@ -74,6 +77,7 @@ CAPABILITIES = {
             Capability.DOSES,
             Capability.WATER,
             Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
         }
     ),
 }
@@ -94,6 +98,8 @@ class DeviceConfig:
     job_attribute: str | None
     program_entity_id: str | None
     program_attribute: str | None
+    # Values the Program input reports while it knows no Program.
+    program_ignored: frozenset[str]
     # The Material used input: entity_id, attribute and unit.
     material: Mapping[str, Any] | None
     # The Slot entities in Slot order, their colour attribute and the Loaded slot input.
@@ -130,6 +136,7 @@ class DeviceConfig:
             job_attribute=job.get("attribute"),
             program_entity_id=program.get("entity_id"),
             program_attribute=program.get("attribute"),
+            program_ignored=frozenset(program.get("ignored", ())),
             material=job.get("material"),
             slots=tuple(job.get("slots", ())),
             colour_attribute=job.get("colour_attribute"),
@@ -147,3 +154,8 @@ class DeviceConfig:
 
     def target(self, value: str) -> Target:
         return self.mapping.get(value, Target.IGNORED)
+
+    def program(self, value: str | None) -> str | None:
+        """The Program a Program input value names, trimmed; None if blank or ignored."""
+        program = (value or "").strip()
+        return program if program and program not in self.program_ignored else None

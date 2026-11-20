@@ -394,10 +394,9 @@ export class RunPage extends LitElement {
     const run = this.run;
     const format = formatter(this.hass);
     const device = deviceName(run, this.devices, t);
-    const water = this.devices
-      ?.find(({ id }) => id === run.device_id)
-      ?.capabilities.includes("water");
-    const kinds = shownKinds(Boolean(water) || run.line_items.some((i) => i.kind === "water"));
+    const devices = this.devices?.filter(({ id }) => id === run.device_id);
+    const water = devices?.some(({ capabilities }) => capabilities.includes("water"));
+    const kinds = shownKinds(devices, run.line_items);
     return html`
       <div class="runbar row">
         ${outcomeChip(run, t)}

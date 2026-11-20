@@ -26,22 +26,13 @@ from .test_cost_statement import export
 from .test_device_flow import fields, offered
 from .test_run_event import record_events
 from .test_runs import stored_runs, value
+from .washing import add_washer, set_energy, set_washer, washed
 from .websocket import PanelClient
 
 
 def washer_entry(hass: HomeAssistant) -> ConfigEntry:
     [entry] = hass.config_entries.async_entries("coinop")
     return entry
-
-
-async def set_washer(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(WASHER_STATUS, status)
-    await hass.async_block_till_done()
-
-
-async def set_energy(hass: HomeAssistant, kwh: float | str) -> None:
-    hass.states.async_set(WASHER_ENERGY, str(kwh), {"unit_of_measurement": "kWh"})
-    await hass.async_block_till_done()
 
 
 async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> None:
@@ -124,7 +115,7 @@ async def test_reconfiguring_a_washing_machine_offers_its_sections(
     ]
 
 
-async def test_a_wash_cycle_is_a_run_with_measured_electricity(
+async def test_a_load_is_a_run_with_measured_electricity(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     await set_energy(hass, 100)
@@ -153,25 +144,10 @@ async def test_a_wash_cycle_is_a_run_with_measured_electricity(
     assert value(hass, "sensor.washer_total_cost") == pytest.approx(0.48)
 
 
-async def wash(hass: HomeAssistant, clock: Clock, kwh: float = 1.2) -> None:
-    """A 90-minute cycle on the washing machine, finalised at its end."""
-    meter = hass.states.get(WASHER_ENERGY)
-    assert meter is not None
-    start = float(meter.state)
-    await set_washer(hass, "running")
-    await clock.advance(minutes=90)
-    await set_energy(hass, start + kwh)
-    await set_washer(hass, "finished")
-    await set_energy(hass, start + kwh)
-
-
 @pytest.fixture
 async def washer(hass: HomeAssistant, clock: Clock) -> ConfigSubentry:
     """A washing machine on a plug's energy meter at 0.50 per kWh."""
-    hass.config.currency = "EUR"
-    await set_energy(hass, 100)
-    await set_washer(hass, "off")
-    return await add_washing_machine(hass, await add_hub(hass), price=0.50)
+    return await add_washer(hass, program=False, price=0.50)
 
 
 @pytest.mark.usefixtures("washer")
@@ -205,7 +181,7 @@ async def test_a_washing_machine_run_has_no_part_count_in_its_sensor_and_event(
 ) -> None:
     fired = record_events(hass, "event.washer_run")
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     last = hass.states.get("sensor.washer_last_run_cost")
     assert last is not None
@@ -223,7 +199,7 @@ async def test_a_washing_machine_run_has_no_part_count_in_its_sensor_and_event(
 async def test_the_panel_gets_no_part_count_for_a_washing_machine_run(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     assert (run["total"], run["part_count"], run["cost_per_part"]) == (0.6, None, None)
@@ -240,7 +216,10 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
     devices = (await panel.call("coinop/devices/list"))["devices"]
 
     assert [(d["type"], d["capabilities"]) for d in devices] == [
-        ("washing_machine", ["doses", "program", "program_consumption", "water"]),
+        (
+            "washing_machine",
+            ["doses", "per_run_meters", "program", "program_consumption", "water"],
+        ),
         ("3d_printer", ["average_power", "images", "job", "material", "part_count"]),
     ]
     assert devices[0]["ha_settings"] == {
@@ -280,7 +259,7 @@ async def test_tags_and_automatic_templates_apply_to_washing_machine_runs(
         },
     )
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     [run] = stored_runs(hass_storage)
     assert run["tags"] == ["Flat 2"]
@@ -294,7 +273,7 @@ async def test_tags_and_automatic_templates_apply_to_washing_machine_runs(
 async def test_a_cost_statement_shows_a_washing_machine_run_without_part_count(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     await panel.call("coinop/runs/update", run_id=run["id"], name="Cotton 60")
 

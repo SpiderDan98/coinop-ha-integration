@@ -4,12 +4,29 @@ import type { HomeAssistant, Message } from "./hass";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
 export const KINDS = ["electricity", "water", "material", "other"] as const;
+/** What a Device Type has; the panel shows a part only for these. */
+export const CAPABILITIES = [
+  "job",
+  "images",
+  "material",
+  "part_count",
+  "average_power",
+  "program",
+  "doses",
+  "water",
+  "program_consumption",
+  "per_run_meters",
+] as const;
+export const DOSE_SOURCES = ["program_default", "default_row", "stock_input"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
-/** The kinds to show: Water only where a Device has water or a Line Item counts it. */
-export const shownKinds = (water: boolean) => KINDS.filter((kind) => kind !== "water" || water);
-export const hasWater = (devices: Device[] | undefined) =>
-  devices?.some((device) => device.capabilities.includes("water")) ?? false;
+/** The kinds to show: Water only where one of the Devices has water or something counts it. */
+export const shownKinds = (devices: Device[] | undefined, counted: { kind?: Kind | null }[]) => {
+  const water =
+    devices?.some((device) => device.capabilities.includes("water")) ||
+    counted.some(({ kind }) => kind === "water");
+  return KINDS.filter((kind) => kind !== "water" || water);
+};
 export type Method = "measured" | "from_history" | "estimated" | "program_default" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
@@ -72,7 +89,7 @@ export interface LineItem {
   share: number | null;
   /** A Dose's Line Item: its Dose and where its amount came from. */
   dose_id?: string;
-  dose_source?: "program_default" | "default_row" | "stock_input";
+  dose_source?: (typeof DOSE_SOURCES)[number];
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -98,18 +115,7 @@ export interface Device {
   name: string;
   /** The Device Type, which the Devices tab groups by. */
   type: "3d_printer" | "washing_machine";
-  /** What its Device Type has; the panel shows a part only for these. */
-  capabilities: (
-    | "job"
-    | "images"
-    | "material"
-    | "part_count"
-    | "average_power"
-    | "program"
-    | "doses"
-    | "water"
-    | "program_consumption"
-  )[];
+  capabilities: (typeof CAPABILITIES)[number][];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
@@ -138,9 +144,15 @@ export interface Device {
           /** Fills gaps in the power reports. */
           running_power: number | null;
         };
+    /** Missing for a Device Type without Program. */
+    program?: { entity_id: string | null; attribute: string | null };
     /** Missing for a Device Type without water. */
-    water?: { source: "meter" | "flow" | "per_program" | "none" };
-    price:
+    water?:
+      | { source: "per_program" | "none" }
+      | { source: "meter" | "flow"; entity_id: string; attribute: string | null };
+    price: NonNullable<Device["ha_settings"]["water_price"]>;
+    /** Per m³; missing without water. */
+    water_price?:
       | { source: "fixed"; value: number }
       | {
           source: "entity";

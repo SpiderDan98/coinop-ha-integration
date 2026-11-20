@@ -323,8 +323,10 @@ describe("Devices tab", () => {
     expect(cards(panel)[1]).toBe(
       "Washer " +
         "Status sensor.washer_status " +
+        "Program sensor.washer_program " +
         "Consumption source Energy meter sensor.washer_plug_energy " +
         "Electricity price €0.30 per kWh " +
+        "Water source None " +
         "Reconfigure in Home Assistant " +
         "Doses Liquid detergent 75 ml · measured by sensor.detergent_scale Colour pods Not dosed " +
         "Program rows Wool " +
@@ -335,6 +337,46 @@ describe("Devices tab", () => {
     const dialog = query(panel, ".settings-dialog");
     expect(queryAll(dialog, ".default-material")).toHaveLength(0);
     expect(queryAll(dialog, ".new-run-tags, .automatic-templates")).toHaveLength(2);
+  });
+
+  it("names a washing machine's water source and water price, or its unused Program input", async () => {
+    const { perProgram } = recorded;
+    const water = { attribute: "total", unit: "L", factor: null };
+    const metered = {
+      ...perProgram,
+      id: "device-metered",
+      name: "Metered",
+      ha_settings: {
+        ...perProgram.ha_settings,
+        program: { entity_id: null, attribute: null },
+        water: { ...water, source: "meter", entity_id: "sensor.washer_water" },
+        water_price: {
+          source: "entity",
+          entity_id: "sensor.water_price",
+          attribute: null,
+          unit: null,
+          factor: null,
+        },
+      },
+    } satisfies typeof perProgram;
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [perProgram, metered] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device > dl").map(text)).toEqual([
+      "Status sensor.washer_status " +
+        "Program sensor.washer_program " +
+        "Consumption source Per Program (kWh in the Program Defaults) " +
+        "Electricity price €0.30 per kWh " +
+        "Water source Per Program (litres in the Program Defaults) " +
+        "Water price €4.00 per m³",
+      "Status sensor.washer_status " +
+        "Not used Program " +
+        "Consumption source Per Program (kWh in the Program Defaults) " +
+        "Electricity price €0.30 per kWh " +
+        "Water source Water meter sensor.washer_water · total " +
+        "Water price From sensor.water_price",
+    ]);
   });
 
   it("is in German when Home Assistant is", async () => {

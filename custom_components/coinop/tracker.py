@@ -53,7 +53,6 @@ from .device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
     DOSES,
-    PROGRAM_DEFAULTS,
     TAGS_FOR_NEW_RUNS,
     DeviceSettings,
 )
@@ -75,7 +74,7 @@ from .models import (
     Stock,
     Usage,
 )
-from .quantities import ELECTRICITY, WATER
+from .quantities import ELECTRICITY, QUANTITIES, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
 from .templates import add_templates, count_running_hours
@@ -87,9 +86,6 @@ OUTCOMES = {
     Target.CANCELLED: Outcome.CANCELLED,
     Target.ENDED: Outcome.UNKNOWN,
 }
-
-# The Program Defaults' column of each consumed quantity.
-DEFAULT_COLUMNS = {LineItemKind.ELECTRICITY: "kwh", LineItemKind.WATER: "litres"}
 
 PRINT_FILE = re.compile(r"(\.gcode)?\.(gcode|bgcode|gco|3mf)$", re.IGNORECASE)
 
@@ -157,7 +153,7 @@ class DeviceTracker:
         self, run: Run
     ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
         if self._per_program:
-            kwh = self._program_row(run)[0].get("kwh")
+            kwh = self._program_row(run)[0].get(ELECTRICITY.default_key)
             return kwh, ConsumptionMethod.PROGRAM_DEFAULT
         return self._estimate(run), ConsumptionMethod.ESTIMATED
 
@@ -169,15 +165,11 @@ class DeviceTracker:
         source = (timeline.source if timeline else None) or {}
         if not self._per_program or source.get("source") in (None, WaterSource.NONE):
             return None
-        litres = self._program_row(run)[0].get("litres")
+        litres = self._program_row(run)[0].get(WATER.default_key)
         return litres, ConsumptionMethod.PROGRAM_DEFAULT
 
     def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
-        """The Program Defaults' row of the Run's Program, else the Default row."""
-        defaults = self._settings.get(self._config.device_id)[PROGRAM_DEFAULTS]
-        if run.program in defaults["programs"]:
-            return defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT
-        return defaults["default"], DoseSource.DEFAULT_ROW
+        return self._settings.program_row(self._config.device_id, run.program)
 
     async def async_start(self) -> None:
         self._unsubscribe = [
@@ -386,7 +378,6 @@ class DeviceTracker:
         ]
         for run in self._unfinalised_runs():
             if run.ended is not None and run.id not in self._final_waits:
-                # Already being finalised.
                 continue
             recorded = [
                 self._record_stock(run, dose, event.data["new_state"]) for dose in doses
@@ -439,9 +430,7 @@ class DeviceTracker:
         if (entity_id := self._config.program_entity_id) is None:
             return None
         state = self._hass.states.get(entity_id)
-        return (
-            input_value(state, self._config.program_attribute) or ""
-        ).strip() or None
+        return self._config.program(input_value(state, self._config.program_attribute))
 
     def correct_program(self, run: Run, program: str | None) -> None:
         """The user's Program for the Run, whose defaults follow it even once the
@@ -456,21 +445,26 @@ class DeviceTracker:
         if not run.finalised:
             self._refresh(run, run.ended)
             return
+        # One the defaults called for already but the Run lacks was marked as checked.
+        checked = set(self._defaults_flags(run)) - set(run.flags)
         row, source = self._program_row(run)
         run.line_items = [
-            _reapplied(run, item, row.get(DEFAULT_COLUMNS[item.kind]))
+            _reapplied(run, item, row.get(QUANTITIES[item.kind].default_key))
             if item.method is ConsumptionMethod.PROGRAM_DEFAULT
             and item.computed is None
             else item
             for item in run.line_items
         ]
         self._reapply_doses(run, row, source)
-        self._flag_defaults(run)
+        for flag in self._defaults_flags(run):
+            if flag not in checked:
+                add_flag(run, flag)
         run.drop_fixed_flags()
 
     def _reapply_doses(self, run: Run, row: dict[str, Any], source: DoseSource) -> None:
         """Each Dose's Line Item from defaults as the row doses it now: changed,
-        added or dropped. Overridden, measured and removed Doses' ones stay."""
+        added or dropped. Overridden, measured and removed Doses' ones stay, and
+        so do those the user gave another Material."""
         items = {i.dose_id: i for i in run.line_items if i.dose_id}
         chargeable = {dose["id"]: material for dose, material in self._dose_materials()}
         doses = (
@@ -482,15 +476,23 @@ class DeviceTracker:
         for dose in doses:
             item = items.pop(dose["id"], None)
             amount = row["doses"].get(dose["id"])
-            if item is not None and not (item.from_defaults and item.computed is None):
+            if item is not None and not (
+                item.from_defaults
+                and item.computed is None
+                and item.material_id == dose["material_id"]
+            ):
                 reapplied.append(item)
             elif item is not None:
                 if amount:
                     item.recompute(amount)
                     item.dose_source = source
                     reapplied.append(item)
-            # A stock input may have measured nothing used: no Line Item to add.
-            elif amount and dose["id"] in chargeable and "stock" not in dose:
+            # A stock input that measured nothing used gets no Line Item.
+            elif (
+                amount
+                and dose["id"] in chargeable
+                and dose["id"] not in run.measured_doses
+            ):
                 reapplied.append(
                     dose_line_item(
                         ulid_now(), dose["id"], chargeable[dose["id"]], amount, source
@@ -872,11 +874,13 @@ class DeviceTracker:
         self._refresh(run, run.ended)
         self._settle_material(run)
         self._flag_defaults(run)
-        if any(
-            self._stock_used(run, dose, material) is None
-            for dose, material in self._dose_materials()
-            if "stock" in dose
-        ):
+        stocked = [(d, m) for d, m in self._dose_materials() if "stock" in d]
+        run.measured_doses = [
+            dose["id"]
+            for dose, material in stocked
+            if self._stock_used(run, dose, material) is not None
+        ]
+        if len(run.measured_doses) < len(stocked):
             add_flag(run, Flag.STOCK_INPUT_UNAVAILABLE)
         linked = self._spoolman_prices(run)
         if not read and linked:
@@ -891,16 +895,28 @@ class DeviceTracker:
         self._finishing.discard(run.id)
 
     @staticmethod
-    def _flag_defaults(run: Run) -> None:
-        if any(
+    def _defaults_flags(run: Run) -> list[Flag]:
+        """The Flags the Run's defaults call for."""
+        missing = any(
             item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
             for item in run.line_items
-        ):
-            add_flag(run, Flag.DEFAULT_MISSING)
-        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+        )
+        early = run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
             item.from_defaults for item in run.line_items
-        ):
-            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+        )
+        return [
+            flag
+            for flag, raised in (
+                (Flag.DEFAULT_MISSING, missing),
+                (Flag.ENDED_EARLY_DEFAULTS, early),
+            )
+            if raised
+        ]
+
+    @classmethod
+    def _flag_defaults(cls, run: Run) -> None:
+        for flag in cls._defaults_flags(run):
+            add_flag(run, flag)
 
     def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
         """The Cost Sources of the Run's Materials linked to Spoolman."""

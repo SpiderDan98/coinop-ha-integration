@@ -39,7 +39,6 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
-from .models import LineItemKind
 from .profiles import METERS, detect
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
@@ -50,10 +49,6 @@ ATTRIBUTE_UNITS: dict[str, list[str]] = {
     ConsumptionSource.POWER: ["W", "kW"],
     WaterSource.METER: ["L", "m³", "gal", "ft³", "CCF"],
     WaterSource.FLOW: ["L/min", "L/h", "m³/h", "gal/min"],
-}
-PRICE_UNITS = {
-    LineItemKind.ELECTRICITY: ["{currency}/kWh", "ct/kWh", "{currency}/MWh"],
-    LineItemKind.WATER: ["{currency}/m³", "{currency}/L", "ct/L"],
 }
 USAGE_UNITS = ["mm", "cm", "m", "g", "kg"]
 FACTOR = NumberSelector(
@@ -128,7 +123,6 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "water_price": Capability.WATER,
         }
         if (self._data.get("water") or {}).get("source") == WaterSource.NONE:
-            # Nothing to price.
             del needs["water_price"], sections["water_price"]
         return {
             name: step
@@ -430,15 +424,31 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             entity_id = user_input.get("entity_id")
             attribute = user_input.get("attribute") if entity_id else None
+            ignored = [v for v in user_input.get("ignored", []) if v.strip()]
             self._data["program"] = {
                 "entity_id": entity_id,
                 "attribute": attribute or None,
-            }
+            } | ({"ignored": ignored} if entity_id and ignored else {})
             return await self._section_done("program")
+        stored = self._data.get("program", {})
+        offered = (
+            offered_values(self.hass, entity_id, stored.get("attribute"))
+            if (entity_id := stored.get("entity_id"))
+            else []
+        )
         schema = vol.Schema(
             {
                 vol.Optional("entity_id"): EntitySelector(),
                 vol.Optional("attribute"): TextSelector(),
+                vol.Optional("ignored"): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(
+                            dict.fromkeys(offered + stored.get("ignored", []))
+                        ),
+                        multiple=True,
+                        custom_value=True,
+                    )
+                ),
             }
         )
         return self.async_show_form(
@@ -789,7 +799,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             ):
                 return await self._price_done(quantity)
             errors["unit"] = "unknown_unit"
-        units = [unit.format(currency=currency) for unit in PRICE_UNITS[quantity.kind]]
+        units = [unit.format(currency=currency) for unit in quantity.price_units]
         schema: dict[Any, Any] = {
             vol.Required("unit"): SelectSelector(
                 SelectSelectorConfig(options=units, custom_value=True)

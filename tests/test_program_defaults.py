@@ -7,12 +7,16 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_hub, add_washing_machine
-from .stored import place_materials
-from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, doses, set_scale
-from .test_programs import WASHER_PROGRAM, set_program
+from .test_doses import SCALE, doses, set_scale
 from .test_runs import stored_runs
-from .test_washing_machines import set_energy, set_washer, wash
+from .washing import (
+    DOSES,
+    add_washer,
+    set_energy,
+    set_program,
+    set_washer,
+    washed,
+)
 from .websocket import PanelClient
 
 ROWS = {
@@ -29,14 +33,7 @@ async def washer(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> ConfigSubentry:
     """A washing machine with a Program input and the laundry Materials."""
-    hass.config.currency = "EUR"
-    place_materials(hass_storage, LIQUID, PODS, WHITENER)
-    await set_energy(hass, 100)
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    return await add_washing_machine(
-        hass, await add_hub(hass), program={"entity_id": WASHER_PROGRAM}, price=0.50
-    )
+    return await add_washer(hass, hass_storage, price=0.50)
 
 
 async def set_rows(
@@ -82,7 +79,7 @@ async def test_a_run_is_dosed_from_the_row_of_its_program(
     await set_rows(panel, washer)
     await set_program(hass, program)
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     [run] = stored_runs(hass_storage)
     assert doses(run) == dosed
@@ -110,7 +107,7 @@ async def test_the_doses_freeze_with_the_last_program(
 ) -> None:
     await set_rows(panel, washer)
     await set_program(hass, "White 60°")
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     await set_program(hass, "Cotton 40°")
     await set_rows(panel, washer, {"default": {"doses": {}}})
@@ -146,7 +143,7 @@ async def test_known_programs_come_from_the_input_and_past_runs(
 ) -> None:
     for program in ("Wool", " Eco 40-60 ", "Cotton 40°"):
         await set_program(hass, program)
-        await wash(hass, clock)
+        await washed(hass, clock, kwh=1.2)
 
     await set_program(hass, "Cotton 40°", {"options": ["Cotton 40°", "White 60°", " "]})
 
@@ -215,7 +212,7 @@ async def test_an_unavailable_stock_input_falls_back_to_the_program_s_row(
     )
     await set_program(hass, "White 60°")
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     await clock.advance(minutes=5)
 
     [run] = stored_runs(hass_storage)

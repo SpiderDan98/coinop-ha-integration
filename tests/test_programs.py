@@ -19,13 +19,20 @@ from .devices import (
     reconfigure,
     walk_to_mapping,
 )
+from .http import HttpClient
+from .test_cost_statement import export
 from .test_device_flow import fields
 from .test_run_event import record_events
 from .test_runs import set_status, stored_runs
-from .test_washing_machines import set_energy, set_washer, wash
+from .washing import (
+    WASHER_PROGRAM,
+    add_washer,
+    set_energy,
+    set_program,
+    set_washer,
+    washed,
+)
 from .websocket import PanelClient
-
-WASHER_PROGRAM = "sensor.washer_program"
 
 
 async def test_the_program_step_follows_the_status_mapping(
@@ -40,7 +47,7 @@ async def test_the_program_step_follows_the_status_mapping(
     result = await configure(hass, result, WASHER_MAPPING)
 
     assert result["step_id"] == "program"
-    assert fields(result) == ["entity_id", "attribute"]
+    assert fields(result) == ["entity_id", "attribute", "ignored"]
     result = await configure(
         hass, result, {"entity_id": WASHER_PROGRAM, "attribute": "program"}
     )
@@ -74,23 +81,10 @@ async def test_a_program_input_is_stored_with_its_attribute(
     assert subentry.data["consumption"]["entity_id"] == WASHER_ENERGY
 
 
-async def set_program(
-    hass: HomeAssistant, program: str, attributes: dict[str, Any] | None = None
-) -> None:
-    hass.states.async_set(WASHER_PROGRAM, program, attributes)
-    await hass.async_block_till_done()
-
-
 @pytest.fixture
 async def programmed(hass: HomeAssistant, clock: Clock) -> ConfigSubentry:
     """A washing machine whose Program input is `WASHER_PROGRAM`'s state."""
-    hass.config.currency = "EUR"
-    await set_energy(hass, 100)
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    return await add_washing_machine(
-        hass, await add_hub(hass), program={"entity_id": WASHER_PROGRAM}, price=0.50
-    )
+    return await add_washer(hass, price=0.50)
 
 
 @pytest.mark.usefixtures("programmed")
@@ -130,6 +124,30 @@ async def test_an_unavailable_program_input_keeps_the_last_program(
 
     [run] = stored_runs(hass_storage)
     assert (run["program"], run["name"]) == ("Eco 40-60", "Eco 40-60")
+
+
+async def test_values_the_program_input_ignores_are_like_no_program(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_energy(hass, 100)
+    await set_washer(hass, "off")
+    await set_program(hass, "Standby")
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": WASHER_PROGRAM, "ignored": ["Standby", "Detecting"]},
+    )
+    assert subentry.data["program"]["ignored"] == ["Standby", "Detecting"]
+
+    await set_washer(hass, "running")
+    await set_program(hass, "Wool")
+    await clock.advance(minutes=30)
+    await set_program(hass, "Detecting")
+    await set_washer(hass, "finished")
+    await set_energy(hass, 101)
+
+    [run] = stored_runs(hass_storage)
+    assert (run["program"], run["name"]) == ("Wool", "Wool")
 
 
 async def test_a_renamed_run_keeps_its_name_when_the_program_changes(
@@ -194,7 +212,7 @@ async def test_correcting_the_program_of_an_ended_run_changes_no_line_item(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
     await set_program(hass, "Cotton 40")
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     before = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
 
@@ -234,7 +252,7 @@ async def test_the_ended_event_and_last_run_cost_carry_the_program(
     fired = record_events(hass, "event.washer_run")
     await set_program(hass, "Cotton 60°")
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     [_, ended] = fired
     assert ended["program"] == "Cotton 60°"
@@ -254,3 +272,25 @@ async def test_a_printer_run_has_no_program_to_correct(
 
     assert error["code"] == "not_allowed"
     assert run["program"] is None
+
+
+@pytest.mark.usefixtures("programmed")
+async def test_a_cost_statement_shows_the_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    await set_program(hass, "Cotton 60°")
+    await washed(hass, clock, kwh=1.2)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], name="Towels")
+
+    detailed = await export(panel, browser, run_ids=[run["id"]])
+    compact = await export(panel, browser, run_ids=[run["id"]], detail="compact")
+
+    assert (
+        "Washer · Jan 15, 2026 · Program Cotton 60° · Running time 1 h 30 min"
+        in detailed.lines
+    )
+    assert compact.lines[3:5] == [
+        "Run Device Program Start Total",
+        "Towels Washer Cotton 60° Jan 15, 2026 €0.60",
+    ]
