@@ -35,6 +35,9 @@ SHARED_TERMS = {
     "consumption.estimate": (
         "config_subentries.device.step.consumption.menu_options.estimate"
     ),
+    "consumption.per_program": (
+        "config_subentries.device.step.consumption.menu_options.per_program"
+    ),
 }
 
 # Terms the panel and the Cost Statement both show: panel key -> statement key.

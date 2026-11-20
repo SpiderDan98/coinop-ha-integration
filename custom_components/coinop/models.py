@@ -347,10 +347,9 @@ class LineItem:
     @property
     def from_defaults(self) -> bool:
         """Its quantity is a default for a whole cycle, not what was measured."""
-        return (
-            self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
-            or self.method is ConsumptionMethod.PROGRAM_DEFAULT
-        )
+        if self.method is ConsumptionMethod.PROGRAM_DEFAULT:
+            return self.quantity is not None
+        return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
     def grams(self) -> float:
@@ -593,6 +592,11 @@ class Run:
                 i.quantity is not None or i.length is not None for i in items
             ),
             Flag.MATERIAL_MISSING: all(i.material_id is not None for i in items),
+            Flag.DEFAULT_MISSING: all(
+                i.quantity is not None
+                for i in self.line_items
+                if i.kind in CONSUMED_KINDS
+            ),
         }
         self.flags = [flag for flag in self.flags if not fixed.get(flag, False)]
 

@@ -70,6 +70,7 @@
   "method.water_measured": "Mit einem Wasserzähler gemessen",
   "method.from_history": "Aus dem aufgezeichneten Verlauf",
   "method.estimated": "Aus der Durchschnittsleistung geschätzt",
+  "method.program_default": "Aus den Programmvorgaben",
   "method.entered": "Von Hand eingetragen",
   "evidence.segments": "{count} Preisabschnitte",
   "item.label": "Bezeichnung",
@@ -119,6 +120,7 @@
   "consumption.energy": "Energiezähler",
   "consumption.power": "Leistungssensor",
   "consumption.estimate": "Aus Durchschnittsleistung schätzen",
+  "consumption.per_program": "Je Programm (kWh in den Programmvorgaben)",
   "consumption.running": "{power} im Betrieb",
   "consumption.paused": "{power} in Pause",
   "price.fixed": "{price} pro kWh",
@@ -374,7 +376,7 @@
   "device.program": "Programm",
   "device.default_row": "Standard",
   "device.default_amount": "Standardmenge von {dose}",
-  "device.program_defaults_hint": "Mengen pro Lauf in der Einheit des Materials. Ein leeres Feld heißt nicht dosiert. Ein Lauf verwendet die Zeile seines Programms, sonst die Standardzeile.",
+  "device.program_defaults_hint": "Mengen pro Lauf: kWh und Liter, wenn nichts sie misst, Dosierungen in der Einheit des Materials. Ein leeres Feld heißt nicht festgelegt oder nicht dosiert. Ein Lauf verwendet die Zeile seines Programms, sonst die Standardzeile.",
   "flag.ended_early_defaults": "Der Lauf endete vorzeitig, wurde aber mit Vorgaben für einen ganzen Durchgang berechnet: Mengen prüfen",
   "dose_source.default_row": "Aus der Standardzeile",
   "device.measured_by": "gemessen von {entity}",
@@ -390,5 +392,12 @@
   "device.program_amount": "{dose} für {program}",
   "device.remove_program": "Zeile von {program} entfernen",
   "device.add_program": "+ Programm hinzufügen",
-  "dose_source.program_default": "Aus den Programmvorgaben"
+  "dose_source.program_default": "Aus den Programmvorgaben",
+  "device.kwh_column": "Strom (kWh)",
+  "device.litres_column": "Wasser (L)",
+  "device.default_kwh": "Standard-kWh",
+  "device.default_litres": "Standard-Liter",
+  "device.program_kwh": "kWh für {program}",
+  "device.program_litres": "Liter für {program}",
+  "flag.default_missing": "Weder eine Messung noch eine Programmvorgabe gefunden: Menge eintragen"
 }

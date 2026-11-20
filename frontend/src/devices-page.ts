@@ -39,6 +39,7 @@ const consumptionDetails = (
 ) => {
   const running = (power: number | null) =>
     power !== null && t("consumption.running", { power: format.quantity(power, "W") });
+  if (consumption.source === "per_program") return nothing;
   if (consumption.source !== "estimate")
     return html`<div>
       ${entity(hass, consumption.entity_id, [
@@ -436,12 +437,19 @@ export class DevicesPage extends LitElement {
   /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
    * column per Dose. Known Programs without a row are suggested; a value stores their row. */
   private renderDoses(
-    { capabilities, known_programs }: Device,
+    { capabilities, known_programs, ha_settings }: Device,
     { doses, program_defaults }: Settings,
     change: (changes: Partial<Settings>) => void,
     t: Localize,
   ) {
     const { programs } = program_defaults;
+    const perProgram = capabilities.includes("program_consumption");
+    const consumed = [
+      ...(perProgram ? (["kwh"] as const) : []),
+      ...(perProgram && ha_settings.water && ha_settings.water.source !== "none"
+        ? (["litres"] as const)
+        : []),
+    ];
     /** `program` null is the Default row. */
     const rowOf = (program: string | null) =>
       program === null ? program_defaults.default : programs[program];
@@ -456,7 +464,8 @@ export class DevicesPage extends LitElement {
       change({ program_defaults: { ...program_defaults, programs: next } });
     const setDoses = (next: Settings["doses"]) => {
       const kept = new Set(next.map(({ id }) => id));
-      const prune = ({ doses: amounts }: Settings["program_defaults"]["default"]) => ({
+      const prune = ({ doses: amounts, ...rest }: Settings["program_defaults"]["default"]) => ({
+        ...rest,
         doses: Object.fromEntries(Object.entries(amounts).filter(([id]) => kept.has(id))),
       });
       change({
@@ -482,8 +491,40 @@ export class DevicesPage extends LitElement {
       );
       const amount = Number(value);
       const valid = value.trim() !== "" && amount > 0;
-      if (row || valid) setRow(program, { doses: valid ? { ...others, [id]: amount } : others });
+      if (row || valid)
+        setRow(program, { ...row, doses: valid ? { ...others, [id]: amount } : others });
     };
+    const setConsumed = (program: string | null, key: (typeof consumed)[number], value: string) => {
+      const { doses: amounts, kwh, litres } = rowOf(program) ?? { doses: {} };
+      const amount = Number(value);
+      const valid = value.trim() !== "" && amount >= 0;
+      const next = { kwh, litres, [key]: valid ? amount : undefined };
+      if (rowOf(program) || valid)
+        setRow(program, {
+          doses: amounts,
+          ...(next.kwh !== undefined && { kwh: next.kwh }),
+          ...(next.litres !== undefined && { litres: next.litres }),
+        });
+    };
+    const consumedCells = (program: string | null) =>
+      consumed.map(
+        (key) =>
+          html`<td class="num">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              aria-label=${
+                program === null
+                  ? t(`device.default_${key}`)
+                  : t(`device.program_${key}`, { program })
+              }
+              .value=${String(rowOf(program)?.[key] ?? "")}
+              @change=${(event: Event) =>
+                setConsumed(program, key, (event.target as HTMLInputElement).value)}
+            />
+          </td>`,
+      );
     const amountCells = (program: string | null, label: (dose: string) => string) =>
       doses.map(
         ({ id, material_id }) =>
@@ -572,12 +613,13 @@ export class DevicesPage extends LitElement {
         <p class="muted small">${t("device.doses_hint")}</p>
       </div>
       ${
-        doses.length
+        doses.length || consumed.length
           ? html`<div class="field program-defaults">
               <span class="label">${t("device.program_defaults")}</span>
               ${table({
                 columns: [
                   { label: t("device.program") },
+                  ...consumed.map((key) => ({ label: t(`device.${key}_column`), num: true })),
                   ...doses.map(({ material_id }) => ({
                     label: `${this.doseName(material_id, t)} (${unitOf(this.material(material_id))})`,
                     num: true,
@@ -585,6 +627,7 @@ export class DevicesPage extends LitElement {
                 ],
                 rows: html`<tr>
                     <td>${t("device.default_row")}</td>
+                    ${consumedCells(null)}
                     ${amountCells(null, (dose) => t("device.default_amount", { dose }))}
                   </tr>
                   ${programNames.map(
@@ -608,6 +651,7 @@ export class DevicesPage extends LitElement {
                               : html`<span class="muted small">${t("device.suggested")}</span>`
                           }
                         </td>
+                        ${consumedCells(program)}
                         ${amountCells(program, (dose) => t("device.program_amount", { dose, program }))}
                       </tr>`,
                   )}`,

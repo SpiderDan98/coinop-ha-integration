@@ -154,13 +154,16 @@ class DeviceTracker:
             return kwh, ConsumptionMethod.PROGRAM_DEFAULT
         return self._estimate(run), ConsumptionMethod.ESTIMATED
 
-    def _water_fallback(self, run: Run) -> tuple[float | None, ConsumptionMethod] | None:
+    def _water_fallback(
+        self, run: Run
+    ) -> tuple[float | None, ConsumptionMethod] | None:
         """The Program's litres, unless the Run has no water source."""
         timeline = run.timelines.get(LineItemKind.WATER)
         source = (timeline.source if timeline else None) or {}
         if not self._per_program or source.get("source") in (None, WaterSource.NONE):
             return None
-        return self._program_row(run)[0].get("litres"), ConsumptionMethod.PROGRAM_DEFAULT
+        litres = self._program_row(run)[0].get("litres")
+        return litres, ConsumptionMethod.PROGRAM_DEFAULT
 
     def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
         """The Program Defaults' row of the Run's Program, else the Default row."""
@@ -797,6 +800,11 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
+        if any(
+            item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
+            for item in run.line_items
+        ):
+            add_flag(run, Flag.DEFAULT_MISSING)
         if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
             item.from_defaults for item in run.line_items
         ):
