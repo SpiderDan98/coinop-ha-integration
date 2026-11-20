@@ -64,7 +64,11 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
     assert live_runs(hass_storage) == current["live"]
     listed = (await panel.call("coinop/materials/list"))["materials"]
     assert [
-        {key: value for key, value in m.items() if key != "price_per_gram"}
+        {
+            key: value
+            for key, value in m.items()
+            if key not in ("price_per_gram", "price_per_piece")
+        }
         for m in listed
     ] == current["catalog"]["materials"]
     await panel.subscribe("coinop/catalog/subscribe")

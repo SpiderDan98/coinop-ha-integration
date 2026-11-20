@@ -15,6 +15,7 @@ from homeassistant.util.ulid import ulid_now
 from custom_components.coinop.cost.material import (
     GRAM,
     MILLILITRE,
+    PIECES,
     change_material,
     material_line_item,
 )
@@ -175,20 +176,28 @@ async def _add(
     """A Line Item entered by hand; it is added to an open Run too.
 
     A Material Line Item names its Material and counts g (the default) or ml,
-    priced at the Material's current price; an Other one defaults to 1 piece.
+    or pieces of a Material priced per piece, at the Material's current price;
+    an Other one defaults to 1 piece.
     """
     if (run := find_run(connection, msg, coinop)) is None:
         return
     if msg["kind"] is LineItemKind.MATERIAL:
-        unit = msg.get("unit", GRAM)
-        if "material_id" not in msg or unit not in (GRAM, MILLILITRE):
+        if "material_id" not in msg:
             connection.send_error(
                 msg["id"],
                 websocket_api.ERR_INVALID_FORMAT,
-                "A Material Line Item names its Material and counts g or ml",
+                "A Material Line Item names its Material",
             )
             return
         if not (material := pickable(connection, msg, coinop, msg["material_id"])):
+            return
+        units = (PIECES,) if material.by_piece else (GRAM, MILLILITRE)
+        if (unit := msg.get("unit", units[0])) not in units:
+            connection.send_error(
+                msg["id"],
+                websocket_api.ERR_INVALID_FORMAT,
+                f"This Material counts {' or '.join(units)}",
+            )
             return
         item = material_line_item(ulid_now(), None, material, measured=False, unit=unit)
         item.label = _text(msg.get("label"))

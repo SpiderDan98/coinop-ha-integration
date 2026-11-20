@@ -25,23 +25,31 @@ MATERIALS = "materials"
 
 
 def _material(data: dict[str, Any]) -> Material:
-    """A Material from its fields, with what follows from them filled in."""
-    resin = MaterialForm(data["form"]) is MaterialForm.RESIN
-    pack_unit = PackUnit.MILLILITRE if resin else PackUnit.GRAM
-    diameter = None if resin else data.get("diameter") or DEFAULT_DIAMETER
-    colour = data.get("colour")
+    """A Material from its fields, with what follows from them filled in.
+
+    Raises ValueError for a Material by weight or volume without a density.
+    """
+    form = MaterialForm(data["form"])
+    usual_unit = PackUnit.MILLILITRE if form is MaterialForm.RESIN else PackUnit.GRAM
     price = data["price"]
+    if price["source"] == "fixed":
+        price = {"pack_unit": usual_unit} | price
+    by_piece = price.get("pack_unit") == PackUnit.PIECE
+    density = None if by_piece else data.get("density")
+    if density is None and not by_piece:
+        raise ValueError("A Material by weight or volume needs its density")
+    filament = form is MaterialForm.FILAMENT and not by_piece
+    colour = data.get("colour")
     return Material.from_dict(
         {
             "vendor": None,
             "default_for_type": False,
             "archived": False,
             **data,
+            "density": density,
             "colour": colour and colour.lower(),
-            "diameter": diameter,
-            "price": {"pack_unit": pack_unit} | price
-            if price["source"] == "fixed"
-            else price,
+            "diameter": data.get("diameter") or DEFAULT_DIAMETER if filament else None,
+            "price": price,
         }
     )
 

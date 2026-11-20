@@ -1,8 +1,9 @@
-"""Materials: what a Device uses up, priced per gram from a Cost Source.
+"""Materials: what a Device uses up, priced per gram (or per piece) from a Cost Source.
 
 Free of Home Assistant types; `as_dict` / `from_dict` give the catalog Store's
 JSON shape. A Cost Source is one entry of `PRICE_SOURCES` ("fixed" or
-"spoolman") with a `per_gram(density)` price.
+"spoolman") with a `per_gram(density)` and a `per_piece()` price. A Material
+bought by the piece (pods, sheets) has no density and no price per gram.
 """
 
 from dataclasses import dataclass, field
@@ -15,31 +16,42 @@ from .models import unknown_fields
 class MaterialForm(StrEnum):
     FILAMENT = "filament"
     RESIN = "resin"
+    DETERGENT = "detergent"
+    FABRIC_SOFTENER = "fabric_softener"
+    LAUNDRY_ADDITIVE = "laundry_additive"
 
 
 class PackUnit(StrEnum):
     GRAM = "g"
     MILLILITRE = "ml"
+    PIECE = "pcs"
 
 
 DEFAULT_DIAMETER = 1.75
 
-# Built-in types with their usual form and density (g/cm³), for pre-filling.
-MATERIAL_TYPES = {
-    "PLA": (MaterialForm.FILAMENT, 1.24),
-    "PLA-CF": (MaterialForm.FILAMENT, 1.29),
-    "PETG": (MaterialForm.FILAMENT, 1.27),
-    "PETG-CF": (MaterialForm.FILAMENT, 1.30),
-    "ABS": (MaterialForm.FILAMENT, 1.04),
-    "ASA": (MaterialForm.FILAMENT, 1.07),
-    "TPU": (MaterialForm.FILAMENT, 1.21),
-    "PA": (MaterialForm.FILAMENT, 1.14),
-    "PC": (MaterialForm.FILAMENT, 1.20),
-    "HIPS": (MaterialForm.FILAMENT, 1.04),
-    "PVA": (MaterialForm.FILAMENT, 1.23),
-    "Standard resin": (MaterialForm.RESIN, 1.10),
-    "ABS-like resin": (MaterialForm.RESIN, 1.10),
-    "Water-washable resin": (MaterialForm.RESIN, 1.10),
+# Built-in types with their usual form, density (g/cm³) and pack unit, for pre-filling.
+MATERIAL_TYPES: dict[str, tuple[MaterialForm, float | None, PackUnit]] = {
+    "PLA": (MaterialForm.FILAMENT, 1.24, PackUnit.GRAM),
+    "PLA-CF": (MaterialForm.FILAMENT, 1.29, PackUnit.GRAM),
+    "PETG": (MaterialForm.FILAMENT, 1.27, PackUnit.GRAM),
+    "PETG-CF": (MaterialForm.FILAMENT, 1.30, PackUnit.GRAM),
+    "ABS": (MaterialForm.FILAMENT, 1.04, PackUnit.GRAM),
+    "ASA": (MaterialForm.FILAMENT, 1.07, PackUnit.GRAM),
+    "TPU": (MaterialForm.FILAMENT, 1.21, PackUnit.GRAM),
+    "PA": (MaterialForm.FILAMENT, 1.14, PackUnit.GRAM),
+    "PC": (MaterialForm.FILAMENT, 1.20, PackUnit.GRAM),
+    "HIPS": (MaterialForm.FILAMENT, 1.04, PackUnit.GRAM),
+    "PVA": (MaterialForm.FILAMENT, 1.23, PackUnit.GRAM),
+    "Standard resin": (MaterialForm.RESIN, 1.10, PackUnit.MILLILITRE),
+    "ABS-like resin": (MaterialForm.RESIN, 1.10, PackUnit.MILLILITRE),
+    "Water-washable resin": (MaterialForm.RESIN, 1.10, PackUnit.MILLILITRE),
+    "Liquid detergent": (MaterialForm.DETERGENT, 1.04, PackUnit.MILLILITRE),
+    "Powder detergent": (MaterialForm.DETERGENT, 0.7, PackUnit.GRAM),
+    "Detergent pods": (MaterialForm.DETERGENT, None, PackUnit.PIECE),
+    "Fabric softener": (MaterialForm.FABRIC_SOFTENER, 1.0, PackUnit.MILLILITRE),
+    "Whitener": (MaterialForm.LAUNDRY_ADDITIVE, 0.9, PackUnit.GRAM),
+    "Stain remover": (MaterialForm.LAUNDRY_ADDITIVE, 1.02, PackUnit.MILLILITRE),
+    "Colour catcher sheets": (MaterialForm.LAUNDRY_ADDITIVE, None, PackUnit.PIECE),
 }
 
 
@@ -48,7 +60,7 @@ def type_density(material_type: str) -> float | None:
     return next(
         (
             density
-            for name, (_, density) in MATERIAL_TYPES.items()
+            for name, (_, density, _) in MATERIAL_TYPES.items()
             if name.casefold() == material_type.casefold()
         ),
         None,
@@ -63,9 +75,17 @@ class FixedPrice:
     pack_size: float
     pack_unit: PackUnit
 
-    def per_gram(self, density: float) -> float:
-        grams_per_unit = density if self.pack_unit is PackUnit.MILLILITRE else 1
-        return self.pack_price / (self.pack_size * grams_per_unit)
+    def per_gram(self, density: float | None) -> float | None:
+        if self.pack_unit is PackUnit.PIECE:
+            return None
+        if self.pack_unit is PackUnit.GRAM:
+            return self.pack_price / self.pack_size
+        return None if density is None else self.pack_price / (self.pack_size * density)
+
+    def per_piece(self) -> float | None:
+        if self.pack_unit is not PackUnit.PIECE:
+            return None
+        return self.pack_price / self.pack_size
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -86,9 +106,13 @@ class SpoolmanPrice:
 
     filament_id: int
     last_read: float | None = None
+    pack_unit = PackUnit.GRAM
 
-    def per_gram(self, density: float) -> float:
+    def per_gram(self, density: float | None) -> float:
         return self.last_read or 0.0
+
+    def per_piece(self) -> None:
+        return None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -120,7 +144,7 @@ class Material:
     name: str
     form: MaterialForm
     type: str
-    density: float
+    density: float | None
     price: FixedPrice | SpoolmanPrice
     vendor: str | None = None
     colour: str | None = None
@@ -130,8 +154,16 @@ class Material:
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
-    def price_per_gram(self) -> float:
+    def by_piece(self) -> bool:
+        return self.price.pack_unit is PackUnit.PIECE
+
+    @property
+    def price_per_gram(self) -> float | None:
         return self.price.per_gram(self.density)
+
+    @property
+    def price_per_piece(self) -> float | None:
+        return self.price.per_piece()
 
     def as_dict(self) -> dict[str, Any]:
         return self.unknown | {

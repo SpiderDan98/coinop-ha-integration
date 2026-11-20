@@ -325,6 +325,14 @@ RESIN = stored_material(
     diameter=None,
     price={"source": "fixed", "pack_price": 30, "pack_size": 1000, "pack_unit": "ml"},
 )
+PODS = stored_material(
+    "pods",
+    form="detergent",
+    type="Detergent pods",
+    density=None,
+    diameter=None,
+    price={"source": "fixed", "pack_price": 12, "pack_size": 40, "pack_unit": "pcs"},
+)
 
 
 async def test_without_a_material_used_input_the_default_material_waits_for_a_quantity(
@@ -536,9 +544,10 @@ async def test_a_material_line_item_added_during_the_run_needs_no_other(
         ({"material_id": "nope"}, "not_found"),
         ({"material_id": "old"}, "not_allowed"),
         ({"material_id": "pla", "unit": "pcs"}, "invalid_format"),
+        ({"material_id": "pods", "unit": "g"}, "invalid_format"),
     ],
 )
-async def test_a_material_line_item_needs_a_current_material_and_g_or_ml(
+async def test_a_material_line_item_needs_a_current_material_and_its_unit(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
@@ -547,7 +556,10 @@ async def test_a_material_line_item_needs_a_current_material_and_g_or_ml(
     code: str,
 ) -> None:
     place_materials(
-        hass_storage, stored_material("pla"), stored_material("old", archived=True)
+        hass_storage,
+        stored_material("pla"),
+        stored_material("old", archived=True),
+        PODS,
     )
     await add_measuring_device(hass, panel)
     await set_status(hass, "printing")
@@ -558,6 +570,68 @@ async def test_a_material_line_item_needs_a_current_material_and_g_or_ml(
     )
 
     assert error["code"] == code
+
+
+async def added_item(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any], **fields: Any
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """An open Run with one Material Line Item added by hand; the Run and the item."""
+    place_materials(hass_storage, stored_material("pla"), RESIN, PODS)
+    await add_measuring_device(hass, panel, default=None, material=None)
+    await set_status(hass, "printing")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    result = await panel.call(
+        "coinop/line_items/add", run_id=run["id"], kind="material", **fields
+    )
+    [added] = material_items(result["run"])
+    return run, added
+
+
+async def test_a_material_priced_per_piece_counts_pieces(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    _, added = await added_item(
+        hass, panel, hass_storage, material_id="pods", quantity=2
+    )
+
+    assert {key: added[key] for key in ("quantity", "unit", "unit_price")} == {
+        "quantity": 2,
+        "unit": "pcs",
+        "unit_price": pytest.approx(0.30),
+    }
+    assert added["amount"] == pytest.approx(0.60)
+    assert added["material"]["density"] is None
+    assert value(hass, MATERIAL_COST) == pytest.approx(0.60)
+    # Pieces weigh nothing Coin-op knows of.
+    assert value(hass, MATERIAL_USED) == 0
+
+
+async def test_changing_between_pieces_and_grams_keeps_the_quantity_and_reprices(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    run, added = await added_item(
+        hass, panel, hass_storage, material_id="pla", quantity=25
+    )
+
+    pods = await pick(panel, run, added, "pods")
+    pla = await pick(panel, run, added, "pla")
+    await pick(panel, run, added, "pods")
+    resin = await pick(panel, run, added, "resin")
+
+    values = ("quantity", "unit", "unit_price", "amount")
+    assert {key: pods[key] for key in values} == {
+        "quantity": 25,
+        "unit": "pcs",
+        "unit_price": pytest.approx(0.30),
+        "amount": pytest.approx(7.5),
+    }
+    assert {key: pla[key] for key in values} == {
+        "quantity": 25,
+        "unit": "g",
+        "unit_price": pytest.approx(0.02),
+        "amount": pytest.approx(0.5),
+    }
+    assert (resin["unit"], resin["unit_price"]) == ("ml", pytest.approx(0.03))
 
 
 async def test_only_material_line_items_change_their_material(

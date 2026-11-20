@@ -70,6 +70,7 @@ async def test_a_filament_is_priced_per_gram_from_its_pack(
             "pack_unit": "g",
         },
         "price_per_gram": pytest.approx(0.01999),
+        "price_per_piece": None,
     }
     assert await materials(panel) == [created]
 
@@ -135,7 +136,12 @@ async def test_built_in_types_give_the_density_to_pre_fill(
     result = await panel.call("coinop/materials/types")
 
     types = {entry["type"]: entry for entry in result["types"]}
-    assert types["PLA"] == {"type": "PLA", "form": "filament", "density": 1.24}
+    assert types["PLA"] == {
+        "type": "PLA",
+        "form": "filament",
+        "density": 1.24,
+        "pack_unit": "g",
+    }
     assert types["PETG"]["density"] == 1.27
     assert types["Standard resin"]["form"] == "resin"
 
@@ -432,3 +438,129 @@ async def test_only_admins_use_the_catalogue(
     error = await user.error(command, **data)
 
     assert error["code"] == "unauthorized"
+
+
+DETERGENT = {
+    "name": "Liquid detergent",
+    "form": "detergent",
+    "type": "Liquid detergent",
+    "density": 1.04,
+    "price": {
+        "source": "fixed",
+        "pack_price": 7.8,
+        "pack_size": 1500,
+        "pack_unit": "ml",
+    },
+}
+PODS = {
+    "name": "Colour pods",
+    "form": "detergent",
+    "type": "Detergent pods",
+    "price": {"source": "fixed", "pack_price": 12, "pack_size": 40, "pack_unit": "pcs"},
+}
+
+
+async def test_a_laundry_product_is_priced_per_gram_by_volume_or_by_weight(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    liquid = await create(panel, **DETERGENT)
+    powder = await create(
+        panel,
+        **DETERGENT
+        | {
+            "name": "Whitener",
+            "form": "laundry_additive",
+            "type": "Whitener",
+            "density": 0.9,
+            "price": {
+                "source": "fixed",
+                "pack_price": 5,
+                "pack_size": 1000,
+                "pack_unit": "g",
+            },
+        },
+    )
+
+    assert liquid["form"] == "detergent"
+    assert liquid["price_per_gram"] == pytest.approx(7.8 / 1560)
+    assert powder["price_per_gram"] == pytest.approx(0.005)
+    assert (liquid["diameter"], powder["diameter"]) == (None, None)
+    assert (liquid["price_per_piece"], powder["price_per_piece"]) == (None, None)
+
+
+async def test_a_material_bought_by_the_piece_is_priced_per_piece(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    created = await create(panel, **PODS, density=1.1, diameter=1.75)
+    without_density = await create(panel, **PODS, density=None)
+
+    assert created["price"]["pack_unit"] == "pcs"
+    assert created["price_per_piece"] == pytest.approx(0.30)
+    assert created["price_per_gram"] is None
+    assert (created["density"], created["diameter"]) == (None, None)
+    assert without_density == created | {"id": without_density["id"]}
+    assert await materials(panel) == [created, without_density]
+
+
+async def test_a_material_by_weight_or_volume_needs_its_density(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    pods = await create(panel, **PODS)
+    without_density = {
+        key: value for key, value in DETERGENT.items() if key != "density"
+    }
+
+    created = await panel.error("coinop/materials/create", material=without_density)
+    updated = await panel.error(
+        "coinop/materials/update",
+        material_id=pods["id"],
+        material={"price": DETERGENT["price"]},
+    )
+
+    assert (created["code"], updated["code"]) == ("invalid_format", "invalid_format")
+    assert await materials(panel) == [pods]
+
+
+async def test_built_in_laundry_types_pre_fill_form_density_and_pack_unit(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    result = await panel.call("coinop/materials/types")
+
+    types = {entry["type"]: entry for entry in result["types"]}
+    assert types["Liquid detergent"] == {
+        "type": "Liquid detergent",
+        "form": "detergent",
+        "density": 1.04,
+        "pack_unit": "ml",
+    }
+    assert types["Powder detergent"]["pack_unit"] == "g"
+    assert types["Fabric softener"]["form"] == "fabric_softener"
+    assert types["Detergent pods"] == {
+        "type": "Detergent pods",
+        "form": "detergent",
+        "density": None,
+        "pack_unit": "pcs",
+    }
+    assert types["Colour catcher sheets"]["form"] == "laundry_additive"
+
+
+async def test_a_catalogue_stored_before_laundry_products_loads_unchanged(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    stored = stored_material("pla", vendor="eSun")
+    place_materials(hass_storage, stored)
+    await add_hub(hass)
+
+    [listed] = await materials(panel)
+
+    assert listed == stored | {
+        "price_per_gram": pytest.approx(0.02),
+        "price_per_piece": None,
+    }
