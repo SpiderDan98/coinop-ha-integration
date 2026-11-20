@@ -97,7 +97,7 @@ Install [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`). It
 
 The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs.
 
-You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values stay as they are.
+You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values and Doses measured by a stock input stay as they are, and saving the same Program again changes nothing.
 
 ### Program Defaults and Doses
 
@@ -109,7 +109,7 @@ Each washing machine's card in the panel's Devices tab has a Dose list and a Pro
 - Rows are suggested from the values the Program input offers and from Programs seen on past Runs; a suggested row is stored once you enter a value.
 - With a meter, a row suggests the average measured kWh and litres of that Program's completed Runs, with the number of Runs. One click applies it; it is never applied automatically.
 
-Changes apply to the open Run at once and to future Runs, never to ended ones. Every amount stays editable on each Run, and each Dose shows where its amount came from: the Program's row, the Default row, a stock input or entered by hand.
+Changes to the Program Defaults apply to the open Run at once and to future Runs, never to ended ones (only correcting a Run's Program re-applies them). Every amount stays editable on each Run, and each Dose shows where its amount came from: the Program's row, the Default row, a stock input or entered by hand.
 
 ### Measuring detergent with a stock input
 
