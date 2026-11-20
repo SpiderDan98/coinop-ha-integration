@@ -80,7 +80,7 @@ The `Makefile` has the same as `make dev`, `make dev-build`, `make dev-restart`,
 
 Then open http://localhost:8124/coinop. The round flask button at the panel's bottom left (shown only when the `coinop_dev` integration is loaded) switches Scenarios too.
 
-- `dev/configuration.yaml`: the container's configuration, with the printers' Status and job helpers (`input_select.<printer>_status`, `input_text.<printer>_job`); set them in HA to drive a live Run.
+- `dev/configuration.yaml`: the container's configuration, with the printers' Status and job helpers (`input_select.<printer>_status`, `input_text.<printer>_job`) and the washing machine's (`input_select.washer_status`, `input_select.washer_program`, `input_number.washer_energy`, `input_number.washer_water`, `input_number.detergent_scale`); set them in HA to drive a live Run. The washing-machine Scenario replays its past loads by setting those helpers' states with past timestamps, so they go through the tracker like live ones.
 - `dev/coinop_dev/`: the dev-only integration, mounted next to Coin-op. Its `load` service removes the hub entry, creates it afresh with the Scenario's Devices as subentries and fills it through Coin-op's own websocket commands on an in-process connection (`Api`), so the data takes the same path as a user's. Thumbnails are the only exception: no command adds one, so they go through `ImageLibrary`. A new Scenario is a fill function plus one entry in `SCENARIOS` (and in `services.yaml`). `tests/test_dev_scenarios.py` loads each one, so a changed command breaks the test, not the dev container.
 
 ## Test

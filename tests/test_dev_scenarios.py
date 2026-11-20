@@ -17,9 +17,9 @@ CONFIG = Path(__file__).parents[1] / "dev" / "configuration.yaml"
 
 @pytest.fixture
 async def helpers(hass: HomeAssistant) -> None:
-    """The printers' helpers from the dev configuration.yaml."""
+    """The Devices' helpers from the dev configuration.yaml."""
     config = await hass.async_add_executor_job(load_yaml_dict, CONFIG)
-    for domain in ("input_select", "input_text"):
+    for domain in ("input_select", "input_text", "input_number"):
         assert await async_setup_component(hass, domain, {domain: config[domain]})
 
 
@@ -42,6 +42,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
         ("few-runs", (1, 3, 7, 0)),
         ("printing-now", (1, 3, 8, 1)),
         ("two-printers", (2, 5, 60, 0)),
+        ("washing-machine", (1, 4, 10, 0)),
     ],
 )
 async def test_a_scenario_fills_coinop_from_scratch(
@@ -78,3 +79,36 @@ async def test_the_long_history_spans_two_years_and_goes_with_the_next_scenario(
     assert thumbnails
     assert await counts(panel) == (0, 0, 0, 0)
     assert not await hass.async_add_executor_job(files.exists)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, "washing-machine", hass_admin_user)
+    await hass.async_block_till_done()
+
+    runs = [
+        (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+        for run in (await panel.call("coinop/runs/list"))["runs"]
+    ]
+    methods = {
+        (item["kind"], item.get("method") or item.get("dose_source"))
+        for run in runs
+        for item in run["line_items"]
+    }
+    assert methods == {
+        ("electricity", "measured"),
+        ("water", "measured"),
+        ("material", "stock_input"),
+        ("material", "program_default"),
+        ("material", "default_row"),
+    }
+    assert {run["program"] for run in runs} == {
+        "Cotton 60°",
+        "Eco 40-60",
+        "Wool",
+        "Quick 30",
+        None,
+    }
+    assert any("ended_early_defaults" in run["flags"] for run in runs)
