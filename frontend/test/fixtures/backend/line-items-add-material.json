@@ -18,9 +18,6 @@
     "tags": [
       "Gift"
     ],
-    "consumption": null,
-    "cost_source": null,
-    "prices": [],
     "average_powers": [],
     "usage": null,
     "loaded_slots": [],
@@ -176,6 +173,7 @@
       }
     ],
     "cover_id": null,
+    "program": null,
     "running_seconds": 4500,
     "total": 2.0,
     "cost_per_part": 0.5,
@@ -197,6 +195,7 @@
     },
     "subtotals": {
       "electricity": 0.1,
+      "water": 0.0,
       "material": 0.4,
       "other": 1.5
     }

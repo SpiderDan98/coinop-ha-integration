@@ -13,32 +13,26 @@ from homeassistant.const import (
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
-    UnitOfEnergy,
-    UnitOfPower,
 )
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import (
     DistanceConverter,
-    EnergyConverter,
     MassConverter,
-    PowerConverter,
+    VolumeConverter,
 )
 
-from .device_config import ConsumptionSource
 from .models import UsageUnit
+from .quantities import Quantity
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
-# Readings are kept in kWh (energy) or W (power).
-METER_UNITS = {
-    ConsumptionSource.ENERGY: (EnergyConverter, UnitOfEnergy.KILO_WATT_HOUR),
-    ConsumptionSource.POWER: (PowerConverter, UnitOfPower.WATT),
-}
 USAGE_UNITS = (
     (DistanceConverter, UsageUnit.MILLIMETRE),
     (MassConverter, UsageUnit.GRAM),
 )
+# A stock input reports a mass, kept in g, or a volume, kept in ml.
+STOCK_UNITS = ((MassConverter, "g", "g"), (VolumeConverter, "mL", "ml"))
 # Price units name the currency by its code or one of these symbols.
 CURRENCY_SYMBOLS = {
     "EUR": {"€"},
@@ -114,9 +108,9 @@ def entity_unit(hass: HomeAssistant, entity_id: str) -> str | None:
     return state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if state else None
 
 
-def unit_scale(source: ConsumptionSource, unit: str | None) -> float | None:
-    """Factor from `unit` to kWh or W; None if Coin-op doesn't recognise it."""
-    converter, canonical = METER_UNITS[source]
+def unit_scale(quantity: Quantity, source: str, unit: str | None) -> float | None:
+    """Factor from `unit` to the unit `source` is kept in; None if not recognised."""
+    converter, canonical = quantity.units(source)
     if unit not in converter.VALID_UNITS:
         return None
     return converter.get_unit_ratio(canonical, unit)
@@ -130,12 +124,21 @@ def usage_scale(unit: str | None) -> tuple[float, UsageUnit] | None:
     return None
 
 
-def price_scale(unit: str | None, currency: str) -> float | None:
-    """Factor from a price in `unit` to `currency`/kWh; None if not recognised."""
+def stock_scale(unit: str | None) -> tuple[float, str] | None:
+    """Factor from `unit` to g or ml; None if it is neither a mass nor a volume."""
+    for converter, canonical, kept in STOCK_UNITS:
+        if unit in converter.VALID_UNITS:
+            return converter.get_unit_ratio(canonical, unit), kept
+    return None
+
+
+def price_scale(quantity: Quantity, unit: str | None, currency: str) -> float | None:
+    """Factor from a price in `unit` to `currency` per the quantity's unit; None if not recognised."""
     if unit is None or unit.count("/") != 1:
         return None
-    money, energy = (part.strip() for part in unit.split("/"))
-    if energy not in EnergyConverter.VALID_UNITS:
+    money, per = (part.strip() for part in unit.split("/"))
+    converter = quantity.total_converter
+    if per not in converter.VALID_UNITS:
         return None
     if money.upper() == currency.upper() or money in CURRENCY_SYMBOLS.get(
         currency.upper(), set()
@@ -145,7 +148,7 @@ def price_scale(unit: str | None, currency: str) -> float | None:
         scale = 0.01
     else:
         return None
-    return scale * EnergyConverter.get_unit_ratio(energy, UnitOfEnergy.KILO_WATT_HOUR)
+    return scale * converter.get_unit_ratio(per, quantity.unit)
 
 
 def _number(state: State | None, attribute: str | None) -> float | None:
@@ -165,29 +168,31 @@ def _reported_unit(state: State, attribute: str | None) -> str | None:
 
 
 def price_reading(
-    state: State | None, price: Mapping[str, Any], currency: str
+    quantity: Quantity, state: State | None, price: Mapping[str, Any], currency: str
 ) -> float | None:
-    """The price entity's current price in `currency`/kWh, or None while it has none."""
+    """The price entity's current price per the quantity's unit, or None while it has none."""
     number = _number(state, price["attribute"])
     if state is None or number is None:
         return None
     scale = (
-        price_scale(_reported_unit(state, price["attribute"]), currency)
-        or price_scale(price["unit"], currency)
+        price_scale(quantity, _reported_unit(state, price["attribute"]), currency)
+        or price_scale(quantity, price["unit"], currency)
         or price["factor"]
     )
     return None if scale is None else number * scale
 
 
-def meter_reading(state: State | None, meter: Mapping[str, Any]) -> float | None:
-    """The meter's current reading in kWh or W, or None while it has none."""
+def meter_reading(
+    quantity: Quantity, state: State | None, meter: Mapping[str, Any]
+) -> float | None:
+    """The meter's or rate input's current reading in its kept unit, or None while it has none."""
     number = _number(state, meter["attribute"])
     if state is None or number is None:
         return None
-    source = ConsumptionSource(meter["source"])
+    source = meter["source"]
     scale = (
-        unit_scale(source, _reported_unit(state, meter["attribute"]))
-        or unit_scale(source, meter["unit"])
+        unit_scale(quantity, source, _reported_unit(state, meter["attribute"]))
+        or unit_scale(quantity, source, meter["unit"])
         or meter["factor"]
     )
     return None if scale is None else number * scale
@@ -203,6 +208,20 @@ def usage_reading(
     scale = usage_scale(_reported_unit(state, usage["attribute"])) or usage_scale(
         usage["unit"]
     )
+    if scale is None:
+        return None
+    factor, unit = scale
+    return number * factor, unit
+
+
+def stock_reading(
+    state: State | None, stock: Mapping[str, Any]
+) -> tuple[float, str] | None:
+    """A Dose's stock input's level in g or ml; None while it has none."""
+    number = _number(state, stock["attribute"])
+    if state is None or number is None:
+        return None
+    scale = stock_scale(_reported_unit(state, stock["attribute"]) or stock["unit"])
     if scale is None:
         return None
     factor, unit = scale

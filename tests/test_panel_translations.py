@@ -22,6 +22,7 @@ SHARED_TERMS = {
     "run.ended": "entity.event.run.state_attributes.event_type.state.ended",
     "sensor.total_cost": "entity.sensor.total_cost.name",
     "sensor.energy_in_runs": "entity.sensor.energy_in_runs.name",
+    "sensor.water_in_runs": "entity.sensor.water_in_runs.name",
     "sensor.material_used": "entity.sensor.material_used.name",
     "sensor.flagged_runs": "entity.sensor.flagged_runs.name",
     "device.status": "config_subentries.device.step.status.title",
@@ -34,14 +35,28 @@ SHARED_TERMS = {
     "consumption.estimate": (
         "config_subentries.device.step.consumption.menu_options.estimate"
     ),
+    "consumption.per_program": (
+        "config_subentries.device.step.consumption.menu_options.per_program"
+    ),
+    "device.program": "config_subentries.device.step.program.title",
+    "device.water": "config_subentries.device.step.reconfigure.menu_options.water",
+    "device.water_price": "config_subentries.device.step.water_price.title",
+    "water.meter": "config_subentries.device.step.water.menu_options.water_meter",
+    "water.flow": "config_subentries.device.step.water.menu_options.water_flow",
+    "water.per_program": (
+        "config_subentries.device.step.water.menu_options.water_per_program"
+    ),
+    "water.none": "config_subentries.device.step.water.menu_options.water_none",
 }
 
 # Terms the panel and the Cost Statement both show: panel key -> statement key.
 STATEMENT_TERMS = {
     "statement.default_title": "title",
     "run.untitled": "untitled",
+    "run.program": "column.program",
     "duration": "duration",
     "kind.electricity": "kind.electricity",
+    "kind.water": "kind.water",
     "kind.material": "kind.material",
     "kind.other": "kind.other",
     "outcome.completed": "outcome_name.completed",

@@ -5,10 +5,14 @@ must pass). Settings of removed Devices are dropped at setup; fields this
 version doesn't know are kept as stored.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from copy import deepcopy
 from typing import Any
 
+from homeassistant.core import CALLBACK_TYPE
+
+from .device_inputs import stock_scale
+from .models import DoseSource
 from .schema import vol
 from .store import CoinOpStore
 from .tags import retag, tag_name
@@ -16,12 +20,84 @@ from .tags import retag, tag_name
 TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
 AUTOMATIC_TEMPLATES = "automatic_templates"
 DEFAULT_MATERIAL = "default_material"
+DOSES = "doses"
+PROGRAM_DEFAULTS = "program_defaults"
+
+
+def _unique_ids(doses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len({dose["id"] for dose in doses}) != len(doses):
+        raise vol.Invalid("Dose ids must be unique")
+    return doses
+
+
+def _stock_unit(stock: dict[str, Any]) -> dict[str, Any]:
+    if stock["attribute"] is not None and stock_scale(stock["unit"]) is None:
+        raise vol.Invalid("A stock input's attribute needs a mass or volume unit")
+    return stock
+
+
+# An entity reporting how much of a Dose's Material is left; an attribute has no unit.
+_STOCK = vol.All(
+    {
+        vol.Required("entity_id"): vol.All(str, vol.Length(min=1)),
+        vol.Optional("attribute", default=None): vol.Any(
+            None, vol.All(str, vol.Length(min=1))
+        ),
+        vol.Optional("unit", default=None): vol.Any(None, str),
+    },
+    _stock_unit,
+)
+
+# A row's amount per Dose id, in its Material's unit; a missing one is not dosed.
+# A missing kWh or litres is not set.
+_ROW = {
+    vol.Required("doses"): {
+        str: vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
+    },
+    vol.Optional("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("litres"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+}
 
 FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
     AUTOMATIC_TEMPLATES: ([], vol.All([str], vol.Unique())),
     DEFAULT_MATERIAL: (None, vol.Any(None, str)),
+    DOSES: (
+        [],
+        vol.All(
+            [
+                {
+                    vol.Required("id"): vol.All(str, vol.Length(min=1)),
+                    vol.Required("material_id"): str,
+                    vol.Optional("stock"): _STOCK,
+                }
+            ],
+            _unique_ids,
+        ),
+    ),
+    PROGRAM_DEFAULTS: (
+        {"default": {"doses": {}}, "programs": {}},
+        {
+            vol.Required("default"): _ROW,
+            # By Program, matched by its exact trimmed text.
+            vol.Optional("programs", default=dict): {
+                vol.All(str, vol.Strip, vol.Length(min=1)): _ROW
+            },
+        },
+    ),
 }
+
+
+def _drop_removed_doses(settings: dict[str, Any]) -> None:
+    """A removed Dose takes its amounts with it."""
+    if PROGRAM_DEFAULTS not in settings:
+        return
+    ids = {dose["id"] for dose in settings.get(DOSES, [])}
+    defaults = settings[PROGRAM_DEFAULTS]
+    for row in [defaults["default"], *defaults.get("programs", {}).values()]:
+        row["doses"] = {
+            id_: amount for id_, amount in row["doses"].items() if id_ in ids
+        }
 
 
 class DeviceSettings:
@@ -37,6 +113,7 @@ class DeviceSettings:
             device_id: stored.get(device_id, {}) for device_id in device_ids
         }
         self._removed = stored.keys() - self._devices.keys()
+        self._listeners: list[Callable[[str], None]] = []
 
     def __contains__(self, device_id: str) -> bool:
         return device_id in self._devices
@@ -47,6 +124,16 @@ class DeviceSettings:
             name: deepcopy(stored.get(name, default))
             for name, (default, _) in FIELDS.items()
         }
+
+    def program_row(
+        self, device_id: str, program: str | None
+    ) -> tuple[dict[str, Any], DoseSource]:
+        """The Program Defaults' row a Run of `program` uses: its Program's, else
+        the Default row."""
+        defaults = self.get(device_id)[PROGRAM_DEFAULTS]
+        if program in defaults["programs"]:
+            return defaults["programs"][program], DoseSource.PROGRAM_DEFAULT
+        return defaults["default"], DoseSource.DEFAULT_ROW
 
     @staticmethod
     def validate(changes: Mapping[str, Any]) -> dict[str, Any]:
@@ -60,9 +147,18 @@ class DeviceSettings:
         self, device_id: str, changes: Mapping[str, Any]
     ) -> dict[str, Any]:
         """Apply `changes` (raises `vol.Invalid` for an unknown field or value)."""
-        self._devices[device_id] = self._devices[device_id] | self.validate(changes)
+        settings = self._devices[device_id] | self.validate(changes)
+        _drop_removed_doses(settings)
+        self._devices[device_id] = settings
         await self._save()
+        for listener in list(self._listeners):
+            listener(device_id)
         return self.get(device_id)
+
+    def async_listen(self, listener: Callable[[str], None]) -> CALLBACK_TYPE:
+        """Call `listener` with the Device's id after each change of its settings."""
+        self._listeners.append(listener)
+        return lambda: self._listeners.remove(listener)
 
     async def async_retag(self, tag: str, new: str | None) -> None:
         """Replace `tag` by `new` in every Device's Tags for new Runs, or remove it."""

@@ -8,13 +8,13 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .cost.totals import run_totals
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .entity import DeviceEntity
 from .models import Run
 from .run_book import RunBook
@@ -31,14 +31,23 @@ def _cost(key: str, translation_key: str) -> SensorEntityDescription:
     )
 
 
-# Each key names the `Totals` field the sensor shows.
+# Each key names the `Totals` field the sensor shows; some only for a Capability.
+MATERIAL_USED = "material_grams"
+WATER_COST = "water_cost"
+WATER_IN_RUNS = "water_litres"
+NEEDS = {
+    MATERIAL_USED: Capability.MATERIAL,
+    WATER_COST: Capability.WATER,
+    WATER_IN_RUNS: Capability.WATER,
+}
 TOTALS = (
     _cost("cost", "total_cost"),
     _cost("electricity_cost", "electricity_cost"),
+    _cost(WATER_COST, "water_cost"),
     _cost("material_cost", "material_cost"),
     _cost("other_cost", "other_cost"),
     SensorEntityDescription(
-        key="material_grams",
+        key=MATERIAL_USED,
         translation_key="material_used",
         device_class=SensorDeviceClass.WEIGHT,
         state_class=SensorStateClass.TOTAL,
@@ -52,6 +61,14 @@ TOTALS = (
         state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=3,
+    ),
+    SensorEntityDescription(
+        key=WATER_IN_RUNS,
+        translation_key="water_in_runs",
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        suggested_display_precision=1,
     ),
     SensorEntityDescription(
         key="runs", translation_key="runs", state_class=SensorStateClass.TOTAL
@@ -93,6 +110,8 @@ async def async_setup_entry(
                 *(
                     TotalSensor(hass, book, device, description)
                     for description in TOTALS
+                    if description.key not in NEEDS
+                    or NEEDS[description.key] in device.capabilities
                 ),
                 CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
                 LastRunCostSensor(hass, book, device, LAST_RUN_COST),
@@ -163,13 +182,21 @@ class LastRunCostSensor(DeviceSensor):
         if run is None:
             return None
         cost = run_totals(run, dt_util.utcnow()).cost
+        parts = (
+            {}
+            if run.part_count is None
+            else {"part_count": run.part_count, "cost_per_part": cost / run.part_count}
+        )
+        program = (
+            {"program": run.program} if Capability.PROGRAM in self._capabilities else {}
+        )
         return {
             "name": run.name,
+            **program,
             "outcome": run.outcome,
             "start": run.started,
             "end": run.ended,
-            "part_count": run.part_count,
-            "cost_per_part": cost / run.part_count,
+            **parts,
             "has_flags": bool(run.flags),
             "tags": list(run.tags),
         }

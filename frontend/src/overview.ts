@@ -3,7 +3,7 @@
 // aggregates are read afresh whenever a Run changes.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { KINDS, getAggregates, getGroupings, type Device, type RunSummary } from "./api";
+import { getAggregates, getGroupings, shownKinds, type Device, type RunSummary } from "./api";
 import { barRows, chartStyles, legend, stackedColumns } from "./charts";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
@@ -176,6 +176,7 @@ export class Overview extends LitElement {
       (latest, group) => (group.month && group.month > latest ? group.month : latest),
       now,
     );
+    const kinds = shownKinds(this.devices, monthKind);
     const columns = monthsBetween(first, last)
       .slice(-MONTHS_SHOWN)
       .map((key) => ({
@@ -183,7 +184,7 @@ export class Overview extends LitElement {
         title: format.monthName(key),
         value: format.money(month.find((group) => group.month === key)?.cost ?? 0),
         href: runsPath(this.basePath, { month: key }),
-        segments: KINDS.map((kind) => {
+        segments: kinds.map((kind) => {
           const amount =
             monthKind.find((group) => group.month === key && group.kind === kind)?.cost ?? 0;
           return {
@@ -199,7 +200,7 @@ export class Overview extends LitElement {
         <span class="muted small">${t("overview.per_month_hint")}</span>
       </div>
       ${stackedColumns(columns)}
-      ${legend(KINDS.map((kind) => ({ label: t(`kind.${kind}`), colour: `var(--coinop-${kind})` })))}
+      ${legend(kinds.map((kind) => ({ label: t(`kind.${kind}`), colour: `var(--coinop-${kind})` })))}
     </div>`;
   }
 

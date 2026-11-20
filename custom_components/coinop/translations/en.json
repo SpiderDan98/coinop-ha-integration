@@ -24,20 +24,30 @@
             "status": "Status & mapping",
             "job": "Job & Material",
             "images": "Images",
+            "program": "Program",
             "consumption": "Consumption source",
             "price": "Electricity price",
+            "water": "Water source",
+            "water_price": "Water price",
             "detect": "Detect again",
             "save": "Save"
           }
         },
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs Coin-op records. Pick the printer's Home Assistant device to take over its name, or leave it empty. For a printer integration Coin-op knows (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
+          "description": "What kind of Device should Coin-op record Runs of? The Device Type decides the next steps and can't be changed later.",
           "data": {
-            "device": "Printer's Home Assistant device (optional)"
+            "device_type": "Device Type"
+          }
+        },
+        "device": {
+          "title": "Home Assistant device",
+          "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows (3D printers: Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
+          "data": {
+            "device": "The Device's Home Assistant device (optional)"
           },
           "data_description": {
-            "device": "Coin-op's own device for this printer is linked to it. Entity pickers in the next steps still offer every entity."
+            "device": "Coin-op's own device for this Device is linked to it. Entity pickers in the next steps still offer every entity."
           }
         },
         "name": {
@@ -48,8 +58,8 @@
           }
         },
         "status": {
-          "title": "Print status",
-          "description": "Pick the entity that reports the printer's status. It does not need to be available now.",
+          "title": "Status",
+          "description": "Pick the entity that reports the Device's status. It does not need to be available now.",
           "data": {
             "entity_id": "Status entity",
             "attribute": "Attribute (optional)"
@@ -116,18 +126,32 @@
             "snapshot": "Only with a camera. Up to three attempts; none when the end of a Run is only noticed later, e.g. after an outage."
           }
         },
+        "program": {
+          "title": "Program",
+          "description": "Optionally pick the entity that reports which program the machine runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
+          "data": {
+            "entity_id": "Program entity (optional)",
+            "attribute": "Attribute (optional)",
+            "ignored": "Values to ignore (optional)"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "ignored": "Values the entity reports while it knows no program, such as a placeholder while it is still detecting. They never become a Run's Program."
+          }
+        },
         "consumption": {
           "title": "Electricity consumption",
           "description": "How should Coin-op determine the electricity a Run uses?",
           "menu_options": {
             "energy": "Energy meter",
             "power": "Power sensor",
-            "estimate": "Estimate from average power"
+            "estimate": "Estimate from average power",
+            "per_program": "Per Program (kWh in the Program Defaults)"
           }
         },
         "energy": {
           "title": "Energy meter",
-          "description": "Pick the entity that counts the printer's energy, e.g. the energy sensor of a power-measuring plug. It does not need to be available now.",
+          "description": "Pick the entity that counts the Device's energy, e.g. the energy sensor of a power-measuring plug. It does not need to be available now.",
           "data": {
             "entity_id": "Energy entity",
             "attribute": "Attribute (optional)",
@@ -140,7 +164,7 @@
         },
         "power": {
           "title": "Power sensor",
-          "description": "Pick the entity that reports the printer's power draw. Coin-op integrates it over time. It does not need to be available now.",
+          "description": "Pick the entity that reports the Device's power draw. Coin-op integrates it over time. It does not need to be available now.",
           "data": {
             "entity_id": "Power entity",
             "attribute": "Attribute (optional)",
@@ -226,6 +250,105 @@
           "data_description": {
             "factor": "Multiply each price by this to get {currency}/kWh."
           }
+        },
+        "water": {
+          "title": "Water consumption",
+          "description": "How should Coin-op determine the water a Run uses?",
+          "menu_options": {
+            "water_meter": "Water meter",
+            "water_flow": "Flow sensor",
+            "water_per_program": "Per Program (litres in the Program Defaults)",
+            "water_none": "None"
+          }
+        },
+        "water_meter": {
+          "title": "Water meter",
+          "description": "Pick the entity that counts the Device's water, e.g. the machine's water consumption sensor or a water meter on its supply. It does not need to be available now.",
+          "data": {
+            "entity_id": "Water entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each reading by this to get litres."
+          }
+        },
+        "water_flow": {
+          "title": "Flow sensor",
+          "description": "Pick the entity that reports the Device's water flow. Coin-op integrates it over time. It does not need to be available now.",
+          "data": {
+            "entity_id": "Flow entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each reading by this to get L/min."
+          }
+        },
+        "water_meter_unit": {
+          "title": "Unit of the water attribute",
+          "description": "In which unit does the attribute count water?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get litres."
+          }
+        },
+        "water_flow_unit": {
+          "title": "Unit of the flow attribute",
+          "description": "In which unit does the attribute report the flow?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each reading by this to get L/min."
+          }
+        },
+        "water_price": {
+          "title": "Water price",
+          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so the cost per load is realistic.",
+          "menu_options": {
+            "water_fixed_price": "Fixed price",
+            "water_price_entity": "Price entity"
+          }
+        },
+        "water_fixed_price": {
+          "title": "Fixed water price",
+          "data": {
+            "price": "Price per m³"
+          },
+          "data_description": {
+            "price": "What you pay per m³, in {currency}, including wastewater."
+          }
+        },
+        "water_price_entity": {
+          "title": "Water price entity",
+          "description": "Pick the entity that reports the current water price per m³ or L, in {currency} or a sub-unit like ct, ideally including wastewater. Each litre of a Run is charged at the price that applied when it was used. It does not need to be available now.",
+          "data": {
+            "entity_id": "Price entity",
+            "attribute": "Attribute (optional)",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state.",
+            "factor": "Multiply each price by this to get {currency}/m³."
+          }
+        },
+        "water_price_unit": {
+          "title": "Unit of the water price attribute",
+          "description": "In which unit does the attribute report the price?",
+          "data": {
+            "unit": "Unit",
+            "factor": "Conversion factor"
+          },
+          "data_description": {
+            "factor": "Multiply each price by this to get {currency}/m³."
+          }
         }
       },
       "error": {
@@ -280,6 +403,9 @@
       "electricity_cost": {
         "name": "Electricity cost"
       },
+      "water_cost": {
+        "name": "Water cost"
+      },
       "material_cost": {
         "name": "Material cost"
       },
@@ -291,6 +417,9 @@
       },
       "energy_in_runs": {
         "name": "Energy in Runs"
+      },
+      "water_in_runs": {
+        "name": "Water in Runs"
       },
       "running_time": {
         "name": "Running time"
@@ -346,6 +475,14 @@
     "data_corrupt": {
       "title": "Coin-op's stored data is corrupt",
       "description": "Coin-op could read {store}, but its content is not what Coin-op writes, e.g. after it was edited by hand. Coin-op did not start so it cannot overwrite your history.\n\nRestore a backup made before the damage under Settings > System > Backups, or put back a copy of the file you kept. Until then Coin-op stays stopped."
+    }
+  },
+  "selector": {
+    "device_type": {
+      "options": {
+        "3d_printer": "3D printer",
+        "washing_machine": "Washing machine"
+      }
     }
   }
 }

@@ -24,20 +24,30 @@
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
             "images": "Bilder",
+            "program": "Programm",
             "consumption": "Verbrauchsquelle",
             "price": "Strompreis",
+            "water": "Wasserquelle",
+            "water_price": "Wasserpreis",
             "detect": "Erneut erkennen",
             "save": "Speichern"
           }
         },
         "user": {
           "title": "Gerät hinzufügen",
-          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe Coin-op erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die Coin-op kennt (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "description": "Welche Art von Gerät soll Coin-op erfassen? Der Gerätetyp bestimmt die nächsten Schritte und lässt sich später nicht ändern.",
           "data": {
-            "device": "Home-Assistant-Gerät des Druckers (optional)"
+            "device_type": "Gerätetyp"
+          }
+        },
+        "device": {
+          "title": "Home-Assistant-Gerät",
+          "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op kennt (3D-Drucker: Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "data": {
+            "device": "Home-Assistant-Gerät (optional)"
           },
           "data_description": {
-            "device": "Das eigene Gerät von Coin-op für diesen Drucker wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
+            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
           }
         },
         "name": {
@@ -48,8 +58,8 @@
           }
         },
         "status": {
-          "title": "Druckstatus",
-          "description": "Wähle die Entität, die den Status des Druckers meldet. Sie muss jetzt nicht verfügbar sein.",
+          "title": "Status",
+          "description": "Wähle die Entität, die den Status des Geräts meldet. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Status-Entität",
             "attribute": "Attribut (optional)"
@@ -116,18 +126,32 @@
             "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
           }
         },
+        "program": {
+          "title": "Programm",
+          "description": "Wähle optional die Entität, die meldet, welches Programm die Maschine ausführt. Ein Lauf speichert sein Programm und wird danach benannt, bis du ihn umbenennst. Das Programm folgt der Eingabe, solange der Lauf offen ist, sodass eine späte oder korrigierte Erkennung übernommen wird; ein Programmwechsel beendet den Lauf nie.",
+          "data": {
+            "entity_id": "Programm-Entität (optional)",
+            "attribute": "Attribut (optional)",
+            "ignored": "Zu ignorierende Werte (optional)"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "ignored": "Werte, die die Entität meldet, solange sie kein Programm kennt, etwa ein Platzhalter während der Erkennung. Sie werden nie zum Programm eines Laufs."
+          }
+        },
         "consumption": {
           "title": "Stromverbrauch",
           "description": "Wie soll Coin-op den Strom bestimmen, den ein Lauf verbraucht?",
           "menu_options": {
             "energy": "Energiezähler",
             "power": "Leistungssensor",
-            "estimate": "Aus Durchschnittsleistung schätzen"
+            "estimate": "Aus Durchschnittsleistung schätzen",
+            "per_program": "Je Programm (kWh in den Programmvorgaben)"
           }
         },
         "energy": {
           "title": "Energiezähler",
-          "description": "Wähle die Entität, die die Energie des Druckers zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
+          "description": "Wähle die Entität, die die Energie des Geräts zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Energie-Entität",
             "attribute": "Attribut (optional)",
@@ -140,7 +164,7 @@
         },
         "power": {
           "title": "Leistungssensor",
-          "description": "Wähle die Entität, die die Leistungsaufnahme des Druckers meldet. Coin-op integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "description": "Wähle die Entität, die die Leistungsaufnahme des Geräts meldet. Coin-op integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Leistungs-Entität",
             "attribute": "Attribut (optional)",
@@ -226,6 +250,105 @@
           "data_description": {
             "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
           }
+        },
+        "water": {
+          "title": "Wasserverbrauch",
+          "description": "Wie soll Coin-op das Wasser bestimmen, das ein Lauf verbraucht?",
+          "menu_options": {
+            "water_meter": "Wasserzähler",
+            "water_flow": "Durchflusssensor",
+            "water_per_program": "Je Programm (Liter in den Programmvorgaben)",
+            "water_none": "Keine"
+          }
+        },
+        "water_meter": {
+          "title": "Wasserzähler",
+          "description": "Wähle die Entität, die das Wasser des Geräts zählt, z. B. den Wasserverbrauchssensor der Maschine oder einen Wasserzähler an ihrem Zulauf. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Wasser-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um Liter zu erhalten."
+          }
+        },
+        "water_flow": {
+          "title": "Durchflusssensor",
+          "description": "Wähle die Entität, die den Wasserdurchfluss des Geräts meldet. Coin-op integriert ihn über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Durchfluss-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um L/min zu erhalten."
+          }
+        },
+        "water_meter_unit": {
+          "title": "Einheit des Wasser-Attributs",
+          "description": "In welcher Einheit zählt das Attribut das Wasser?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um Liter zu erhalten."
+          }
+        },
+        "water_flow_unit": {
+          "title": "Einheit des Durchfluss-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Durchfluss?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um L/min zu erhalten."
+          }
+        },
+        "water_price": {
+          "title": "Wasserpreis",
+          "description": "Zahlst du einen festen Preis pro m³, oder meldet eine Entität den aktuellen Preis? Rechne die Abwassergebühr mit ein, damit die Kosten pro Wäsche realistisch sind.",
+          "menu_options": {
+            "water_fixed_price": "Fester Preis",
+            "water_price_entity": "Preis-Entität"
+          }
+        },
+        "water_fixed_price": {
+          "title": "Fester Wasserpreis",
+          "data": {
+            "price": "Preis pro m³"
+          },
+          "data_description": {
+            "price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser."
+          }
+        },
+        "water_price_entity": {
+          "title": "Wasserpreis-Entität",
+          "description": "Wähle die Entität, die den aktuellen Wasserpreis pro m³ oder L meldet, in {currency} oder einer Untereinheit wie ct, am besten einschließlich Abwasser. Jeder Liter eines Laufs kostet den Preis, der galt, als er verbraucht wurde. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Preis-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/m³ zu erhalten."
+          }
+        },
+        "water_price_unit": {
+          "title": "Einheit des Wasserpreis-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Preis?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/m³ zu erhalten."
+          }
         }
       },
       "error": {
@@ -280,6 +403,9 @@
       "electricity_cost": {
         "name": "Stromkosten"
       },
+      "water_cost": {
+        "name": "Wasserkosten"
+      },
       "material_cost": {
         "name": "Materialkosten"
       },
@@ -291,6 +417,9 @@
       },
       "energy_in_runs": {
         "name": "Energie in Läufen"
+      },
+      "water_in_runs": {
+        "name": "Wasser in Läufen"
       },
       "running_time": {
         "name": "Laufzeit"
@@ -346,6 +475,14 @@
     "data_corrupt": {
       "title": "Die gespeicherten Daten von Coin-op sind beschädigt",
       "description": "Coin-op konnte {store} lesen, aber der Inhalt ist nicht das, was Coin-op schreibt, etwa nach einer Bearbeitung von Hand. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle unter Einstellungen > System > Backups ein Backup von vor der Beschädigung wieder her oder lege eine aufbewahrte Kopie der Datei zurück. Bis dahin bleibt Coin-op gestoppt."
+    }
+  },
+  "selector": {
+    "device_type": {
+      "options": {
+        "3d_printer": "3D-Drucker",
+        "washing_machine": "Waschmaschine"
+      }
     }
   }
 }

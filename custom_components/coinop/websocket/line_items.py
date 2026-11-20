@@ -15,10 +15,19 @@ from homeassistant.util.ulid import ulid_now
 from custom_components.coinop.cost.material import (
     GRAM,
     MILLILITRE,
+    PIECES,
     change_material,
     material_line_item,
 )
-from custom_components.coinop.models import VALUES, LineItem, LineItemKind, Run
+from custom_components.coinop.models import (
+    CONSUMED_KINDS,
+    VALUES,
+    ConsumptionMethod,
+    LineItem,
+    LineItemKind,
+    Run,
+)
+from custom_components.coinop.quantities import WATER
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 from custom_components.coinop.templates import template_fields
@@ -105,11 +114,10 @@ async def _update(
         return
     run, item = found
     material_item = item.kind is LineItemKind.MATERIAL
-    electricity_item = item.kind is LineItemKind.ELECTRICITY
     for field, refused, message in (
         (
             "unit",
-            item.is_computed or material_item or electricity_item,
+            item.is_computed or material_item or item.kind in CONSUMED_KINDS,
             "Coin-op sets this unit",
         ),
         ("material_id", not material_item, "Only Material Line Items have one"),
@@ -157,7 +165,7 @@ async def _reset(
         vol.Required("run_id"): str,
         vol.Required("kind"): vol.All(
             vol.Coerce(LineItemKind),
-            vol.In([LineItemKind.OTHER, LineItemKind.MATERIAL]),
+            vol.In([LineItemKind.OTHER, LineItemKind.MATERIAL, LineItemKind.WATER]),
         ),
         vol.Optional("label"): vol.Any(None, str),
         vol.Optional("unit"): str,
@@ -175,20 +183,43 @@ async def _add(
     """A Line Item entered by hand; it is added to an open Run too.
 
     A Material Line Item names its Material and counts g (the default) or ml,
-    priced at the Material's current price; an Other one defaults to 1 piece.
+    or pieces of a Material priced per piece, at the Material's current price;
+    a Water one counts litres, one per Run; an Other one defaults to 1 piece.
     """
     if (run := find_run(connection, msg, coinop)) is None:
         return
-    if msg["kind"] is LineItemKind.MATERIAL:
-        unit = msg.get("unit", GRAM)
-        if "material_id" not in msg or unit not in (GRAM, MILLILITRE):
+    if msg["kind"] is LineItemKind.WATER:
+        if any(i.kind is LineItemKind.WATER for i in run.line_items):
+            connection.send_error(
+                msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has its Water"
+            )
+            return
+        item = LineItem(
+            id=ulid_now(),
+            kind=LineItemKind.WATER,
+            quantity=None,
+            unit=WATER.unit,
+            unit_price=0.0,
+            amount=0.0,
+            method=ConsumptionMethod.ENTERED,
+        )
+    elif msg["kind"] is LineItemKind.MATERIAL:
+        if "material_id" not in msg:
             connection.send_error(
                 msg["id"],
                 websocket_api.ERR_INVALID_FORMAT,
-                "A Material Line Item names its Material and counts g or ml",
+                "A Material Line Item names its Material",
             )
             return
         if not (material := pickable(connection, msg, coinop, msg["material_id"])):
+            return
+        units = (PIECES,) if material.by_piece else (GRAM, MILLILITRE)
+        if (unit := msg.get("unit", units[0])) not in units:
+            connection.send_error(
+                msg["id"],
+                websocket_api.ERR_INVALID_FORMAT,
+                f"This Material counts {' or '.join(units)}",
+            )
             return
         item = material_line_item(ulid_now(), None, material, measured=False, unit=unit)
         item.label = _text(msg.get("label"))

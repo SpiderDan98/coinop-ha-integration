@@ -42,6 +42,8 @@ OPTIONS_SCHEMA = vol.Schema(
 
 class CoinOpConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
+    # 1.2: every Device stores its Device Type.
+    MINOR_VERSION = 2
 
     @classmethod
     @callback

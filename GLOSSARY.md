@@ -10,7 +10,7 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, …), which determines which computed Line Items, such as electricity and material, its Runs get.
+The kind of Device (3D printer, washing machine, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
 _Avoid_: Category, device class
 _German UI_: Gerätetyp
 
@@ -25,7 +25,7 @@ _Avoid_: Gate, bay, tray
 _German UI_: Fach
 
 **Integration Profile**:
-The known Device Inputs of a specific printer integration, used to fill in a Device's Device Inputs automatically.
+The known Device Inputs of a specific integration for one Device Type, used to fill in a Device's Device Inputs automatically.
 _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 
@@ -40,9 +40,14 @@ _Avoid_: Result, status (for the ending)
 _German UI_: Ausgang (Abgeschlossen, Abgebrochen, Fehlgeschlagen, Unbekannt)
 
 **Part Count**:
-The number of usable parts a Run produced, which its total cost is divided by to give the cost per part.
+The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of 3D printers have one.
 _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
+
+**Program**:
+The washing program a Run of a washing machine ran, such as "Cotton 60°" or "Eco 40-60", as its Program Device Input reports it or the user corrects it.
+_Avoid_: Cycle, mode, wash type
+_German UI_: Programm
 
 **Tag**:
 A user-chosen keyword that groups Runs across Devices and periods, such as "Cosplay helmet" or "Gift"; a Run can have any number of them.
@@ -70,9 +75,9 @@ _Avoid_: Main image, title image
 _German UI_: Titelbild
 
 **Line Item**:
-One cost line on a Run, such as electricity, filament, or inserting threaded inserts.
+One cost line on a Run, such as electricity, filament, or inserting threaded inserts. Its kind is Electricity, Water, Material or Other.
 _Avoid_: Position, entry, cost line
-_German UI_: Posten
+_German UI_: Posten (Strom, Wasser, Material, Sonstiges)
 
 **Line Item Template**:
 A saved Line Item that can be added to any Run again.
@@ -103,3 +108,18 @@ _German UI_: Material
 A filament product in Spoolman, not a single spool, that a Material links to; the Material then takes its price per gram and its type, density, diameter, colour and vendor from it, so a new spool needs no relinking.
 _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
+
+**Dose**:
+One product a washing machine's Runs use, such as detergent or fabric softener, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
+_Avoid_: Additive, dosage, detergent (as the generic term)
+_German UI_: Dosierung
+
+**Stock input**:
+An entity reporting how much of a Dose's product is left, in g or ml (for example a scale under the bottle); what it loses during a Run, refills ignored, is the Dose's amount.
+_Avoid_: Level sensor, fill level
+_German UI_: Bestandssensor
+
+**Program Defaults**:
+A Device's kWh, litres and Dose amounts for each Program, plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+_Avoid_: Presets, program profiles, estimates
+_German UI_: Programmvorgaben

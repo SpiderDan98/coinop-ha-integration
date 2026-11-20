@@ -4,6 +4,13 @@
       "id": "device-kobra",
       "name": "Kobra",
       "type": "3d_printer",
+      "capabilities": [
+        "average_power",
+        "images",
+        "job",
+        "material",
+        "part_count"
+      ],
       "ha_settings": {
         "printer_device_id": null,
         "status": {
@@ -63,8 +70,16 @@
         "automatic_templates": [
           "template-wear"
         ],
-        "default_material": "pla-black"
-      }
+        "default_material": "pla-black",
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
     }
   ]
 }

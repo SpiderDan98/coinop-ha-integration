@@ -1,4 +1,4 @@
-// "Manual Run": a Run made by hand for a print Coin-op did not see. Pre-fills the
+// "Manual Run": a Run made by hand for a Run Coin-op did not see. Pre-fills the
 // Device's Tags for new Runs, opens the new Run's page once created and fires `close`.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -21,6 +21,7 @@ export class ManualRunDialog extends LitElement {
 
   @state() private deviceId?: string;
   @state() private name = "";
+  @state() private program = "";
   @state() private started = "";
   @state() private ended = "";
   @state() private outcome: Outcome = "completed";
@@ -56,6 +57,7 @@ export class ManualRunDialog extends LitElement {
     const times = this.times;
     const now = formatter(this.hass).toInput(new Date().toISOString());
     const tags = this.runTags ?? device?.settings.tags_for_new_runs ?? [];
+    const program = this.programOf(device);
     const input = (event: Event) => (event.target as HTMLInputElement).value;
     return html`<coinop-dialog
       class="manual-dialog dialog"
@@ -87,9 +89,23 @@ export class ManualRunDialog extends LitElement {
           name="name"
           autofocus
           .value=${this.name}
-          placeholder=${t("run.untitled")}
+          placeholder=${program ?? t("run.untitled")}
           @input=${(event: Event) => (this.name = input(event))}
       /></label>
+      ${
+        device?.capabilities.includes("program")
+          ? html`<label
+              >${t("run.program")}<input
+                name="program"
+                list="known-programs"
+                .value=${this.program}
+                @input=${(event: Event) => (this.program = input(event))}
+              /><datalist id="known-programs">
+                ${device.known_programs.map((known) => html`<option value=${known}></option>`)}
+              </datalist></label
+            >`
+          : nothing
+      }
       <div class="row times">
         <label
           >${t("run.started")}<input
@@ -178,10 +194,17 @@ export class ManualRunDialog extends LitElement {
     </coinop-dialog>`;
   }
 
+  /** The Program entered, null for none; undefined for a Device without Programs. */
+  private programOf(device: Device | undefined) {
+    if (!device?.capabilities.includes("program")) return undefined;
+    return this.program.trim() || null;
+  }
+
   private async create(tags: string[]) {
     const device = this.device;
     const { started, ended } = this.times;
     if (!device || !started || !ended) return;
+    const program = this.programOf(device);
     this.saving = true;
     this.failed = false;
     try {
@@ -192,6 +215,7 @@ export class ManualRunDialog extends LitElement {
         ended,
         outcome: this.outcome,
         tags,
+        ...(program === undefined ? {} : { program }),
       });
       navigate(`${this.basePath}/run/${encodeURIComponent(run.id)}`);
       this.close();

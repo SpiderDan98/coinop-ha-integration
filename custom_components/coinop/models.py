@@ -29,6 +29,12 @@ class Flag(StrEnum):
     SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
+    # A Cancelled or Failed Run charged water or Dose defaults meant for a whole Run.
+    ENDED_EARLY_DEFAULTS = "ended_early_defaults"
+    # A Dose's stock input reported nothing usable: its default was charged.
+    STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
+    # A computed Line Item had neither a measurement nor a default.
+    DEFAULT_MISSING = "default_missing"
 
 
 class UsageUnit(StrEnum):
@@ -40,6 +46,7 @@ class UsageUnit(StrEnum):
 
 class LineItemKind(StrEnum):
     ELECTRICITY = "electricity"
+    WATER = "water"
     MATERIAL = "material"
     OTHER = "other"
 
@@ -51,11 +58,26 @@ class QuantityBasis(StrEnum):
     RUNNING_HOURS = "running_hours"
 
 
-class ElectricityMethod(StrEnum):
+# Consumed quantities: at most one Line Item each per Run.
+CONSUMED_KINDS = frozenset({LineItemKind.ELECTRICITY, LineItemKind.WATER})
+
+
+class ConsumptionMethod(StrEnum):
+    """Where a consumed quantity's Line Item (electricity, water) came from."""
+
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
     ESTIMATED = "estimated"
+    PROGRAM_DEFAULT = "program_default"
     ENTERED = "entered"
+
+
+class DoseSource(StrEnum):
+    """Where a Dose Line Item's amount came from."""
+
+    PROGRAM_DEFAULT = "program_default"
+    DEFAULT_ROW = "default_row"
+    STOCK_INPUT = "stock_input"
 
 
 @overload
@@ -81,11 +103,14 @@ def unknown_fields(cls: type, data: dict[str, Any]) -> dict[str, Any]:
 
 @dataclass
 class PriceSegment:
-    """Evidence on the Electricity Line Item: energy used while one price applied."""
+    """Evidence on a consumed quantity's Line Item: what was used while one price applied.
+
+    Stored as `kwh`, the unit of the first quantity it was written for.
+    """
 
     start: datetime
     end: datetime
-    kwh: float
+    quantity: float
     unit_price: float
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -93,7 +118,7 @@ class PriceSegment:
         return self.unknown | {
             "start": _iso(self.start),
             "end": _iso(self.end),
-            "kwh": self.kwh,
+            "kwh": self.quantity,
             "unit_price": self.unit_price,
         }
 
@@ -102,21 +127,64 @@ class PriceSegment:
         return cls(
             start=_time(data["start"]),
             end=_time(data["end"]),
-            kwh=data["kwh"],
+            quantity=data["kwh"],
             unit_price=data["unit_price"],
+            unknown=unknown_fields(cls, {k: v for k, v in data.items() if k != "kwh"}),
+        )
+
+
+def _timeline(entries: list[Any]) -> list[tuple[datetime, float | None]]:
+    return [(_time(at), value) for at, value in entries]
+
+
+@dataclass
+class Timeline:
+    """What a Run follows for one consumed quantity, such as electricity.
+
+    `source` is the Device's source section when the Run started (a meter, a
+    rate input or a fallback), `cost_source` the Device's price section the Run
+    follows. `readings` are the meter's (time, value) reports and `prices` the
+    (since, price per unit) timeline, None while they had no value; both are
+    kept until finalised.
+    """
+
+    source: dict[str, Any] | None = None
+    cost_source: dict[str, Any] | None = None
+    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
+    prices: list[tuple[datetime, float | None]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def as_dict(self) -> dict[str, Any]:
+        return self.unknown | {
+            "source": self.source,
+            "cost_source": self.cost_source,
+            "readings": [[_iso(at), value] for at, value in self.readings],
+            "prices": [[_iso(at), price] for at, price in self.prices],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Timeline:
+        return cls(
+            source=data["source"],
+            cost_source=data["cost_source"],
+            readings=_timeline(data["readings"]),
+            prices=_timeline(data["prices"]),
             unknown=unknown_fields(cls, data),
         )
 
 
 @dataclass
 class MaterialCopy:
-    """Evidence on a Material Line Item: its Material as it was when priced."""
+    """Evidence on a Material Line Item: its Material as it was when priced.
+
+    One priced per piece has no density and no price per gram.
+    """
 
     name: str
     type: str
-    density: float
+    density: float | None
     diameter: float | None
-    price_per_gram: float
+    price_per_gram: float | None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
@@ -157,6 +225,29 @@ class Usage:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Usage:
         return cls(_time(data["at"]), data["value"], UsageUnit(data["unit"]))
+
+
+@dataclass
+class Stock:
+    """What a Dose's stock input reported during the Run: its last `level` and
+    when it was last reported, in g or ml, and the decreases summed so far."""
+
+    at: datetime
+    level: float
+    unit: str
+    used: float = 0.0
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "at": _iso(self.at),
+            "level": self.level,
+            "unit": self.unit,
+            "used": self.used,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Stock:
+        return cls(_time(data["at"]), data["level"], data["unit"], data["used"])
 
 
 @dataclass(frozen=True)
@@ -207,11 +298,12 @@ class LineItem:
     Computed Line Items keep `label` None and are labelled by their kind in the
     output language. Material Line Items reference their Material by
     `material_id`, which keeps it from being deleted, and keep a copy of it in
-    `material`; their unit is g or ml. A `measured` one follows the Material used
+    `material`; their unit is g, ml or pcs. A `measured` one follows the Material used
     input, whose length (mm) it keeps, and the Slots it was attributed through
     (`slots`); split across several Materials, `share` is its estimated share of
-    the measured total. A Line Item copied from a Line Item
-    Template keeps only `template_id` as its origin and the template's `basis`;
+    the measured total. A Dose's Line Item references it by `dose_id` and keeps
+    where its amount came from in `dose_source`. A Line Item copied from a Line
+    Item Template keeps only `template_id` as its origin and the template's `basis`;
     with running hours Coin-op computes its quantity. Quantity, unit price and
     amount are what counts; once the user overrides a computed one, `computed`
     keeps what Coin-op computed.
@@ -232,7 +324,9 @@ class LineItem:
     share: float | None = None
     template_id: str | None = None
     basis: QuantityBasis | None = None
-    method: ElectricityMethod | None = None
+    dose_id: str | None = None
+    dose_source: DoseSource | None = None
+    method: ConsumptionMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -242,20 +336,33 @@ class LineItem:
         """Coin-op computes its values, live while the Run is open."""
         return (
             (
-                self.kind is LineItemKind.ELECTRICITY
-                and self.method is not ElectricityMethod.ENTERED
+                self.kind in CONSUMED_KINDS
+                and self.method is not ConsumptionMethod.ENTERED
             )
             or self.measured
             or self.basis is QuantityBasis.RUNNING_HOURS
+            or self.dose_source is not None
         )
 
     @property
+    def from_defaults(self) -> bool:
+        """Its Water or Dose quantity is a default for a whole Run, not what was
+        measured; Program-default electricity doesn't count."""
+        if self.method is ConsumptionMethod.PROGRAM_DEFAULT:
+            return self.kind is LineItemKind.WATER and self.quantity is not None
+        return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
+
+    @property
     def grams(self) -> float:
-        """How much Material it counts for; millilitres weigh their density."""
-        if self.kind is not LineItemKind.MATERIAL or not self.quantity:
+        """How much Material it counts for; millilitres weigh their density, pieces nothing."""
+        if (
+            self.kind is not LineItemKind.MATERIAL
+            or not self.quantity
+            or self.unit == "pcs"
+        ):
             return 0.0
         if self.unit == "ml" and self.material is not None:
-            return self.quantity * self.material.density
+            return self.quantity * (self.material.density or 0.0)
         return self.quantity
 
     @property
@@ -302,6 +409,12 @@ class LineItem:
         self.computed = None
 
     def as_dict(self) -> dict[str, Any]:
+        # Only a Dose's Line Item has the Dose fields, so others keep their shape.
+        dose = (
+            {}
+            if self.dose_id is None
+            else {"dose_id": self.dose_id, "dose_source": self.dose_source}
+        )
         return self.unknown | {
             "id": self.id,
             "kind": self.kind,
@@ -314,6 +427,7 @@ class LineItem:
             "share": self.share,
             "template_id": self.template_id,
             "basis": self.basis,
+            **dose,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -339,13 +453,17 @@ class LineItem:
             share=data.get("share"),
             template_id=data.get("template_id"),
             basis=None if data.get("basis") is None else QuantityBasis(data["basis"]),
+            dose_id=data.get("dose_id"),
+            dose_source=None
+            if data.get("dose_source") is None
+            else DoseSource(data["dose_source"]),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],
             amount=data["amount"],
             method=None
             if data["method"] is None
-            else ElectricityMethod(data["method"]),
+            else ConsumptionMethod(data["method"]),
             segments=[PriceSegment.from_dict(s) for s in data["segments"]],
             computed=data.get("computed"),
             unknown=unknown_fields(cls, data),
@@ -400,17 +518,17 @@ class Run:
     are still awaited; frozen once finalised. `end_reconstructed` marks an end
     Coin-op only learnt about after the Status input or Coin-op itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
+    `program` the Program it ran, which the name follows until the user renames it;
     `last_seen` is the last time the Status input was seen running during the
     open Run.
-    `consumption` is the Device's consumption section when the Run started;
-    `readings` are its meter's (time, kWh or W) reports, None while it had no
-    value, kept until finalised. `cost_source` is the Device's price section the
-    Run follows; `prices` its (since, price per kWh) timeline, None while the
-    price entity had no value, kept until finalised. `average_powers` are the
-    (since, running W, paused W) the Run's consumption model used. `usage` is what
+    `timelines` are what it follows for each consumed quantity, by its Line Item
+    kind. `average_powers` are the (since, running W, paused W) its electricity
+    estimate used. `usage` is what
     the Material used input last reported during the Run: its measured total.
     `loaded_slots` is the timeline of the Slot it printed from, kept until
-    finalised.
+    finalised; `stocks` what each Dose's stock input reported, by Dose id, too.
+    `measured_doses` are the Doses whose stock input measured the Run (nothing used
+    included), kept from finalisation on for a Program correction.
     `cover_id` is the image the user picked as Cover Image.
     """
 
@@ -421,6 +539,7 @@ class Run:
     line_items: list[LineItem]
     name: str | None = None
     job_name: str | None = None
+    program: str | None = None
     last_seen: datetime | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
@@ -428,21 +547,25 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
-    part_count: int = 1
+    part_count: int | None = 1
     note: str | None = None
     tags: list[str] = field(default_factory=list)
-    consumption: dict[str, Any] | None = None
-    readings: list[tuple[datetime, float | None]] = field(default_factory=list)
-    cost_source: dict[str, Any] | None = None
-    prices: list[tuple[datetime, float | None]] = field(default_factory=list)
+    timelines: dict[str, Timeline] = field(default_factory=dict)
     average_powers: list[tuple[datetime, float | None, float | None]] = field(
         default_factory=list
     )
     images: list[RunImage] = field(default_factory=list)
     usage: Usage | None = None
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
+    stocks: dict[str, Stock] = field(default_factory=dict)
+    measured_doses: list[str] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def follow_program(self, program: str | None) -> None:
+        if self.name in (None, self.program):
+            self.name = program
+        self.program = program
 
     @property
     def paused(self) -> bool:
@@ -457,8 +580,12 @@ class Run:
         return not self.finalised and item.is_computed
 
     def deletable(self, item: LineItem) -> bool:
-        """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
-        return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
+        """Every Run keeps its one Electricity Line Item and a computed Water one,
+        overridden down to 0 at most."""
+        kept = item.kind is LineItemKind.ELECTRICITY or (
+            item.kind is LineItemKind.WATER and item.is_computed
+        )
+        return not kept and not self.locked(item)
 
     def drop_fixed_flags(self) -> None:
         """Drops the Flags the user's corrections fixed; the others wait for "Mark as checked"."""
@@ -468,6 +595,11 @@ class Run:
                 i.quantity is not None or i.length is not None for i in items
             ),
             Flag.MATERIAL_MISSING: all(i.material_id is not None for i in items),
+            Flag.DEFAULT_MISSING: all(
+                i.quantity is not None
+                for i in self.line_items
+                if i.kind in CONSUMED_KINDS
+            ),
         }
         self.flags = [flag for flag in self.flags if not fixed.get(flag, False)]
 
@@ -485,12 +617,18 @@ class Run:
         return next(picked, None) or next(iter(self.images_in_order), None)
 
     def as_dict(self) -> dict[str, Any]:
+        # A Run stored without timelines (by an older or newer minor version) keeps that shape.
+        timelines = {
+            kind: timeline.as_dict() for kind, timeline in self.timelines.items()
+        }
         return self.unknown | {
             "id": self.id,
             "device_id": self.device_id,
             "device_name": self.device_name,
             "name": self.name,
             "job_name": self.job_name,
+            # Only Runs of Device Types with Programs have one.
+            **({"program": self.program} if self.program is not None else {}),
             "started": _iso(self.started),
             "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
@@ -505,16 +643,23 @@ class Run:
             "part_count": self.part_count,
             "note": self.note,
             "tags": list(self.tags),
-            "consumption": self.consumption,
-            "readings": [[_iso(at), value] for at, value in self.readings],
-            "cost_source": self.cost_source,
-            "prices": [[_iso(at), price] for at, price in self.prices],
+            **({"timelines": timelines} if timelines else {}),
             "average_powers": [
                 [_iso(at), running, paused]
                 for at, running, paused in self.average_powers
             ],
             "usage": None if self.usage is None else self.usage.as_dict(),
             "loaded_slots": [loaded.as_dict() for loaded in self.loaded_slots],
+            **(
+                {"stocks": {id_: s.as_dict() for id_, s in self.stocks.items()}}
+                if self.stocks
+                else {}
+            ),
+            **(
+                {"measured_doses": list(self.measured_doses)}
+                if self.measured_doses
+                else {}
+            ),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
             "cover_id": self.cover_id,
@@ -528,6 +673,7 @@ class Run:
             device_name=data["device_name"],
             name=data["name"],
             job_name=data.get("job_name"),
+            program=data.get("program"),
             started=_time(data["started"]),
             last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),
@@ -539,10 +685,10 @@ class Run:
             part_count=data["part_count"],
             note=data.get("note"),
             tags=list(data.get("tags", [])),
-            consumption=data.get("consumption"),
-            readings=[(_time(at), value) for at, value in data.get("readings", [])],
-            cost_source=data.get("cost_source"),
-            prices=[(_time(at), price) for at, price in data.get("prices", [])],
+            timelines={
+                kind: Timeline.from_dict(timeline)
+                for kind, timeline in data.get("timelines", {}).items()
+            },
             average_powers=[
                 (_time(at), running, paused)
                 for at, running, paused in data.get("average_powers", [])
@@ -553,6 +699,11 @@ class Run:
             loaded_slots=[
                 LoadedSlot.from_dict(loaded) for loaded in data.get("loaded_slots", [])
             ],
+            stocks={
+                id_: Stock.from_dict(stock)
+                for id_, stock in data.get("stocks", {}).items()
+            },
+            measured_doses=list(data.get("measured_doses", [])),
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             cover_id=data.get("cover_id"),

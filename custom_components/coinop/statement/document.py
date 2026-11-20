@@ -18,7 +18,8 @@ from PIL import Image
 from custom_components.coinop.cost.rounding import round_amount, rounded_sum
 from custom_components.coinop.cost.running_time import running_time
 from custom_components.coinop.images.encode import InvalidImage, jpeg
-from custom_components.coinop.models import LineItem, Outcome, Run
+from custom_components.coinop.models import LineItem, LineItemKind, Outcome, Run
+from custom_components.coinop.quantities import WATER
 
 from .export import Detail, Options
 from .text import Text
@@ -108,8 +109,8 @@ def _total(run: Run, decimals: int) -> Decimal:
     return rounded_sum((item.amount for item in run.line_items), decimals)
 
 
-def _per_part(run: Run, decimals: int) -> Decimal:
-    return round_amount(float(_total(run, decimals)) / run.part_count, decimals)
+def _per_part(run: Run, part_count: int, decimals: int) -> Decimal:
+    return round_amount(float(_total(run, decimals)) / part_count, decimals)
 
 
 def _name(run: Run, text: Text) -> str:
@@ -128,6 +129,14 @@ def _label(item: LineItem, text: Text) -> str:
     if item.material is not None:
         return item.material.name
     return text(f"kind.{item.kind}")
+
+
+def _unit_price(item: LineItem, text: Text) -> str:
+    """Water is priced per m³, as the utility bills it."""
+    if item.kind is LineItemKind.WATER and item.unit == WATER.unit:
+        per_m3 = item.unit_price / WATER.per_unit(1.0)
+        return f"{text.unit_price(per_m3)}/{WATER.price_unit}"
+    return text.unit_price(item.unit_price)
 
 
 def _parts(count: int, text: Text) -> str:
@@ -176,10 +185,14 @@ def _section(
     details = [
         run.device_name,
         text.date(run.started),
+        *([text("program", program=run.program)] if run.program else []),
         text("running_time", duration=text.duration(running_time(run, now))),
-        _parts(run.part_count, text),
-        text("per_part", amount=text.money(_per_part(run, decimals))),
     ]
+    if (count := run.part_count) is not None:
+        details += [
+            _parts(count, text),
+            text("per_part", amount=text.money(_per_part(run, count, decimals))),
+        ]
     pdf.line_of_text(" · ".join(details), 9, grey=True)
     if outcome := _outcome(run, text):
         pdf.line_of_text(text("outcome", outcome=outcome), 9, grey=True)
@@ -201,7 +214,7 @@ def _section(
                 ""
                 if item.quantity is None
                 else text.quantity(item.quantity, item.unit),
-                text.unit_price(item.unit_price),
+                _unit_price(item, text),
                 text.money(round_amount(item.amount, decimals)),
             )
             for item in run.line_items
@@ -219,27 +232,44 @@ def _compact(pdf: _Document, runs: list[Run]) -> None:
             return text("with_outcome", name=_name(run, text), outcome=outcome)
         return _name(run, text)
 
+    def parts(run: Run) -> tuple[str, str]:
+        if (count := run.part_count) is None:
+            return "", ""
+        return str(count), text.money(_per_part(run, count, decimals))
+
+    # Without any Run that has a Program or Part Count, its columns are left out.
+    with_programs = any(run.program for run in runs)
+    with_parts = any(run.part_count is not None for run in runs)
+    programs = ("program",) if with_programs else ()
+    columns = ("part_count", "cost_per_part") if with_parts else ()
     pdf.rows(
-        (32, 20, 16, 8, 12, 12),
-        ("LEFT", "LEFT", "LEFT", "RIGHT", "RIGHT", "RIGHT"),
+        (
+            32,
+            20,
+            *((18,) if with_programs else ()),
+            16,
+            *((8, 12) if with_parts else ()),
+            12,
+        ),
+        (
+            "LEFT",
+            "LEFT",
+            *(("LEFT",) * len(programs)),
+            "LEFT",
+            *(("RIGHT",) * len(columns)),
+            "RIGHT",
+        ),
         [
             text(f"column.{column}")
-            for column in (
-                "run",
-                "device",
-                "started",
-                "part_count",
-                "cost_per_part",
-                "total",
-            )
+            for column in ("run", "device", *programs, "started", *columns, "total")
         ],
         [
             (
                 name(run),
                 run.device_name,
+                *((run.program or "",) if with_programs else ()),
                 text.date(run.started),
-                str(run.part_count),
-                text.money(_per_part(run, decimals)),
+                *(parts(run) if with_parts else ()),
                 text.money(_total(run, decimals)),
             )
             for run in runs

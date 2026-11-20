@@ -3,72 +3,128 @@
     {
       "type": "PLA",
       "form": "filament",
-      "density": 1.24
+      "density": 1.24,
+      "pack_unit": "g"
     },
     {
       "type": "PLA-CF",
       "form": "filament",
-      "density": 1.29
+      "density": 1.29,
+      "pack_unit": "g"
     },
     {
       "type": "PETG",
       "form": "filament",
-      "density": 1.27
+      "density": 1.27,
+      "pack_unit": "g"
     },
     {
       "type": "PETG-CF",
       "form": "filament",
-      "density": 1.3
+      "density": 1.3,
+      "pack_unit": "g"
     },
     {
       "type": "ABS",
       "form": "filament",
-      "density": 1.04
+      "density": 1.04,
+      "pack_unit": "g"
     },
     {
       "type": "ASA",
       "form": "filament",
-      "density": 1.07
+      "density": 1.07,
+      "pack_unit": "g"
     },
     {
       "type": "TPU",
       "form": "filament",
-      "density": 1.21
+      "density": 1.21,
+      "pack_unit": "g"
     },
     {
       "type": "PA",
       "form": "filament",
-      "density": 1.14
+      "density": 1.14,
+      "pack_unit": "g"
     },
     {
       "type": "PC",
       "form": "filament",
-      "density": 1.2
+      "density": 1.2,
+      "pack_unit": "g"
     },
     {
       "type": "HIPS",
       "form": "filament",
-      "density": 1.04
+      "density": 1.04,
+      "pack_unit": "g"
     },
     {
       "type": "PVA",
       "form": "filament",
-      "density": 1.23
+      "density": 1.23,
+      "pack_unit": "g"
     },
     {
       "type": "Standard resin",
       "form": "resin",
-      "density": 1.1
+      "density": 1.1,
+      "pack_unit": "ml"
     },
     {
       "type": "ABS-like resin",
       "form": "resin",
-      "density": 1.1
+      "density": 1.1,
+      "pack_unit": "ml"
     },
     {
       "type": "Water-washable resin",
       "form": "resin",
-      "density": 1.1
+      "density": 1.1,
+      "pack_unit": "ml"
+    },
+    {
+      "type": "Liquid detergent",
+      "form": "detergent",
+      "density": 1.04,
+      "pack_unit": "ml"
+    },
+    {
+      "type": "Powder detergent",
+      "form": "detergent",
+      "density": 0.7,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Detergent pods",
+      "form": "detergent",
+      "density": null,
+      "pack_unit": "pcs"
+    },
+    {
+      "type": "Fabric softener",
+      "form": "fabric_softener",
+      "density": 1.0,
+      "pack_unit": "ml"
+    },
+    {
+      "type": "Whitener",
+      "form": "laundry_additive",
+      "density": 0.9,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Stain remover",
+      "form": "laundry_additive",
+      "density": 1.02,
+      "pack_unit": "ml"
+    },
+    {
+      "type": "Colour catcher sheets",
+      "form": "laundry_additive",
+      "density": null,
+      "pack_unit": "pcs"
     }
   ]
 }

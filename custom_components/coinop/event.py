@@ -6,7 +6,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .cost.totals import run_totals
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .entity import DeviceEntity
 from .models import Run
 from .run_book import RunBook, RunChange
@@ -46,19 +46,43 @@ class RunEvent(DeviceEntity, EventEntity):
             )
         elif change is RunChange.ENDED:
             totals = run_totals(run, dt_util.utcnow())
+            parts = (
+                {}
+                if run.part_count is None
+                else {
+                    "cost_per_part": totals.cost / run.part_count,
+                    "part_count": run.part_count,
+                }
+            )
+            grams = (
+                {"material_grams": totals.material_grams}
+                if Capability.MATERIAL in self._capabilities
+                else {}
+            )
+            litres = (
+                {"water_litres": totals.water_litres}
+                if Capability.WATER in self._capabilities
+                else {}
+            )
+            program = (
+                {"program": run.program}
+                if Capability.PROGRAM in self._capabilities
+                else {}
+            )
             self._trigger_event(
                 change,
                 {
                     "name": run.name,
+                    **program,
                     "outcome": run.outcome,
                     "start": run.started,
                     "end": run.ended,
                     "running_hours": totals.running_hours,
                     "total_cost": totals.cost,
-                    "cost_per_part": totals.cost / run.part_count,
-                    "part_count": run.part_count,
+                    **parts,
                     "energy_kwh": totals.energy_kwh,
-                    "material_grams": totals.material_grams,
+                    **litres,
+                    **grams,
                     "has_flags": bool(run.flags),
                     "tags": list(run.tags),
                 },

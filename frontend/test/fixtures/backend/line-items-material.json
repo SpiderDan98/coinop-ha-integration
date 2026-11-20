@@ -21,9 +21,6 @@
       "Cosplay helmet",
       "Gift"
     ],
-    "consumption": null,
-    "cost_source": null,
-    "prices": [],
     "average_powers": [],
     "usage": null,
     "loaded_slots": [],
@@ -124,6 +121,7 @@
       }
     ],
     "cover_id": null,
+    "program": null,
     "running_seconds": 32400,
     "total": 1.05,
     "cost_per_part": 1.05,
@@ -145,6 +143,7 @@
     },
     "subtotals": {
       "electricity": 0.3,
+      "water": 0.0,
       "material": 2.75,
       "other": -2.0
     }

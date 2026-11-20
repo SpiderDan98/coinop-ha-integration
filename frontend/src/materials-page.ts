@@ -22,6 +22,8 @@ import {
   listFilaments,
   restoreMaterial,
   updateMaterial,
+  MATERIAL_FORMS,
+  PACK_UNITS,
   type Filament,
   type Filaments,
   type Material,
@@ -36,10 +38,15 @@ import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
-const FORMS: MaterialForm[] = ["filament", "resin"];
-const PACK_UNITS: PackUnit[] = ["g", "ml"];
 const DEFAULT_DIAMETER = "1.75";
-const usualUnit = (form: MaterialForm): PackUnit => (form === "resin" ? "ml" : "g");
+const USUAL_UNIT = {
+  filament: "g",
+  resin: "ml",
+  detergent: "ml",
+  fabric_softener: "ml",
+  laundry_additive: "g",
+} satisfies Record<MaterialForm, PackUnit>;
+const usualUnit = (form: MaterialForm): PackUnit => USUAL_UNIT[form];
 
 // Inputs keep their text as typed; numbers are read only when saving.
 const blankDraft = () => ({
@@ -65,7 +72,7 @@ const draftOf = ({ price, ...material }: Material): Draft => ({
   name: material.name,
   form: material.form,
   type: material.type,
-  density: String(material.density),
+  density: material.density === null ? "" : String(material.density),
   vendor: material.vendor ?? "",
   colour: material.colour ?? "",
   diameter: material.diameter === null ? DEFAULT_DIAMETER : String(material.diameter),
@@ -92,6 +99,9 @@ const filamentName = (filament: Filament) =>
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
 
+const byPiece = (draft: Draft) => draft.pack_unit === "pcs";
+const hasDiameter = (draft: Draft) => draft.form === "filament" && !byPiece(draft);
+
 /** The fields of a draft that the backend would refuse, so they can be marked. */
 function problems(draft: Draft) {
   const positive = (value: string) => value.trim() !== "" && Number(value) > 0;
@@ -103,8 +113,8 @@ function problems(draft: Draft) {
   const checks = {
     name: draft.name.trim() !== "",
     type: draft.type.trim() !== "",
-    density: positive(draft.density),
-    diameter: draft.form !== "filament" || draft.diameter.trim() === "" || positive(draft.diameter),
+    density: byPiece(draft) || positive(draft.density),
+    diameter: !hasDiameter(draft) || draft.diameter.trim() === "" || positive(draft.diameter),
     colour: draft.colour.trim() === "" || COLOUR.test(draft.colour.trim()),
     pack_price: draft.pack_price.trim() !== "" && Number(draft.pack_price) >= 0,
     pack_size: positive(draft.pack_size),
@@ -116,10 +126,10 @@ const fieldsOf = (draft: Draft): MaterialFields => ({
   name: draft.name,
   form: draft.form,
   type: draft.type,
-  density: Number(draft.density),
+  density: byPiece(draft) ? null : Number(draft.density),
   vendor: draft.vendor.trim() || null,
   colour: draft.colour.trim() || null,
-  diameter: draft.form === "filament" ? Number(draft.diameter) || null : null,
+  diameter: hasDiameter(draft) ? Number(draft.diameter) || null : null,
   default_for_type: draft.default_for_type,
   price: {
     source: "fixed",
@@ -285,7 +295,7 @@ export class MaterialsPage extends LitElement {
         { label: t("materials.form_type") },
         { label: t("materials.properties") },
         { label: t("materials.pack") },
-        { label: t("materials.price_per_kg"), num: true },
+        { label: t("materials.unit_price"), num: true },
         { label: t("materials.default_for_type"), class: "center" },
         {},
       ],
@@ -303,8 +313,13 @@ export class MaterialsPage extends LitElement {
             </td>
             <td>${t(`form.${material.form}`)} · ${material.type}</td>
             <td class="small">
-              ${number(material.density)}
-              g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
+              ${
+                material.density === null
+                  ? nothing
+                  : `${number(material.density)} g/cm³${
+                      material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`
+                    }`
+              }
             </td>
             <td class="small">
               ${
@@ -316,7 +331,13 @@ export class MaterialsPage extends LitElement {
                   : t("materials.from_spoolman")
               }
             </td>
-            <td class="num">${format.money(material.price_per_gram * 1000)} / kg</td>
+            <td class="num">
+              ${
+                material.price_per_piece === null
+                  ? `${format.money((material.price_per_gram ?? 0) * 1000)} / kg`
+                  : `${format.money(material.price_per_piece)} / pcs`
+              }
+            </td>
             <td>
               ${
                 material.archived
@@ -414,7 +435,7 @@ export class MaterialsPage extends LitElement {
             set({ form, pack_unit: usualUnit(form) });
           }}
         >
-          ${FORMS.map(
+          ${MATERIAL_FORMS.map(
             (form) =>
               html`<option value=${form} ?selected=${draft.form === form}>
                 ${t(`form.${form}`)}
@@ -434,8 +455,8 @@ export class MaterialsPage extends LitElement {
           ${known.map((type) => html`<option value=${type}></option>`)}
         </datalist></label
       >
-      ${number("density", t("materials.density"))}
-      ${draft.form === "filament" ? number("diameter", t("materials.diameter")) : nothing}
+      ${byPiece(draft) ? nothing : number("density", t("materials.density"))}
+      ${hasDiameter(draft) ? number("diameter", t("materials.diameter")) : nothing}
       ${text("vendor", t("materials.vendor"))}
       <div class="label colour">
         ${t("materials.colour")}
@@ -506,10 +527,13 @@ export class MaterialsPage extends LitElement {
     </form>`;
   }
 
-  /** Linking happens on existing Materials; new ones come from the Filament list. */
+  /** Linking happens on existing Materials; new ones come from the Filament list.
+   * A Material bought by the piece is never linked. */
   private renderCostSource(draft: Draft, set: (changes: Partial<Draft>) => void, t: Localize) {
     const linked = draft.price_source === "spoolman";
-    if (!this.editing || (!linked && this.spoolman?.status !== "ok")) return nothing;
+    const edited = this.materials?.find((material) => material.id === this.editing);
+    if (!edited || edited.price_per_piece !== null || byPiece(draft)) return nothing;
+    if (!linked && this.spoolman?.status !== "ok") return nothing;
     const filaments = this.spoolman?.filaments ?? [];
     const known = filaments.some((filament) => String(filament.id) === draft.filament_id);
     const pick = (event: Event) => (event.target as HTMLSelectElement).value;
@@ -574,7 +598,7 @@ export class MaterialsPage extends LitElement {
     );
   }
 
-  /** A built-in type pre-fills its form, density and usual pack unit. */
+  /** A built-in type pre-fills its form, density and pack unit. */
   private setType(type: string) {
     if (!this.draft) return;
     const known = this.types.find(
@@ -585,8 +609,8 @@ export class MaterialsPage extends LitElement {
           ...this.draft,
           type,
           form: known.form,
-          density: String(known.density),
-          pack_unit: usualUnit(known.form),
+          density: known.density === null ? "" : String(known.density),
+          pack_unit: known.pack_unit,
         }
       : { ...this.draft, type };
   }

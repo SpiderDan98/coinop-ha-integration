@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { Material } from "../src/api";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
+import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
 const SUBSCRIBE = "coinop/runs/subscribe";
 const LIST = "coinop/devices/list";
@@ -32,7 +33,7 @@ describe("Devices tab", () => {
 
     expect(cards(panel)).toEqual([
       "Kobra " +
-        "Print status sensor.kobra_status " +
+        "Status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
         "Material used sensor.kobra_filament_used · mm " +
         "Not used Slots, Thumbnail, Camera " +
@@ -82,7 +83,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Print status event.kobra_print · event_type " +
+      "Status event.kobra_print · event_type " +
         "Not used Print job, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
@@ -305,11 +306,84 @@ describe("Devices tab", () => {
     expect(text(panel)).toContain("Coin-op could not load its Devices.");
   });
 
+  it("shows a washing machine without the printer-only parts", async () => {
+    const [kobra] = recorded.devices;
+    const backend = recordedBackend()
+      .reply(LIST, () => ({ devices: [kobra, recorded.washer] }))
+      .subscription("coinop/catalog/subscribe", () => [
+        { ...recorded.catalog.filled, materials: recorded.laundry },
+      ]);
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device-type h2").map(text)).toEqual([
+      "3D printers",
+      "Washing machines",
+    ]);
+    expect(cards(panel)[1]).toBe(
+      "Washer " +
+        "Status sensor.washer_status " +
+        "Program sensor.washer_program " +
+        "Consumption source Energy meter sensor.washer_plug_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Water source None " +
+        "Reconfigure in Home Assistant " +
+        "Doses Liquid detergent 75 ml · measured by sensor.detergent_scale Colour pods Not dosed " +
+        "Program rows Wool " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    );
+    await click(panel, iconButton(panel, "Edit settings of Washer"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(queryAll(dialog, ".default-material")).toHaveLength(0);
+    expect(queryAll(dialog, ".new-run-tags, .automatic-templates")).toHaveLength(2);
+  });
+
+  it("names a washing machine's water source and water price, or its unused Program input", async () => {
+    const { perProgram } = recorded;
+    const water = { attribute: "total", unit: "L", factor: null };
+    const metered = {
+      ...perProgram,
+      id: "device-metered",
+      name: "Metered",
+      ha_settings: {
+        ...perProgram.ha_settings,
+        program: { entity_id: null, attribute: null },
+        water: { ...water, source: "meter", entity_id: "sensor.washer_water" },
+        water_price: {
+          source: "entity",
+          entity_id: "sensor.water_price",
+          attribute: null,
+          unit: null,
+          factor: null,
+        },
+      },
+    } satisfies typeof perProgram;
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [perProgram, metered] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device > dl").map(text)).toEqual([
+      "Status sensor.washer_status " +
+        "Program sensor.washer_program " +
+        "Consumption source Per Program (kWh in the Program Defaults) " +
+        "Electricity price €0.30 per kWh " +
+        "Water source Per Program (litres in the Program Defaults) " +
+        "Water price €4.00 per m³",
+      "Status sensor.washer_status " +
+        "Not used Program " +
+        "Consumption source Per Program (kWh in the Program Defaults) " +
+        "Electricity price €0.30 per kWh " +
+        "Water source Water meter sensor.washer_water · total " +
+        "Water price From sensor.water_price",
+    ]);
+  });
+
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Druckstatus sensor.kobra_status " +
+      "Status sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
         "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Nicht verwendet Fächer, Vorschaubild, Kamera " +
@@ -392,6 +466,351 @@ describe("A Device's settings dialog", () => {
     expect(queryAll(panel, ".settings-dialog")).toEqual([]);
     expect(backend.sent(SETTINGS)).toEqual([]);
     expect(text(query(panel, ".device .automatic-templates"))).toBe("Wear Kobra");
+  });
+});
+
+describe("A washing machine's Doses", () => {
+  const SETTINGS = "coinop/devices/update_settings";
+  const [kobra] = recorded.devices;
+  const whitener = {
+    ...recorded.laundry[0],
+    id: "material-whitener",
+    name: "Whitener",
+    price: { source: "fixed", pack_price: 4, pack_size: 1000, pack_unit: "g" },
+  } as Material;
+  const washerBackend = () => {
+    const backend = recordedBackend()
+      .reply(LIST, () => ({ devices: [kobra, recorded.washer] }))
+      .subscription("coinop/catalog/subscribe", () => [
+        {
+          ...recorded.catalog.filled,
+          materials: [...recorded.catalog.filled.materials, ...recorded.laundry, whitener],
+        },
+      ])
+      .reply(SETTINGS, (msg) => ({
+        settings: { ...recorded.washer.settings, ...(msg.settings as object) },
+      }));
+    backend.hass.states = {
+      "sensor.washer_power": {
+        attributes: { friendly_name: "Washer power", unit_of_measurement: "W" },
+      },
+      "sensor.softener_tank": {
+        attributes: { friendly_name: "Softener tank", unit_of_measurement: "L", level: 0.4 },
+      },
+      "sensor.detergent_scale": {
+        attributes: { friendly_name: "Detergent scale", unit_of_measurement: "g", model: "X1" },
+      },
+    };
+    return backend;
+  };
+  const open = (panel: Element) => click(panel, iconButton(panel, "Edit settings of Washer"));
+  const doses = (root: Element) => queryAll(root, ".doses li .dose-name").map(text);
+  const amount = (root: Element, dose: string) =>
+    query(root, `input[aria-label="Default amount of ${dose}"]`) as HTMLInputElement;
+  const stockInput = (root: Element, dose: string, part = "Stock input") =>
+    root.querySelector<HTMLSelectElement>(`select[aria-label="${part} of ${dose}"]`);
+
+  it("shows the Doses on the card with their Default amounts and stock inputs", async () => {
+    const panel = await mountPanel(washerBackend(), { path: "/devices" });
+
+    const washer = queryAll(panel, ".device")[1] as HTMLElement;
+    expect(text(query(washer, ".doses"))).toBe(
+      "Liquid detergent 75 ml · measured by Detergent scale Colour pods Not dosed",
+    );
+    expect(queryAll(panel, ".device")[0]?.querySelector(".doses")).toBeNull();
+  });
+
+  it("measure a Dose in g or ml by a stock input with a mass or volume unit", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+    const detergent = stockInput(dialog, "Liquid detergent") as HTMLSelectElement;
+    expect(detergent.value).toBe("sensor.detergent_scale");
+    expect(queryAll(detergent, "option").map(text)).toEqual([
+      "No stock input",
+      "Detergent scale",
+      "Softener tank",
+    ]);
+    expect(stockInput(dialog, "Colour pods")).toBeNull();
+    expect(stockInput(dialog, "Liquid detergent", "Stock unit")).toBeNull();
+
+    await fill(panel, detergent, "");
+    await fill(panel, query(dialog, "select.add-dose"), "material-whitener");
+    await fill(panel, stockInput(dialog, "Whitener") as HTMLSelectElement, "sensor.softener_tank");
+    const attribute = stockInput(dialog, "Whitener", "Stock attribute") as HTMLSelectElement;
+    expect(queryAll(attribute, "option").map(text)).toEqual(["State", "level"]);
+    await fill(panel, attribute, "level");
+    const unit = stockInput(dialog, "Whitener", "Stock unit") as HTMLSelectElement;
+    expect(unit.value).toBe("g");
+    await fill(panel, unit, "L");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      doses: [
+        { id: "dose-detergent", material_id: "material-detergent" },
+        { id: "dose-pods", material_id: "material-pods" },
+        {
+          id: expect.any(String),
+          material_id: "material-whitener",
+          stock: { entity_id: "sensor.softener_tank", attribute: "level", unit: "L" },
+        },
+      ],
+    });
+    expect(text(query(queryAll(panel, ".device")[1] as HTMLElement, ".doses"))).toBe(
+      "Liquid detergent 75 ml Colour pods Not dosed Whitener Not dosed · measured by Softener tank",
+    );
+  });
+
+  it("are added, reordered and removed in the settings dialog", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+    expect(doses(dialog)).toEqual(["Liquid detergent", "Colour pods"]);
+    const picker = query(dialog, "select.add-dose") as HTMLSelectElement;
+    expect(queryAll(picker, "option").map(text)).toContain("Whitener");
+
+    await fill(panel, picker, "material-whitener");
+    await click(panel, iconButton(dialog, "Move Whitener up"));
+    await click(panel, iconButton(dialog, "Remove Colour pods"));
+    expect(doses(dialog)).toEqual(["Liquid detergent", "Whitener"]);
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      doses: [
+        {
+          id: "dose-detergent",
+          material_id: "material-detergent",
+          stock: { entity_id: "sensor.detergent_scale", attribute: null, unit: null },
+        },
+        { id: expect.any(String), material_id: "material-whitener" },
+      ],
+    });
+  });
+
+  it("are dosed by the Default row of the Program Defaults", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+    expect(text(query(dialog, ".program-defaults thead"))).toBe(
+      "Program Electricity (kWh) Liquid detergent (ml) Colour pods (pcs)",
+    );
+    expect(amount(dialog, "Liquid detergent").value).toBe("75");
+    expect(amount(dialog, "Colour pods").value).toBe("");
+
+    await fill(panel, amount(dialog, "Liquid detergent"), "");
+    await fill(panel, amount(dialog, "Colour pods"), "1");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    expect(backend.sent(SETTINGS)).toEqual([
+      {
+        type: SETTINGS,
+        device_id: "device-washer",
+        settings: {
+          program_defaults: {
+            default: { doses: { "dose-pods": 1 } },
+            programs: { Wool: { doses: { "dose-detergent": 40 } } },
+          },
+        },
+      },
+    ]);
+    expect(text(query(queryAll(panel, ".device")[1] as HTMLElement, ".doses"))).toBe(
+      "Liquid detergent Not dosed · measured by Detergent scale Colour pods 1 pcs",
+    );
+  });
+
+  it("dose a new Dose in the same save", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+
+    await fill(panel, query(dialog, "select.add-dose"), "material-whitener");
+    await fill(panel, amount(dialog, "Whitener"), "20");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    const settings = sent?.settings as typeof recorded.washer.settings;
+    const added = settings.doses[2]?.id ?? "";
+    expect(settings.program_defaults.default.doses).toEqual({
+      "dose-detergent": 75,
+      [added]: 20,
+    });
+  });
+});
+
+describe("A washing machine's Program rows", () => {
+  const SETTINGS = "coinop/devices/update_settings";
+  const [kobra] = recorded.devices;
+  const washerBackend = () =>
+    recordedBackend()
+      .reply(LIST, () => ({ devices: [kobra, recorded.washer] }))
+      .subscription("coinop/catalog/subscribe", () => [
+        {
+          ...recorded.catalog.filled,
+          materials: [...recorded.catalog.filled.materials, ...recorded.laundry],
+        },
+      ])
+      .reply(SETTINGS, (msg) => ({
+        settings: { ...recorded.washer.settings, ...(msg.settings as object) },
+      }));
+  const openDialog = async (panel: Element) => {
+    await click(panel, iconButton(panel, "Edit settings of Washer"));
+    return query(panel, ".settings-dialog");
+  };
+  const rows = (dialog: Element) => queryAll(dialog, ".program-defaults tbody tr").map(text);
+  const amount = (root: Element, dose: string, program: string) =>
+    query(root, `input[aria-label="${dose} for ${program}"]`) as HTMLInputElement;
+
+  it("are suggested from the known Programs and stored once a value is entered", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+    expect(rows(dialog)).toEqual([
+      "Default",
+      "Cotton 60° Suggested",
+      "Wool",
+      "Eco 40-60 Suggested",
+    ]);
+    expect(amount(dialog, "Liquid detergent", "Wool").value).toBe("40");
+    expect(amount(dialog, "Liquid detergent", "Cotton 60°").value).toBe("");
+
+    await fill(panel, amount(dialog, "Colour pods", "Eco 40-60"), "1");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      program_defaults: {
+        default: { doses: { "dose-detergent": 75 } },
+        programs: {
+          Wool: { doses: { "dose-detergent": 40 } },
+          "Eco 40-60": { doses: { "dose-pods": 1 } },
+        },
+      },
+    });
+  });
+
+  it("store nothing for a suggestion that stays empty", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await fill(panel, amount(dialog, "Colour pods", "Cotton 60°"), "");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    expect(backend.sent(SETTINGS)).toEqual([]);
+  });
+
+  it("are added and removed by hand", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await fill(panel, query(dialog, "input.add-program"), " Rinse ");
+    await click(panel, iconButton(dialog, "Remove the row of Wool"));
+    expect(rows(dialog)).toEqual([
+      "Default",
+      "Cotton 60° Suggested",
+      "Wool Suggested",
+      "Eco 40-60 Suggested",
+      "Rinse",
+    ]);
+    expect((query(dialog, "input.add-program") as HTMLInputElement).value).toBe("");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      program_defaults: {
+        default: { doses: { "dose-detergent": 75 } },
+        programs: { Rinse: { doses: {} } },
+      },
+    });
+    expect(text(query(queryAll(panel, ".device")[1] as HTMLElement, ".program-rows"))).toBe(
+      "Rinse",
+    );
+  });
+
+  it("lose a removed Dose's amounts", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await click(panel, iconButton(dialog, "Remove Liquid detergent"));
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      doses: [{ id: "dose-pods", material_id: "material-pods" }],
+      program_defaults: { default: { doses: {} }, programs: { Wool: { doses: {} } } },
+    });
+  });
+
+  it("are listed on the card", async () => {
+    const panel = await mountPanel(washerBackend(), { path: "/devices" });
+
+    const washer = queryAll(panel, ".device")[1] as HTMLElement;
+    expect(text(query(washer, ".program-rows"))).toBe("Wool");
+    expect(queryAll(panel, ".device")[0]?.querySelector(".program-rows")).toBeNull();
+  });
+
+  const SUGGESTIONS = "coinop/devices/measured_suggestions";
+  const suggesting = () =>
+    washerBackend().reply(SUGGESTIONS, () => ({ suggestions: recorded.measuredSuggestions }));
+  const cell = (dialog: Element, label: string) =>
+    query(dialog, `input[aria-label="${label}"]`).closest("td") as HTMLElement;
+
+  it("show the mean kWh of measured Runs beside the cells that have one", async () => {
+    const backend = suggesting();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    expect(backend.sent(SUGGESTIONS)).toEqual([{ type: SUGGESTIONS, device_id: "device-washer" }]);
+    expect(text(query(cell(dialog, "Default kWh"), ".suggestion"))).toBe("Ø 1.2 kWh · 1 Run");
+    expect(text(query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"))).toBe(
+      "Ø 1.2 kWh · 1 Run",
+    );
+    expect(cell(dialog, "kWh for Wool").querySelector(".suggestion")).toBeNull();
+    expect(
+      (query(dialog, 'input[aria-label="kWh for Cotton 60°"]') as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("apply a measured suggestion with a click, stored on save", async () => {
+    const backend = suggesting();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await click(panel, query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"));
+    expect(
+      (query(dialog, 'input[aria-label="kWh for Cotton 60°"]') as HTMLInputElement).value,
+    ).toBe("1.2");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      program_defaults: {
+        default: { doses: { "dose-detergent": 75 } },
+        programs: {
+          Wool: { doses: { "dose-detergent": 40 } },
+          "Cotton 60°": { doses: {}, kwh: 1.2 },
+        },
+      },
+    });
+  });
+
+  it("go without measured suggestions when they can't be had", async () => {
+    const backend = washerBackend().reply(SUGGESTIONS, () => {
+      throw new WsError("not_found");
+    });
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    expect(queryAll(dialog, ".suggestion")).toEqual([]);
+    expect(rows(dialog)[0]).toBe("Default");
   });
 });
 

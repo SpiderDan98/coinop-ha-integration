@@ -1,0 +1,42 @@
+[
+  {
+    "id": "material-detergent",
+    "name": "Liquid detergent",
+    "form": "detergent",
+    "type": "Liquid detergent",
+    "density": 1.04,
+    "vendor": null,
+    "colour": null,
+    "diameter": null,
+    "default_for_type": false,
+    "archived": false,
+    "price": {
+      "source": "fixed",
+      "pack_price": 7.8,
+      "pack_size": 1500.0,
+      "pack_unit": "ml"
+    },
+    "price_per_gram": 0.005,
+    "price_per_piece": null
+  },
+  {
+    "id": "material-pods",
+    "name": "Colour pods",
+    "form": "detergent",
+    "type": "Detergent pods",
+    "density": null,
+    "vendor": null,
+    "colour": null,
+    "diameter": null,
+    "default_for_type": false,
+    "archived": false,
+    "price": {
+      "source": "fixed",
+      "pack_price": 12.0,
+      "pack_size": 40.0,
+      "pack_unit": "pcs"
+    },
+    "price_per_gram": null,
+    "price_per_piece": 0.3
+  }
+]

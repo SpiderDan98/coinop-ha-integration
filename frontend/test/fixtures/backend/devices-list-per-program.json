@@ -1,0 +1,83 @@
+{
+  "devices": [
+    {
+      "id": "device-washer",
+      "name": "Washer",
+      "type": "washing_machine",
+      "capabilities": [
+        "doses",
+        "per_run_meters",
+        "program",
+        "program_consumption",
+        "water"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.washer_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "running"
+          ],
+          "paused": [
+            "paused"
+          ],
+          "finished": [
+            "finished"
+          ],
+          "cancelled": [
+            "cancelled"
+          ],
+          "ended": [],
+          "fault": [],
+          "ignored": [
+            "off"
+          ]
+        },
+        "program": {
+          "entity_id": "sensor.washer_program",
+          "attribute": null
+        },
+        "consumption": {
+          "source": "per_program"
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        },
+        "water": {
+          "source": "per_program"
+        },
+        "water_price": {
+          "source": "fixed",
+          "value": 4.0
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {},
+            "kwh": 0.9,
+            "litres": 50.0
+          },
+          "programs": {
+            "Wool": {
+              "doses": {},
+              "kwh": 0.4,
+              "litres": 45.0
+            }
+          }
+        }
+      },
+      "known_programs": [
+        "Wool"
+      ]
+    }
+  ]
+}

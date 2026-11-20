@@ -26,8 +26,12 @@ from custom_components.coinop.runtime import CoinOpConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
-# Each printer's Status and job inputs are helpers from the dev configuration.yaml.
+# Each Device's inputs are helpers from the dev configuration.yaml.
 PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
+WASHER = "washer"
+TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
+    WASHER: "Washing machine"
+}
 
 MATERIALS = [
     ("Prusament PLA Galaxy Black", "PLA", "#1d1d24", "Prusa", 29.99),
@@ -62,6 +66,43 @@ PARTS = [
     "Bike light mount",
     "Fan duct",
     "Board game insert",
+]
+# Name, type, form, density, pack unit, pack price, pack size.
+LAUNDRY = [
+    ("Liquid detergent Color", "Liquid detergent", "detergent", 1.04, "ml", 9.95, 1500),
+    (
+        "Fabric softener Sensitive",
+        "Fabric softener",
+        "fabric_softener",
+        1.0,
+        "ml",
+        2.49,
+        1000,
+    ),
+    ("Oxygen whitener", "Whitener", "laundry_additive", 0.9, "g", 3.95, 750),
+    (
+        "Colour catcher sheets",
+        "Colour catcher sheets",
+        "laundry_additive",
+        None,
+        "pcs",
+        3.49,
+        20,
+    ),
+]
+# Days ago, Program (None: never recognised), minutes into the load it is
+# recognised, minutes, kWh, litres, grams of detergent off the scale, Outcome.
+LOADS = [
+    (26, "Cotton 60°", 0, 128, 1.12, 58.0, 78, "finished"),
+    (23, "Eco 40-60", 0, 218, 0.71, 49.0, 72, "finished"),
+    (20, "Wool", 0, 62, 0.38, 44.0, 41, "finished"),
+    (17, None, 0, 95, 0.85, 52.0, 76, "finished"),
+    (14, "Cotton 60°", 0, 125, 1.18, 56.5, 80, "finished"),
+    (12, "Quick 30", 8, 31, 0.32, 38.0, 50, "finished"),
+    (9, "Eco 40-60", 0, 40, 0.35, 30.5, 70, "cancelled"),
+    (6, "Cotton 60°", 0, 131, 1.09, 57.0, 77, "finished"),
+    (3, "Eco 40-60", 0, 221, 0.74, 48.0, 74, "finished"),
+    (1, "Wool", 0, 60, 0.41, 46.0, 39, "finished"),
 ]
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
 
@@ -113,7 +154,7 @@ class Seed:
         self.entry = entry
         self.devices = {
             key: subentry.subentry_id
-            for key, (name, _) in PRINTERS.items()
+            for key, name in TITLES.items()
             for subentry in entry.subentries.values()
             if subentry.title == name
         }
@@ -373,6 +414,126 @@ async def _two_printers(seed: Seed) -> None:
             )
 
 
+async def _washing(seed: Seed) -> None:
+    materials = []
+    for name, type_, form, density, pack_unit, pack_price, pack_size in LAUNDRY:
+        material = {
+            "name": name,
+            "form": form,
+            "type": type_,
+            "density": density,
+            "price": {
+                "source": "fixed",
+                "pack_price": pack_price,
+                "pack_size": pack_size,
+                "pack_unit": pack_unit,
+            },
+        }
+        created = await seed.api.call("coinop/materials/create", material=material)
+        materials.append(created["material"]["id"])
+    detergent, softener, whitener, sheets = materials
+    await seed.api.call(
+        "coinop/devices/update_settings",
+        device_id=seed.devices[WASHER],
+        settings={
+            "doses": [
+                {
+                    "id": "detergent",
+                    "material_id": detergent,
+                    "stock": {"entity_id": "input_number.detergent_scale"},
+                },
+                {"id": "softener", "material_id": softener},
+                {"id": "whitener", "material_id": whitener},
+                {"id": "sheets", "material_id": sheets},
+            ],
+            "program_defaults": {
+                "default": {
+                    "kwh": 0.9,
+                    "litres": 50,
+                    "doses": {"detergent": 75, "softener": 30},
+                },
+                "programs": {
+                    "Cotton 60°": {
+                        "kwh": 1.1,
+                        "litres": 56,
+                        "doses": {
+                            "detergent": 75,
+                            "softener": 30,
+                            "whitener": 20,
+                            "sheets": 1,
+                        },
+                    },
+                    "Eco 40-60": {
+                        "kwh": 0.72,
+                        "litres": 48,
+                        "doses": {"detergent": 70, "softener": 30},
+                    },
+                    "Wool": {"kwh": 0.4, "litres": 45, "doses": {"detergent": 40}},
+                },
+            },
+        },
+    )
+    meters = {"washer_energy": 412.5, "washer_water": 18250.0, "detergent_scale": 650.0}
+    for days, program, recognised, minutes, kwh, litres, grams, outcome in LOADS:
+        if meters["detergent_scale"] < grams:
+            # A new bottle; a refill between loads counts nothing.
+            meters["detergent_scale"] += 1500
+        start = seed.now.replace(hour=9, minute=30) - timedelta(days=days)
+        end = start + timedelta(minutes=minutes)
+        known = None if recognised else program
+        await _replay(seed.hass, "input_select.washer_program", known or "", start)
+        await _replay_meters(seed.hass, meters, start)
+        await _replay(seed.hass, "input_select.washer_status", "running", start)
+        meters["detergent_scale"] -= grams
+        await _replay_meters(seed.hass, meters, start + timedelta(minutes=3))
+        if program and recognised:
+            at = start + timedelta(minutes=recognised)
+            await _replay(seed.hass, "input_select.washer_program", program, at)
+        meters["washer_energy"] = round(meters["washer_energy"] + kwh, 3)
+        meters["washer_water"] = round(meters["washer_water"] + litres, 1)
+        await _replay_meters(seed.hass, meters, end - timedelta(minutes=2))
+        await _replay(seed.hass, "input_select.washer_status", outcome, end)
+        # Reports after the end spare the wait for them.
+        await _replay_meters(seed.hass, meters, end + timedelta(minutes=1))
+    for key, value in meters.items():
+        await seed.hass.services.async_call(
+            "input_number",
+            "set_value",
+            {"entity_id": f"input_number.{key}", "value": value},
+            blocking=True,
+        )
+    await _async_set_washer(seed.hass, "off", "Wool")
+
+
+async def _replay_meters(
+    hass: HomeAssistant, meters: dict[str, float], at: datetime
+) -> None:
+    for key, value in meters.items():
+        await _replay(hass, f"input_number.{key}", value, at)
+
+
+async def _replay(
+    hass: HomeAssistant, entity_id: str, value: float | str, at: datetime
+) -> None:
+    """Report a helper's value as of `at`, which its services can't backdate."""
+    attributes = state.attributes if (state := hass.states.get(entity_id)) else None
+    hass.states.async_set(entity_id, str(value), attributes, timestamp=at.timestamp())
+    await hass.async_block_till_done()
+
+
+async def _async_set_washer(hass: HomeAssistant, status: str, program: str) -> None:
+    for entity_id, option in (
+        ("input_select.washer_program", program),
+        ("input_select.washer_status", status),
+    ):
+        await hass.services.async_call(
+            "input_select",
+            "select_option",
+            {"entity_id": entity_id, "option": option},
+            blocking=True,
+        )
+
+
 async def _printing_now(seed: Seed) -> None:
     await _few_runs(seed)
     await seed.set_printer("prusa", "printing", "Gridfinity bins 3x2.gcode")
@@ -386,7 +547,7 @@ async def _nothing(seed: Seed) -> None:
 class Scenario:
     title: str
     description: str
-    printers: tuple[str, ...]
+    devices: tuple[str, ...]
     fill: Callable[[Seed], Awaitable[None]]
 
 
@@ -416,12 +577,22 @@ SCENARIOS = {
         ("prusa", "bambu"),
         _long_history,
     ),
+    "washing-machine": Scenario(
+        "Washing machine",
+        "A washer with energy and water meters, a detergent scale and Program "
+        "Defaults; 10 loads over four weeks. Its helpers start the next one.",
+        (WASHER,),
+        _washing,
+    ),
 }
 
 
 def _device(key: str) -> dict[str, Any]:
     """The Device's subentry data, as Add Device writes it."""
+    if key == WASHER:
+        return _washer()
     return {
+        "device_type": "3d_printer",
         "printer_device_id": None,
         "status": {"entity_id": f"input_select.{key}_status", "attribute": None},
         "mapping": {
@@ -451,6 +622,41 @@ def _device(key: str) -> dict[str, Any]:
     }
 
 
+def _washer() -> dict[str, Any]:
+    return {
+        "device_type": "washing_machine",
+        "printer_device_id": None,
+        "status": {"entity_id": "input_select.washer_status", "attribute": None},
+        "mapping": {
+            "running": ["running"],
+            "paused": ["paused"],
+            "finished": ["finished"],
+            "cancelled": ["cancelled"],
+            "ended": [],
+            "fault": [],
+            "ignored": ["off"],
+        },
+        "program": {"entity_id": "input_select.washer_program", "attribute": None},
+        "consumption": {
+            "source": "energy",
+            "entity_id": "input_number.washer_energy",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        },
+        "price": {"source": "fixed", "value": 0.32},
+        "water": {
+            "source": "meter",
+            "entity_id": "input_number.washer_water",
+            "attribute": None,
+            "unit": "L",
+            "factor": None,
+        },
+        # Per m³, wastewater included.
+        "water_price": {"source": "fixed", "value": 4.2},
+    }
+
+
 async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     """Replace whatever Coin-op holds by the Scenario `name`."""
     scenario = SCENARIOS[name]
@@ -462,15 +668,17 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     for key in PRINTERS:
         if hass.states.get(f"input_select.{key}_status"):
             await _async_set_printer(hass, key, "idle")
+    if program := hass.states.get("input_select.washer_program"):
+        await _async_set_washer(hass, "off", program.state)
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
-    for key in scenario.printers:
+    for key in scenario.devices:
         hass.config_entries.async_add_subentry(
             entry,
             ConfigSubentry(
                 data=MappingProxyType(_device(key)),
                 subentry_type=SUBENTRY_DEVICE,
-                title=PRINTERS[key][0],
+                title=TITLES[key],
                 unique_id=None,
             ),
         )

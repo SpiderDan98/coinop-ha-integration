@@ -5,5 +5,6 @@ NAME = "Coin-op"
 
 SUBENTRY_DEVICE = "device"
 
-# Every Device is a 3D printer so far; the panel groups Devices by their type.
+# Stored in each Device's subentry data; the panel groups Devices by it.
 DEVICE_TYPE_3D_PRINTER = "3d_printer"
+DEVICE_TYPE_WASHING_MACHINE = "washing_machine"

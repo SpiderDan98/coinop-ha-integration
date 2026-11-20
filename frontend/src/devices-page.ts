@@ -1,15 +1,22 @@
 // The Devices tab: a section per Device Type with a card per Device. A card shows the
 // HA-side settings, which only the Device's reconfigure flow in HA changes, and a summary
 // of Coin-op's own settings, edited in a dialog. Devices are added in HA too.
-import { mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
+import { mdiArrowDown, mdiArrowUp, mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
+import {
+  getMeasuredSuggestions,
+  updateDeviceSettings,
+  type Device,
+  type LineItemTemplate,
+  type Material,
+} from "./api";
 import "./dialog";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 import "./tag-input";
 
 export const RECONFIGURE = "/config/integrations/integration/coinop";
@@ -38,6 +45,7 @@ const consumptionDetails = (
 ) => {
   const running = (power: number | null) =>
     power !== null && t("consumption.running", { power: format.quantity(power, "W") });
+  if (consumption.source === "per_program") return nothing;
   if (consumption.source !== "estimate")
     return html`<div>
       ${entity(hass, consumption.entity_id, [
@@ -52,6 +60,71 @@ const consumptionDetails = (
   ];
   return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
 };
+
+/** A price section: fixed per `unit`, or the entity it follows. */
+const priceOf = (
+  hass: HomeAssistant,
+  price: Device["ha_settings"]["price"],
+  unit: string,
+  t: Localize,
+  format: Format,
+) =>
+  price.source === "fixed"
+    ? t("price.fixed", { price: format.unitPrice(price.value), unit })
+    : entity(hass, price.entity_id, [price.attribute], (name) =>
+        t("price.entity", { entity: name }),
+      );
+
+/** The water source with its entity, and the water price unless there's no water. */
+const waterOf = (
+  hass: HomeAssistant,
+  { water, water_price }: Device["ha_settings"],
+  t: Localize,
+  format: Format,
+) =>
+  water
+    ? html`<dt>${t("device.water")}</dt>
+        <dd class="water">
+          <div>${t(`water.${water.source}`)}</div>
+          ${
+            "entity_id" in water
+              ? html`<div>${entity(hass, water.entity_id, [water.attribute])}</div>`
+              : nothing
+          }
+        </dd>
+        ${
+          water.source !== "none" && water_price
+            ? html`<dt>${t("device.water_price")}</dt>
+                <dd class="water-price">${priceOf(hass, water_price, "m³", t, format)}</dd>`
+            : nothing
+        }`
+    : nothing;
+
+type Settings = Device["settings"];
+
+/** The unit a Dose of the Material counts in; Spoolman prices by weight. */
+const unitOf = (material?: Material) =>
+  material?.price.source === "fixed" ? material.price.pack_unit : "g";
+
+type Stock = NonNullable<Settings["doses"][number]["stock"]>;
+
+// HA's mass and volume units, as its unit converters know them.
+const STOCK_UNITS = new Set(
+  ["μg", "mg", "g", "kg", "oz", "lb", "st"].concat([
+    "mL",
+    "L",
+    "fl. oz.",
+    "gal",
+    "m³",
+    "ft³",
+    "CCF",
+    "MCF",
+  ]),
+);
+const ATTRIBUTE_UNITS = ["g", "kg", "mL", "L"];
+
+/** Unique enough per Device; `crypto.randomUUID` needs a secure context HA may not have. */
+const newDoseId = () => `dose-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 const chips = (names: string[], kind: "tag" | "template", none: string) =>
   names.length
@@ -79,6 +152,11 @@ export class DevicesPage extends LitElement {
   @state() private saved = new Map<string, Device["settings"]>();
   /** The Device whose settings the dialog edits, and the settings as edited so far. */
   @state() private editing?: { device: Device; draft: Device["settings"] };
+  /** The measured suggestions for the Device being edited, once they arrive. */
+  @state() private suggestions?: {
+    deviceId: string;
+    rows: Awaited<ReturnType<typeof getMeasuredSuggestions>>;
+  };
   @state() private saving = false;
   @state() private failed = false;
 
@@ -96,6 +174,14 @@ export class DevicesPage extends LitElement {
     return material.archived
       ? t("materials.archived_name", { name: material.name })
       : material.name;
+  }
+
+  private doseName(materialId: string, t: Localize) {
+    return this.materialName(materialId) ?? t("device.material_gone");
+  }
+
+  private material(id: string) {
+    return this.materials.find((material) => material.id === id);
   }
 
   override render() {
@@ -140,35 +226,44 @@ export class DevicesPage extends LitElement {
       <dl>
         <dt>${t("device.status")}</dt>
         <dd>${entity(this.hass, ha.status.entity_id, [ha.status.attribute])}</dd>
-        ${this.renderOptionalInputs(ha, t)}
+        ${this.renderOptionalInputs(device, t)}
         <dt>${t("device.consumption")}</dt>
         <dd class="consumption">
           <div>${t(`consumption.${ha.consumption.source}`)}</div>
           ${consumptionDetails(this.hass, ha, t, format)}
         </dd>
         <dt>${t("device.price")}</dt>
-        <dd class="price">
-          ${
-            ha.price.source === "fixed"
-              ? t("price.fixed", { price: format.unitPrice(ha.price.value) })
-              : entity(this.hass, ha.price.entity_id, [ha.price.attribute], (name) =>
-                  t("price.entity", { entity: name }),
-                )
-          }
-        </dd>
+        <dd class="price">${priceOf(this.hass, ha.price, "kWh", t, format)}</dd>
+        ${waterOf(this.hass, ha, t, format)}
       </dl>
       <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
         >${t("device.reconfigure")}</a
       >
       <div class="settings">
         <dl>
-          <dt>${t("device.default_material")}</dt>
-          <dd class="default-material">
-            ${
-              this.materialName(settings.default_material) ??
-              html`<span class="muted">${t("device.no_default_material")}</span>`
-            }
-          </dd>
+          ${
+            device.capabilities.includes("material")
+              ? html`<dt>${t("device.default_material")}</dt>
+                  <dd class="default-material">
+                    ${
+                      this.materialName(settings.default_material) ??
+                      html`<span class="muted">${t("device.no_default_material")}</span>`
+                    }
+                  </dd>`
+              : nothing
+          }
+          ${device.capabilities.includes("doses") ? this.renderDoseSummary(settings, t, format) : nothing}
+          ${
+            device.capabilities.includes("doses") && device.capabilities.includes("program")
+              ? html`<dt>${t("device.program_rows")}</dt>
+                  <dd class="program-rows">
+                    ${
+                      Object.keys(settings.program_defaults.programs).join(", ") ||
+                      html`<span class="muted">${t("device.none")}</span>`
+                    }
+                  </dd>`
+              : nothing
+          }
           <dt>${t("device.tags_for_new_runs")}</dt>
           <dd class="new-run-tags">
             ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
@@ -180,19 +275,60 @@ export class DevicesPage extends LitElement {
           class="edit"
           .label=${t("device.edit", { device: name })}
           .path=${mdiPencil}
-          @click=${() => {
-            this.failed = false;
-            this.editing = { device, draft: settings };
-          }}
+          @click=${() => this.edit(device, settings)}
         ></ha-icon-button>
       </div>
     </div>`;
   }
 
-  /** The Device Inputs it has, then the ones it doesn't use in one line. */
-  private renderOptionalInputs({ job, images }: Device["ha_settings"], t: Localize) {
+  /** Each Dose with its Default row amount. */
+  private renderDoseSummary({ doses, program_defaults }: Settings, t: Localize, format: Format) {
+    const amounts = program_defaults.default.doses;
+    return html`<dt>${t("device.doses")}</dt>
+      <dd class="doses">
+        ${
+          doses.length
+            ? html`<ul>
+                ${doses.map(({ id, material_id, stock }) => {
+                  const amount = amounts[id];
+                  return html`<li>
+                    <span class="dose-name">${this.doseName(material_id, t)}</span>
+                    <span class="muted"
+                      >${
+                        amount === undefined
+                          ? t("device.not_dosed")
+                          : format.quantity(amount, unitOf(this.material(material_id)))
+                      }</span
+                    >
+                    ${
+                      stock
+                        ? html`<span class="muted small stock"
+                            >·
+                            ${entity(this.hass, stock.entity_id, [], (name) =>
+                              t("device.measured_by", { entity: name }),
+                            )}</span
+                          >`
+                        : nothing
+                    }
+                  </li>`;
+                })}
+              </ul>`
+            : html`<span class="muted">${t("device.none")}</span>`
+        }
+      </dd>`;
+  }
+
+  /** Of the Device Inputs its Device Type offers, the ones it has, then the ones it
+   * doesn't use in one line. */
+  private renderOptionalInputs({ capabilities, ha_settings }: Device, t: Localize) {
     const hass = this.hass;
+    const { job = { entity_id: null, attribute: null }, images, program } = ha_settings;
     const rows = [
+      [
+        "program",
+        t("device.program"),
+        program?.entity_id && entity(hass, program.entity_id, [program.attribute]),
+      ],
       ["job", t("device.job"), job.entity_id && entity(hass, job.entity_id, [job.attribute])],
       [
         "material-used",
@@ -234,8 +370,12 @@ export class DevicesPage extends LitElement {
           ]),
       ],
     ] as const;
-    const unused = rows.filter(([, , shown]) => !shown).map(([, label]) => label);
-    return html`${rows.map(([name, label, shown]) =>
+    const needs = { program: "program", thumbnail: "images", camera: "images" } as const;
+    const offered = rows.filter(([name]) =>
+      capabilities.includes(name in needs ? needs[name as keyof typeof needs] : "job"),
+    );
+    const unused = offered.filter(([, , shown]) => !shown).map(([, label]) => label);
+    return html`${offered.map(([name, label, shown]) =>
       shown
         ? html`<dt>${label}</dt>
             <dd class=${name}>${shown}</dd>`
@@ -252,49 +392,17 @@ export class DevicesPage extends LitElement {
   private renderDialog(device: Device, draft: Device["settings"], t: Localize) {
     const change = (changes: Partial<Device["settings"]>) =>
       (this.editing = { device, draft: { ...draft, ...changes } });
-    // The Device's archived default stays pickable; other archived Materials don't.
-    const original = this.settingsOf(device).default_material;
-    const pickable = this.materials.filter(
-      (material) => !material.archived || material.id === original,
-    );
     return html`<coinop-dialog
       class="settings-dialog dialog"
       .label=${t("device.settings_title", { device: device.name })}
       .closeLabel=${t("dialog.close")}
       @cancel=${this.close}
     >
-      <div class="field default-material">
-        <span class="label">${t("device.default_material")}</span>
-        ${
-          pickable.length
-            ? html`<select
-                aria-label=${t("device.default_material")}
-                autofocus
-                @change=${(event: Event) =>
-                  change({ default_material: (event.target as HTMLSelectElement).value || null })}
-              >
-                <option value="" ?selected=${draft.default_material === null}>
-                  ${t("device.no_default_material")}
-                </option>
-                ${pickable.map(
-                  (material) =>
-                    html`<option
-                      value=${material.id}
-                      ?selected=${material.id === draft.default_material}
-                    >
-                      ${this.materialName(material.id)}
-                    </option>`,
-                )}
-              </select>`
-            : html`<p class="no-materials">
-                ${t("device.no_materials")}
-                <a href="${this.basePath}/materials" @click=${followLink}
-                  >${t("item.to_materials")}</a
-                >
-              </p>`
-        }
-        <p class="muted small">${t("device.default_material_hint")}</p>
-      </div>
+      ${
+        device.capabilities.includes("material")
+          ? this.renderDefaultMaterial(device, draft.default_material, change, t)
+          : nothing
+      }
       <div class="field new-run-tags">
         <span class="label">${t("device.tags_for_new_runs")}</span>
         <coinop-tag-input
@@ -307,6 +415,7 @@ export class DevicesPage extends LitElement {
         ></coinop-tag-input>
         <p class="muted small">${t("device.tags_hint")}</p>
       </div>
+      ${device.capabilities.includes("doses") ? this.renderDoses(device, draft, change, t) : nothing}
       ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
       <p class="muted small ha-settings">
         ${t("device.ha_settings")}
@@ -327,6 +436,401 @@ export class DevicesPage extends LitElement {
         </ha-button>
       </div>
     </coinop-dialog>`;
+  }
+
+  private renderDefaultMaterial(
+    device: Device,
+    chosen: string | null,
+    change: (changes: Partial<Device["settings"]>) => void,
+    t: Localize,
+  ) {
+    // The Device's archived default stays pickable; other archived Materials don't.
+    const original = this.settingsOf(device).default_material;
+    const pickable = this.materials.filter(
+      (material) => !material.archived || material.id === original,
+    );
+    return html`<div class="field default-material">
+      <span class="label">${t("device.default_material")}</span>
+      ${
+        pickable.length
+          ? html`<select
+              aria-label=${t("device.default_material")}
+              autofocus
+              @change=${(event: Event) =>
+                change({ default_material: (event.target as HTMLSelectElement).value || null })}
+            >
+              <option value="" ?selected=${chosen === null}>
+                ${t("device.no_default_material")}
+              </option>
+              ${pickable.map(
+                (material) =>
+                  html`<option value=${material.id} ?selected=${material.id === chosen}>
+                    ${this.materialName(material.id)}
+                  </option>`,
+              )}
+            </select>`
+          : this.noMaterials(t)
+      }
+      <p class="muted small">${t("device.default_material_hint")}</p>
+    </div>`;
+  }
+
+  private noMaterials(t: Localize) {
+    return html`<p class="no-materials">
+      ${t("device.no_materials")}
+      <a href="${this.basePath}/materials" @click=${followLink}>${t("item.to_materials")}</a>
+    </p>`;
+  }
+
+  /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
+   * column per Dose. Known Programs without a row are suggested; a value stores their row. */
+  private renderDoses(
+    { id, capabilities, known_programs, ha_settings }: Device,
+    { doses, program_defaults }: Settings,
+    change: (changes: Partial<Settings>) => void,
+    t: Localize,
+  ) {
+    const { programs } = program_defaults;
+    const perProgram = capabilities.includes("program_consumption");
+    const consumed = [
+      ...(perProgram ? (["kwh"] as const) : []),
+      ...(perProgram && ha_settings.water && ha_settings.water.source !== "none"
+        ? (["litres"] as const)
+        : []),
+    ];
+    /** `program` null is the Default row. */
+    const rowOf = (program: string | null) =>
+      program === null ? program_defaults.default : programs[program];
+    const setRow = (program: string | null, row: Settings["program_defaults"]["default"]) =>
+      change({
+        program_defaults:
+          program === null
+            ? { ...program_defaults, default: row }
+            : { ...program_defaults, programs: { ...programs, [program]: row } },
+      });
+    const setPrograms = (next: typeof programs) =>
+      change({ program_defaults: { ...program_defaults, programs: next } });
+    const setDoses = (next: Settings["doses"]) => {
+      const kept = new Set(next.map(({ id }) => id));
+      const prune = ({ doses: amounts, ...rest }: Settings["program_defaults"]["default"]) => ({
+        ...rest,
+        doses: Object.fromEntries(Object.entries(amounts).filter(([id]) => kept.has(id))),
+      });
+      change({
+        doses: next,
+        program_defaults: {
+          default: prune(program_defaults.default),
+          programs: Object.fromEntries(
+            Object.entries(programs).map(([name, row]) => [name, prune(row)]),
+          ),
+        },
+      });
+    };
+    const move = (index: number, by: number) => {
+      const next = [...doses];
+      const [dose] = next.splice(index, 1);
+      if (dose) next.splice(index + by, 0, dose);
+      setDoses(next);
+    };
+    /** Writes a cell's value, or clears it unless `valid`; a suggested row is stored
+     * only once it gets a valid value. */
+    const setCell = (
+      program: string | null,
+      value: string,
+      valid: (amount: number) => boolean,
+      write: (row: Settings["program_defaults"]["default"], amount?: number) => typeof row,
+    ) => {
+      const row = rowOf(program);
+      const amount = value.trim() === "" ? NaN : Number(value);
+      if (row || valid(amount))
+        setRow(program, write(row ?? { doses: {} }, valid(amount) ? amount : undefined));
+    };
+    const setAmount = (program: string | null, id: string, value: string) =>
+      setCell(
+        program,
+        value,
+        (amount) => amount > 0,
+        (row, amount) => {
+          const doses = Object.fromEntries(Object.entries(row.doses).filter(([own]) => own !== id));
+          return { ...row, doses: amount === undefined ? doses : { ...doses, [id]: amount } };
+        },
+      );
+    const setConsumed = (program: string | null, key: (typeof consumed)[number], value: string) =>
+      setCell(
+        program,
+        value,
+        (amount) => amount >= 0,
+        ({ doses, ...row }, amount) => {
+          const { kwh, litres } =
+            key === "kwh" ? { ...row, kwh: amount } : { ...row, litres: amount };
+          return {
+            doses,
+            ...(kwh !== undefined && { kwh }),
+            ...(litres !== undefined && { litres }),
+          };
+        },
+      );
+    const suggestions = this.suggestions?.deviceId === id ? this.suggestions.rows : undefined;
+    const format = formatter(this.hass);
+    const suggestion = (program: string | null, key: (typeof consumed)[number]) => {
+      const measured = (program === null ? suggestions?.default : suggestions?.programs[program])?.[
+        key
+      ];
+      if (!measured) return nothing;
+      const value = format.quantity(measured.mean, key === "kwh" ? "kWh" : "L");
+      return html`<ha-button
+        class="suggestion"
+        appearance="plain"
+        size="small"
+        title=${t("device.apply_suggestion")}
+        @click=${() => setConsumed(program, key, String(measured.mean))}
+      >
+        ${
+          measured.runs === 1
+            ? t("device.suggestion_one", { value })
+            : t("device.suggestion", { value, count: measured.runs })
+        }
+      </ha-button>`;
+    };
+    const consumedCells = (program: string | null) =>
+      consumed.map(
+        (key) =>
+          html`<td class="num">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              aria-label=${
+                program === null
+                  ? t(`device.default_${key}`)
+                  : t(`device.program_${key}`, { program })
+              }
+              .value=${String(rowOf(program)?.[key] ?? "")}
+              @change=${(event: Event) =>
+                setConsumed(program, key, (event.target as HTMLInputElement).value)}
+            />
+            ${suggestion(program, key)}
+          </td>`,
+      );
+    const amountCells = (program: string | null, label: (dose: string) => string) =>
+      doses.map(
+        ({ id, material_id }) =>
+          html`<td class="num">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              aria-label=${label(this.doseName(material_id, t))}
+              .value=${String(rowOf(program)?.doses[id] ?? "")}
+              @change=${(event: Event) =>
+                setAmount(program, id, (event.target as HTMLInputElement).value)}
+            />
+          </td>`,
+      );
+    const hasPrograms = capabilities.includes("program");
+    const programNames = hasPrograms
+      ? [...new Set([...known_programs, ...Object.keys(programs)])]
+      : [];
+    const addable = this.materials.filter((material) => !material.archived);
+    return html`<div class="field doses">
+        <span class="label">${t("device.doses")}</span>
+        <ol class="dose-list">
+          ${doses.map((dose, index) => {
+            const name = this.doseName(dose.material_id, t);
+            const unit = unitOf(this.material(dose.material_id));
+            const setStock = (stock?: Stock) => {
+              const { id, material_id } = dose;
+              setDoses(
+                doses.map((other, at) =>
+                  at === index ? { id, material_id, ...(stock && { stock }) } : other,
+                ),
+              );
+            };
+            return html`<li>
+              <span class="dose-name">${name}</span>
+              <span class="muted small">${unit}</span>
+              <ha-icon-button
+                class="up"
+                .label=${t("device.move_dose_up", { dose: name })}
+                .path=${mdiArrowUp}
+                ?disabled=${index === 0}
+                @click=${() => move(index, -1)}
+              ></ha-icon-button>
+              <ha-icon-button
+                class="down"
+                .label=${t("device.move_dose_down", { dose: name })}
+                .path=${mdiArrowDown}
+                ?disabled=${index === doses.length - 1}
+                @click=${() => move(index, 1)}
+              ></ha-icon-button>
+              <ha-icon-button
+                class="remove"
+                .label=${t("device.remove_dose", { dose: name })}
+                .path=${mdiClose}
+                @click=${() => setDoses(doses.filter((_, other) => other !== index))}
+              ></ha-icon-button>
+              ${unit === "pcs" ? nothing : this.renderStock(dose.stock, name, unit, setStock, t)}
+            </li>`;
+          })}
+        </ol>
+        ${
+          addable.length
+            ? html`<select
+                class="add-dose"
+                aria-label=${t("device.add_dose")}
+                @change=${(event: Event) => {
+                  const select = event.target as HTMLSelectElement;
+                  if (select.value)
+                    setDoses([...doses, { id: newDoseId(), material_id: select.value }]);
+                  select.value = "";
+                }}
+              >
+                <option value="">${t("device.add_dose")}</option>
+                ${addable.map(
+                  (material) => html`<option value=${material.id}>${material.name}</option>`,
+                )}
+              </select>`
+            : this.noMaterials(t)
+        }
+        <p class="muted small">${t("device.doses_hint")}</p>
+      </div>
+      ${
+        doses.length || consumed.length
+          ? html`<div class="field program-defaults">
+              <span class="label">${t("device.program_defaults")}</span>
+              ${table({
+                columns: [
+                  { label: t("device.program") },
+                  ...consumed.map((key) => ({ label: t(`device.${key}_column`), num: true })),
+                  ...doses.map(({ material_id }) => ({
+                    label: `${this.doseName(material_id, t)} (${unitOf(this.material(material_id))})`,
+                    num: true,
+                  })),
+                ],
+                rows: html`<tr>
+                    <td>${t("device.default_row")}</td>
+                    ${consumedCells(null)}
+                    ${amountCells(null, (dose) => t("device.default_amount", { dose }))}
+                  </tr>
+                  ${programNames.map(
+                    (program) =>
+                      html`<tr class="program-row ${programs[program] ? "" : "suggested"}">
+                        <td>
+                          <span class="program-name">${program}</span>
+                          ${
+                            programs[program]
+                              ? html`<ha-icon-button
+                                  class="remove"
+                                  .label=${t("device.remove_program", { program })}
+                                  .path=${mdiClose}
+                                  @click=${() =>
+                                    setPrograms(
+                                      Object.fromEntries(
+                                        Object.entries(programs).filter(([own]) => own !== program),
+                                      ),
+                                    )}
+                                ></ha-icon-button>`
+                              : html`<span class="muted small">${t("device.suggested")}</span>`
+                          }
+                        </td>
+                        ${consumedCells(program)}
+                        ${amountCells(program, (dose) => t("device.program_amount", { dose, program }))}
+                      </tr>`,
+                  )}`,
+              })}
+              ${
+                hasPrograms
+                  ? html`<input
+                      class="add-program"
+                      aria-label=${t("device.add_program")}
+                      placeholder=${t("device.add_program")}
+                      @change=${(event: Event) => {
+                        const input = event.target as HTMLInputElement;
+                        const program = input.value.trim();
+                        input.value = "";
+                        if (program && !programs[program]) setRow(program, { doses: {} });
+                      }}
+                    />`
+                  : nothing
+              }
+              <p class="muted small">${t("device.program_defaults_hint")}</p>
+            </div>`
+          : nothing
+      }`;
+  }
+
+  /** A native select over the mass and volume entities (ADR 0007), an optional attribute and its unit. */
+  private renderStock(
+    stock: Stock | undefined,
+    dose: string,
+    unit: string,
+    change: (stock?: Stock) => void,
+    t: Localize,
+  ) {
+    const states = this.hass.states;
+    const entities = Object.keys(states)
+      .filter(
+        (id) =>
+          id === stock?.entity_id ||
+          STOCK_UNITS.has(states[id]?.attributes.unit_of_measurement ?? ""),
+      )
+      .sort((a, b) => entityName(this.hass, a).localeCompare(entityName(this.hass, b)));
+    const attributes = Object.entries(states[stock?.entity_id ?? ""]?.attributes ?? {})
+      .filter(([name, value]) => name === stock?.attribute || Number.isFinite(value))
+      .map(([name]) => name);
+    return html`<div class="stock row">
+      <select
+        aria-label=${t("device.stock_input", { dose })}
+        @change=${(event: Event) => {
+          const entity_id = (event.target as HTMLSelectElement).value;
+          change(entity_id ? { entity_id, attribute: null, unit: null } : undefined);
+        }}
+      >
+        <option value="" ?selected=${!stock}>${t("device.no_stock_input")}</option>
+        ${entities.map(
+          (id) =>
+            html`<option value=${id} ?selected=${id === stock?.entity_id}>
+              ${entityName(this.hass, id)}
+            </option>`,
+        )}
+      </select>
+      ${
+        stock
+          ? html`<select
+              aria-label=${t("device.stock_attribute", { dose })}
+              @change=${(event: Event) => {
+                const attribute = (event.target as HTMLSelectElement).value || null;
+                const fallback = unit === "ml" ? "mL" : unit;
+                change({ ...stock, attribute, unit: attribute ? (stock.unit ?? fallback) : null });
+              }}
+            >
+              <option value="" ?selected=${!stock.attribute}>${t("device.stock_state")}</option>
+              ${attributes.map(
+                (name) =>
+                  html`<option value=${name} ?selected=${name === stock.attribute}>
+                    ${name}
+                  </option>`,
+              )}
+            </select>`
+          : nothing
+      }
+      ${
+        stock?.attribute
+          ? html`<select
+              aria-label=${t("device.stock_unit", { dose })}
+              @change=${(event: Event) =>
+                change({ ...stock, unit: (event.target as HTMLSelectElement).value })}
+            >
+              ${ATTRIBUTE_UNITS.map(
+                (option) =>
+                  html`<option value=${option} ?selected=${option === stock.unit}>
+                    ${option}
+                  </option>`,
+              )}
+            </select>`
+          : nothing
+      }
+    </div>`;
   }
 
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
@@ -402,12 +906,26 @@ export class DevicesPage extends LitElement {
     }
   }
 
+  private async edit(device: Device, settings: Settings) {
+    this.failed = false;
+    this.editing = { device, draft: settings };
+    this.suggestions = undefined;
+    if (!device.capabilities.includes("program_consumption")) return;
+    try {
+      const rows = await getMeasuredSuggestions(this.hass, device.id);
+      if (this.editing?.device.id === device.id) this.suggestions = { deviceId: device.id, rows };
+    } catch {
+      // Without suggestions the table is still complete.
+    }
+  }
+
   private close() {
     this.editing = undefined;
   }
 
   static override styles = [
     shared,
+    tableStyles,
     css`
       .device-type + .device-type {
         margin-top: 24px;
@@ -474,6 +992,60 @@ export class DevicesPage extends LitElement {
       .reconfigure {
         align-self: flex-start;
         margin-bottom: 12px;
+      }
+      .settings .doses ul,
+      .dose-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .settings .doses ul {
+        display: flex;
+        flex-direction: column;
+      }
+      .dose-list li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+      }
+      .dose-list .stock {
+        flex-basis: 100%;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .dose-list .stock select {
+        min-width: 0;
+      }
+      .dose-list .dose-name {
+        flex: 1;
+      }
+      .dose-list ha-icon-button {
+        --ha-icon-button-size: 32px;
+        --mdc-icon-size: 18px;
+      }
+      .program-defaults td input {
+        width: 6em;
+        text-align: right;
+      }
+      .program-defaults .suggestion {
+        display: block;
+        margin-inline-start: auto;
+        white-space: nowrap;
+      }
+      .program-row td:first-child {
+        white-space: nowrap;
+      }
+      .program-row .remove {
+        --ha-icon-button-size: 28px;
+        --mdc-icon-size: 16px;
+        vertical-align: middle;
+      }
+      .program-row.suggested .program-name {
+        color: var(--secondary-text-color);
+      }
+      .add-program {
+        align-self: flex-start;
       }
       .template-chip {
         display: inline-flex;

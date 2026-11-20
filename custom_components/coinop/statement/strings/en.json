@@ -4,6 +4,7 @@
   "period": "Period {start} – {end}",
   "period_day": "Period {day}",
   "running_time": "Running time {duration}",
+  "program": "Program {program}",
   "part_one": "1 part",
   "parts": "{count} parts",
   "per_part": "{amount} per part",
@@ -17,6 +18,7 @@
     "amount": "Amount",
     "run": "Run",
     "device": "Device",
+    "program": "Program",
     "started": "Start",
     "part_count": "Parts",
     "cost_per_part": "Per part",
@@ -30,6 +32,7 @@
   "page": "Page {page} of {pages}",
   "kind": {
     "electricity": "Electricity",
+    "water": "Water",
     "material": "Material",
     "other": "Other"
   },

@@ -3,10 +3,31 @@
 import type { HomeAssistant, Message } from "./hass";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
-export const KINDS = ["electricity", "material", "other"] as const;
+export const KINDS = ["electricity", "water", "material", "other"] as const;
+/** What a Device Type has; the panel shows a part only for these. */
+export const CAPABILITIES = [
+  "job",
+  "images",
+  "material",
+  "part_count",
+  "average_power",
+  "program",
+  "doses",
+  "water",
+  "program_consumption",
+  "per_run_meters",
+] as const;
+export const DOSE_SOURCES = ["program_default", "default_row", "stock_input"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
-export type Method = "measured" | "from_history" | "estimated" | "entered";
+/** The kinds to show: Water only where one of the Devices has water or something counts it. */
+export const shownKinds = (devices: Device[] | undefined, counted: { kind?: Kind | null }[]) => {
+  const water =
+    devices?.some((device) => device.capabilities.includes("water")) ||
+    counted.some(({ kind }) => kind === "water");
+  return KINDS.filter((kind) => kind !== "water" || water);
+};
+export type Method = "measured" | "from_history" | "estimated" | "program_default" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
 
@@ -24,14 +45,17 @@ export interface RunSummary {
   device_id: string;
   device_name: string;
   name: string | null;
+  /** The Program it ran; always null for a Device Type without Programs. */
+  program: string | null;
   started: string;
   ended: string | null;
   outcome: Outcome | null;
   finalised: boolean;
   running_seconds: number;
   total: number;
-  part_count: number;
-  cost_per_part: number;
+  /** Null for a Device Type without Part Count. */
+  part_count: number | null;
+  cost_per_part: number | null;
   /** Open Flags; a cleared Flag is gone. */
   flags: string[];
   /** Alphabetical. */
@@ -63,6 +87,9 @@ export interface LineItem {
   slots: { number: number; type: string; colour: string | null }[];
   /** Split across several Materials: this Line Item's estimated share of the measured total. */
   share: number | null;
+  /** A Dose's Line Item: its Dose and where its amount came from. */
+  dose_id?: string;
+  dose_source?: (typeof DOSE_SOURCES)[number];
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -87,11 +114,13 @@ export interface Device {
   id: string;
   name: string;
   /** The Device Type, which the Devices tab groups by. */
-  type: "3d_printer";
+  type: "3d_printer" | "washing_machine";
+  capabilities: (typeof CAPABILITIES)[number][];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
-    job: {
+    /** Missing for a Device Type without job. */
+    job?: {
       entity_id: string | null;
       attribute: string | null;
       /** Missing for Devices added before Material used existed. */
@@ -105,6 +134,8 @@ export interface Device {
     images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
       | { source: "estimate"; running_power: number; paused_power: number | null }
+      /** From the Program Defaults' kWh. */
+      | { source: "per_program" }
       | { source: "energy"; entity_id: string; attribute: string | null }
       | {
           source: "power";
@@ -113,7 +144,15 @@ export interface Device {
           /** Fills gaps in the power reports. */
           running_power: number | null;
         };
-    price:
+    /** Missing for a Device Type without Program. */
+    program?: { entity_id: string | null; attribute: string | null };
+    /** Missing for a Device Type without water. */
+    water?:
+      | { source: "per_program" | "none" }
+      | { source: "meter" | "flow"; entity_id: string; attribute: string | null };
+    price: NonNullable<Device["ha_settings"]["water_price"]>;
+    /** Per m³; missing without water. */
+    water_price?:
       | { source: "fixed"; value: number }
       | {
           source: "entity";
@@ -128,7 +167,23 @@ export interface Device {
     tags_for_new_runs: string[];
     automatic_templates: string[];
     default_material: string | null;
+    /** In order; each Dose becomes a Material Line Item on Runs that dose it. */
+    doses: {
+      id: string;
+      material_id: string;
+      /** An entity reporting how much is left in g or ml; an attribute names its unit. */
+      stock?: { entity_id: string; attribute: string | null; unit: string | null };
+    }[];
+    /** The amount per Dose id in its Material's unit; a missing one is not dosed. The
+     * kWh and litres a Run takes when not measured; missing ones are not set. A Run
+     * uses the row of its Program, else the Default row. */
+    program_defaults: {
+      default: { doses: Record<string, number>; kwh?: number; litres?: number };
+      programs: Record<string, Device["settings"]["program_defaults"]["default"]>;
+    };
   };
+  /** What its Program input offers, then the other Programs its Runs had. */
+  known_programs: string[];
 }
 
 export type RunChange = "started" | "created" | "updated" | "ended" | "deleted";
@@ -138,22 +193,25 @@ export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSu
 export interface Totals {
   cost: number;
   electricity_cost: number;
+  water_cost: number;
   material_cost: number;
   other_cost: number;
   material_grams: number;
   energy_kwh: number;
+  water_litres: number;
   runs: number;
   running_hours: number;
   flagged_runs: number;
 }
 
-export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag";
+export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag" | "program";
 
 /**
  * One group's values along the dimensions asked for, then its totals. Cost, grams and
  * kWh sum the group's Line Items; a Run counts once in every group holding one of its
  * Line Items, so Material and Tag groups overlap. `month` is "YYYY-MM" of the Run's
- * start in HA's time zone; `null` is "none" (no Material, no Tag, Run still open).
+ * start in HA's time zone; `null` is "none" (no Material, no Tag, no Program, Run still
+ * open).
  */
 export type Group = Totals &
   Partial<{
@@ -165,6 +223,7 @@ export type Group = Totals &
     material_name: string | null;
     outcome: Outcome | null;
     tag: string | null;
+    program: string | null;
   }>;
 
 /** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some
@@ -210,14 +269,18 @@ export const updateRun = (
   hass: HomeAssistant,
   runId: string,
   changes: Partial<
-    Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
+    Pick<
+      RunDetail,
+      "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "program" | "tags"
+    >
   >,
 ) => runResult(hass, { type: "coinop/runs/update", run_id: runId, ...changes });
 
 /** A Run made by hand, final at once. */
 export const createRun = (
   hass: HomeAssistant,
-  run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags">,
+  run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags"> &
+    Partial<Pick<RunDetail, "program">>,
 ) => runResult(hass, { type: "coinop/runs/create", ...run });
 
 export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
@@ -255,7 +318,8 @@ type Entered = Partial<
 >;
 
 /** An amount back-computes the unit price; a computed Line Item becomes manual.
- * A new Material re-prices the Line Item and reweighs its measured length. */
+ * A new Material re-prices the Line Item and reweighs its measured length; between a
+ * Material bought by the piece and one by weight only the unit changes. */
 export const updateLineItem = (
   hass: HomeAssistant,
   runId: string,
@@ -272,7 +336,8 @@ export const updateLineItem = (
 export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
   runResult(hass, { type: "coinop/line_items/reset", run_id: runId, line_item_id: lineItemId });
 
-/** A Material Line Item names its Material and counts g or ml at its current price. */
+/** A Material Line Item names its Material and counts g or ml (pcs for one bought by
+ * the piece) at its current price. */
 export const addLineItem = (
   hass: HomeAssistant,
   runId: string,
@@ -361,6 +426,18 @@ export const updateDeviceSettings = async (
     })
   ).settings;
 
+/** The mean measured kWh and litres of the Device's Completed Runs and how many Runs
+ * that is, per Program row; the Default row's from Runs whose Program has no row. */
+export const getMeasuredSuggestions = async (hass: HomeAssistant, deviceId: string) => {
+  type Row = Partial<Record<"kwh" | "litres", { mean: number; runs: number }>>;
+  return (
+    await hass.callWS<{ suggestions: { default: Row; programs: Record<string, Row> } }>({
+      type: "coinop/devices/measured_suggestions",
+      device_id: deviceId,
+    })
+  ).suggestions;
+};
+
 /** A name another Tag has, ignoring case, is that Tag; resolves to the resulting Tag. */
 export const createTag = async (hass: HomeAssistant, name: string) =>
   (await hass.callWS<{ tag: string }>({ type: "coinop/tags/create", name })).tag;
@@ -377,15 +454,24 @@ export const deleteTag = (hass: HomeAssistant, tag: string) =>
 export const listDevices = async (hass: HomeAssistant) =>
   (await hass.callWS<{ devices: Device[] }>({ type: "coinop/devices/list" })).devices;
 
-export type MaterialForm = "filament" | "resin";
-export type PackUnit = "g" | "ml";
+export const MATERIAL_FORMS = [
+  "filament",
+  "resin",
+  "detergent",
+  "fabric_softener",
+  "laundry_additive",
+] as const;
+export type MaterialForm = (typeof MATERIAL_FORMS)[number];
+export const PACK_UNITS = ["g", "ml", "pcs"] as const;
+export type PackUnit = (typeof PACK_UNITS)[number];
 
-/** What a Material is made of; `update` takes any part of it. */
+/** What a Material is made of; `update` takes any part of it. One bought by the
+ * piece ("pcs") has no density. */
 export interface MaterialFields {
   name: string;
   form: MaterialForm;
   type: string;
-  density: number;
+  density: number | null;
   vendor: string | null;
   colour: string | null;
   diameter: number | null;
@@ -401,7 +487,9 @@ export interface Material extends Omit<MaterialFields, "price"> {
   archived: boolean;
   /** A linked Material keeps the last price per gram read from Spoolman. */
   price: MaterialFields["price"] | (SpoolmanLink & { per_gram: number | null });
-  price_per_gram: number;
+  /** Exactly one is set: per piece when bought by the piece, else per gram. */
+  price_per_gram: number | null;
+  price_per_piece: number | null;
 }
 
 export interface Filament {
@@ -424,7 +512,8 @@ export type Filaments = {
 export interface MaterialType {
   type: string;
   form: MaterialForm;
-  density: number;
+  density: number | null;
+  pack_unit: PackUnit;
 }
 
 export interface LineItemTemplate {

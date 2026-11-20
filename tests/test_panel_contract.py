@@ -15,7 +15,16 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
-from .devices import STATUS, add_device, add_hub
+from .devices import (
+    STATUS,
+    WASHER_ENERGY,
+    WASHER_STATUS,
+    WASHER_WATER,
+    WATER_PRICE,
+    add_device,
+    add_hub,
+    add_washing_machine,
+)
 from .http import HttpClient
 from .images import picture
 from .stored import (
@@ -332,6 +341,209 @@ async def test_record_a_manual_run(
     assert_recorded("runs-create", stable_ids(created, ids))
 
 
+async def test_record_a_washing_machine_and_its_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    laundry = {"form": "detergent", "diameter": None}
+    place_materials(
+        hass_storage,
+        stored_material(
+            "material-detergent",
+            name="Liquid detergent",
+            type="Liquid detergent",
+            density=1.04,
+            price={
+                "source": "fixed",
+                "pack_price": 7.8,
+                "pack_size": 1500.0,
+                "pack_unit": "ml",
+            },
+            **laundry,
+        ),
+        stored_material(
+            "material-pods",
+            name="Colour pods",
+            type="Detergent pods",
+            density=None,
+            price={
+                "source": "fixed",
+                "pack_price": 12.0,
+                "pack_size": 40.0,
+                "pack_unit": "pcs",
+            },
+            **laundry,
+        ),
+    )
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set(
+        "sensor.washer_program",
+        "Cotton 60°",
+        {"options": ["Cotton 60°", "Wool", "Eco 40-60"]},
+    )
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": "sensor.washer_program"},
+        price=0.30,
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [
+                {"id": "dose-detergent", "material_id": "material-detergent"},
+                {"id": "dose-pods", "material_id": "material-pods"},
+            ],
+            "program_defaults": {
+                "default": {"doses": {"dose-detergent": 75}},
+                "programs": {"Wool": {"doses": {"dose-detergent": 40}}},
+            },
+        },
+    )
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(minutes=90)
+    hass.states.async_set(WASHER_ENERGY, "101.2", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+    # Weighed only from the next Run on, so the recorded one keeps its Default row.
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [
+                {
+                    "id": "dose-detergent",
+                    "material_id": "material-detergent",
+                    "stock": {"entity_id": "sensor.detergent_scale"},
+                },
+                {"id": "dose-pods", "material_id": "material-pods"},
+            ]
+        },
+    )
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    suggestions = await panel.call(
+        "coinop/devices/measured_suggestions", device_id=subentry.subentry_id
+    )
+
+    [electricity, detergent] = detail["run"]["line_items"]
+    ids = {
+        subentry.subentry_id: "device-washer",
+        run["id"]: "wash",
+        electricity["id"]: "wash-electricity",
+        detergent["id"]: "wash-detergent",
+    }
+    assert_recorded("devices-list-washing-machine", stable_ids(devices, ids))
+    assert_recorded("runs-get-washing-machine", stable_ids(detail, ids))
+    assert_recorded("devices-measured-suggestions", suggestions)
+
+
+async def test_record_water_on_washing_machine_runs(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """Measured water across a price change, and water added by hand without a source."""
+    hass.config.currency = "EUR"
+    litres = {"unit_of_measurement": "L"}
+    per_m3 = {"unit_of_measurement": "EUR/m³"}
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_WATER, "1000", litres)
+    hass.states.async_set(WATER_PRICE, "4", per_m3)
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set("sensor.dryer_status", "off")
+    entry = await add_hub(hass)
+    metered = await add_washing_machine(
+        hass, entry, water="meter", water_price={"entity_id": WATER_PRICE}
+    )
+    unmetered = await add_washing_machine(
+        hass, entry, name="Basement", status="sensor.dryer_status"
+    )
+    hass.states.async_set(WASHER_WATER, "1000", litres, force_update=True)
+    hass.states.async_set(WASHER_STATUS, "running")
+    hass.states.async_set("sensor.dryer_status", "running")
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_WATER, "1020", litres)
+    hass.states.async_set(WATER_PRICE, "5", per_m3)
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_WATER, "1050", litres)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    hass.states.async_set("sensor.dryer_status", "finished")
+    await clock.advance(minutes=5)
+
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    [wash] = [run for run in runs if run["device_id"] == metered.subentry_id]
+    [other] = [run for run in runs if run["device_id"] == unmetered.subentry_id]
+    detail = await panel.call("coinop/runs/get", run_id=wash["id"])
+    added = await panel.call(
+        "coinop/line_items/add",
+        run_id=other["id"],
+        kind="water",
+        quantity=60,
+        unit_price=0.0045,
+    )
+
+    ids = {
+        metered.subentry_id: "device-washer",
+        unmetered.subentry_id: "device-basement",
+        wash["id"]: "water-wash",
+        other["id"]: "basement-wash",
+        **{
+            item["id"]: f"water-wash-{item['kind']}"
+            for item in detail["run"]["line_items"]
+        },
+        **{
+            item["id"]: f"basement-wash-{item['kind']}"
+            for item in added["run"]["line_items"]
+        },
+    }
+    assert_recorded("runs-get-water", stable_ids(detail, ids))
+    assert_recorded("line-items-add-water", stable_ids(added, ids))
+
+
+async def test_record_electricity_and_water_per_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A washing machine without meters: a "Wool" Run priced from its Program's row."""
+    hass.config.currency = "EUR"
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set("sensor.washer_program", "Wool", {"options": ["Wool"]})
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": "sensor.washer_program"},
+        source="per_program",
+        water="per_program",
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}, "kwh": 0.9, "litres": 50},
+                "programs": {"Wool": {"doses": {}, "kwh": 0.4, "litres": 45}},
+            }
+        },
+    )
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(minutes=40)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    ids = {
+        subentry.subentry_id: "device-washer",
+        run["id"]: "wool",
+        **{item["id"]: f"wool-{item['kind']}" for item in detail["run"]["line_items"]},
+    }
+    assert_recorded("devices-list-per-program", stable_ids(devices, ids))
+    assert_recorded("runs-get-per-program", stable_ids(detail, ids))
+
+
 async def test_record_what_deleting_a_run_drops(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
@@ -377,6 +589,44 @@ async def test_record_the_aggregates_of_overview_and_analysis(
     ]
 
     assert_recorded("aggregates-get", answers)
+
+
+async def test_record_washing_machine_runs_by_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    washer: dict[str, Any] = {
+        "device_id": "device-washer",
+        "device_name": "Washer",
+        "part_count": None,
+    }
+    started = CLOCK_START - DAY
+    place_runs(
+        hass_storage,
+        stored_run("vase", name="Vase"),
+        stored_run("monday", **washer, name="Cotton 60°", program="Cotton 60°"),
+        stored_run(
+            "tuesday",
+            **washer,
+            name="Cotton 60°",
+            program="Cotton 60°",
+            started=started + timedelta(hours=3),
+            line_items=[
+                electricity(0.24, 0.30, started, started + timedelta(hours=2)),
+                line_item("other", 0.5, id="tuesday-rinse", label="Extra rinse"),
+            ],
+        ),
+        stored_run("eco", **washer, name="Eco 40-60", program="Eco 40-60"),
+        stored_run("unknown", **washer, name=None),
+    )
+    await add_hub(hass)
+
+    runs = await panel.call("coinop/runs/list")
+    run_ids = ["eco", "monday", "tuesday", "unknown"]
+    by_program = {"group_by": ["program"], "run_ids": run_ids} | await panel.call(
+        "coinop/aggregates/get", group_by=["program"], run_ids=run_ids
+    )
+
+    assert_recorded("aggregates-by-program", runs | {"aggregates": [by_program]})
 
 
 async def test_record_what_the_image_commands_answer(
@@ -484,6 +734,54 @@ async def test_record_the_catalogue_the_panel_shows(
     assert_recorded("catalog-subscribe", stable_ids(events, ids))
     assert_recorded("tags-rename", rename)
     assert_recorded("templates-update", stable_ids(updated, ids))
+
+
+async def test_record_laundry_materials(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    created = []
+    for name, material in (
+        (
+            "detergent",
+            {
+                "name": "Liquid detergent",
+                "form": "detergent",
+                "type": "Liquid detergent",
+                "density": 1.04,
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 7.8,
+                    "pack_size": 1500,
+                    "pack_unit": "ml",
+                },
+            },
+        ),
+        (
+            "pods",
+            {
+                "name": "Colour pods",
+                "form": "detergent",
+                "type": "Detergent pods",
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 12,
+                    "pack_size": 40,
+                    "pack_unit": "pcs",
+                },
+            },
+        ),
+    ):
+        result = await panel.call("coinop/materials/create", material=material)
+        created.append((result["material"], f"material-{name}"))
+
+    assert_recorded(
+        "materials-create-laundry",
+        stable_ids(
+            [material for material, _ in created],
+            {material["id"]: fixed for material, fixed in created},
+        ),
+    )
 
 
 async def test_record_a_run_split_across_slots(

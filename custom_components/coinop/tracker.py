@@ -3,9 +3,10 @@
 import asyncio
 from datetime import datetime, timedelta
 from functools import partial
+from itertools import takewhile
 import re
+from typing import Any
 
-from homeassistant.components.recorder import history
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -21,36 +22,47 @@ from homeassistant.helpers.event import (
     async_track_state_report_event,
     async_track_time_interval,
 )
-from homeassistant.helpers.recorder import get_instance
 from homeassistant.util import dt as dt_util
 from homeassistant.util.ulid import ulid_now
 
 from . import recorded
 from .catalog import Catalog
 from .cost import consumption
-from .cost.electricity import electricity_line_item, price_gap
-from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
+from .cost.consumption import spread
+from .cost.electricity import estimate
+from .cost.material import (
+    GRAM,
+    MILLILITRE,
+    dose_line_item,
+    in_pack_unit,
+    material_line_item,
+    slot_line_items,
+)
+from .cost.pricing import priced_line_item
 from .cost.slots import slot_material, slot_shares
-from .device_config import DeviceConfig, Target
+from .device_config import Capability, DeviceConfig, Target, WaterSource
 from .device_inputs import (
     input_time,
     input_value,
-    meter_reading,
-    price_reading,
     slot_colour,
     slot_number,
+    stock_reading,
     usage_reading,
 )
 from .device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
+    DOSES,
     TAGS_FOR_NEW_RUNS,
     DeviceSettings,
 )
 from .images import DeviceImages
 from .materials import Material, MaterialForm, SpoolmanPrice
+from .metering import LIVE_INTERVAL, Metering
 from .models import (
-    ElectricityMethod,
+    CONSUMED_KINDS,
+    ConsumptionMethod,
+    DoseSource,
     Flag,
     LineItem,
     LineItemKind,
@@ -59,26 +71,16 @@ from .models import (
     Pause,
     Run,
     SlotReport,
+    Stock,
     Usage,
 )
+from .quantities import ELECTRICITY, QUANTITIES, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
-from .store import LIVE_SAVE_DELAY
 from .templates import add_templates, count_running_hours
-from .timelines import (
-    add_flag,
-    add_price,
-    add_reading,
-    has_final_report,
-    kwh,
-    meter_of,
-)
+from .timelines import add_flag
 
-LIVE_INTERVAL = timedelta(minutes=1)
 FINAL_REPORT_WAIT = timedelta(minutes=5)
-# An open Run is refreshed every minute and saved about a minute later; a longer
-# silence means Coin-op wasn't watching the meter.
-OUTAGE = LIVE_INTERVAL + LIVE_SAVE_DELAY
 OUTCOMES = {
     Target.FINISHED: Outcome.COMPLETED,
     Target.CANCELLED: Outcome.CANCELLED,
@@ -114,13 +116,60 @@ class DeviceTracker:
         self._catalog = catalog
         self._spoolman = spoolman
         self._unsubscribe: list[CALLBACK_TYPE] = []
+        self._unsubscribe_stocks: list[CALLBACK_TYPE] = []
         # Until Coin-op has seen the Status input, it may have missed the end.
         self._status_lost = True
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
         self._finishing: set[str] = set()
-        # The price entity's last valid report, for a Run starting while it has none.
-        self._last_price: tuple[datetime, float] | None = None
+        self._electricity = Metering(
+            hass,
+            ELECTRICITY,
+            config,
+            gap_rates=lambda run: [
+                (since, running) for since, running, _ in run.average_powers
+            ],
+            fallback=self._electricity_fallback,
+            silent_meter_falls_back=self._per_program,
+        )
+        self._meterings: tuple[Metering, ...] = (self._electricity,)
+        if Capability.WATER in config.capabilities:
+            self._meterings += (
+                Metering(
+                    hass,
+                    WATER,
+                    config,
+                    gap_rates=lambda run: [(run.started, None)],
+                    fallback=self._water_fallback,
+                    silent_meter_falls_back=self._per_program,
+                ),
+            )
+
+    @property
+    def _per_program(self) -> bool:
+        return Capability.PROGRAM_CONSUMPTION in self._config.capabilities
+
+    def _electricity_fallback(
+        self, run: Run
+    ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
+        if self._per_program:
+            kwh = self._program_row(run)[0].get(ELECTRICITY.default_key)
+            return kwh, ConsumptionMethod.PROGRAM_DEFAULT
+        return self._estimate(run), ConsumptionMethod.ESTIMATED
+
+    def _water_fallback(
+        self, run: Run
+    ) -> tuple[float | None, ConsumptionMethod] | None:
+        """The Program's litres, unless the Run has no water source."""
+        timeline = run.timelines.get(LineItemKind.WATER)
+        source = (timeline.source if timeline else None) or {}
+        if not self._per_program or source.get("source") in (None, WaterSource.NONE):
+            return None
+        litres = self._program_row(run)[0].get(WATER.default_key)
+        return litres, ConsumptionMethod.PROGRAM_DEFAULT
+
+    def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
+        return self._settings.program_row(self._config.device_id, run.program)
 
     async def async_start(self) -> None:
         self._unsubscribe = [
@@ -128,20 +177,19 @@ class DeviceTracker:
                 self._hass, self._config.status_entity_id, self._on_status
             ),
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
+            self._settings.async_listen(self._on_settings),
         ]
-        if price_entity_id := self._config.price_entity_id:
-            self._unsubscribe.append(
-                async_track_state_change_event(
-                    self._hass, price_entity_id, self._on_price
+        for metering in self._meterings:
+            if price_entity_id := metering.price_entity_id:
+                self._unsubscribe.append(
+                    async_track_state_change_event(
+                        self._hass, price_entity_id, partial(self._on_price, metering)
+                    )
                 )
-            )
-            self._remember_price(self._hass.states.get(price_entity_id))
-        sections = [run.consumption for run in self._unfinalised_runs()]
-        if meters := {
-            meter["entity_id"]
-            for section in [*sections, self._config.consumption]
-            if (meter := meter_of(section))
-        }:
+                metering.remember_price(self._hass.states.get(price_entity_id))
+        if meters := set[str]().union(
+            *(m.meter_entities(self._unfinalised_runs()) for m in self._meterings)
+        ):
             self._unsubscribe += [
                 async_track_state_change_event(self._hass, meters, self._on_meter),
                 async_track_state_report_event(self._hass, meters, self._on_meter),
@@ -155,6 +203,11 @@ class DeviceTracker:
                     self._hass, usage["entity_id"], self._on_usage
                 ),
             ]
+        self._follow_stocks()
+        if program := self._config.program_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(self._hass, program, self._on_program)
+            )
         if loaded_slot := self._config.loaded_slot_entity_id:
             self._unsubscribe.append(
                 async_track_state_change_event(
@@ -163,9 +216,11 @@ class DeviceTracker:
             )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
+            self._record_program(run)
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
+            self._record_stocks(run)
             await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
@@ -177,29 +232,33 @@ class DeviceTracker:
             self._images.async_copy_thumbnail(open_run)
 
     async def _async_follow_device(self, run: Run) -> None:
-        """Apply the Device's price and average power to the open Run from now on.
-
-        The same price entity as before only catches up on missed reports.
-        """
+        """Apply the Device's prices and average power to the open Run from now on."""
         now = dt_util.utcnow()
         self._follow_average_power(run, now)
-        price = dict(self._config.price)
-        if run.cost_source != price:
-            # A Run stored before it had a Cost Source followed this one from start.
-            since = run.started if run.cost_source is None else now
-            run.cost_source = price
-            add_price(run, since, self._current_price())
-        elif entity_id := self._config.price_entity_id:
-            since = run.prices[-1][0] if run.prices else run.started
-            for state in await self._async_history(entity_id, since, now):
-                self._record_price(run, state)
-            self._record_price(run, self._hass.states.get(entity_id))
+        for metering in self._meterings:
+            await metering.async_follow(run, now)
         self._book.async_update(run)
+
+    def _estimate(self, run: Run) -> consumption.Model:
+        """Electricity from the average powers, without measurement."""
+        return consumption.piecewise(
+            [
+                (
+                    since,
+                    estimate(
+                        running or 0.0,
+                        running or 0.0 if paused is None else paused,
+                        run.pauses,
+                    ),
+                )
+                for since, running, paused in run.average_powers
+            ]
+        )
 
     def _follow_average_power(self, run: Run, at: datetime) -> None:
         # Unless the Device changed its consumption source since the Run started.
         current = self._config.consumption
-        pinned = run.consumption
+        pinned = self._electricity.timeline(run).source
         section = (
             current if not pinned or pinned["source"] == current["source"] else pinned
         )
@@ -211,49 +270,20 @@ class DeviceTracker:
 
     async def _async_catch_up(self, run: Run) -> None:
         """Add the meter reports missed while Coin-op wasn't running."""
-        if not (meter := meter_of(run.consumption)):
-            return
-        entity_id = meter["entity_id"]
         now = dt_util.utcnow()
-        since = run.readings[-1][0] if run.readings else run.started
-        missed = await self._async_history(entity_id, since, now)
-        for state in missed:
-            self._record(run, state)
-        if current := self._hass.states.get(entity_id):
-            self._record(run, current)
-        watched = max(
-            [
-                run.electricity.segments[-1].end,
-                *(state.last_updated for state in missed),
-            ]
-        )
-        if now - watched > OUTAGE:
-            add_reading(run, watched, None)
+        metered = [await m.async_catch_up(run, now) for m in self._meterings]
+        if not any(metered):
+            return
         if run.ended is None:
             self._refresh(run, now)
         self._book.async_update(run)
-
-    async def _async_history(
-        self, entity_id: str, start: datetime, end: datetime
-    ) -> list[State]:
-        if "recorder" not in self._hass.config.components:
-            return []
-        states = await get_instance(self._hass).async_add_executor_job(
-            partial(
-                history.state_changes_during_period,
-                self._hass,
-                start,
-                end,
-                entity_id,
-                include_start_time_state=False,
-            )
-        )
-        return states.get(entity_id, [])
 
     @callback
     def async_stop(self) -> None:
         while self._unsubscribe:
             self._unsubscribe.pop()()
+        while self._unsubscribe_stocks:
+            self._unsubscribe_stocks.pop()()
         while self._final_waits:
             self._final_waits.popitem()[1]()
         self._images.async_stop()
@@ -268,10 +298,13 @@ class DeviceTracker:
     ) -> None:
         state = event.data["new_state"]
         for run in self._unfinalised_runs():
-            meter = meter_of(run.consumption)
-            if meter is None or meter["entity_id"] != event.data["entity_id"]:
+            watching = [
+                m for m in self._meterings if m.watches(run, event.data["entity_id"])
+            ]
+            if not watching:
                 continue
-            self._record(run, state)
+            for metering in watching:
+                metering.record(run, state)
             if run.ended is None:
                 self._refresh(run, dt_util.utcnow())
             elif not self._awaits_report(run):
@@ -316,6 +349,172 @@ class DeviceTracker:
         if changed < run.started or late or self._next_started(run, changed):
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
+
+    def _stocked_doses(self) -> list[dict[str, Any]]:
+        """The Doses with a stock input."""
+        if Capability.DOSES not in self._config.capabilities:
+            return []
+        doses = self._settings.get(self._config.device_id)[DOSES]
+        return [dose for dose in doses if "stock" in dose]
+
+    def _follow_stocks(self) -> None:
+        """Listen to the stock inputs the Doses have now."""
+        while self._unsubscribe_stocks:
+            self._unsubscribe_stocks.pop()()
+        if entities := {dose["stock"]["entity_id"] for dose in self._stocked_doses()}:
+            self._unsubscribe_stocks = [
+                async_track_state_change_event(self._hass, entities, self._on_stock),
+                async_track_state_report_event(self._hass, entities, self._on_stock),
+            ]
+
+    @callback
+    def _on_stock(
+        self, event: Event[EventStateChangedData] | Event[EventStateReportedData]
+    ) -> None:
+        doses = [
+            dose
+            for dose in self._stocked_doses()
+            if dose["stock"]["entity_id"] == event.data["entity_id"]
+        ]
+        for run in self._unfinalised_runs():
+            if run.ended is not None and run.id not in self._final_waits:
+                continue
+            recorded = [
+                self._record_stock(run, dose, event.data["new_state"]) for dose in doses
+            ]
+            if not any(recorded):
+                continue
+            if run.ended is not None and not self._awaits_report(run):
+                self._finish(run)
+                continue
+            self._refresh(run, run.ended or dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _record_stocks(self, run: Run) -> None:
+        for dose in self._stocked_doses():
+            state = self._hass.states.get(dose["stock"]["entity_id"])
+            self._record_stock(run, dose, state)
+
+    def _record_stock(
+        self, run: Run, dose: dict[str, Any], state: State | None
+    ) -> bool:
+        """Add a stock input's valid report of the Run to its usage; whether it was one."""
+        if (reading := stock_reading(state, dose["stock"])) is None:
+            return False
+        assert state is not None
+        changed = input_time(state, dose["stock"]["attribute"])
+        if run.ended is not None and (
+            changed > run.ended + FINAL_REPORT_WAIT or self._next_started(run, changed)
+        ):
+            return False
+        level, unit = reading
+        at = max(changed, state.last_reported)
+        if (stock := run.stocks.get(dose["id"])) is None:
+            run.stocks[dose["id"]] = Stock(at, level, unit)
+        elif stock.unit == unit:
+            # A refill counts nothing.
+            stock.used += max(stock.level - level, 0.0)
+            stock.level, stock.at = level, max(stock.at, at)
+        return True
+
+    @callback
+    def _on_program(self, event: Event[EventStateChangedData]) -> None:
+        if (
+            run := self._book.open_run(self._config.device_id)
+        ) and self._record_program(run):
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _program(self) -> str | None:
+        """The Program input's value; None while it has none to give."""
+        if (entity_id := self._config.program_entity_id) is None:
+            return None
+        state = self._hass.states.get(entity_id)
+        return self._config.program(input_value(state, self._config.program_attribute))
+
+    def correct_program(self, run: Run, program: str | None) -> None:
+        """The user's Program for the Run, whose defaults follow it even once the
+        Run is final (ADR 0002)."""
+        if program == run.program:
+            return
+        if run.ended is None:
+            run.follow_program(program)
+            self._refresh(run, dt_util.utcnow())
+            return
+        run.program = program
+        if not run.finalised:
+            self._refresh(run, run.ended)
+            return
+        # One the defaults called for already but the Run lacks was marked as checked.
+        checked = set(self._defaults_flags(run)) - set(run.flags)
+        row, source = self._program_row(run)
+        run.line_items = [
+            _reapplied(run, item, row.get(QUANTITIES[item.kind].default_key))
+            if item.method is ConsumptionMethod.PROGRAM_DEFAULT
+            and item.computed is None
+            else item
+            for item in run.line_items
+        ]
+        self._reapply_doses(run, row, source)
+        for flag in self._defaults_flags(run):
+            if flag not in checked:
+                add_flag(run, flag)
+        run.drop_fixed_flags()
+
+    def _reapply_doses(self, run: Run, row: dict[str, Any], source: DoseSource) -> None:
+        """Each Dose's Line Item from defaults as the row doses it now: changed,
+        added or dropped. Overridden, measured and removed Doses' ones stay, and
+        so do those the user gave another Material."""
+        items = {i.dose_id: i for i in run.line_items if i.dose_id}
+        chargeable = {dose["id"]: material for dose, material in self._dose_materials()}
+        doses = (
+            self._settings.get(self._config.device_id)[DOSES]
+            if Capability.DOSES in self._config.capabilities
+            else []
+        )
+        reapplied = []
+        for dose in doses:
+            item = items.pop(dose["id"], None)
+            amount = row["doses"].get(dose["id"])
+            if item is not None and not (
+                item.from_defaults
+                and item.computed is None
+                and item.material_id == dose["material_id"]
+            ):
+                reapplied.append(item)
+            elif item is not None:
+                if amount:
+                    item.recompute(amount)
+                    item.dose_source = source
+                    reapplied.append(item)
+            # A stock input that measured nothing used gets no Line Item.
+            elif (
+                amount
+                and dose["id"] in chargeable
+                and dose["id"] not in run.measured_doses
+            ):
+                reapplied.append(
+                    dose_line_item(
+                        ulid_now(), dose["id"], chargeable[dose["id"]], amount, source
+                    )
+                )
+        lead = list(
+            takewhile(lambda i: i.kind in CONSUMED_KINDS or i.measured, run.line_items)
+        )
+        run.line_items = [
+            *lead,
+            *reapplied,
+            *items.values(),
+            *(i for i in run.line_items[len(lead) :] if not i.dose_id),
+        ]
+
+    def _record_program(self, run: Run) -> bool:
+        """Follow a new valid Program; whether the Run changed."""
+        program = self._program()
+        if program is None or program == run.program:
+            return False
+        run.follow_program(program)
+        return True
 
     @callback
     def _on_slot(self, event: Event[EventStateChangedData]) -> None:
@@ -370,36 +569,24 @@ class DeviceTracker:
         return None if material is None or material.archived else material
 
     @callback
-    def _on_price(self, event: Event[EventStateChangedData]) -> None:
-        state = event.data["new_state"]
-        self._remember_price(state)
-        if run := self._book.open_run(self._config.device_id):
-            self._record_price(run, state)
+    def _on_price(
+        self, metering: Metering, event: Event[EventStateChangedData]
+    ) -> None:
+        run = self._book.open_run(self._config.device_id)
+        metering.on_price(event.data["new_state"], run)
+        if run:
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
-    def _price_of(self, state: State | None) -> float | None:
-        return price_reading(state, self._config.price, self._hass.config.currency)
-
-    def _current_price(self) -> float | None:
-        if (entity_id := self._config.price_entity_id) is None:
-            value: float = self._config.price["value"]
-            return value
-        return self._price_of(self._hass.states.get(entity_id))
-
-    def _remember_price(self, state: State | None) -> None:
-        if state is not None and (price := self._price_of(state)) is not None:
-            self._last_price = (self._price_time(state), price)
-
-    def _price_time(self, state: State) -> datetime:
-        return input_time(state, self._config.price.get("attribute"))
-
-    def _record_price(self, run: Run, state: State | None) -> None:
-        """Add the price entity's report to the Run's price timeline."""
-        if state is None:
-            add_price(run, dt_util.utcnow(), None)
-        else:
-            add_price(run, self._price_time(state), self._price_of(state))
+    @callback
+    def _on_settings(self, device_id: str) -> None:
+        if device_id != self._config.device_id:
+            return
+        self._follow_stocks()
+        if run := self._book.open_run(self._config.device_id):
+            self._record_stocks(run)
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
 
     @callback
     def _on_tick(self, now: datetime) -> None:
@@ -489,22 +676,26 @@ class DeviceTracker:
             started=at,
             last_seen=at,
             line_items=[],
-            consumption=dict(self._config.consumption),
-            cost_source=dict(self._config.price),
             tags=settings[TAGS_FOR_NEW_RUNS],
+            part_count=self._part_count(),
         )
-        if meter := meter_of(run.consumption):
-            self._record(run, self._hass.states.get(meter["entity_id"]))
+        for metering in self._meterings:
+            metering.open(run, at)
         self._follow_average_power(run, at)
         self._record_usage(run, self._usage_state())
         self._record_slot(run)
-        self._open_prices(run, at)
+        self._record_program(run)
+        self._record_stocks(run)
         self._refresh(run, at)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
         )
         self._book.async_start(run)
         self._images.async_copy_thumbnail(run)
+
+    @property
+    def has_programs(self) -> bool:
+        return Capability.PROGRAM in self._config.capabilities
 
     async def async_create_run(
         self,
@@ -513,105 +704,84 @@ class DeviceTracker:
         outcome: Outcome,
         name: str | None,
         tags: list[str] | None,
+        program: str | None = None,
     ) -> Run:
         """A Run made by hand, final at once: no Snapshot, no `started` or `ended`.
 
-        Without `tags` it gets the Device's Tags for new Runs.
+        Without `tags` it gets the Device's Tags for new Runs; without a name, its
+        Program's.
         """
         settings = self._settings.get(self._config.device_id)
         run = Run(
             id=ulid_now(),
             device_id=self._config.device_id,
             device_name=self._config.name,
-            name=name,
+            name=name or program,
+            program=program,
             started=started,
             ended=ended,
             outcome=outcome,
             finalised=True,
             line_items=[],
-            consumption=dict(self._config.consumption),
-            cost_source=dict(self._config.price),
             tags=settings[TAGS_FOR_NEW_RUNS] if tags is None else tags,
+            part_count=self._part_count(),
         )
+        for metering in self._meterings:
+            metering.pin(run)
         covered = await recorded.async_covers(self._hass, started, ended)
-        await self._async_past_prices(run, covered)
-        run.line_items = [await self._async_past_electricity(run, covered)]
-        run.readings, run.prices = [], []
+        for metering in self._meterings:
+            if item := await self._async_past_quantity(metering, run, covered):
+                run.line_items.append(item)
+        # Stock inputs aren't read for a past Run: its Doses come from its Program's row.
+        run.line_items += self._doses(run)
+        for metering in self._meterings:
+            metering.finish(run)
         self._settle_material(run, measuring=False)
+        self._flag_defaults(run)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), ended
         )
         await self._book.async_add(run)
         return run
 
-    async def _async_past_prices(self, run: Run, covered: bool) -> None:
-        """A past Run's price timeline from history, flagged where it has none."""
-        assert run.ended is not None
-        if (entity_id := self._config.price_entity_id) is None:
-            add_price(run, run.started, self._current_price())
-            return
-        states = await recorded.async_states(
-            self._hass, entity_id, run.started, run.ended
-        )
-        if not any(self._price_time(state) <= run.started for state in states):
-            add_price(run, run.started, None)
-        for state in states:
-            self._record_price(run, state)
-        if not covered or price_gap(run.started, run.ended, run.prices):
-            # Without the recorder, the last price it knew may be outdated.
-            add_flag(run, Flag.PRICE_GAP)
+    def _part_count(self) -> int | None:
+        return 1 if Capability.PART_COUNT in self._config.capabilities else None
 
-    async def _async_past_electricity(self, run: Run, covered: bool) -> LineItem:
-        """From the meter's history if it covers the Run, else estimated from the
-        average running power, else left for the user to enter.
-        """
+    async def _async_past_quantity(
+        self, metering: Metering, run: Run, covered: bool
+    ) -> LineItem | None:
+        """From the meter's history if it covers the Run, else from the Program
+        Defaults (electricity: the average running power), else left for the
+        user to enter; None with neither a meter nor a fallback."""
         assert run.ended is not None
-        start, end, prices = run.started, run.ended, run.prices
-        meter = meter_of(run.consumption)
-        if covered and meter:
-            states = await recorded.async_states(
-                self._hass, meter["entity_id"], start, end
+        electricity = metering is self._electricity
+        per_program = self._per_program and metering.counts(run)
+        if not (electricity or per_program or metering.meter(run)):
+            return None
+        await metering.async_past_prices(run, covered)
+        if await metering.async_past_readings(run, covered):
+            if electricity:
+                self._follow_average_power(run, run.started)
+            return metering.priced(
+                run, run.ended, metering.model(run), ConsumptionMethod.FROM_HISTORY
             )
-            before = [state for state in states if state.last_updated <= start]
-            if before and meter_reading(before[-1], meter) is not None:
-                for state in states[len(before) - 1 :]:
-                    self._record(run, state)
-                self._follow_average_power(run, start)
-                return electricity_line_item(
-                    ulid_now(),
-                    start,
-                    end,
-                    kwh(run),
-                    prices,
-                    ElectricityMethod.FROM_HISTORY,
-                )
-        if (running := self._config.consumption.get("running_power")) is not None:
-            return electricity_line_item(
-                ulid_now(),
-                start,
-                end,
-                consumption.estimate(running, running, []),
-                prices,
-                ElectricityMethod.ESTIMATED,
+        if per_program:
+            return metering.fallen_back(run, run.ended)
+        if (
+            electricity
+            and (running := self._config.consumption.get("running_power")) is not None
+        ):
+            return metering.priced(
+                run,
+                run.ended,
+                estimate(running, running, []),
+                ConsumptionMethod.ESTIMATED,
             )
-        item = electricity_line_item(
-            ulid_now(), start, end, lambda _, __: 0.0, prices, ElectricityMethod.ENTERED
+        item = metering.priced(
+            run, run.ended, lambda _, __: 0.0, ConsumptionMethod.ENTERED
         )
         item.quantity, item.segments = None, []
         return item
-
-    def _open_prices(self, run: Run, at: datetime) -> None:
-        """The price at Run start; without one, the last valid price before it."""
-        if (entity_id := self._config.price_entity_id) is None:
-            add_price(run, at, self._current_price())
-            return
-        state = self._hass.states.get(entity_id)
-        if self._price_of(state) is None and self._last_price:
-            add_price(run, *self._last_price)
-        if state is None:
-            add_price(run, at, None)
-        else:
-            self._record_price(run, state)
 
     @callback
     def async_end_run(self) -> asyncio.Future[None]:
@@ -657,9 +827,15 @@ class DeviceTracker:
         return self._await_final_report(run)
 
     def _awaits_report(self, run: Run) -> bool:
-        """Whether the meter or the Material used input may still report the Run's end."""
+        """Whether the meter, the Material used input or a stock input may still
+        report the Run's end."""
         assert run.ended is not None
-        if meter_of(run.consumption) and not has_final_report(run):
+        if any(metering.awaits_report(run) for metering in self._meterings):
+            return True
+        if any(
+            (stock := run.stocks.get(dose["id"])) is None or stock.at < run.ended
+            for dose in self._stocked_doses()
+        ):
             return True
         return self._config.material is not None and (
             run.usage is None or run.usage.at < run.ended
@@ -697,16 +873,50 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
+        self._flag_defaults(run)
+        stocked = [(d, m) for d, m in self._dose_materials() if "stock" in d]
+        run.measured_doses = [
+            dose["id"]
+            for dose, material in stocked
+            if self._stock_used(run, dose, material) is not None
+        ]
+        if len(run.measured_doses) < len(stocked):
+            add_flag(run, Flag.STOCK_INPUT_UNAVAILABLE)
         linked = self._spoolman_prices(run)
         if not read and linked:
             add_flag(run, Flag.SPOOLMAN_UNREACHABLE)
         if any(price.last_read is None for price in linked):
             add_flag(run, Flag.SPOOLMAN_NO_PRICE)
-        run.readings = []
-        run.prices = []
+        for metering in self._meterings:
+            metering.finish(run)
         run.loaded_slots = []
+        run.stocks = {}
         await self._async_finalise(run)
         self._finishing.discard(run.id)
+
+    @staticmethod
+    def _defaults_flags(run: Run) -> list[Flag]:
+        """The Flags the Run's defaults call for."""
+        missing = any(
+            item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
+            for item in run.line_items
+        )
+        early = run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+            item.from_defaults for item in run.line_items
+        )
+        return [
+            flag
+            for flag, raised in (
+                (Flag.DEFAULT_MISSING, missing),
+                (Flag.ENDED_EARLY_DEFAULTS, early),
+            )
+            if raised
+        ]
+
+    @classmethod
+    def _flag_defaults(cls, run: Run) -> None:
+        for flag in cls._defaults_flags(run):
+            add_flag(run, flag)
 
     def _spoolman_prices(self, run: Run) -> list[SpoolmanPrice]:
         """The Cost Sources of the Run's Materials linked to Spoolman."""
@@ -722,6 +932,8 @@ class DeviceTracker:
         """Flag missing usage or Material; without a Material used input (or a
         measurement, as on a manual Run), add a Material Line Item to fill in
         unless the user already added one."""
+        if Capability.MATERIAL not in self._config.capabilities:
+            return
         items = [i for i in run.line_items if i.measured]
         if not (measuring and self._config.material) and not any(
             i.kind is LineItemKind.MATERIAL for i in run.line_items
@@ -764,19 +976,6 @@ class DeviceTracker:
             if run.device_id == self._config.device_id and not run.finalised
         ]
 
-    def _record(self, run: Run, state: State | None) -> None:
-        """Add the meter's report to the Run's readings and flag gaps and resets."""
-        meter = meter_of(run.consumption)
-        assert meter is not None
-        value = meter_reading(state, meter)
-        if state is None:
-            add_reading(run, dt_util.utcnow(), None)
-        elif value is None:
-            add_reading(run, state.last_updated, None)
-        else:
-            add_reading(run, state.last_updated, value)
-            add_reading(run, state.last_reported, value)
-
     def _slot_fell_back(self, slot: SlotReport) -> bool:
         return slot_material(slot, self._catalog.materials()) is None
 
@@ -803,28 +1002,88 @@ class DeviceTracker:
             item_id,
         )
 
+    def _dose_materials(self) -> list[tuple[dict[str, Any], Material]]:
+        """The Doses whose Material can be charged, with it, in Dose list order."""
+        if Capability.DOSES not in self._config.capabilities:
+            return []
+        return [
+            (dose, material)
+            for dose in self._settings.get(self._config.device_id)[DOSES]
+            if (material := self._catalog.material(dose["material_id"]))
+            and not material.archived
+        ]
+
+    @staticmethod
+    def _stock_used(run: Run, dose: dict[str, Any], material: Material) -> float | None:
+        """What the Dose's stock input lost so far, in the Material's unit; None
+        without a usable report."""
+        if (stock := run.stocks.get(dose["id"])) is None:
+            return None
+        return in_pack_unit(material, stock.used, stock.unit)
+
+    def _doses(self, run: Run) -> list[LineItem]:
+        """A Line Item per Dose its stock input or else its Program's row doses.
+
+        No Program or no row for it means the Default row.
+        """
+        row, row_source = self._program_row(run)
+        ids = {i.dose_id: i.id for i in run.line_items if i.dose_id}
+        items = []
+        for dose, material in self._dose_materials():
+            amount, source = row["doses"].get(dose["id"]), row_source
+            if (
+                "stock" in dose
+                and (used := self._stock_used(run, dose, material)) is not None
+            ):
+                amount, source = used, DoseSource.STOCK_INPUT
+            if amount:
+                item_id = ids.get(dose["id"]) or ulid_now()
+                items.append(
+                    dose_line_item(item_id, dose["id"], material, amount, source)
+                )
+        return items
+
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`."""
-        item = electricity_line_item(
-            run.electricity.id if run.line_items else ulid_now(),
-            run.started,
-            until,
-            kwh(run),
-            run.prices,
-            ElectricityMethod.MEASURED
-            if meter_of(run.consumption)
-            else ElectricityMethod.ESTIMATED,
-        )
+        consumed = [
+            item
+            for metering in self._meterings
+            if (item := metering.refresh(run, until))
+        ]
+        # A quantity without measurement or fallback keeps a Line Item entered by hand.
+        kinds = {item.kind for item in consumed}
         materials = self._measured_items(run, until) if self._config.material else []
+        doses = self._doses(run)
         run.line_items = [
-            item,
+            *consumed,
             *materials,
+            *doses,
             *(
                 i
                 for i in run.line_items
-                if i.kind is not LineItemKind.ELECTRICITY and not i.measured
+                if i.kind not in kinds and not i.measured and not i.dose_id
             ),
         ]
         count_running_hours(run.line_items, run, until)
-        if price_gap(run.started, until, run.prices):
-            add_flag(run, Flag.PRICE_GAP)
+
+
+def _reapplied(run: Run, item: LineItem, amount: float | None) -> LineItem:
+    """The final Run's consumed Line Item with a new default `amount`, spread over
+    the Run at the prices it was charged."""
+    assert run.ended is not None
+    prices = [(s.start, s.unit_price) for s in item.segments] or [
+        (run.started, item.unit_price)
+    ]
+    reapplied = priced_line_item(
+        item.id,
+        item.kind,
+        item.unit,
+        run.started,
+        run.ended,
+        spread(amount or 0.0, run.started, run.ended),
+        prices,
+        ConsumptionMethod.PROGRAM_DEFAULT,
+    )
+    if amount is None:
+        reapplied.quantity, reapplied.segments = None, []
+    return reapplied

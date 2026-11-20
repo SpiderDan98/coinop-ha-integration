@@ -3,22 +3,54 @@
 Removed Devices are not listed; their Runs keep `device_id` and `device_name`.
 """
 
+from statistics import fmean
 from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
-from custom_components.coinop.const import DEVICE_TYPE_3D_PRINTER
+from custom_components.coinop.device_config import Capability, DeviceConfig
+from custom_components.coinop.device_inputs import offered_values
 from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
+    DOSES,
     TAGS_FOR_NEW_RUNS,
 )
+from custom_components.coinop.models import (
+    ConsumptionMethod,
+    DoseSource,
+    LineItemKind,
+    Outcome,
+    Run,
+)
+from custom_components.coinop.quantities import QUANTITIES
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 
 from .command import command, found
 from .materials import pickable
+
+
+def _known_programs(
+    hass: HomeAssistant, coinop: CoinOp, device: DeviceConfig
+) -> list[str]:
+    """The Program input's offered values, then other Programs of its Runs A-Z;
+    never one the Program input ignores."""
+    offered = (
+        offered_values(hass, entity_id, device.program_attribute)
+        if (entity_id := device.program_entity_id)
+        else []
+    )
+    ran = sorted(
+        {
+            run.program
+            for run in coinop.book.runs()
+            if run.device_id == device.device_id and run.program
+        },
+        key=str.casefold,
+    )
+    return list(dict.fromkeys(p for v in [*offered, *ran] if (p := device.program(v))))
 
 
 @command({vol.Required("type"): "coinop/devices/list"})
@@ -35,9 +67,15 @@ def _list(
                 {
                     "id": device.device_id,
                     "name": device.name,
-                    "type": DEVICE_TYPE_3D_PRINTER,
-                    "ha_settings": dict(device.flow_data),
+                    "type": device.device_type,
+                    "capabilities": sorted(device.capabilities),
+                    "ha_settings": {
+                        key: value
+                        for key, value in device.flow_data.items()
+                        if key != "device_type"
+                    },
                     "settings": coinop.settings.get(device.device_id),
+                    "known_programs": _known_programs(hass, coinop, device),
                 }
                 for device in coinop.devices
             ]
@@ -61,19 +99,48 @@ async def _update_settings(
     """Change the named panel settings; returns all of the Device's panel settings.
 
     Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
-    the default Material must exist and not be archived.
+    the default Material and a new Dose's Material must exist and not be archived,
+    and only a Device Type with Doses has a Dose list. Only a Dose counted in g or
+    ml can have a stock input.
     """
-    device = msg["device_id"] if msg["device_id"] in coinop.settings else None
+    device_id = msg["device_id"]
+    device = next((d for d in coinop.devices if d.device_id == device_id), None)
     if found(connection, msg, device, "Device") is None:
         return
+    assert device is not None
     try:
         changes = coinop.settings.validate(msg["settings"])
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
-    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None and not pickable(
-        connection, msg, coinop, material_id
+    if DOSES in changes and Capability.DOSES not in device.capabilities:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "This Device has no Doses"
+        )
+        return
+    kept = {
+        (dose["id"], dose["material_id"])
+        for dose in coinop.settings.get(device_id)[DOSES]
+    }
+    picked = [
+        dose["material_id"]
+        for dose in changes.get(DOSES, [])
+        if (dose["id"], dose["material_id"]) not in kept
+    ]
+    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None:
+        picked.append(material_id)
+    if not all(pickable(connection, msg, coinop, id_) for id_ in picked):
+        return
+    if any(
+        (material := coinop.catalog.material(dose["material_id"])) and material.by_piece
+        for dose in changes.get(DOSES, [])
+        if "stock" in dose
     ):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_ALLOWED,
+            "A Dose counted in pieces has no stock input",
+        )
         return
     templates = changes.get(AUTOMATIC_TEMPLATES, [])
     complete = len(coinop.catalog.find_templates(templates)) == len(templates)
@@ -90,4 +157,80 @@ async def _update_settings(
     connection.send_result(msg["id"], {"settings": settings})
 
 
-COMMANDS = (_list, _update_settings)
+def _measured(run: Run, kind: LineItemKind) -> float | None:
+    """What was measured, also under the user's override."""
+    return next(
+        (
+            item.computed["quantity"] if item.computed else item.quantity
+            for item in run.line_items
+            if item.kind is kind
+            and item.method
+            in (ConsumptionMethod.MEASURED, ConsumptionMethod.FROM_HISTORY)
+        ),
+        None,
+    )
+
+
+@command(
+    {
+        vol.Required("type"): "coinop/devices/measured_suggestions",
+        vol.Required("device_id"): str,
+    }
+)
+def _measured_suggestions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coinop: CoinOp,
+) -> None:
+    """The mean measured kWh and litres of the Device's Completed Runs, with their
+    count, per Program and for the Default row (Runs whose Program has no row).
+
+    Only measured and from-history quantities count, as measured even if overridden;
+    a key without Runs is left out.
+    """
+    device_id = msg["device_id"]
+    device = next((d for d in coinop.devices if d.device_id == device_id), None)
+    if found(connection, msg, device, "Device") is None:
+        return
+    values: dict[str | None, dict[str, list[float]]] = {}
+    for run in coinop.book.runs():
+        if (
+            run.device_id != device_id
+            or run.outcome is not Outcome.COMPLETED
+            or not run.finalised
+        ):
+            continue
+        rows: list[str | None] = [run.program] if run.program else []
+        if (
+            coinop.settings.program_row(device_id, run.program)[1]
+            is DoseSource.DEFAULT_ROW
+        ):
+            rows.append(None)
+        for quantity in QUANTITIES.values():
+            if (measured := _measured(run, quantity.kind)) is not None:
+                for row in rows:
+                    values.setdefault(row, {}).setdefault(
+                        quantity.default_key, []
+                    ).append(measured)
+
+    decimals = {q.default_key: q.decimals for q in QUANTITIES.values()}
+
+    def means(row: str | None) -> dict[str, Any]:
+        return {
+            key: {"mean": round(fmean(measured), decimals[key]), "runs": len(measured)}
+            for key, measured in values.get(row, {}).items()
+        }
+
+    connection.send_result(
+        msg["id"],
+        {
+            "suggestions": {
+                "default": means(None),
+                "programs": {row: means(row) for row in values if row is not None},
+            }
+        },
+    )
+
+
+COMMANDS = (_list, _update_settings, _measured_suggestions)

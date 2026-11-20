@@ -4,7 +4,8 @@ and the user's corrections: fields, Flags, "End Run now" and deletion.
 Summaries carry what a gallery tile shows (with its Cover Image); `get` returns
 the stored Run with amounts rounded to the currency, the derived subtotals and
 total, and every image with the URLs to fetch it from.
-Corrections never recompute a cost (ADR 0002).
+Corrections never recompute a cost, except that a corrected Program re-applies
+its defaults (ADR 0002).
 """
 
 from datetime import datetime
@@ -27,6 +28,7 @@ from custom_components.coinop.cost.rounding import (
     rounded_sum,
 )
 from custom_components.coinop.cost.running_time import running_time
+from custom_components.coinop.device_config import Capability
 from custom_components.coinop.images import image_info, upload_rules
 from custom_components.coinop.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.coinop.run_book import RunBook, RunChange
@@ -56,6 +58,7 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "device_id": run.device_id,
         "device_name": run.device_name,
         "name": run.name,
+        "program": run.program,
         "started": run.started.isoformat(),
         "ended": None if run.ended is None else run.ended.isoformat(),
         "outcome": run.outcome,
@@ -63,7 +66,9 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "running_seconds": round(running_time(run, now).total_seconds()),
         "total": float(total),
         "part_count": run.part_count,
-        "cost_per_part": float(round_amount(float(total) / run.part_count, decimals)),
+        "cost_per_part": None
+        if run.part_count is None
+        else float(round_amount(float(total) / run.part_count, decimals)),
         "flags": list(run.flags),
         "tags": list(run.tags),
         "cover": None if (cover := run.cover) is None else image_info(run, cover),
@@ -83,7 +88,9 @@ def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
 
 def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
     # Meter readings are long on an open Run and of no use to the panel.
-    stored = {key: value for key, value in run.as_dict().items() if key != "readings"}
+    stored = run.as_dict()
+    for timeline in stored.get("timelines", {}).values():
+        del timeline["readings"]
     return {
         **stored,
         **_summary(run, now, decimals),
@@ -203,6 +210,7 @@ _FINAL_FIELDS = ("started", "ended", "outcome")
         vol.Optional("ended"): _moment,
         vol.Optional("outcome"): vol.Coerce(Outcome),
         vol.Optional("part_count"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("program"): vol.Any(None, str),
         vol.Optional("tags"): [tag_name],
     }
 )
@@ -219,6 +227,16 @@ async def _update(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run is not final yet"
         )
         return
+    if "part_count" in msg and run.part_count is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has no Part Count"
+        )
+        return
+    if "program" in msg and not _has_program(coinop, run):
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has no Program"
+        )
+        return
     started, ended = msg.get("started", run.started), msg.get("ended", run.ended)
     if ended is not None and ended <= started:
         connection.send_error(
@@ -232,6 +250,11 @@ async def _update(
         run.note = _text(msg["note"])
     run.outcome = msg.get("outcome", run.outcome)
     run.part_count = msg.get("part_count", run.part_count)
+    if "program" in msg:
+        if tracker := _tracker(coinop, run.device_id):
+            tracker.correct_program(run, _text(msg["program"]))
+        else:
+            run.program = _text(msg["program"])
     if "tags" in msg:
         run.tags = await coinop.catalog.async_add_tags(msg["tags"])
     await coinop.book.async_correct(run)
@@ -247,6 +270,7 @@ async def _update(
         vol.Required("ended"): _moment,
         vol.Required("outcome"): vol.Coerce(Outcome),
         vol.Optional("tags"): [tag_name],
+        vol.Optional("program"): vol.Any(None, str),
     }
 )
 async def _create(
@@ -266,12 +290,19 @@ async def _create(
             "A manual Run ends after it starts, and not in the future",
         )
         return
+    program = _text(msg.get("program"))
+    if program is not None and not tracker.has_programs:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Device has no Programs"
+        )
+        return
     run = await tracker.async_create_run(
         msg["started"],
         msg["ended"],
         msg["outcome"],
         _text(msg.get("name")),
         await coinop.catalog.async_add_tags(msg["tags"]) if "tags" in msg else None,
+        program,
     )
     _send_run(hass, connection, msg["id"], run)
 
@@ -295,6 +326,14 @@ async def _clear_flag(
         run.flags.remove(msg["flag"])
         await coinop.book.async_correct(run)
     _send_run(hass, connection, msg["id"], run)
+
+
+def _has_program(coinop: CoinOp, run: Run) -> bool:
+    """Whether the Run's Device Type has Programs; for a removed Device, whether it had one."""
+    device = next((d for d in coinop.devices if d.device_id == run.device_id), None)
+    if device is None:
+        return run.program is not None
+    return Capability.PROGRAM in device.capabilities
 
 
 def _tracker(coinop: CoinOp, device_id: str) -> DeviceTracker | None:

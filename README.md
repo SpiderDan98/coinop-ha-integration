@@ -1,6 +1,6 @@
 # Coin-op
 
-A Home Assistant custom integration that records what each print of your 3D printers costs: electricity, material and anything else you add, kept as an editable history of Runs.
+A Home Assistant custom integration that records what each print of your 3D printers and each load of your washing machine costs: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
 
 Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
 
@@ -14,6 +14,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
+- Washing machines are the second Device Type: each load is a Run with electricity, water and the detergent and other products dosed into it. See [Washing machines](#washing-machines).
 
 ## Installation
 
@@ -75,6 +76,88 @@ If an update of the integration renames or replaces its entities, open the Devic
 ## Using it with hass-anycubic
 
 The hass-anycubic integration has cost sensors of its own (such as job energy, job electricity cost and last job total cost). Coin-op ignores them and computes every cost itself. Turn off one of the two cost features, for example by disabling hass-anycubic's cost entities, so your dashboards don't count the same print twice.
+
+## Washing machines
+
+Choose **Washing machine** as the Device Type when you add a Device. Like a printer, a washing machine is followed through entities its integration already provides: a Status opens and closes each load's Run, and its costs are frozen into Line Items when it ends. Coin-op doesn't detect wash cycles or programs itself.
+
+A washing machine's Runs get these Line Items:
+
+- **Electricity**, from an energy meter or a power sensor exactly as for printers, or "per Program" from the kWh in the Program Defaults.
+- **Water**, from a water meter or a flow sensor (any of Home Assistant's volume and flow units), or "per Program" from the litres in the Program Defaults. It is priced per m³ from a fixed value or a price entity (per m³ or per litre, sub-units such as ct/L included). Include the wastewater charge in the price. With the water source "None" there is no Water Line Item, but you can add one by hand on a Run.
+- **Doses**: one Material Line Item for each detergent, fabric softener or other product the load uses.
+
+The setup asks for the Status, its mapping, an optional Program input, the electricity source and price, and the water source and price. Part Count, Slots, Material used, Thumbnail and Camera don't apply to washing machines and aren't shown.
+
+### Only a smart plug?
+
+Install [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`). It detects cycles and programs from the power curve of a plug that measures power, and Coin-op takes the Status and the Program from it. Pick the plug's energy meter as the electricity source, and choose "per Program" for water: each load then gets the litres you set for its Program.
+
+### Program
+
+The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs. Values the input reports while it knows no program (a placeholder such as `detecting...`) can be listed as values to ignore: they count as no Program.
+
+You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values, Doses measured by a stock input (also when it measured nothing used) and Doses you gave another Material stay as they are, a Flag you marked as checked stays checked, and saving the same Program again changes nothing.
+
+### Program Defaults and Doses
+
+Each washing machine's card in the panel's Devices tab has a Dose list and a Program Defaults table.
+
+- **Materials**: detergents, fabric softeners and laundry additives are Materials in the Materials tab, like filament. Built-in types (liquid and powder detergent, pods, fabric softener, whitener, stain remover, colour catcher sheets) pre-fill a typical density. Pods and sheets are priced per piece: 40 pods for €12 cost €0.30 each.
+- **Doses**: one entry per product that goes into the machine, each pointing to a Material. Each Dose a Run uses becomes its own Material Line Item.
+- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them.
+- Rows are suggested from the values the Program input offers and from Programs seen on past Runs; a suggested row is stored once you enter a value.
+- With a meter, a row suggests the average measured kWh and litres of that Program's completed Runs, with the number of Runs. One click applies it; it is never applied automatically.
+
+Changes to the Program Defaults apply to the open Run at once and to future Runs, never to ended ones (only correcting a Run's Program re-applies them). Every amount stays editable on each Run, and each Dose shows where its amount came from: the Program's row, the Default row, a stock input or entered by hand.
+
+### Measuring detergent with a stock input
+
+A Dose can have a stock input: an entity that reports how much of the product is left, in a mass or volume unit, such as a scale under the bottle. The Dose's amount is then the decrease from the Run's start to its end; a refill during the load counts nothing. Coin-op waits up to 5 minutes after the end for a final report, and converts between g and ml through the Material's density. When the stock input reports nothing usable, the Program's amount is charged and the Run gets a Flag.
+
+Some machines only report a fill level in %, such as Miele's TwinDos. Turn it into ml with the tank's size in a template sensor (replace the entity and the 1400 ml tank size with yours), then pick that sensor as the stock input:
+
+```yaml
+template:
+  - sensor:
+      - name: Detergent tank
+        unique_id: detergent_tank_ml
+        unit_of_measurement: mL
+        device_class: volume_storage
+        state_class: measurement
+        availability: "{{ is_number(states('sensor.my_washer_detergent_level')) }}"
+        state: "{{ (states('sensor.my_washer_detergent_level') | float * 1400 / 100) | round(0) }}"
+```
+
+A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a single load's usage is only as exact as that.
+
+### Flags on washing machine Runs
+
+- **Ended early with defaults**: a Cancelled or Failed Run was charged water or Dose defaults meant for a whole Run. Lower them if it stopped early.
+- **Default missing**: neither a measurement nor a Program Default gave a quantity; enter it on the Run.
+- **Stock input unavailable**: a Dose's stock input reported nothing usable, so its default was charged.
+- A meter that reported nothing during a load (and has no recorder history for it) falls back to the Program's kWh or litres and marks the Run with a consumption gap.
+
+### Manual Runs, entities and statements
+
+- A manual Run of a washing machine asks for its Program (a known one or free text). Electricity and water come from recorder history when a meter covers the period, else from the Program Defaults; Doses come from the Program Defaults.
+- A washing machine's sensors are those of a printer, with **Water in Runs** (litres) and **Water cost** instead of Material used. Its Run event's `ended` carries the Program and the litres; Last Run cost carries the Program. Neither has a Part Count.
+- The Overview and Analysis show Water as a cost kind, and the Analysis compares Programs by Run count and cost per Run. The Runs tab filters by Program.
+- A Cost Statement shows each load's Program, Water and Doses, without Part Count.
+
+### Washing machine Integration Profiles
+
+When you add a washing machine and pick its Home Assistant device from one of these integrations, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
+
+| Integration | Status | Program | Electricity | Water |
+|---|---|---|---|---|
+| [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`) | State sensor | Program sensor | your plug's energy meter, chosen by you | chosen by you |
+| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle | Water consumption sensor of the current cycle |
+| [Home Connect](https://www.home-assistant.io/integrations/home_connect/) (`home_connect`) | Operation state sensor | Active program select | chosen by you | chosen by you |
+
+- WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor reports placeholders such as `detecting...`; the profile fills them in as values to ignore (Program step), so they never become a Run's Program or a suggested Program row.
+- Miele's consumption sensors count the current cycle and drop to 0 afterwards. Coin-op keeps the reading at the load's end, so that drop is neither lost nor counted twice.
+- **Detect again** in the reconfigure menu re-applies the Status, the mapping and the Program, and leaves electricity, water and prices as they are.
 
 ## Spoolman
 
