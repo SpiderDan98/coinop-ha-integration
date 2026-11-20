@@ -270,6 +270,7 @@ async def _update(
         vol.Required("ended"): _moment,
         vol.Required("outcome"): vol.Coerce(Outcome),
         vol.Optional("tags"): [tag_name],
+        vol.Optional("program"): vol.Any(None, str),
     }
 )
 async def _create(
@@ -289,12 +290,19 @@ async def _create(
             "A manual Run ends after it starts, and not in the future",
         )
         return
+    program = _text(msg.get("program"))
+    if program is not None and not tracker.has_programs:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Device has no Programs"
+        )
+        return
     run = await tracker.async_create_run(
         msg["started"],
         msg["ended"],
         msg["outcome"],
         _text(msg.get("name")),
         await coinop.catalog.async_add_tags(msg["tags"]) if "tags" in msg else None,
+        program,
     )
     _send_run(hass, connection, msg["id"], run)
 

@@ -10,6 +10,7 @@ from .clock import Clock
 from .devices import add_hub, add_washing_machine
 from .stored import place_materials
 from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, set_scale
+from .test_manual_runs import create
 from .test_programs import WASHER_PROGRAM, set_program
 from .test_runs import stored_runs, value
 from .test_washing_machines import set_washer
@@ -292,3 +293,20 @@ async def test_correcting_an_open_runs_program_applies_its_defaults_at_once(
         "White 60°",
         pytest.approx(0.42 + 0.22 + 0.42 + 0.08),
     )
+
+
+async def test_correcting_a_manual_runs_program_re_applies_its_defaults(
+    clock: Clock, washer: ConfigSubentry, panel: PanelClient
+) -> None:
+    await set_rows(panel, washer)
+    await clock.advance(hours=3)
+    run = await create(panel, washer.subentry_id, program="Cotton 40°")
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert costs(corrected) == [
+        ("electricity", "program_default", pytest.approx(1.4), pytest.approx(0.42)),
+        ("water", "program_default", pytest.approx(55), pytest.approx(0.22)),
+        ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
+        ("dose-whitener", "program_default", 20, pytest.approx(0.08)),
+    ]
