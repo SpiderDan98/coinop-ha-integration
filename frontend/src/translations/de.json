@@ -35,6 +35,7 @@
   "run.per_part": "{amount} pro Teil × {count}",
   "run.name": "Name",
   "run.program": "Programm",
+  "run.program_hint": "Ein anderes Programm wendet seine Vorgaben auf die Kosten an, die aus Vorgaben stammen und nicht überschrieben sind.",
   "run.outcome": "Ausgang",
   "run.part_count": "Teileanzahl",
   "run.note": "Notiz",

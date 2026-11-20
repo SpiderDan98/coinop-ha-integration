@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from functools import partial
+from itertools import takewhile
 import re
 from typing import Any
 
@@ -27,6 +28,7 @@ from homeassistant.util.ulid import ulid_now
 from . import recorded
 from .catalog import Catalog
 from .cost import consumption
+from .cost.consumption import spread
 from .cost.electricity import estimate
 from .cost.material import (
     GRAM,
@@ -36,6 +38,7 @@ from .cost.material import (
     material_line_item,
     slot_line_items,
 )
+from .cost.pricing import priced_line_item
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, Target, WaterSource
 from .device_inputs import (
@@ -58,6 +61,7 @@ from .images import DeviceImages
 from .materials import Material, MaterialForm, SpoolmanPrice
 from .metering import LIVE_INTERVAL, Metering
 from .models import (
+    CONSUMED_KINDS,
     ConsumptionMethod,
     DoseSource,
     Flag,
@@ -83,6 +87,9 @@ OUTCOMES = {
     Target.CANCELLED: Outcome.CANCELLED,
     Target.ENDED: Outcome.UNKNOWN,
 }
+
+# The Program Defaults' column of each consumed quantity.
+DEFAULT_COLUMNS = {LineItemKind.ELECTRICITY: "kwh", LineItemKind.WATER: "litres"}
 
 PRINT_FILE = re.compile(r"(\.gcode)?\.(gcode|bgcode|gco|3mf)$", re.IGNORECASE)
 
@@ -435,6 +442,69 @@ class DeviceTracker:
         return (
             input_value(state, self._config.program_attribute) or ""
         ).strip() or None
+
+    def correct_program(self, run: Run, program: str | None) -> None:
+        """The user's Program for the Run, whose defaults follow it even once the
+        Run is final (ADR 0002)."""
+        if program == run.program:
+            return
+        if run.ended is None:
+            run.follow_program(program)
+            self._refresh(run, dt_util.utcnow())
+            return
+        run.program = program
+        if not run.finalised:
+            self._refresh(run, run.ended)
+            return
+        row, source = self._program_row(run)
+        run.line_items = [
+            _reapplied(run, item, row.get(DEFAULT_COLUMNS[item.kind]))
+            if item.method is ConsumptionMethod.PROGRAM_DEFAULT
+            and item.computed is None
+            else item
+            for item in run.line_items
+        ]
+        self._reapply_doses(run, row, source)
+        _flag_defaults(run)
+        run.drop_fixed_flags()
+
+    def _reapply_doses(self, run: Run, row: dict[str, Any], source: DoseSource) -> None:
+        """Each Dose's Line Item from defaults as the row doses it now: changed,
+        added or dropped. Overridden, measured and removed Doses' ones stay."""
+        items = {i.dose_id: i for i in run.line_items if i.dose_id}
+        chargeable = {dose["id"]: material for dose, material in self._dose_materials()}
+        doses = (
+            self._settings.get(self._config.device_id)[DOSES]
+            if Capability.DOSES in self._config.capabilities
+            else []
+        )
+        reapplied = []
+        for dose in doses:
+            item = items.pop(dose["id"], None)
+            amount = row["doses"].get(dose["id"])
+            if item is not None and not (item.from_defaults and item.computed is None):
+                reapplied.append(item)
+            elif item is not None:
+                if amount:
+                    item.recompute(amount)
+                    item.dose_source = source
+                    reapplied.append(item)
+            # A stock input may have measured nothing used: no Line Item to add.
+            elif amount and dose["id"] in chargeable and "stock" not in dose:
+                reapplied.append(
+                    dose_line_item(
+                        ulid_now(), dose["id"], chargeable[dose["id"]], amount, source
+                    )
+                )
+        lead = list(
+            takewhile(lambda i: i.kind in CONSUMED_KINDS or i.measured, run.line_items)
+        )
+        run.line_items = [
+            *lead,
+            *reapplied,
+            *items.values(),
+            *(i for i in run.line_items[len(lead) :] if not i.dose_id),
+        ]
 
     def _record_program(self, run: Run) -> bool:
         """Follow a new valid Program; whether the Run changed."""
@@ -800,15 +870,7 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
-        if any(
-            item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
-            for item in run.line_items
-        ):
-            add_flag(run, Flag.DEFAULT_MISSING)
-        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
-            item.from_defaults for item in run.line_items
-        ):
-            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+        _flag_defaults(run)
         if any(
             self._stock_used(run, dose, material) is None
             for dose, material in self._dose_materials()
@@ -974,3 +1036,38 @@ class DeviceTracker:
             ),
         ]
         count_running_hours(run.line_items, run, until)
+
+
+def _flag_defaults(run: Run) -> None:
+    """Flag a missing default and defaults charged on an ended-early Run."""
+    if any(
+        item.method is ConsumptionMethod.PROGRAM_DEFAULT and item.quantity is None
+        for item in run.line_items
+    ):
+        add_flag(run, Flag.DEFAULT_MISSING)
+    if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+        item.from_defaults for item in run.line_items
+    ):
+        add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+
+
+def _reapplied(run: Run, item: LineItem, amount: float | None) -> LineItem:
+    """The final Run's consumed Line Item with a new default `amount`, spread over
+    the Run at the prices it was charged."""
+    assert run.ended is not None
+    prices = [(s.start, s.unit_price) for s in item.segments] or [
+        (run.started, item.unit_price)
+    ]
+    reapplied = priced_line_item(
+        item.id,
+        item.kind,
+        item.unit,
+        run.started,
+        run.ended,
+        spread(amount or 0.0, run.started, run.ended),
+        prices,
+        ConsumptionMethod.PROGRAM_DEFAULT,
+    )
+    if amount is None:
+        reapplied.quantity, reapplied.segments = None, []
+    return reapplied
