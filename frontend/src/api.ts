@@ -413,6 +413,18 @@ export const updateDeviceSettings = async (
     })
   ).settings;
 
+/** The mean measured kWh and litres of the Device's Completed Runs and how many Runs
+ * that is, per Program row; the Default row's from Runs whose Program has no row. */
+export const getMeasuredSuggestions = async (hass: HomeAssistant, deviceId: string) => {
+  type Row = Partial<Record<"kwh" | "litres", { mean: number; runs: number }>>;
+  return (
+    await hass.callWS<{ suggestions: { default: Row; programs: Record<string, Row> } }>({
+      type: "coinop/devices/measured_suggestions",
+      device_id: deviceId,
+    })
+  ).suggestions;
+};
+
 /** A name another Tag has, ignoring case, is that Tag; resolves to the resulting Tag. */
 export const createTag = async (hass: HomeAssistant, name: string) =>
   (await hass.callWS<{ tag: string }>({ type: "coinop/tags/create", name })).tag;

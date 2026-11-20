@@ -10,6 +10,7 @@ import type {
   Group,
   Totals,
   Filaments,
+  getMeasuredSuggestions,
   LineItemTemplate,
   Material,
   MaterialType,
@@ -26,6 +27,7 @@ import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.js
 import devicesList from "./fixtures/backend/devices-list.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
+import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
@@ -125,6 +127,11 @@ export const recorded = {
   washer: devicesListWashingMachine.devices[0] as Device,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
+  /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
+   * no row of its own): 1.2 kWh from 1 Run for the Default row and for "Cotton 60°". */
+  measuredSuggestions: devicesMeasuredSuggestions.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
   /** `coinop/runs/get` of "water-wash" on "device-washer" with a water meter: 50 L measured,
    * 20 L at 4.00 and 30 L at 5.00 per m³ ("water-wash-water"). */
   waterWash: runsGetWater.run as RunDetail,

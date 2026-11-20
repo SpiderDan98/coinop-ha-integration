@@ -714,6 +714,62 @@ describe("A washing machine's Program rows", () => {
     expect(text(query(washer, ".program-rows"))).toBe("Wool");
     expect(queryAll(panel, ".device")[0]?.querySelector(".program-rows")).toBeNull();
   });
+
+  const SUGGESTIONS = "coinop/devices/measured_suggestions";
+  const suggesting = () =>
+    washerBackend().reply(SUGGESTIONS, () => ({ suggestions: recorded.measuredSuggestions }));
+  const cell = (dialog: Element, label: string) =>
+    query(dialog, `input[aria-label="${label}"]`).closest("td") as HTMLElement;
+
+  it("show the mean kWh of measured Runs beside the cells that have one", async () => {
+    const backend = suggesting();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    expect(backend.sent(SUGGESTIONS)).toEqual([{ type: SUGGESTIONS, device_id: "device-washer" }]);
+    expect(text(query(cell(dialog, "Default kWh"), ".suggestion"))).toBe("Ø 1.2 kWh · 1 Run");
+    expect(text(query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"))).toBe(
+      "Ø 1.2 kWh · 1 Run",
+    );
+    expect(cell(dialog, "kWh for Wool").querySelector(".suggestion")).toBeNull();
+    expect(
+      (query(dialog, 'input[aria-label="kWh for Cotton 60°"]') as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("apply a measured suggestion with a click, stored on save", async () => {
+    const backend = suggesting();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    await click(panel, query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"));
+    expect(
+      (query(dialog, 'input[aria-label="kWh for Cotton 60°"]') as HTMLInputElement).value,
+    ).toBe("1.2");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      program_defaults: {
+        default: { doses: { "dose-detergent": 75 } },
+        programs: {
+          Wool: { doses: { "dose-detergent": 40 } },
+          "Cotton 60°": { doses: {}, kwh: 1.2 },
+        },
+      },
+    });
+  });
+
+  it("go without measured suggestions when they can't be had", async () => {
+    const backend = washerBackend().reply(SUGGESTIONS, () => {
+      throw new WsError("not_found");
+    });
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const dialog = await openDialog(panel);
+
+    expect(queryAll(dialog, ".suggestion")).toEqual([]);
+    expect(rows(dialog)[0]).toBe("Default");
+  });
 });
 
 describe("Device settings without a catalogue", () => {
