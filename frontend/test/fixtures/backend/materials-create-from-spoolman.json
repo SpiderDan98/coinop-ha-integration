@@ -15,6 +15,7 @@
       "filament_id": 8,
       "per_gram": 0.02999
     },
-    "price_per_gram": 0.02999
+    "price_per_gram": 0.02999,
+    "price_per_piece": null
   }
 }

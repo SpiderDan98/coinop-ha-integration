@@ -4,9 +4,10 @@ Every Store is registered in `SCHEMAS`; the missing-data check, the `.bak`
 copy before a major migration and uninstall then cover it.
 
 Schema versions: a minor version only adds fields (read them with a default;
-older code keeps fields it doesn't know), a major version breaks the shape and
-registers a migration from the major before it. Migrations only reshape and
-fill defaults, never recompute frozen values.
+older code keeps fields it doesn't know) or moves values into new fields with a
+minor migration, a major version breaks the shape and registers a migration
+from the major before it. Migrations only reshape and fill defaults, never
+recompute frozen values.
 """
 
 from collections.abc import Callable, Iterable, Mapping
@@ -28,7 +29,7 @@ from .const import DOMAIN
 from .models import Run
 
 STORAGE_VERSION = 1
-STORAGE_MINOR_VERSION = 1
+STORAGE_MINOR_VERSION = 2
 LIVE_SAVE_DELAY = timedelta(seconds=60)
 
 # Hub entry data: the Stores Coin-op has written, so a missing one is noticed.
@@ -46,9 +47,33 @@ class Schema:
     migrations: Mapping[int, Callable[[dict[str, Any]], dict[str, Any]]] = field(
         default_factory=dict
     )
+    # Minor version N of the current major -> turns its data into minor N + 1.
+    minor_migrations: Mapping[int, Callable[[dict[str, Any]], dict[str, Any]]] = field(
+        default_factory=dict
+    )
 
 
-RUNS_SCHEMA = Schema(STORAGE_VERSION, STORAGE_MINOR_VERSION, {"runs": []})
+def _electricity_timeline(data: dict[str, Any]) -> dict[str, Any]:
+    """1.2 keeps a Run's source, price and their timelines per quantity."""
+    for run in data["runs"]:
+        if any(k in run for k in ("consumption", "cost_source", "readings", "prices")):
+            run["timelines"] = {
+                "electricity": {
+                    "source": run.pop("consumption", None),
+                    "cost_source": run.pop("cost_source", None),
+                    "readings": run.pop("readings", []),
+                    "prices": run.pop("prices", []),
+                }
+            }
+    return data
+
+
+RUNS_SCHEMA = Schema(
+    STORAGE_VERSION,
+    STORAGE_MINOR_VERSION,
+    {"runs": []},
+    minor_migrations={1: _electricity_timeline},
+)
 SCHEMAS = {
     "catalog": Schema(1, 1, {"materials": [], "tags": [], "templates": []}),
     "runs": RUNS_SCHEMA,
@@ -81,12 +106,14 @@ class CoinOpStore(Store[dict[str, Any]]):
     async def _async_migrate_func(
         self, old_major_version: int, old_minor_version: int, old_data: Any
     ) -> dict[str, Any]:
-        if old_major_version == self.version:
-            return dict(old_data)
-        await self.bak(old_major_version, old_minor_version).async_save(old_data)
-        data: dict[str, Any] = old_data
-        for version in range(old_major_version, self.version):
-            data = self.schema.migrations[version](data)
+        data: dict[str, Any] = deepcopy(old_data)
+        if old_major_version != self.version:
+            await self.bak(old_major_version, old_minor_version).async_save(old_data)
+            for version in range(old_major_version, self.version):
+                data = self.schema.migrations[version](data)
+            old_minor_version = 1
+        for minor in range(old_minor_version, self.schema.minor_version):
+            data = self.schema.minor_migrations[minor](data)
         return data
 
 

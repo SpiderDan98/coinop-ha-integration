@@ -1,10 +1,13 @@
-"""Material Line Items: measured usage in grams, priced from a Material's price per gram."""
+"""Material Line Items: measured usage in grams, priced from a Material's price per gram.
+
+A Material priced per piece counts pieces at its price per piece instead.
+"""
 
 from collections.abc import Callable
 from dataclasses import replace
 import math
 
-from custom_components.coinop.materials import Material
+from custom_components.coinop.materials import Material, PackUnit
 from custom_components.coinop.models import (
     LineItem,
     LineItemKind,
@@ -16,20 +19,36 @@ from custom_components.coinop.models import (
 
 GRAM = "g"
 MILLILITRE = "ml"
+PIECES = "pcs"
 
 
 def grams_of_length(length: float, material: Material) -> float | None:
     """Grams in `length` mm of the Material's filament; None without a diameter."""
-    if material.diameter is None:
+    if material.diameter is None or material.density is None:
         return None
     cubic_mm = length * math.pi * (material.diameter / 2) ** 2
     return cubic_mm / 1000 * material.density
 
 
+def line_unit(material: Material | None, unit: str) -> str:
+    """The unit a Line Item counts the Material in: pieces for one priced per
+    piece, else g or ml as before (ml when it is bought by volume)."""
+    if material is None:
+        return unit
+    if material.by_piece:
+        return PIECES
+    if unit == PIECES:
+        by_volume = material.price.pack_unit is PackUnit.MILLILITRE
+        return MILLILITRE if by_volume else GRAM
+    return unit
+
+
 def unit_price(material: Material, unit: str) -> float:
-    """The Material's current price per gram, or per millilitre."""
-    per_gram = material.price_per_gram
-    return per_gram * material.density if unit == MILLILITRE else per_gram
+    """The Material's current price per gram, millilitre or piece; 0 if it has none."""
+    if unit == PIECES:
+        return material.price_per_piece or 0.0
+    per_gram = material.price_per_gram or 0.0
+    return per_gram * (material.density or 0.0) if unit == MILLILITRE else per_gram
 
 
 def copy(material: Material) -> MaterialCopy:
@@ -65,6 +84,7 @@ def material_line_item(
     quantity = usage.value if usage and usage.unit is UsageUnit.GRAM else None
     if length is not None and material is not None:
         quantity = grams_of_length(length, material)
+    unit = line_unit(material, unit)
     price = 0.0 if material is None else unit_price(material, unit)
     return LineItem(
         id=item_id,
@@ -117,7 +137,9 @@ def change_material(item: LineItem, material: Material) -> None:
 
     The grams follow the stored length unless the user overrode the quantity;
     an overridden Line Item keeps the recomputed values as its computed ones.
+    Between pieces and grams the quantity stays and only the unit changes.
     """
+    item.unit = line_unit(material, item.unit)
     price = unit_price(material, item.unit)
     item.material_id, item.material = material.id, copy(material)
     computed = item.computed

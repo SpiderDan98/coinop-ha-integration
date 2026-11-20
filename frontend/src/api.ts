@@ -259,7 +259,8 @@ type Entered = Partial<
 >;
 
 /** An amount back-computes the unit price; a computed Line Item becomes manual.
- * A new Material re-prices the Line Item and reweighs its measured length. */
+ * A new Material re-prices the Line Item and reweighs its measured length; between a
+ * Material bought by the piece and one by weight only the unit changes. */
 export const updateLineItem = (
   hass: HomeAssistant,
   runId: string,
@@ -276,7 +277,8 @@ export const updateLineItem = (
 export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
   runResult(hass, { type: "coinop/line_items/reset", run_id: runId, line_item_id: lineItemId });
 
-/** A Material Line Item names its Material and counts g or ml at its current price. */
+/** A Material Line Item names its Material and counts g or ml (pcs for one bought by
+ * the piece) at its current price. */
 export const addLineItem = (
   hass: HomeAssistant,
   runId: string,
@@ -381,15 +383,24 @@ export const deleteTag = (hass: HomeAssistant, tag: string) =>
 export const listDevices = async (hass: HomeAssistant) =>
   (await hass.callWS<{ devices: Device[] }>({ type: "coinop/devices/list" })).devices;
 
-export type MaterialForm = "filament" | "resin";
-export type PackUnit = "g" | "ml";
+export const MATERIAL_FORMS = [
+  "filament",
+  "resin",
+  "detergent",
+  "fabric_softener",
+  "laundry_additive",
+] as const;
+export type MaterialForm = (typeof MATERIAL_FORMS)[number];
+export const PACK_UNITS = ["g", "ml", "pcs"] as const;
+export type PackUnit = (typeof PACK_UNITS)[number];
 
-/** What a Material is made of; `update` takes any part of it. */
+/** What a Material is made of; `update` takes any part of it. One bought by the
+ * piece ("pcs") has no density. */
 export interface MaterialFields {
   name: string;
   form: MaterialForm;
   type: string;
-  density: number;
+  density: number | null;
   vendor: string | null;
   colour: string | null;
   diameter: number | null;
@@ -405,7 +416,9 @@ export interface Material extends Omit<MaterialFields, "price"> {
   archived: boolean;
   /** A linked Material keeps the last price per gram read from Spoolman. */
   price: MaterialFields["price"] | (SpoolmanLink & { per_gram: number | null });
-  price_per_gram: number;
+  /** Exactly one is set: per piece when bought by the piece, else per gram. */
+  price_per_gram: number | null;
+  price_per_piece: number | null;
 }
 
 export interface Filament {
@@ -428,7 +441,8 @@ export type Filaments = {
 export interface MaterialType {
   type: string;
   form: MaterialForm;
-  density: number;
+  density: number | null;
+  pack_unit: PackUnit;
 }
 
 export interface LineItemTemplate {

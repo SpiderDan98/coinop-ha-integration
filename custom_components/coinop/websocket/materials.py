@@ -4,6 +4,7 @@ Material fields travel nested under `material`, since `type` names the command.
 Changes reach open panels through the catalogue subscription (`catalog.py`).
 """
 
+from collections.abc import Awaitable
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -36,19 +37,36 @@ _FIELDS = {
     "name": _TEXT,
     "form": vol.In([form.value for form in MaterialForm]),
     "type": _TEXT,
-    "density": _POSITIVE,
+    "density": vol.Any(None, _POSITIVE),
     "price": _FIXED_PRICE,
     "vendor": vol.Any(None, _TEXT),
     "colour": vol.Any(None, vol.Match(r"^#[0-9a-fA-F]{6}$")),
     "diameter": vol.Any(None, _POSITIVE),
     "default_for_type": bool,
 }
-_REQUIRED = ("name", "form", "type", "density", "price")
+# A density is checked once the pack unit is known (`Catalog` raises ValueError).
+_REQUIRED = ("name", "form", "type", "price")
 _MATERIAL_ID = vol.Required("material_id")
 
 
 def material_dict(material: Material) -> dict[str, Any]:
-    return material.as_dict() | {"price_per_gram": material.price_per_gram}
+    return material.as_dict() | {
+        "price_per_gram": material.price_per_gram,
+        "price_per_piece": material.price_per_piece,
+    }
+
+
+async def _saved(
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    save: Awaitable[Material],
+) -> Material | None:
+    """The saved Material; a Material by weight or volume without a density answers `invalid_format`."""
+    try:
+        return await save
+    except ValueError as error:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(error))
+        return None
 
 
 def _found(
@@ -95,13 +113,13 @@ def _types(
     msg: dict[str, Any],
     coinop: CoinOp,
 ) -> None:
-    """Built-in types with their form and density, for suggestions and pre-filling."""
+    """Built-in types with their form, density and pack unit, for suggestions and pre-filling."""
     connection.send_result(
         msg["id"],
         {
             "types": [
-                {"type": name, "form": form, "density": density}
-                for name, (form, density) in MATERIAL_TYPES.items()
+                {"type": name, "form": form, "density": density, "pack_unit": unit}
+                for name, (form, density, unit) in MATERIAL_TYPES.items()
             ]
         },
     )
@@ -122,8 +140,10 @@ async def _create(
     msg: dict[str, Any],
     coinop: CoinOp,
 ) -> None:
-    material = await coinop.catalog.async_create_material(msg["material"])
-    connection.send_result(msg["id"], {"material": material_dict(material)})
+    if material := await _saved(
+        connection, msg, coinop.catalog.async_create_material(msg["material"])
+    ):
+        connection.send_result(msg["id"], {"material": material_dict(material)})
 
 
 @command(
@@ -148,6 +168,13 @@ async def _update(
         return
     changes = msg["material"]
     if changes.get("price", {}).get("source") == "spoolman":
+        if material.by_piece:
+            connection.send_error(
+                msg["id"],
+                websocket_api.ERR_NOT_ALLOWED,
+                "A Material priced per piece can't be linked to Spoolman",
+            )
+            return
         filament_id = changes["price"]["filament_id"]
         updated = await spoolman_call(
             connection,
@@ -155,7 +182,9 @@ async def _update(
             coinop.spoolman.async_link(material, filament_id, changes),
         )
     else:
-        updated = await coinop.catalog.async_update_material(material, changes)
+        updated = await _saved(
+            connection, msg, coinop.catalog.async_update_material(material, changes)
+        )
     if updated:
         connection.send_result(msg["id"], {"material": material_dict(updated)})
 

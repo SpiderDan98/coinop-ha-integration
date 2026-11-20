@@ -519,6 +519,54 @@ async def test_record_the_catalogue_the_panel_shows(
     assert_recorded("templates-update", stable_ids(updated, ids))
 
 
+async def test_record_laundry_materials(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    created = []
+    for name, material in (
+        (
+            "detergent",
+            {
+                "name": "Liquid detergent",
+                "form": "detergent",
+                "type": "Liquid detergent",
+                "density": 1.04,
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 7.8,
+                    "pack_size": 1500,
+                    "pack_unit": "ml",
+                },
+            },
+        ),
+        (
+            "pods",
+            {
+                "name": "Colour pods",
+                "form": "detergent",
+                "type": "Detergent pods",
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 12,
+                    "pack_size": 40,
+                    "pack_unit": "pcs",
+                },
+            },
+        ),
+    ):
+        result = await panel.call("coinop/materials/create", material=material)
+        created.append((result["material"], f"material-{name}"))
+
+    assert_recorded(
+        "materials-create-laundry",
+        stable_ids(
+            [material for material, _ in created],
+            {material["id"]: fixed for material, fixed in created},
+        ),
+    )
+
+
 async def test_record_a_run_split_across_slots(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
