@@ -200,7 +200,15 @@ export class WattbillPanel extends LitElement {
               ></wattbill-overview>`
             : // One template for every other page, so only the Overview's filter and
               // selection are kept while the user looks elsewhere.
-              html`<div>${this.renderPage(current, run)}</div>`,
+              html`<div>
+                ${
+                  // As HA's view headings; on phones the tab row names the page.
+                  current.name !== "run" && current.name !== "overview" && !this.narrow
+                    ? html`<h1 class="page-title">${t(`tab.${current.name}`)}</h1>`
+                    : nothing
+                }
+                ${this.renderPage(current, run)}
+              </div>`,
         )}
       </main>
       ${
@@ -250,8 +258,7 @@ export class WattbillPanel extends LitElement {
 
   private renderTitle(current: ReturnType<typeof page>, run: RunSummary | undefined) {
     const t = localize(this.hass);
-    if (current.name === "overview") return "WattBill";
-    if (current.name !== "run" && !this.narrow) return t(`tab.${current.name}`);
+    if (current.name === "overview" || (current.name !== "run" && !this.narrow)) return "WattBill";
     const home = html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>`;
     if (current.name !== "run") return home;
     return html`${home}<span class="muted"> › </span
@@ -406,8 +413,16 @@ export class WattbillPanel extends LitElement {
       }
       /* The bottom padding keeps the last row clear of the floating button. */
       main {
-        padding: 16px 24px 88px;
+        padding: 24px 32px 88px;
         max-width: 1400px;
+      }
+      /* Matches the heading card of HA's sections view. */
+      .page-title {
+        margin: 0 0 24px;
+        padding: 2px 4px;
+        font-size: var(--ha-font-size-xl, 20px);
+        font-weight: var(--ha-font-weight-bold, 700);
+        line-height: normal;
       }
       /* The create buttons' counterpart; HA's docked sidebar is --ha-sidebar-width wide. */
       ha-icon-button.dev {
