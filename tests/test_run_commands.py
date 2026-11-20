@@ -24,7 +24,7 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
     await clock.advance(hours=2)
     await set_status(hass, "finished")
 
-    result = await panel.call("wattbill/runs/list")
+    result = await panel.call("coinop/runs/list")
 
     [run] = result["runs"]
     assert run == {
@@ -63,13 +63,13 @@ async def test_a_run_reads_like_a_receipt_of_rounded_amounts(
     )
     await add_hub(hass)
 
-    result = await panel.call("wattbill/runs/get", run_id="helmet")
+    result = await panel.call("coinop/runs/get", run_id="helmet")
 
     run = result["run"]
     assert [item["amount"] for item in run["line_items"]] == [0.07, 0.13, 0.13, 1.01]
     assert run["subtotals"] == {"electricity": 0.07, "material": 0.26, "other": 1.01}
     assert run["total"] == 1.34
-    [listed] = (await panel.call("wattbill/runs/list"))["runs"]
+    [listed] = (await panel.call("coinop/runs/list"))["runs"]
     assert listed["total"] == 1.34
 
 
@@ -82,7 +82,7 @@ async def test_amounts_round_to_the_currency_decimals(
     )
     await add_hub(hass)
 
-    run = (await panel.call("wattbill/runs/get", run_id="vase"))["run"]
+    run = (await panel.call("coinop/runs/get", run_id="vase"))["run"]
 
     assert run["line_items"][0]["amount"] == 13
     assert run["total"] == 13
@@ -93,7 +93,7 @@ async def test_an_unknown_run_is_not_found(
 ) -> None:
     await add_hub(hass)
 
-    error = await panel.error("wattbill/runs/get", run_id="nope")
+    error = await panel.error("coinop/runs/get", run_id="nope")
 
     assert error["code"] == "not_found"
 
@@ -106,9 +106,9 @@ async def test_an_open_run_shows_its_evidence_and_running_time_so_far(
     await add_device(hass, entry, running_power=125, price=0.25)
     await set_status(hass, "printing")
     await clock.advance(hours=4)
-    [summary] = (await panel.call("wattbill/runs/list"))["runs"]
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
 
-    run = (await panel.call("wattbill/runs/get", run_id=summary["id"]))["run"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
 
     assert run["ended"] is None
     assert run["running_seconds"] == 4 * 3600
@@ -126,7 +126,7 @@ async def test_subscribers_see_runs_start_progress_and_end(
 ) -> None:
     entry = await add_hub(hass)
     await set_status(hass, "idle")
-    await panel.subscribe("wattbill/runs/subscribe")
+    await panel.subscribe("coinop/runs/subscribe")
     assert await panel.event() == {"runs": []}
 
     await add_device(hass, entry, running_power=120, price=0.30)
@@ -157,7 +157,7 @@ async def test_a_new_subscriber_first_gets_every_run(
     place_runs(hass_storage, stored_run("a"), stored_run("b"))
     await add_hub(hass)
 
-    await panel.subscribe("wattbill/runs/subscribe")
+    await panel.subscribe("coinop/runs/subscribe")
 
     assert {run["id"] for run in (await panel.event())["runs"]} == {"a", "b"}
 
@@ -165,10 +165,10 @@ async def test_a_new_subscriber_first_gets_every_run(
 @pytest.mark.parametrize(
     ("command", "data"),
     [
-        ("wattbill/runs/list", {}),
-        ("wattbill/runs/subscribe", {}),
-        ("wattbill/runs/get", {"run_id": "a"}),
-        ("wattbill/aggregates/get", {"group_by": ["month"]}),
+        ("coinop/runs/list", {}),
+        ("coinop/runs/subscribe", {}),
+        ("coinop/runs/get", {"run_id": "a"}),
+        ("coinop/aggregates/get", {"group_by": ["month"]}),
     ],
 )
 async def test_only_admins_read_runs(
@@ -187,12 +187,12 @@ async def test_only_admins_read_runs(
     assert error["code"] == "unauthorized"
 
 
-async def test_commands_wait_for_wattbill_to_be_loaded(
+async def test_commands_wait_for_coinop_to_be_loaded(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
     assert await hass.config_entries.async_unload(entry.entry_id)
 
-    error = await panel.error("wattbill/runs/list")
+    error = await panel.error("coinop/runs/list")
 
     assert error["code"] == "not_loaded"

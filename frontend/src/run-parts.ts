@@ -45,7 +45,7 @@ export const deleteDialog = (
     [t("runs.title"), String(drop.runs)],
     [t("sensor.flagged_runs"), String(drop.flagged_runs)],
   ];
-  return html`<wattbill-dialog class="dialog" alert .label=${title} @cancel=${cancel}>
+  return html`<coinop-dialog class="dialog" alert .label=${title} @cancel=${cancel}>
     <p>${t("delete.drop")}</p>
     <dl>
       ${rows.map(
@@ -63,5 +63,5 @@ export const deleteDialog = (
         ${t("delete.confirm")}
       </ha-button>
     </div>
-  </wattbill-dialog>`;
+  </coinop-dialog>`;
 };

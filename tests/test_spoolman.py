@@ -143,7 +143,7 @@ async def link(
     panel: PanelClient, material_id: str, filament_id: int, **changes: Any
 ) -> dict[str, Any]:
     result = await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id=material_id,
         material=changes
         | {"price": {"source": "spoolman", "filament_id": filament_id}},
@@ -231,7 +231,7 @@ async def test_a_spool_without_its_own_weight_counts_the_filament_weight(
 
 
 async def filaments(panel: PanelClient) -> dict[str, Any]:
-    listed: dict[str, Any] = await panel.call("wattbill/spoolman/filaments")
+    listed: dict[str, Any] = await panel.call("coinop/spoolman/filaments")
     return listed
 
 
@@ -307,7 +307,7 @@ async def test_a_material_created_from_a_filament_takes_over_its_details(
 ) -> None:
     await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
 
-    result = await panel.call("wattbill/materials/create_from_spoolman", filament_id=7)
+    result = await panel.call("coinop/materials/create_from_spoolman", filament_id=7)
 
     created = result["material"]
     assert created == {
@@ -324,7 +324,7 @@ async def test_a_material_created_from_a_filament_takes_over_its_details(
         "price": {"source": "spoolman", "filament_id": 7, "per_gram": 0.02},
         "price_per_gram": 0.02,
     }
-    assert (await panel.call("wattbill/materials/list"))["materials"] == [created]
+    assert (await panel.call("coinop/materials/list"))["materials"] == [created]
 
 
 async def test_linked_materials_follow_their_filament_when_the_tab_opens(
@@ -337,7 +337,7 @@ async def test_linked_materials_follow_their_filament_when_the_tab_opens(
     place_materials(hass_storage, stored_material("pla", name="Black PLA"))
     await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
     await link(panel, "pla", 7, colour="#ffffff")
-    await panel.subscribe("wattbill/catalog/subscribe")
+    await panel.subscribe("coinop/catalog/subscribe")
     await panel.event()
 
     serve_spoolman(
@@ -392,21 +392,21 @@ async def test_linking_needs_spoolman_and_the_filament(
     price = {"source": "spoolman", "filament_id": 9}
 
     missing = await panel.error(
-        "wattbill/materials/update", material_id="pla", material={"price": price}
+        "coinop/materials/update", material_id="pla", material={"price": price}
     )
     not_created = await panel.error(
-        "wattbill/materials/create_from_spoolman", filament_id=9
+        "coinop/materials/create_from_spoolman", filament_id=9
     )
     spoolman_down(aioclient_mock)
     unreachable = await panel.error(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id="pla",
         material={"price": price | {"filament_id": 7}},
     )
 
     # A Material comes from a Filament only through create_from_spoolman.
     by_hand = await panel.error(
-        "wattbill/materials/create",
+        "coinop/materials/create",
         material={
             "name": "PLA",
             "form": "filament",
@@ -418,7 +418,7 @@ async def test_linking_needs_spoolman_and_the_filament(
     assert by_hand["code"] == "invalid_format"
     assert (missing["code"], not_created["code"]) == ("not_found", "not_found")
     assert unreachable["code"] == "spoolman_unreachable"
-    [material] = (await panel.call("wattbill/materials/list"))["materials"]
+    [material] = (await panel.call("coinop/materials/list"))["materials"]
     assert material["price"]["source"] == "fixed"
 
 
@@ -443,8 +443,8 @@ async def test_a_run_end_reads_the_price_spoolman_has_then(
     await set_usage(hass, 1000)
     serve_spoolman(aioclient_mock, filaments=[filament(7, price=30.0)])
 
-    [open_run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail = (await panel.call("wattbill/runs/get", run_id=open_run["id"]))["run"]
+    [open_run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = (await panel.call("coinop/runs/get", run_id=open_run["id"]))["run"]
     # While the Run is open, the last price read applies.
     assert material_items(detail)[0]["unit_price"] == 0.02
 

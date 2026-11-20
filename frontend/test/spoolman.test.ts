@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { change, click, fill, mountPanel, query, queryAll, text } from "./render";
 
-const FILAMENTS = "wattbill/spoolman/filaments";
-const CATALOG = "wattbill/catalog/subscribe";
+const FILAMENTS = "coinop/spoolman/filaments";
+const CATALOG = "coinop/catalog/subscribe";
 const linked = recorded.linkSpoolman.material;
 const withLinked = {
   ...recorded.catalog.filled,
@@ -28,8 +28,8 @@ function spoolmanBackend(filaments = recorded.spoolman.filaments) {
   return recordedBackend()
     .subscription(CATALOG, () => [withLinked])
     .reply(FILAMENTS, () => filaments)
-    .reply("wattbill/materials/create_from_spoolman", () => recorded.createFromSpoolman)
-    .reply("wattbill/materials/update", () => recorded.linkSpoolman);
+    .reply("coinop/materials/create_from_spoolman", () => recorded.createFromSpoolman)
+    .reply("coinop/materials/update", () => recorded.linkSpoolman);
 }
 
 describe("Spoolman in the Materials tab", () => {
@@ -60,7 +60,7 @@ describe("Spoolman in the Materials tab", () => {
     await click(panel, button(row(panel, "tr.filament", "PETG"), "Create Material"));
 
     expect(backend.calls.at(-1)).toEqual({
-      type: "wattbill/materials/create_from_spoolman",
+      type: "coinop/materials/create_from_spoolman",
       filament_id: 8,
     });
   });
@@ -84,7 +84,7 @@ describe("Spoolman in the Materials tab", () => {
     await click(panel, button(panel, "Save"));
 
     expect(backend.calls.at(-1)).toEqual({
-      type: "wattbill/materials/update",
+      type: "coinop/materials/update",
       material_id: "material-1",
       material: {
         name: "eSun PLA+ black",
@@ -106,7 +106,7 @@ describe("Spoolman in the Materials tab", () => {
     await click(panel, button(panel, "Save"));
 
     expect(backend.calls.at(-1)).toMatchObject({
-      type: "wattbill/materials/update",
+      type: "coinop/materials/update",
       material_id: "pla-black",
       material: {
         type: "PLA",
@@ -142,7 +142,7 @@ describe("Spoolman in the Materials tab", () => {
   });
 
   it("says when creating from Spoolman fails because it went away", async () => {
-    const backend = spoolmanBackend().reply("wattbill/materials/create_from_spoolman", () => {
+    const backend = spoolmanBackend().reply("coinop/materials/create_from_spoolman", () => {
       throw new WsError("spoolman_unreachable");
     });
     const panel = await mountPanel(backend, { path: "/materials" });

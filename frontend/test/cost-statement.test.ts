@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
-const CREATE = "wattbill/cost_statement/create";
+const CREATE = "coinop/cost_statement/create";
 
 const pick = (panel: Element, name: string) =>
   query(
@@ -263,7 +263,7 @@ describe("Remembered export options", () => {
 
   it("are left out where they no longer fit", async () => {
     localStorage.setItem(
-      "wattbill-statement-options",
+      "coinop-statement-options",
       JSON.stringify({ detail: "poster", language: "fr", markup: -3, images: "yes" }),
     );
 

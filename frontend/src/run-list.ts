@@ -26,7 +26,7 @@ import { table, tableStyles } from "./table";
 import { sortTags, tagChip } from "./tag-input";
 
 const VIEWS = ["gallery", "table"] as const;
-const VIEW_KEY = "wattbill-runs-view";
+const VIEW_KEY = "coinop-runs-view";
 
 /** The view this browser last chose; the gallery without one. */
 function storedView() {
@@ -37,7 +37,7 @@ function storedView() {
   }
 }
 
-@customElement("wattbill-run-list")
+@customElement("coinop-run-list")
 export class RunList extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) runs: RunSummary[] = [];
@@ -45,7 +45,7 @@ export class RunList extends LitElement {
   @property({ attribute: false }) devices?: Device[];
   /** Every Tag there is, offered in the Tag filter. */
   @property({ attribute: false }) tags: string[] = [];
-  /** Where Run pages live, e.g. "/wattbill". */
+  /** Where Run pages live, e.g. "/coinop". */
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
   @property({ attribute: false }) filter = NO_FILTER;
@@ -272,7 +272,7 @@ export class RunList extends LitElement {
     return html`<tr class="run ${selected ? "selected" : ""}" @click=${open}>
       ${pick}
       <td class="cover">
-        <wattbill-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></wattbill-run-image>
+        <coinop-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></coinop-run-image>
       </td>
       <td class="name strong">${name}</td>
       <td>${deviceName(run, this.devices, t)}</td>
@@ -480,7 +480,7 @@ export class RunList extends LitElement {
         margin: 0;
         cursor: pointer;
       }
-      .cover wattbill-run-image {
+      .cover coinop-run-image {
         width: 56px;
         border-radius: 6px;
         overflow: hidden;
@@ -590,6 +590,6 @@ export class RunList extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-run-list": RunList;
+    "coinop-run-list": RunList;
   }
 }

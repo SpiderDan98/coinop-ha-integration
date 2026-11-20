@@ -6,7 +6,7 @@ import type { HomeAssistant } from "./hass";
 import { localize } from "./localize";
 import { shared } from "./styles";
 
-@customElement("wattbill-run-image")
+@customElement("coinop-run-image")
 export class RunImageElement extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** The image's backend path; none shows the placeholder. */
@@ -81,6 +81,6 @@ export class RunImageElement extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-run-image": RunImageElement;
+    "coinop-run-image": RunImageElement;
   }
 }

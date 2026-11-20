@@ -13,7 +13,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.wattbill.const import DOMAIN
+from custom_components.coinop.const import DOMAIN
 
 STATUS = "sensor.kobra_status"
 ENERGY = "sensor.kobra_plug_energy"
@@ -29,7 +29,7 @@ MAPPING = {
 
 
 async def add_hub(hass: HomeAssistant) -> ConfigEntry:
-    MockConfigEntry(domain=DOMAIN, title="WattBill").add_to_hass(hass)
+    MockConfigEntry(domain=DOMAIN, title="Coin-op").add_to_hass(hass)
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

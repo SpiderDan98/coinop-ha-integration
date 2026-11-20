@@ -1,8 +1,8 @@
 {
-  "name": "wattbill-panel",
+  "name": "coinop-panel",
   "private": true,
   "type": "module",
-  "description": "The WattBill sidebar panel, bundled into custom_components/wattbill/frontend/",
+  "description": "The Coin-op sidebar panel, bundled into custom_components/coinop/frontend/",
   "engines": {
     "node": ">=24"
   },

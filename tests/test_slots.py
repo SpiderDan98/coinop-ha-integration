@@ -11,7 +11,7 @@ from .clock import Clock
 from .devices import add_device, add_hub, configure, start_reconfigure
 from .stored import place_materials, stored_material
 from .test_device_flow import suggested
-from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_material_usage import (
     GRAMS_PER_METRE,
     MATERIAL_USED,
@@ -230,8 +230,8 @@ async def split_run(
     await clock.advance(minutes=20)
     await set_usage(hass, 1000)
     await set_status(hass, "finished")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail: dict[str, Any] = (await panel.call("wattbill/runs/get", run_id=run["id"]))[
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail: dict[str, Any] = (await panel.call("coinop/runs/get", run_id=run["id"]))[
         "run"
     ]
     return detail
@@ -293,7 +293,7 @@ async def test_split_line_items_are_corrected_independently(
     petg, red = material_items(run)
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=red["id"],
         quantity=1,
@@ -316,11 +316,11 @@ async def test_the_loaded_slots_survive_a_restart(
     entry = await add_ace_device(hass, panel)
     await set_status(hass, "printing")
     await clock.advance(minutes=45)
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
 
     await load(hass, 2)
     await clock.advance(minutes=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
     await clock.advance(minutes=14)
     await set_usage(hass, 1000)
     await set_status(hass, "finished")

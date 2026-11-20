@@ -1,11 +1,11 @@
-"""Adding WattBill: a confirmation-only hub flow, allowed once per installation."""
+"""Adding Coin-op: a confirmation-only hub flow, allowed once per installation."""
 
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState, FlowType
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.wattbill.const import DOMAIN
+from custom_components.coinop.const import DOMAIN
 
 
 async def test_confirmation_creates_the_hub_entry(hass: HomeAssistant) -> None:
@@ -21,7 +21,7 @@ async def test_confirmation_creates_the_hub_entry(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     [entry] = hass.config_entries.async_entries(DOMAIN)
-    assert entry.title == "WattBill"
+    assert entry.title == "Coin-op"
     assert entry.state is ConfigEntryState.LOADED
 
 

@@ -13,13 +13,13 @@ from .devices import add_device, add_hub
 from .http import HttpClient
 from .images import THUMBNAIL, add_thumbnail, colour, opened, picture
 from .test_images import only_run, run_images, stored_files
-from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_runs import set_status
 from .websocket import PanelClient
 
 
 def uploads(run_id: str) -> str:
-    return f"/api/wattbill/runs/{run_id}/images"
+    return f"/api/coinop/runs/{run_id}/images"
 
 
 async def open_run(hass: HomeAssistant, thumbnail: str | None = None) -> None:
@@ -107,7 +107,7 @@ async def test_the_run_tells_the_panel_what_it_takes(
     await open_run(hass)
     run_id = (await only_run(panel))["id"]
 
-    result = await panel.call("wattbill/runs/get", run_id=run_id)
+    result = await panel.call("coinop/runs/get", run_id=run_id)
 
     assert result["run"]["uploads"] == {
         "limit": 10,
@@ -187,11 +187,11 @@ async def test_set_as_cover_picks_the_cover_image(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
     run_id, [_thumbnail, _green, blue] = await run_with_photos(hass, clock, panel, http)
-    await panel.subscribe("wattbill/runs/subscribe")
+    await panel.subscribe("coinop/runs/subscribe")
     await panel.event()
 
     result = await panel.call(
-        "wattbill/images/set_cover", run_id=run_id, image_id=blue["id"]
+        "coinop/images/set_cover", run_id=run_id, image_id=blue["id"]
     )
 
     assert result["run"]["cover"]["id"] == blue["id"]
@@ -204,11 +204,11 @@ async def test_the_cover_image_choice_outlives_a_restart(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
     run_id, [*_, blue] = await run_with_photos(hass, clock, panel, http)
-    await panel.call("wattbill/images/set_cover", run_id=run_id, image_id=blue["id"])
-    entry = hass.config_entries.async_entries("wattbill")[0]
+    await panel.call("coinop/images/set_cover", run_id=run_id, image_id=blue["id"])
+    entry = hass.config_entries.async_entries("coinop")[0]
 
-    await stop_wattbill(hass, entry)
-    await start_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
+    await start_coinop(hass, entry)
 
     assert (await only_run(panel))["cover"]["id"] == blue["id"]
 
@@ -217,10 +217,10 @@ async def test_deleting_the_picked_cover_falls_back_to_the_rule(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
     run_id, [thumbnail, _green, blue] = await run_with_photos(hass, clock, panel, http)
-    await panel.call("wattbill/images/set_cover", run_id=run_id, image_id=blue["id"])
+    await panel.call("coinop/images/set_cover", run_id=run_id, image_id=blue["id"])
 
     result = await panel.call(
-        "wattbill/images/delete", run_id=run_id, image_id=blue["id"]
+        "coinop/images/delete", run_id=run_id, image_id=blue["id"]
     )
 
     assert result["run"]["cover"]["id"] == thumbnail["id"]
@@ -233,7 +233,7 @@ async def test_any_single_image_can_be_deleted_with_its_files(
     run_id, [thumbnail, green, blue] = await run_with_photos(hass, clock, panel, http)
 
     for image in (green, thumbnail):
-        await panel.call("wattbill/images/delete", run_id=run_id, image_id=image["id"])
+        await panel.call("coinop/images/delete", run_id=run_id, image_id=image["id"])
     await hass.async_block_till_done()
 
     assert [i["id"] for i in await run_images(panel)] == [blue["id"]]
@@ -250,7 +250,7 @@ async def test_cover_and_delete_need_an_existing_image(
 ) -> None:
     run_id, [thumbnail, *_] = await run_with_photos(hass, clock, panel, http)
 
-    for command in ("wattbill/images/set_cover", "wattbill/images/delete"):
+    for command in ("coinop/images/set_cover", "coinop/images/delete"):
         for ids in (
             {"run_id": run_id, "image_id": "unknown"},
             {"run_id": "unknown", "image_id": thumbnail["id"]},

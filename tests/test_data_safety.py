@@ -1,4 +1,4 @@
-"""WattBill's data is never lost or silently overwritten."""
+"""Coin-op's data is never lost or silently overwritten."""
 
 from copy import deepcopy
 from pathlib import Path
@@ -18,13 +18,13 @@ from .devices import add_device, add_hub
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
 
-def wattbill_keys(hass_storage: dict[str, Any]) -> set[str]:
-    return {key for key in hass_storage if key.startswith("wattbill.")}
+def coinop_keys(hass_storage: dict[str, Any]) -> set[str]:
+    return {key for key in hass_storage if key.startswith("coinop.")}
 
 
-def wattbill_data(hass_storage: dict[str, Any]) -> dict[str, Any]:
-    """WattBill's Stores and the config entries, which hold the hub entry."""
-    keys = wattbill_keys(hass_storage) | {"core.config_entries"}
+def coinop_data(hass_storage: dict[str, Any]) -> dict[str, Any]:
+    """Coin-op's Stores and the config entries, which hold the hub entry."""
+    keys = coinop_keys(hass_storage) | {"core.config_entries"}
     return deepcopy({key: hass_storage.get(key) for key in keys})
 
 
@@ -48,7 +48,7 @@ async def set_up_again(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 @pytest.mark.parametrize(
     "lost",
-    ["wattbill.catalog", "wattbill.runs", "wattbill.live", "wattbill.device_settings"],
+    ["coinop.catalog", "coinop.runs", "coinop.live", "coinop.device_settings"],
 )
 async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_issue(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], lost: str
@@ -57,15 +57,15 @@ async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_i
     assert await hass.config_entries.async_unload(entry.entry_id)
     # As if HA moved a corrupt file aside.
     del hass_storage[lost]
-    before = wattbill_data(hass_storage)
+    before = coinop_data(hass_storage)
     entry_data = dict(entry.data)
 
     assert not await set_up_again(hass, entry)
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert wattbill_data(hass_storage) == before
+    assert coinop_data(hass_storage) == before
     assert entry.data == entry_data
-    issue = ir.async_get(hass).async_get_issue("wattbill", "data_missing")
+    issue = ir.async_get(hass).async_get_issue("coinop", "data_missing")
     assert issue is not None
     assert issue.is_fixable
     assert issue.severity is ir.IssueSeverity.CRITICAL
@@ -75,10 +75,10 @@ async def test_a_missing_store_stops_setup_without_writing_and_raises_a_repair_i
 @pytest.mark.parametrize(
     ("store", "data"),
     [
-        ("wattbill.runs", {"runs": [{"id": "benchy"}]}),
-        ("wattbill.live", {"runs": "benchy"}),
-        ("wattbill.catalog", {"materials": [{"id": "pla", "name": "PLA"}]}),
-        ("wattbill.device_settings", {"devices": []}),
+        ("coinop.runs", {"runs": [{"id": "benchy"}]}),
+        ("coinop.live", {"runs": "benchy"}),
+        ("coinop.catalog", {"materials": [{"id": "pla", "name": "PLA"}]}),
+        ("coinop.device_settings", {"devices": []}),
     ],
 )
 async def test_corrupt_data_stops_setup_without_writing_and_raises_a_repair_issue(
@@ -88,17 +88,17 @@ async def test_corrupt_data_stops_setup_without_writing_and_raises_a_repair_issu
     store: str,
     data: dict[str, Any],
 ) -> None:
-    """Readable JSON that isn't WattBill's shape, e.g. after a bad manual edit."""
+    """Readable JSON that isn't Coin-op's shape, e.g. after a bad manual edit."""
     entry = await record_a_run(hass, clock)
     assert await hass.config_entries.async_unload(entry.entry_id)
     hass_storage[store]["data"] = data
-    before = wattbill_data(hass_storage)
+    before = coinop_data(hass_storage)
 
     assert not await set_up_again(hass, entry)
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert wattbill_data(hass_storage) == before
-    issue = ir.async_get(hass).async_get_issue("wattbill", "data_corrupt")
+    assert coinop_data(hass_storage) == before
+    issue = ir.async_get(hass).async_get_issue("coinop", "data_corrupt")
     assert issue is not None
     assert issue.severity is ir.IssueSeverity.CRITICAL
     assert issue.translation_placeholders == {"store": store}
@@ -109,7 +109,7 @@ async def lose_runs(
 ) -> ConfigEntry:
     entry = await record_a_run(hass, clock)
     assert await hass.config_entries.async_unload(entry.entry_id)
-    del hass_storage["wattbill.runs"]
+    del hass_storage["coinop.runs"]
     assert not await set_up_again(hass, entry)
     return entry
 
@@ -118,10 +118,10 @@ async def start_fix(hass: HomeAssistant) -> Any:
     assert await async_setup_component(hass, "repairs", {})
     manager = repairs_flow_manager(hass)
     assert manager is not None
-    result = await manager.async_init("wattbill", data={"issue_id": "data_missing"})
+    result = await manager.async_init("coinop", data={"issue_id": "data_missing"})
     assert result["type"] is FlowResultType.MENU
     assert result["menu_options"] == ["restore", "fresh_start"]
-    assert result["description_placeholders"] == {"stores": "wattbill.runs"}
+    assert result["description_placeholders"] == {"stores": "coinop.runs"}
     return result
 
 
@@ -129,7 +129,7 @@ async def test_the_repair_explains_how_to_restore_a_backup_and_changes_nothing(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await lose_runs(hass, clock, hass_storage)
-    before = wattbill_data(hass_storage)
+    before = coinop_data(hass_storage)
     result = await start_fix(hass)
     manager = repairs_flow_manager(hass)
     assert manager is not None
@@ -141,8 +141,8 @@ async def test_the_repair_explains_how_to_restore_a_backup_and_changes_nothing(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "restore"
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert wattbill_data(hass_storage) == before
-    assert ir.async_get(hass).async_get_issue("wattbill", "data_missing")
+    assert coinop_data(hass_storage) == before
+    assert ir.async_get(hass).async_get_issue("coinop", "data_missing")
 
 
 async def test_a_deliberate_fresh_start_starts_the_missing_store_empty(
@@ -163,7 +163,7 @@ async def test_a_deliberate_fresh_start_starts_the_missing_store_empty(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.state is ConfigEntryState.LOADED
-    assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
+    assert ir.async_get(hass).async_get_issue("coinop", "data_missing") is None
     assert stored_runs(hass_storage) == []
     # The open Run in the intact live Store is kept.
     assert value(hass, RUNS) == 1
@@ -181,17 +181,17 @@ async def test_a_first_setup_starts_with_empty_stores(
 
     assert entry.state is ConfigEntryState.LOADED
     assert value(hass, RUNS) == 0
-    assert hass_storage["wattbill.catalog"]["data"] == {
+    assert hass_storage["coinop.catalog"]["data"] == {
         "materials": [],
         "tags": [],
         "templates": [],
     }
-    assert ir.async_get(hass).async_get_issue("wattbill", "data_missing") is None
+    assert ir.async_get(hass).async_get_issue("coinop", "data_missing") is None
 
 
 @pytest.mark.parametrize(
     "store",
-    ["wattbill.catalog", "wattbill.runs", "wattbill.live", "wattbill.device_settings"],
+    ["coinop.catalog", "coinop.runs", "coinop.live", "coinop.device_settings"],
 )
 async def test_data_from_a_newer_major_version_stops_setup_without_writing(
     hass: HomeAssistant, hass_storage: dict[str, Any], store: str
@@ -200,10 +200,10 @@ async def test_data_from_a_newer_major_version_stops_setup_without_writing(
         "version": 2,
         "minor_version": 1,
         "key": store,
-        "data": {"runs": [], "written_by": "a newer WattBill"},
+        "data": {"runs": [], "written_by": "a newer Coin-op"},
     }
-    before = wattbill_data(hass_storage)
-    entry = MockConfigEntry(domain="wattbill", title="WattBill")
+    before = coinop_data(hass_storage)
+    entry = MockConfigEntry(domain="coinop", title="Coin-op")
     entry.add_to_hass(hass)
 
     assert not await set_up_again(hass, entry)
@@ -212,7 +212,7 @@ async def test_data_from_a_newer_major_version_stops_setup_without_writing(
     assert entry.reason is not None
     assert store in entry.reason
     assert entry.data == {}
-    assert wattbill_data(hass_storage) == before
+    assert coinop_data(hass_storage) == before
 
 
 async def test_removing_the_hub_deletes_all_stored_data(
@@ -223,18 +223,18 @@ async def test_removing_the_hub_deletes_all_stored_data(
 ) -> None:
     hass.config.config_dir = str(tmp_path)
     entry = await record_a_run(hass, clock)
-    hass_storage["wattbill.runs.bak"] = {"version": 1, "data": {"runs": []}}
-    files = tmp_path / "wattbill"
+    hass_storage["coinop.runs.bak"] = {"version": 1, "data": {"runs": []}}
+    files = tmp_path / "coinop"
     (files / "runs").mkdir(parents=True)
     (files / "runs" / "image.webp").write_bytes(b"webp")
-    assert wattbill_keys(hass_storage) >= {
-        "wattbill.catalog",
-        "wattbill.runs",
-        "wattbill.live",
+    assert coinop_keys(hass_storage) >= {
+        "coinop.catalog",
+        "coinop.runs",
+        "coinop.live",
     }
 
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert wattbill_keys(hass_storage) == set()
+    assert coinop_keys(hass_storage) == set()
     assert not files.exists()

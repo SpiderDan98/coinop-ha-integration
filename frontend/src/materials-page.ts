@@ -129,7 +129,7 @@ const fieldsOf = (draft: Draft): MaterialFields => ({
   },
 });
 
-@customElement("wattbill-materials-page")
+@customElement("coinop-materials-page")
 export class MaterialsPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Undefined until the catalogue arrives. */
@@ -748,6 +748,6 @@ export class MaterialsPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-materials-page": MaterialsPage;
+    "coinop-materials-page": MaterialsPage;
   }
 }

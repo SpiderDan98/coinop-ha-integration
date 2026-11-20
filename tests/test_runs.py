@@ -27,7 +27,7 @@ async def set_status(hass: HomeAssistant, status: str) -> None:
 
 
 def stored_runs(hass_storage: dict[str, Any]) -> list[dict[str, Any]]:
-    runs: list[dict[str, Any]] = hass_storage["wattbill.runs"]["data"]["runs"]
+    runs: list[dict[str, Any]] = hass_storage["coinop.runs"]["data"]["runs"]
     return runs
 
 

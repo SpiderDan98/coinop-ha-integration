@@ -2,8 +2,8 @@
 import * as esbuild from "esbuild";
 
 const options = {
-  entryPoints: ["src/wattbill-panel.ts"],
-  outfile: "../custom_components/wattbill/frontend/wattbill-panel.js",
+  entryPoints: ["src/coinop-panel.ts"],
+  outfile: "../custom_components/coinop/frontend/coinop-panel.js",
   bundle: true,
   format: "esm",
   target: "es2022",

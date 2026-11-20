@@ -10,7 +10,7 @@ import "./dialog";
 import "./run-image";
 import { shared } from "./styles";
 
-@customElement("wattbill-run-images")
+@customElement("coinop-run-images")
 export class RunImages extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) run!: RunDetail;
@@ -58,11 +58,7 @@ export class RunImages extends LitElement {
     const full = run.images.filter((image) => image.kind === "upload").length >= limit;
     const errorKey = `images.error.${this.error}`;
     return html`
-      <wattbill-run-image
-        class="cover"
-        .hass=${this.hass}
-        .src=${run.cover?.url}
-      ></wattbill-run-image>
+      <coinop-run-image class="cover" .hass=${this.hass} .src=${run.cover?.url}></coinop-run-image>
       ${
         run.images.length
           ? html`<div class="strip">
@@ -108,7 +104,7 @@ export class RunImages extends LitElement {
   private renderImage(image: RunImage, isCover: boolean) {
     const t = localize(this.hass);
     return html`<figure>
-      <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
+      <coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
       <figcaption>${t(`image.${image.kind}`)}</figcaption>
       <div class="actions">
         ${
@@ -137,13 +133,13 @@ export class RunImages extends LitElement {
   private renderDeleteDialog(image: RunImage) {
     const t = localize(this.hass);
     const cancel = () => (this.deleting = undefined);
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="image-dialog dialog"
       alert
       .label=${t("images.delete_title")}
       @cancel=${cancel}
     >
-      <wattbill-run-image .hass=${this.hass} .src=${image.tile_url}></wattbill-run-image>
+      <coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
       <p class="muted small">${t("images.delete_warning")}</p>
       <div slot="footer" class="row end">
         <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
@@ -153,7 +149,7 @@ export class RunImages extends LitElement {
           ${t("delete.confirm")}
         </ha-button>
       </div>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   static override styles = [
@@ -180,7 +176,7 @@ export class RunImages extends LitElement {
         font-size: 11px;
         color: var(--secondary-text-color);
       }
-      figure wattbill-run-image {
+      figure coinop-run-image {
         border-radius: 6px;
         overflow: hidden;
         margin-bottom: 2px;
@@ -207,8 +203,8 @@ export class RunImages extends LitElement {
       .images-error {
         color: var(--error-color, #db4437);
       }
-      wattbill-dialog {
-        --wattbill-dialog-width: 360px;
+      coinop-dialog {
+        --coinop-dialog-width: 360px;
       }
     `,
   ];
@@ -216,6 +212,6 @@ export class RunImages extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-run-images": RunImages;
+    "coinop-run-images": RunImages;
   }
 }

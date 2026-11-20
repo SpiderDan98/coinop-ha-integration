@@ -1,6 +1,6 @@
 // The Devices tab: a section per Device Type with a card per Device. A card shows the
 // HA-side settings, which only the Device's reconfigure flow in HA changes, and a summary
-// of WattBill's own settings, edited in a dialog. Devices are added in HA too.
+// of Coin-op's own settings, edited in a dialog. Devices are added in HA too.
 import { mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -12,7 +12,7 @@ import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
 import "./tag-input";
 
-export const RECONFIGURE = "/config/integrations/integration/wattbill";
+export const RECONFIGURE = "/config/integrations/integration/coinop";
 
 const entityName = (hass: HomeAssistant, entityId: string) =>
   hass.states[entityId]?.attributes.friendly_name ?? entityId;
@@ -60,7 +60,7 @@ const chips = (names: string[], kind: "tag" | "template", none: string) =>
       )
     : html`<span class="muted">${none}</span>`;
 
-@customElement("wattbill-devices-page")
+@customElement("coinop-devices-page")
 export class DevicesPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Undefined while loading; null when loading failed. */
@@ -257,7 +257,7 @@ export class DevicesPage extends LitElement {
     const pickable = this.materials.filter(
       (material) => !material.archived || material.id === original,
     );
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="settings-dialog dialog"
       .label=${t("device.settings_title", { device: device.name })}
       .closeLabel=${t("dialog.close")}
@@ -297,14 +297,14 @@ export class DevicesPage extends LitElement {
       </div>
       <div class="field new-run-tags">
         <span class="label">${t("device.tags_for_new_runs")}</span>
-        <wattbill-tag-input
+        <coinop-tag-input
           .hass=${this.hass}
           .tags=${draft.tags_for_new_runs}
           .catalog=${this.tags}
           .label=${t("device.tags_for_new_runs")}
           @tags-change=${(event: CustomEvent<string[]>) =>
             change({ tags_for_new_runs: event.detail })}
-        ></wattbill-tag-input>
+        ></coinop-tag-input>
         <p class="muted small">${t("device.tags_hint")}</p>
       </div>
       ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
@@ -326,7 +326,7 @@ export class DevicesPage extends LitElement {
           ${t("device.save")}
         </ha-button>
       </div>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
@@ -481,7 +481,7 @@ export class DevicesPage extends LitElement {
         font-size: 12px;
         padding: 1px 8px;
         border-radius: 10px;
-        background: color-mix(in srgb, var(--wattbill-other) 14%, transparent);
+        background: color-mix(in srgb, var(--coinop-other) 14%, transparent);
       }
       .template-chip .remove {
         --ha-icon-button-size: 24px;
@@ -512,6 +512,6 @@ export class DevicesPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-devices-page": DevicesPage;
+    "coinop-devices-page": DevicesPage;
   }
 }

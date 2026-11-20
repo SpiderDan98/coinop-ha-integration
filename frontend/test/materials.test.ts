@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
-const CATALOG = "wattbill/catalog/subscribe";
+const CATALOG = "coinop/catalog/subscribe";
 const rows = (panel: Element, selector = ".active tr.material") =>
   queryAll(panel, selector).map(text);
 const field = (panel: Element, name: string) => query(panel, `[name=${name}]`);
@@ -27,15 +27,15 @@ function catalogBackend() {
   const backend = recordedBackend();
   const pla = recorded.material("material-1");
   return backend
-    .reply("wattbill/materials/create", (msg) => ({
+    .reply("coinop/materials/create", (msg) => ({
       material: { ...pla, ...(msg.material as object), id: "new" },
     }))
-    .reply("wattbill/materials/update", (msg) => ({
+    .reply("coinop/materials/update", (msg) => ({
       material: { ...pla, ...(msg.material as object) },
     }))
-    .reply("wattbill/materials/archive", () => ({ material: { ...pla, archived: true } }))
-    .reply("wattbill/materials/restore", () => ({ material: pla }))
-    .reply("wattbill/materials/delete", () => ({ deleted: true }));
+    .reply("coinop/materials/archive", () => ({ material: { ...pla, archived: true } }))
+    .reply("coinop/materials/restore", () => ({ material: pla }))
+    .reply("coinop/materials/delete", () => ({ deleted: true }));
 }
 
 describe("Materials tab", () => {
@@ -44,7 +44,7 @@ describe("Materials tab", () => {
 
     await click(panel, query(panel, `a.tab[href$="/materials"]`));
 
-    expect(location.pathname).toBe("/wattbill/materials");
+    expect(location.pathname).toBe("/coinop/materials");
     expect(query(panel, "a.tab.on").title).toBe("Materials");
     expect(text(query(panel, ".page-title"))).toBe("Materials");
   });
@@ -95,7 +95,7 @@ describe("Materials tab", () => {
     await click(panel, button(panel, "Save"));
 
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/create",
+      type: "coinop/materials/create",
       material: {
         name: "Sunlu PETG white",
         form: "filament",
@@ -138,7 +138,7 @@ describe("Materials tab", () => {
     await click(panel, button(panel, "Save"));
 
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/update",
+      type: "coinop/materials/update",
       material_id: "material-1",
       material: {
         name: "eSun PLA+ black",
@@ -155,7 +155,7 @@ describe("Materials tab", () => {
   });
 
   it("keeps the form open and says so when the backend rejects it", async () => {
-    const backend = catalogBackend().reply("wattbill/materials/create", () => {
+    const backend = catalogBackend().reply("coinop/materials/create", () => {
       throw new WsError("invalid_format");
     });
     const panel = await mountPanel(backend, { path: "/materials" });
@@ -166,7 +166,7 @@ describe("Materials tab", () => {
 
     await click(panel, button(panel, "Save"));
 
-    expect(lastCall(backend)?.type).toBe("wattbill/materials/create");
+    expect(lastCall(backend)?.type).toBe("coinop/materials/create");
     expect(text(query(panel, "form.material"))).toContain(
       "Check the fields: name, type, density, pack price and pack size are required",
     );
@@ -181,7 +181,7 @@ describe("Materials tab", () => {
 
     await click(panel, button(panel, "Save"));
 
-    expect(backend.sent("wattbill/materials/create")).toEqual([]);
+    expect(backend.sent("coinop/materials/create")).toEqual([]);
     const marked = queryAll(panel, 'form.material [aria-invalid="true"]').map((input) =>
       input.getAttribute("name"),
     );
@@ -231,7 +231,7 @@ describe("Materials tab", () => {
     await click(panel, query(row(panel, "Standard Resin grey"), "ha-icon-button.star"));
 
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/update",
+      type: "coinop/materials/update",
       material_id: "material-2",
       material: { default_for_type: true },
     });
@@ -243,12 +243,12 @@ describe("Materials tab", () => {
 
     await click(panel, button(row(panel, "eSun PLA+ black"), "Archive"));
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/archive",
+      type: "coinop/materials/archive",
       material_id: "material-1",
     });
     await click(panel, button(row(panel, "PLA red (old brand)"), "Restore"));
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/restore",
+      type: "coinop/materials/restore",
       material_id: "material-3",
     });
   });
@@ -258,17 +258,17 @@ describe("Materials tab", () => {
     const panel = await mountPanel(backend, { path: "/materials" });
 
     await click(panel, button(row(panel, "Standard Resin grey"), "Delete"));
-    expect(backend.calls.map((call) => call.type)).not.toContain("wattbill/materials/delete");
+    expect(backend.calls.map((call) => call.type)).not.toContain("coinop/materials/delete");
     await click(panel, button(row(panel, "Standard Resin grey"), "Delete for good"));
 
     expect(lastCall(backend)).toEqual({
-      type: "wattbill/materials/delete",
+      type: "coinop/materials/delete",
       material_id: "material-2",
     });
   });
 
   it("says when a Material is kept archived because Runs use it", async () => {
-    const backend = catalogBackend().reply("wattbill/materials/delete", () => ({
+    const backend = catalogBackend().reply("coinop/materials/delete", () => ({
       deleted: false,
     }));
     const panel = await mountPanel(backend, { path: "/materials" });

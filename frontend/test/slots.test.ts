@@ -5,8 +5,8 @@ import { mountPanel, query, queryAll, text } from "./render";
 const split = recorded.splitRun;
 const showing = (run = split, language = "en") =>
   recordedBackend({ language })
-    .subscription("wattbill/runs/subscribe", () => [{ runs: [run] }])
-    .reply("wattbill/runs/get", () => ({ run }));
+    .subscription("coinop/runs/subscribe", () => [{ runs: [run] }])
+    .reply("coinop/runs/get", () => ({ run }));
 const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
 
 describe("A Run split across Slots", () => {

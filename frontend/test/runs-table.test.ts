@@ -7,8 +7,8 @@ const [started] = recorded.changes;
 
 const view = (panel: Element, name: "gallery" | "table") =>
   query(panel, `.view-toggle button.show-${name}`);
-const head = (panel: Element) => queryAll(panel, "wattbill-run-list thead th").map(text);
-const rows = (panel: Element) => queryAll(panel, "wattbill-run-list tbody tr.run").map(text);
+const head = (panel: Element) => queryAll(panel, "coinop-run-list thead th").map(text);
+const rows = (panel: Element) => queryAll(panel, "coinop-run-list tbody tr.run").map(text);
 const row = (panel: Element, name: string) => {
   const found = queryAll(panel, "tr.run").find((candidate) =>
     text(query(candidate, ".name")).startsWith(name),
@@ -66,7 +66,7 @@ describe("Runs table", () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend, RUNS);
     await click(panel, view(panel, "table"));
-    backend.push("wattbill/runs/subscribe", started);
+    backend.push("coinop/runs/subscribe", started);
     await settle(panel);
 
     expect(queryAll(panel, "tr.run input.pick")).toHaveLength(3);
@@ -98,10 +98,10 @@ describe("Runs table", () => {
 
     await click(panel, query(row(panel, "Helmet"), "input.pick"));
     await click(panel, query(row(panel, "Helmet"), ".pick-cell"));
-    expect(location.pathname).toBe("/wattbill/runs");
+    expect(location.pathname).toBe("/coinop/runs");
 
     await click(panel, query(row(panel, "Benchy"), ".outcome"));
-    expect(location.pathname).toBe("/wattbill/run/benchy");
+    expect(location.pathname).toBe("/coinop/run/benchy");
   });
 
   it("shows fewer columns on a phone", async () => {
@@ -121,7 +121,7 @@ describe("Sorting the Runs table", () => {
     click(panel, query(header(panel, label), "button.sort"));
   const url = () => location.pathname + location.search;
   const inTable = async (path = "/runs") => {
-    localStorage.setItem("wattbill-runs-view", "table");
+    localStorage.setItem("coinop-runs-view", "table");
     return mountPanel(recordedBackend(), { path });
   };
 
@@ -148,12 +148,12 @@ describe("Sorting the Runs table", () => {
     expect(names(panel)).toEqual(["Untitled Run", "Helmet", "Benchy"]);
     expect(header(panel, "Total").getAttribute("aria-sort")).toBe("ascending");
     expect(header(panel, "Start").getAttribute("aria-sort")).toBe("none");
-    expect(url()).toBe("/wattbill/runs?sort=total&order=asc");
+    expect(url()).toBe("/coinop/runs?sort=total&order=asc");
 
     await sortBy(panel, "Total");
     expect(names(panel)).toEqual(["Benchy", "Helmet", "Untitled Run"]);
     expect(header(panel, "Total").getAttribute("aria-sort")).toBe("descending");
-    expect(url()).toBe("/wattbill/runs?sort=total&order=desc");
+    expect(url()).toBe("/coinop/runs?sort=total&order=desc");
   });
 
   it("sorts by name, Device, start, duration and cost per part", async () => {
@@ -185,7 +185,7 @@ describe("Sorting the Runs table", () => {
 
     await sortBy(panel, "Name");
 
-    expect(url()).toBe("/wattbill/runs?outcome=failed_cancelled&sort=name&order=asc");
+    expect(url()).toBe("/coinop/runs?outcome=failed_cancelled&sort=name&order=asc");
     expect(names(panel)).toEqual(["Helmet", "Untitled Run"]);
     expect(basket(panel)).toMatch(/^1 Run €0.30 Helmet/);
   });

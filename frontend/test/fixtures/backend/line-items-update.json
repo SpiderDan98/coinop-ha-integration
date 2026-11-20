@@ -114,15 +114,15 @@
         "id": "benchy-thumbnail",
         "kind": "thumbnail",
         "created": "2026-01-12T10:00:00+00:00",
-        "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
-        "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+        "url": "/api/coinop/runs/benchy/images/benchy-thumbnail",
+        "tile_url": "/api/coinop/runs/benchy/images/benchy-thumbnail/tile"
       },
       {
         "id": "benchy-snapshot",
         "kind": "snapshot",
         "created": "2026-01-12T11:15:00+00:00",
-        "url": "/api/wattbill/runs/benchy/images/benchy-snapshot",
-        "tile_url": "/api/wattbill/runs/benchy/images/benchy-snapshot/tile"
+        "url": "/api/coinop/runs/benchy/images/benchy-snapshot",
+        "tile_url": "/api/coinop/runs/benchy/images/benchy-snapshot/tile"
       }
     ],
     "cover_id": null,
@@ -133,8 +133,8 @@
       "id": "benchy-thumbnail",
       "kind": "thumbnail",
       "created": "2026-01-12T10:00:00+00:00",
-      "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
-      "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+      "url": "/api/coinop/runs/benchy/images/benchy-thumbnail",
+      "tile_url": "/api/coinop/runs/benchy/images/benchy-thumbnail/tile"
     },
     "uploads": {
       "limit": 10,

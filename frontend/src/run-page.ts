@@ -173,7 +173,7 @@ const shownValue = (
   return values.quantity === null ? "—" : format.quantity(values.quantity, item.unit);
 };
 
-@customElement("wattbill-run-page")
+@customElement("coinop-run-page")
 export class RunPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) runId = "";
@@ -406,11 +406,11 @@ export class RunPage extends LitElement {
       </div>
       <div class="grid">
         <div class="card facts">
-          <wattbill-run-images
+          <coinop-run-images
             .hass=${this.hass}
             .run=${run}
             @run-changed=${this.onImagesChanged}
-          ></wattbill-run-images>
+          ></coinop-run-images>
           ${this.renderFields(run, t, format)}
           <dl>
             <dt>${t("run.device")}</dt>
@@ -450,7 +450,7 @@ export class RunPage extends LitElement {
           ${KINDS.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
             return html`
-              <div class="card kind" style="--kind-color: var(--wattbill-${kind})">
+              <div class="card kind" style="--kind-color: var(--coinop-${kind})">
                 <div class="row between">
                   <h3>${t(`kind.${kind}`)}</h3>
                   <b class="num">${format.money(run.subtotals[kind])}</b>
@@ -537,14 +537,14 @@ export class RunPage extends LitElement {
       </label>
       <div class="wide label">
         ${t("run.tags")}
-        <wattbill-tag-input
+        <coinop-tag-input
           .hass=${this.hass}
           .tags=${run.tags}
           .catalog=${this.tags}
           .label=${t("run.tags")}
           @tags-change=${(event: CustomEvent<string[]>) =>
             this.save(updateRun(this.hass, this.runId, { tags: event.detail }))}
-        ></wattbill-tag-input>
+        ></coinop-tag-input>
       </div>
       <p class="wide muted small">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
       ${this.failed === "fields" ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
@@ -555,7 +555,7 @@ export class RunPage extends LitElement {
     const why = evidence(item, t, format);
     const shown = itemValues(item, format);
     const { computed, locked } = item;
-    // Labels and units WattBill sets stay as they are, rendered in the output language;
+    // Labels and units Coin-op sets stay as they are, rendered in the output language;
     // a Material Line Item is named by its Material and counts g or ml.
     const entered = item.kind === "other";
     // Running hours are hours, whatever the template called them.
@@ -1008,7 +1008,7 @@ export class RunPage extends LitElement {
         min-width: 0;
       }
       .item.manual {
-        box-shadow: inset 3px 0 var(--wattbill-manual);
+        box-shadow: inset 3px 0 var(--coinop-manual);
         padding-left: 10px;
       }
       :host([narrow]) :is(.item, .item-head) {
@@ -1040,8 +1040,8 @@ export class RunPage extends LitElement {
         text-align: right;
       }
       .item input.manual {
-        border-bottom-color: var(--wattbill-manual);
-        color: var(--wattbill-manual);
+        border-bottom-color: var(--coinop-manual);
+        color: var(--coinop-manual);
       }
       .quantity {
         display: flex;
@@ -1064,7 +1064,7 @@ export class RunPage extends LitElement {
         color: var(--secondary-text-color);
       }
       .actions ha-icon-button.reset {
-        color: var(--wattbill-manual);
+        color: var(--coinop-manual);
       }
       .lock {
         --mdc-icon-size: 18px;
@@ -1136,6 +1136,6 @@ export class RunPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-run-page": RunPage;
+    "coinop-run-page": RunPage;
   }
 }

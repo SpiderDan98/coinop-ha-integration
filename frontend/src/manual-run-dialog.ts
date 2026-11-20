@@ -1,4 +1,4 @@
-// "Manual Run": a Run made by hand for a print WattBill did not see. Pre-fills the
+// "Manual Run": a Run made by hand for a print Coin-op did not see. Pre-fills the
 // Device's Tags for new Runs, opens the new Run's page once created and fires `close`.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -11,7 +11,7 @@ import "./dialog";
 import { shared } from "./styles";
 import "./tag-input";
 
-@customElement("wattbill-manual-run-dialog")
+@customElement("coinop-manual-run-dialog")
 export class ManualRunDialog extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) devices: Device[] = [];
@@ -57,7 +57,7 @@ export class ManualRunDialog extends LitElement {
     const now = formatter(this.hass).toInput(new Date().toISOString());
     const tags = this.runTags ?? device?.settings.tags_for_new_runs ?? [];
     const input = (event: Event) => (event.target as HTMLInputElement).value;
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="manual-dialog dialog"
       .label=${t("manual.title")}
       .closeLabel=${t("dialog.close")}
@@ -129,13 +129,13 @@ export class ManualRunDialog extends LitElement {
       >
       <div class="label">
         ${t("run.tags")}
-        <wattbill-tag-input
+        <coinop-tag-input
           .hass=${this.hass}
           .tags=${tags}
           .catalog=${this.tags}
           .label=${t("run.tags")}
           @tags-change=${(event: CustomEvent<string[]>) => (this.runTags = event.detail)}
-        ></wattbill-tag-input>
+        ></coinop-tag-input>
       </div>
       ${this.failed ? html`<p class="error small">${t("manual.failed")}</p>` : nothing}
       <div slot="footer" class="row end">
@@ -151,11 +151,11 @@ export class ManualRunDialog extends LitElement {
           ${t("manual.create")}
         </ha-button>
       </div>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   private renderNoDevices(t: Localize) {
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="manual-dialog dialog"
       .label=${t("manual.title")}
       .closeLabel=${t("dialog.close")}
@@ -175,7 +175,7 @@ export class ManualRunDialog extends LitElement {
           ${t("manual.close")}
         </ha-button>
       </div>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   private async create(tags: string[]) {
@@ -233,6 +233,6 @@ export class ManualRunDialog extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-manual-run-dialog": ManualRunDialog;
+    "coinop-manual-run-dialog": ManualRunDialog;
   }
 }

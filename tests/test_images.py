@@ -22,20 +22,20 @@ from .images import (
     picture,
 )
 from .test_device_flow import suggested
-from .test_lifecycle import JOB, at, start_job, start_wattbill, stop_wattbill
+from .test_lifecycle import JOB, at, start_coinop, start_job, stop_coinop
 from .test_runs import NO_MATERIAL, set_status, stored_runs
 from .websocket import PanelClient
 
 
 def stored_files(files: Path) -> list[Path]:
-    """Every file in WattBill's file folder."""
+    """Every file in Coin-op's file folder."""
     return sorted(path for path in files.rglob("*") if path.is_file())
 
 
 async def run_images(panel: PanelClient) -> list[dict[str, Any]]:
     """The images of the only Run, as the Run page receives them."""
-    [summary] = (await panel.call("wattbill/runs/list"))["runs"]
-    run = (await panel.call("wattbill/runs/get", run_id=summary["id"]))["run"]
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
     images: list[dict[str, Any]] = run["images"]
     return images
 
@@ -343,11 +343,11 @@ async def test_no_snapshot_when_the_end_is_only_noticed_long_after(
     await add_device(hass, entry, camera=CAMERA)
     await set_status(hass, "printing")
     await clock.advance(hours=1)
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await set_status(hass, "finished")
     await clock.advance(minutes=3)
 
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     assert await run_images(panel) == []
     assert camera.requests == 0
@@ -361,11 +361,11 @@ async def test_a_snapshot_when_the_end_is_noticed_moments_after(
     await add_device(hass, entry, camera=CAMERA)
     await set_status(hass, "printing")
     await clock.advance(hours=1)
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await set_status(hass, "finished")
     await clock.advance(minutes=1)
 
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     assert await snapshot_colour(panel, http) == "blue"
 
@@ -382,13 +382,13 @@ async def test_no_snapshot_for_a_run_closed_by_the_next_job(
 
     await start_job(hass, "cube.gcode")
 
-    assert len((await panel.call("wattbill/runs/list"))["runs"]) == 2
+    assert len((await panel.call("coinop/runs/list"))["runs"]) == 2
     assert camera.requests == 0
 
 
 async def only_run(panel: PanelClient) -> dict[str, Any]:
     summary: dict[str, Any]
-    [summary] = (await panel.call("wattbill/runs/list"))["runs"]
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
     return summary
 
 
@@ -436,7 +436,7 @@ async def test_a_run_without_images_has_no_cover_image_and_no_flag(
 
     run = await only_run(panel)
     assert run["cover"] is None
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     assert detail["flags"] == NO_MATERIAL
 
 
@@ -470,12 +470,12 @@ async def test_unknown_images_are_not_found(
     run_id = (await only_run(panel))["id"]
 
     for url in (
-        f"/api/wattbill/runs/{run_id}/images/unknown",
-        f"/api/wattbill/runs/unknown/images/{image['id']}",
+        f"/api/coinop/runs/{run_id}/images/unknown",
+        f"/api/coinop/runs/unknown/images/{image['id']}",
         f"{image['url']}/huge",
     ):
         assert (await http.get(url))[0] == HTTPStatus.NOT_FOUND, url
-    traversal = f"/api/wattbill/runs/{run_id}/images/..%2F..%2Fconfiguration.yaml"
+    traversal = f"/api/coinop/runs/{run_id}/images/..%2F..%2Fconfiguration.yaml"
     assert (await http.get(traversal))[0] >= HTTPStatus.BAD_REQUEST
 
 
@@ -507,8 +507,8 @@ async def test_images_outlive_a_restart(
     await clock.advance(hours=1)
     await set_status(hass, "finished")
 
-    await stop_wattbill(hass, entry)
-    await start_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
+    await start_coinop(hass, entry)
 
     assert await thumbnail_colour(panel, http) == "green"
 
@@ -528,14 +528,14 @@ async def test_files_no_run_refers_to_are_removed_at_startup(
         await set_status(hass, "printing")
         await clock.advance(hours=1)
         await set_status(hass, "finished")
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     kept, _dropped = stored_runs(hass_storage)
-    hass_storage["wattbill.runs"]["data"]["runs"] = [kept]
+    hass_storage["coinop.runs"]["data"]["runs"] = [kept]
     [image] = kept["images"]
     leftover = files / "images" / kept["id"] / "01KF000000000000000LEFTOVER.webp"
     leftover.write_bytes(b"webp")
 
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     assert {path.name for path in stored_files(files)} == {
         f"{image['id']}.webp",
@@ -569,7 +569,7 @@ async def test_end_run_now_takes_a_snapshot(
     await set_status(hass, "printing")
     await clock.advance(hours=1)
 
-    await panel.call("wattbill/runs/end", run_id=(await only_run(panel))["id"])
+    await panel.call("coinop/runs/end", run_id=(await only_run(panel))["id"])
     await hass.async_block_till_done()
 
     assert await snapshot_colour(panel, http) == "blue"
@@ -586,10 +586,10 @@ async def test_deleting_a_run_deletes_its_files(
         await set_status(hass, "printing")
         await clock.advance(hours=1)
         await set_status(hass, "finished")
-    runs = (await panel.call("wattbill/runs/list"))["runs"]
+    runs = (await panel.call("coinop/runs/list"))["runs"]
     assert len(stored_files(files)) == 8
 
-    await panel.call("wattbill/runs/delete", run_ids=[runs[0]["id"]])
+    await panel.call("coinop/runs/delete", run_ids=[runs[0]["id"]])
     await hass.async_block_till_done()
 
     assert len(stored_files(files)) == 4

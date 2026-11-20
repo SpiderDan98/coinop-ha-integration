@@ -92,11 +92,11 @@ def _place_catalogue(
     hass_storage: dict[str, Any], name: str, entries: list[Any]
 ) -> None:
     catalog = hass_storage.setdefault(
-        "wattbill.catalog",
+        "coinop.catalog",
         {
             "version": 1,
             "minor_version": 1,
-            "key": "wattbill.catalog",
+            "key": "coinop.catalog",
             "data": {"materials": [], "tags": [], "templates": []},
         },
     )
@@ -113,7 +113,7 @@ def place_tags(hass_storage: dict[str, Any], *tags: str) -> None:
 
 def place_runs(hass_storage: dict[str, Any], *runs: dict[str, Any]) -> None:
     """Ended Runs go to the runs Store, open ones to the live Store."""
-    for key, finalised in (("wattbill.runs", True), ("wattbill.live", False)):
+    for key, finalised in (("coinop.runs", True), ("coinop.live", False)):
         hass_storage[key] = {
             "version": 1,
             "minor_version": 1,

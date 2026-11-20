@@ -3,8 +3,8 @@ import type { Message } from "../src/hass";
 import { recorded, recordedBackend } from "./fake-hass";
 import { change, click, mountPanel, query, queryAll, text } from "./render";
 
-const UPDATE = "wattbill/runs/update";
-const SUBSCRIBE = "wattbill/runs/subscribe";
+const UPDATE = "coinop/runs/update";
+const SUBSCRIBE = "coinop/runs/subscribe";
 const [started] = recorded.changes;
 
 /** Answers corrections with the recorded Run plus what was changed. */
@@ -46,7 +46,7 @@ describe("Correcting a Run", () => {
           "Spoolman hat keinen Preis für das Filament: Stückpreis eintragen",
       ],
     ]) {
-      const backend = recordedBackend({ language }).reply("wattbill/runs/get", () => ({ run }));
+      const backend = recordedBackend({ language }).reply("coinop/runs/get", () => ({ run }));
       const panel = await mountPanel(backend, { path: "/run/benchy" });
 
       expect(queryAll(panel, ".flag .text").map(text).join("|")).toBe(labels);
@@ -126,7 +126,7 @@ describe("Correcting a Run", () => {
     const backend = correcting().subscription(SUBSCRIBE, () => [
       { runs: [...recorded.snapshot.runs, started.run] },
     ]);
-    backend.reply("wattbill/runs/end", () => ({
+    backend.reply("coinop/runs/end", () => ({
       run: { ...recorded.run("print-live"), ended: "2026-01-15T10:45:00+00:00" },
     }));
     const panel = await mountPanel(backend, { path: "/run/print-live" });
@@ -138,12 +138,12 @@ describe("Correcting a Run", () => {
 
     await click(panel, query(panel, "ha-button.end-run"));
 
-    expect(backend.calls.at(-1)).toEqual({ type: "wattbill/runs/end", run_id: "print-live" });
+    expect(backend.calls.at(-1)).toEqual({ type: "coinop/runs/end", run_id: "print-live" });
     expect(queryAll(panel, "ha-button.end-run")).toHaveLength(0);
   });
 
   it("lists open Flags until they are marked checked", async () => {
-    const backend = correcting().reply("wattbill/runs/clear_flag", () => ({
+    const backend = correcting().reply("coinop/runs/clear_flag", () => ({
       run: { ...recorded.run("helmet"), flags: [] },
     }));
     const panel = await mountPanel(backend, { path: "/run/helmet" });
@@ -154,7 +154,7 @@ describe("Correcting a Run", () => {
     await click(panel, query(panel, ".flag ha-button"));
 
     expect(backend.calls.at(-1)).toEqual({
-      type: "wattbill/runs/clear_flag",
+      type: "coinop/runs/clear_flag",
       run_id: "helmet",
       flag: "fault",
     });
@@ -174,8 +174,8 @@ describe("Correcting a Run", () => {
 describe("Deleting a Run", () => {
   const deleting = () =>
     correcting()
-      .reply("wattbill/runs/delete_preview", () => recorded.deletePreview)
-      .reply("wattbill/runs/delete", () => recorded.deletePreview);
+      .reply("coinop/runs/delete_preview", () => recorded.deletePreview)
+      .reply("coinop/runs/delete", () => recorded.deletePreview);
 
   it("says how much the sensor totals drop before deleting", async () => {
     const backend = deleting();
@@ -184,7 +184,7 @@ describe("Deleting a Run", () => {
     await click(panel, query(panel, "ha-button.delete-run"));
 
     expect(backend.calls.at(-1)).toEqual({
-      type: "wattbill/runs/delete_preview",
+      type: "coinop/runs/delete_preview",
       run_ids: ["helmet"],
     });
     expect(text(query(panel, ".dialog"))).toBe(
@@ -201,14 +201,14 @@ describe("Deleting a Run", () => {
 
     await click(panel, query(panel, ".dialog ha-button.cancel"));
     expect(queryAll(panel, ".dialog")).toHaveLength(0);
-    expect(backend.sent("wattbill/runs/delete")).toEqual([]);
+    expect(backend.sent("coinop/runs/delete")).toEqual([]);
 
     await click(panel, query(panel, "ha-button.delete-run"));
     await click(panel, query(panel, ".dialog ha-button.confirm"));
-    expect(backend.sent("wattbill/runs/delete")).toEqual([
-      { type: "wattbill/runs/delete", run_ids: ["helmet"] },
+    expect(backend.sent("coinop/runs/delete")).toEqual([
+      { type: "coinop/runs/delete", run_ids: ["helmet"] },
     ]);
-    expect(location.pathname).toBe("/wattbill/runs");
+    expect(location.pathname).toBe("/coinop/runs");
   });
 
   it("is offered only once the Run is final", async () => {
@@ -222,7 +222,7 @@ describe("Deleting a Run", () => {
 
   it("is in German when Home Assistant is", async () => {
     const german = recordedBackend({ language: "de" }).reply(
-      "wattbill/runs/delete_preview",
+      "coinop/runs/delete_preview",
       () => recorded.deletePreview,
     );
     const panel = await mountPanel(german, { path: "/run/helmet" });

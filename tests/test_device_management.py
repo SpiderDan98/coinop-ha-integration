@@ -1,4 +1,4 @@
-"""After setup: WattBill's own HA device per Device, renaming and removing Devices."""
+"""After setup: Coin-op's own HA device per Device, renaming and removing Devices."""
 
 from typing import Any
 
@@ -14,7 +14,7 @@ from .test_persistence import live_runs, restart
 from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
 
-def wattbill_device(hass: HomeAssistant, entity_id: str = TOTAL_COST) -> dr.DeviceEntry:
+def coinop_device(hass: HomeAssistant, entity_id: str = TOTAL_COST) -> dr.DeviceEntry:
     entity = er.async_get(hass).async_get(entity_id)
     assert entity is not None, entity_id
     assert entity.device_id is not None, entity_id
@@ -31,11 +31,11 @@ async def test_a_devices_entities_sit_on_its_own_ha_device_linked_to_the_printer
 
     await add_device(hass, entry, name="Kobra", printer=printer.id)
 
-    device = wattbill_device(hass)
+    device = coinop_device(hass)
     assert device.id != printer.id
     assert device.name == "Kobra"
     assert device.via_device_id == printer.id
-    assert wattbill_device(hass, "sensor.kobra_runs") == device
+    assert coinop_device(hass, "sensor.kobra_runs") == device
 
 
 async def test_without_a_printer_device_the_ha_device_stands_alone(
@@ -45,13 +45,13 @@ async def test_without_a_printer_device_the_ha_device_stands_alone(
 
     await add_device(hass, entry, name="Kobra")
 
-    device = wattbill_device(hass)
+    device = coinop_device(hass)
     assert device.name == "Kobra"
     assert device.via_device_id is None
 
 
 async def rename(hass: HomeAssistant, name: str) -> None:
-    dr.async_get(hass).async_update_device(wattbill_device(hass).id, name_by_user=name)
+    dr.async_get(hass).async_update_device(coinop_device(hass).id, name_by_user=name)
     await hass.async_block_till_done()
 
 
@@ -62,7 +62,7 @@ async def test_renaming_the_ha_device_renames_the_device(hass: HomeAssistant) ->
     await rename(hass, "Workshop Kobra")
 
     assert entry.subentries[subentry.subentry_id].title == "Workshop Kobra"
-    assert wattbill_device(hass).name == "Workshop Kobra"
+    assert coinop_device(hass).name == "Workshop Kobra"
 
 
 async def test_runs_carry_the_devices_new_name(
@@ -157,7 +157,7 @@ async def test_removing_a_device_removes_its_ha_device_and_entities(
     printer = add_printer(hass)
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry, printer=printer.id)
-    device_id = wattbill_device(hass).id
+    device_id = coinop_device(hass).id
 
     await remove(hass, entry, kobra)
 

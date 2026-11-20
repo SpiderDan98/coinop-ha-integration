@@ -1,4 +1,4 @@
-"""WattBill's data lands in Home Assistant backups and comes back as a whole."""
+"""Coin-op's data lands in Home Assistant backups and comes back as a whole."""
 
 from copy import deepcopy
 from typing import Any
@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 import pytest
 
-from custom_components.wattbill.const import DOMAIN
+from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
 from .devices import add_device, add_hub
@@ -39,7 +39,7 @@ async def test_a_backup_first_writes_pending_changes_of_open_runs(
     assert run["ended"] is None
 
 
-async def test_a_restore_rolls_wattbill_back_and_reconciles_the_open_run(
+async def test_a_restore_rolls_coinop_back_and_reconciles_the_open_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     assert await async_setup_component(hass, "backup", {})
@@ -61,7 +61,7 @@ async def test_a_restore_rolls_wattbill_back_and_reconciles_the_open_run(
         await set_status(hass, "finished")
     assert value(hass, RUNS) == 4
 
-    # Restoring replaces WattBill's files and restarts Home Assistant, by which
+    # Restoring replaces Coin-op's files and restarts Home Assistant, by which
     # time the printer is idle.
     assert await hass.config_entries.async_unload(entry.entry_id)
     for key in [k for k in hass_storage if k.startswith(DOMAIN)]:
@@ -72,7 +72,7 @@ async def test_a_restore_rolls_wattbill_back_and_reconciles_the_open_run(
     await hass.async_block_till_done()
 
     [first, reconciled] = stored_runs(hass_storage)
-    assert first == backup["wattbill.runs"]["data"]["runs"][0]
+    assert first == backup["coinop.runs"]["data"]["runs"][0]
     assert reconciled["id"] == open_run["id"]
     assert reconciled["outcome"] == "unknown"
     assert live_runs(hass_storage) == []

@@ -67,7 +67,7 @@ function totals(
   });
 }
 
-@customElement("wattbill-analysis-page")
+@customElement("coinop-analysis-page")
 export class AnalysisPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Replaced, not changed, whenever a Run changes. */
@@ -264,6 +264,6 @@ const share = (amount: number, total: number, format: Format) =>
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-analysis-page": AnalysisPage;
+    "coinop-analysis-page": AnalysisPage;
   }
 }

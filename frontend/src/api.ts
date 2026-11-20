@@ -1,4 +1,4 @@
-// WattBill's websocket commands (custom_components/wattbill/websocket/). Amounts,
+// Coin-op's websocket commands (custom_components/coinop/websocket/). Amounts,
 // subtotals and totals arrive rounded to the currency; the panel only formats them.
 import type { HomeAssistant, Message } from "./hass";
 
@@ -63,7 +63,7 @@ export interface LineItem {
   slots: { number: number; type: string; colour: string | null }[];
   /** Split across several Materials: this Line Item's estimated share of the measured total. */
   share: number | null;
-  /** What WattBill computed, kept while the user's override counts instead. */
+  /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
   locked: boolean;
@@ -123,7 +123,7 @@ export interface Device {
           factor: number | null;
         };
   };
-  /** WattBill's own settings for the Device, set in the Devices tab. */
+  /** Coin-op's own settings for the Device, set in the Devices tab. */
   settings: {
     tags_for_new_runs: string[];
     automatic_templates: string[];
@@ -176,7 +176,7 @@ export const getAggregates = async (
 ) =>
   (
     await hass.callWS<{ groups: Group[] }>({
-      type: "wattbill/aggregates/get",
+      type: "coinop/aggregates/get",
       group_by: groupBy,
       ...only,
     })
@@ -197,10 +197,10 @@ export async function getGroupings<const G extends Record<string, Dimension[]>>(
 
 /** All Runs first, then each change; resolves to the unsubscribe function. */
 export const subscribeRuns = (hass: HomeAssistant, onEvent: (event: RunsEvent) => void) =>
-  hass.connection.subscribeMessage(onEvent, { type: "wattbill/runs/subscribe" });
+  hass.connection.subscribeMessage(onEvent, { type: "coinop/runs/subscribe" });
 
 export const getRun = async (hass: HomeAssistant, runId: string) =>
-  (await hass.callWS<{ run: RunDetail }>({ type: "wattbill/runs/get", run_id: runId })).run;
+  (await hass.callWS<{ run: RunDetail }>({ type: "coinop/runs/get", run_id: runId })).run;
 
 const runResult = async (hass: HomeAssistant, msg: Message) =>
   (await hass.callWS<{ run: RunDetail }>(msg)).run;
@@ -212,26 +212,26 @@ export const updateRun = (
   changes: Partial<
     Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
   >,
-) => runResult(hass, { type: "wattbill/runs/update", run_id: runId, ...changes });
+) => runResult(hass, { type: "coinop/runs/update", run_id: runId, ...changes });
 
 /** A Run made by hand, final at once. */
 export const createRun = (
   hass: HomeAssistant,
   run: Pick<RunDetail, "device_id" | "name" | "started" | "ended" | "outcome" | "tags">,
-) => runResult(hass, { type: "wattbill/runs/create", ...run });
+) => runResult(hass, { type: "coinop/runs/create", ...run });
 
 export const clearFlag = (hass: HomeAssistant, runId: string, flag: string) =>
-  runResult(hass, { type: "wattbill/runs/clear_flag", run_id: runId, flag });
+  runResult(hass, { type: "coinop/runs/clear_flag", run_id: runId, flag });
 
 /** End Run now: the open Run ends as Unknown and is finalised. */
 export const endRun = (hass: HomeAssistant, runId: string) =>
-  runResult(hass, { type: "wattbill/runs/end", run_id: runId });
+  runResult(hass, { type: "coinop/runs/end", run_id: runId });
 
 /** Multipart, as the websocket caps messages; a refusal throws its `code`. */
 export const uploadImages = async (hass: HomeAssistant, runId: string, files: File[]) => {
   const body = new FormData();
   for (const file of files) body.append("file", file);
-  const response = await hass.fetchWithAuth(`/api/wattbill/runs/${runId}/images`, {
+  const response = await hass.fetchWithAuth(`/api/coinop/runs/${runId}/images`, {
     method: "POST",
     body,
   });
@@ -245,10 +245,10 @@ export const uploadImages = async (hass: HomeAssistant, runId: string, files: Fi
 
 /** Until that image is deleted; then the Cover Image falls back to the rule. */
 export const setCover = (hass: HomeAssistant, runId: string, imageId: string) =>
-  runResult(hass, { type: "wattbill/images/set_cover", run_id: runId, image_id: imageId });
+  runResult(hass, { type: "coinop/images/set_cover", run_id: runId, image_id: imageId });
 
 export const deleteImage = (hass: HomeAssistant, runId: string, imageId: string) =>
-  runResult(hass, { type: "wattbill/images/delete", run_id: runId, image_id: imageId });
+  runResult(hass, { type: "coinop/images/delete", run_id: runId, image_id: imageId });
 
 type Entered = Partial<
   Pick<LineItem, "label" | "unit" | "quantity" | "unit_price" | "amount" | "material_id">
@@ -263,21 +263,21 @@ export const updateLineItem = (
   changes: Entered,
 ) =>
   runResult(hass, {
-    type: "wattbill/line_items/update",
+    type: "coinop/line_items/update",
     run_id: runId,
     line_item_id: lineItemId,
     ...changes,
   });
 
 export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
-  runResult(hass, { type: "wattbill/line_items/reset", run_id: runId, line_item_id: lineItemId });
+  runResult(hass, { type: "coinop/line_items/reset", run_id: runId, line_item_id: lineItemId });
 
 /** A Material Line Item names its Material and counts g or ml at its current price. */
 export const addLineItem = (
   hass: HomeAssistant,
   runId: string,
   item: Entered & { kind: Exclude<Kind, "electricity"> },
-) => runResult(hass, { type: "wattbill/line_items/add", run_id: runId, ...item });
+) => runResult(hass, { type: "coinop/line_items/add", run_id: runId, ...item });
 
 /** A copy of the template; `quantity` replaces an entered default quantity. */
 export const addTemplateLineItem = (
@@ -287,7 +287,7 @@ export const addTemplateLineItem = (
   quantity?: number,
 ) =>
   runResult(hass, {
-    type: "wattbill/line_items/add_template",
+    type: "coinop/line_items/add_template",
     run_id: runId,
     template_id: templateId,
     ...(quantity === undefined ? {} : { quantity }),
@@ -302,7 +302,7 @@ export const saveAsTemplate = async (
 ) =>
   (
     await hass.callWS<{ template: LineItemTemplate }>({
-      type: "wattbill/line_items/save_as_template",
+      type: "coinop/line_items/save_as_template",
       run_id: runId,
       line_item_id: lineItemId,
       ...(label === undefined ? {} : { label }),
@@ -310,21 +310,21 @@ export const saveAsTemplate = async (
   ).template;
 
 export const deleteLineItem = (hass: HomeAssistant, runId: string, lineItemId: string) =>
-  runResult(hass, { type: "wattbill/line_items/delete", run_id: runId, line_item_id: lineItemId });
+  runResult(hass, { type: "coinop/line_items/delete", run_id: runId, line_item_id: lineItemId });
 
 export const previewDelete = async (hass: HomeAssistant, runIds: string[]) =>
-  (await hass.callWS<{ drop: Totals }>({ type: "wattbill/runs/delete_preview", run_ids: runIds }))
+  (await hass.callWS<{ drop: Totals }>({ type: "coinop/runs/delete_preview", run_ids: runIds }))
     .drop;
 
 export const deleteRuns = (hass: HomeAssistant, runIds: string[]) =>
-  hass.callWS<{ drop: Totals }>({ type: "wattbill/runs/delete", run_ids: runIds });
+  hass.callWS<{ drop: Totals }>({ type: "coinop/runs/delete", run_ids: runIds });
 
 export const STATEMENT_DETAILS = ["detailed", "compact"] as const;
 export const STATEMENT_LANGUAGES = ["en", "de"] as const;
 
 /** The only option with a server-side default: the hub's Markup in %. */
 export const getStatementDefaults = (hass: HomeAssistant) =>
-  hass.callWS<{ markup: number }>({ type: "wattbill/cost_statement/defaults" });
+  hass.callWS<{ markup: number }>({ type: "coinop/cost_statement/defaults" });
 
 /** The signed path to download the PDF from, briefly; a null title means the default. */
 export const createStatement = async (
@@ -342,7 +342,7 @@ export const createStatement = async (
 ) =>
   (
     await hass.callWS<{ path: string }>({
-      type: "wattbill/cost_statement/create",
+      type: "coinop/cost_statement/create",
       run_ids: runIds,
       ...options,
     })
@@ -355,7 +355,7 @@ export const updateDeviceSettings = async (
 ) =>
   (
     await hass.callWS<{ settings: Device["settings"] }>({
-      type: "wattbill/devices/update_settings",
+      type: "coinop/devices/update_settings",
       device_id: deviceId,
       settings,
     })
@@ -363,19 +363,19 @@ export const updateDeviceSettings = async (
 
 /** A name another Tag has, ignoring case, is that Tag; resolves to the resulting Tag. */
 export const createTag = async (hass: HomeAssistant, name: string) =>
-  (await hass.callWS<{ tag: string }>({ type: "wattbill/tags/create", name })).tag;
+  (await hass.callWS<{ tag: string }>({ type: "coinop/tags/create", name })).tag;
 
 /** Renaming to another Tag's name merges both; resolves to the resulting Tag. */
 export const renameTag = async (hass: HomeAssistant, tag: string, name: string) =>
-  (await hass.callWS<{ tag: string }>({ type: "wattbill/tags/rename", tag, name })).tag;
+  (await hass.callWS<{ tag: string }>({ type: "coinop/tags/rename", tag, name })).tag;
 
 /** Removes the Tag from every Run and Device. */
 export const deleteTag = (hass: HomeAssistant, tag: string) =>
-  hass.callWS<Record<string, never>>({ type: "wattbill/tags/delete", tag });
+  hass.callWS<Record<string, never>>({ type: "coinop/tags/delete", tag });
 
 /** Current Devices only; a Run whose `device_id` isn't listed belongs to a removed Device. */
 export const listDevices = async (hass: HomeAssistant) =>
-  (await hass.callWS<{ devices: Device[] }>({ type: "wattbill/devices/list" })).devices;
+  (await hass.callWS<{ devices: Device[] }>({ type: "coinop/devices/list" })).devices;
 
 export type MaterialForm = "filament" | "resin";
 export type PackUnit = "g" | "ml";
@@ -444,20 +444,20 @@ export type Catalog = { materials: Material[]; tags: string[]; templates: LineIt
 
 /** Every catalogue in the first event; afterwards only the one that changed. */
 export const subscribeCatalog = (hass: HomeAssistant, onEvent: (event: Partial<Catalog>) => void) =>
-  hass.connection.subscribeMessage(onEvent, { type: "wattbill/catalog/subscribe" });
+  hass.connection.subscribeMessage(onEvent, { type: "coinop/catalog/subscribe" });
 
 export const getMaterialTypes = async (hass: HomeAssistant) =>
-  (await hass.callWS<{ types: MaterialType[] }>({ type: "wattbill/materials/types" })).types;
+  (await hass.callWS<{ types: MaterialType[] }>({ type: "coinop/materials/types" })).types;
 
 export const createMaterial = (hass: HomeAssistant, material: MaterialFields) =>
-  hass.callWS<{ material: Material }>({ type: "wattbill/materials/create", material });
+  hass.callWS<{ material: Material }>({ type: "coinop/materials/create", material });
 
 export const listFilaments = (hass: HomeAssistant) =>
-  hass.callWS<Filaments>({ type: "wattbill/spoolman/filaments" });
+  hass.callWS<Filaments>({ type: "coinop/spoolman/filaments" });
 
 export const createMaterialFromSpoolman = (hass: HomeAssistant, filamentId: number) =>
   hass.callWS<{ material: Material }>({
-    type: "wattbill/materials/create_from_spoolman",
+    type: "coinop/materials/create_from_spoolman",
     filament_id: filamentId,
   });
 
@@ -470,20 +470,20 @@ export const updateMaterial = (
   },
 ) =>
   hass.callWS<{ material: Material }>({
-    type: "wattbill/materials/update",
+    type: "coinop/materials/update",
     material_id: materialId,
     material,
   });
 
 export const archiveMaterial = (hass: HomeAssistant, materialId: string) =>
   hass.callWS<{ material: Material }>({
-    type: "wattbill/materials/archive",
+    type: "coinop/materials/archive",
     material_id: materialId,
   });
 
 export const restoreMaterial = (hass: HomeAssistant, materialId: string) =>
   hass.callWS<{ material: Material }>({
-    type: "wattbill/materials/restore",
+    type: "coinop/materials/restore",
     material_id: materialId,
   });
 
@@ -491,13 +491,13 @@ export const restoreMaterial = (hass: HomeAssistant, materialId: string) =>
 export const deleteMaterial = async (hass: HomeAssistant, materialId: string) =>
   (
     await hass.callWS<{ deleted: boolean }>({
-      type: "wattbill/materials/delete",
+      type: "coinop/materials/delete",
       material_id: materialId,
     })
   ).deleted;
 
 export const createTemplate = (hass: HomeAssistant, template: TemplateFields) =>
-  hass.callWS<{ template: LineItemTemplate }>({ type: "wattbill/templates/create", template });
+  hass.callWS<{ template: LineItemTemplate }>({ type: "coinop/templates/create", template });
 
 /** Runs keep their copies; only Line Items added afterwards follow. */
 export const updateTemplate = (
@@ -506,7 +506,7 @@ export const updateTemplate = (
   template: Partial<TemplateFields>,
 ) =>
   hass.callWS<{ template: LineItemTemplate }>({
-    type: "wattbill/templates/update",
+    type: "coinop/templates/update",
     template_id: templateId,
     template,
   });
@@ -514,6 +514,6 @@ export const updateTemplate = (
 /** Runs keep their copies; Devices stop adding it automatically. */
 export const deleteTemplate = (hass: HomeAssistant, templateId: string) =>
   hass.callWS<Record<string, never>>({
-    type: "wattbill/templates/delete",
+    type: "coinop/templates/delete",
     template_id: templateId,
   });

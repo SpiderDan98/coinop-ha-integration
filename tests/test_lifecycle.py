@@ -133,11 +133,11 @@ async def fire(
     await hass.async_block_till_done()
 
 
-async def stop_wattbill(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def stop_coinop(hass: HomeAssistant, entry: ConfigEntry) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def start_wattbill(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def start_coinop(hass: HomeAssistant, entry: ConfigEntry) -> None:
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
@@ -183,7 +183,7 @@ async def test_a_run_that_ended_while_the_status_was_lost_ends_when_it_returns(
     assert kwh(run) == pytest.approx(0.2)
 
 
-async def test_a_run_that_ended_while_wattbill_was_stopped_takes_the_end_state_time(
+async def test_a_run_that_ended_while_coinop_was_stopped_takes_the_end_state_time(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
@@ -191,11 +191,11 @@ async def test_a_run_that_ended_while_wattbill_was_stopped_takes_the_end_state_t
     await set_status(hass, "printing")
     await clock.advance(hours=1)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(hours=1)
     await set_status(hass, "cancelled")
     await clock.advance(hours=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == "cancelled"
@@ -212,11 +212,11 @@ async def test_a_terminal_event_missed_while_stopped_ends_the_run_when_it_fired(
     await fire(hass, "started", at())
     await clock.advance(hours=1)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(hours=1)
     await fire(hass, "finished", at(hours=1, minutes=30))
     await clock.advance(hours=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == "completed"
@@ -233,9 +233,9 @@ async def test_an_open_run_whose_print_goes_on_continues_after_a_restart(
     await fire(hass, "started", at())
     await clock.advance(hours=1)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(hours=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
     await clock.advance(hours=1)
     await fire(hass, "finished", at(hours=3))
 
@@ -355,7 +355,7 @@ async def test_a_print_with_another_job_closes_the_old_run_and_opens_a_new_one(
     assert value(hass, RUNS) == 2
 
 
-async def test_a_job_change_while_wattbill_was_stopped_closes_at_the_last_sighting(
+async def test_a_job_change_while_coinop_was_stopped_closes_at_the_last_sighting(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
@@ -363,12 +363,12 @@ async def test_a_job_change_while_wattbill_was_stopped_closes_at_the_last_sighti
     await start_job(hass, "benchy.gcode")
     await clock.advance(hours=1)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await set_status(hass, STATE_UNAVAILABLE)
     await clock.advance(hours=1)
     await start_job(hass, "cube.gcode")
     await clock.advance(hours=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [benchy] = stored_runs(hass_storage)
     assert benchy["ended"] == at(hours=1)

@@ -5,7 +5,7 @@ The panel builds buttons and icon buttons from Home Assistant's own `ha-button`,
 ## Why
 
 - `ha-*` elements are not a documented API for custom panels; the only contract is the `hass`, `narrow`, `route` and `panel` properties.
-- HA registers most `ha-*` elements only when one of its own pages needs them. Before a custom panel renders, HA has always loaded just its app shell and sidebar, which bring `ha-button`, `ha-icon-button`, `ha-svg-icon`, `ha-tooltip` and `ha-spinner` (checked for frontend 20260429.3, HA 2026.5, and 20261028.4, HA 2026.11). Opening `/wattbill` directly must work.
+- HA registers most `ha-*` elements only when one of its own pages needs them. Before a custom panel renders, HA has always loaded just its app shell and sidebar, which bring `ha-button`, `ha-icon-button`, `ha-svg-icon`, `ha-tooltip` and `ha-spinner` (checked for frontend 20260429.3, HA 2026.5, and 20261028.4, HA 2026.11). Opening `/coinop` directly must work.
 - `ha-input`, `ha-select`, `ha-dialog` and the like can be loaded only through HA's private router (loading the config panel's automation route); a frontend release can break that without notice.
 - The elements change between releases: `ha-textfield` is gone, `ha-button`'s `size="small"` became `size="s"` in 2026.11, and `ha-data-table` was largely rewritten in that half year.
 

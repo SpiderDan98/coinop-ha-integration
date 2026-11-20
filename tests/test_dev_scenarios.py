@@ -8,7 +8,7 @@ from homeassistant.util.yaml import load_yaml_dict
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
-from dev.wattbill_dev.scenarios import async_load
+from dev.coinop_dev.scenarios import async_load
 
 from .websocket import PanelClient
 
@@ -25,10 +25,10 @@ async def helpers(hass: HomeAssistant) -> None:
 
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     """Devices, Materials, Runs and open Runs."""
-    runs = (await panel.call("wattbill/runs/list"))["runs"]
+    runs = (await panel.call("coinop/runs/list"))["runs"]
     return (
-        len((await panel.call("wattbill/devices/list"))["devices"]),
-        len((await panel.call("wattbill/materials/list"))["materials"]),
+        len((await panel.call("coinop/devices/list"))["devices"]),
+        len((await panel.call("coinop/materials/list"))["materials"]),
         len(runs),
         sum(run["ended"] is None for run in runs),
     )
@@ -44,7 +44,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
         ("two-printers", (2, 5, 60, 0)),
     ],
 )
-async def test_a_scenario_fills_wattbill_from_scratch(
+async def test_a_scenario_fills_coinop_from_scratch(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
@@ -56,7 +56,7 @@ async def test_a_scenario_fills_wattbill_from_scratch(
     await hass.async_block_till_done()
 
     assert await counts(panel) == expected
-    assert len(hass.config_entries.async_entries("wattbill")) == 1
+    assert len(hass.config_entries.async_entries("coinop")) == 1
 
 
 @pytest.mark.usefixtures("helpers")
@@ -64,7 +64,7 @@ async def test_the_long_history_spans_two_years_and_goes_with_the_next_scenario(
     hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
 ) -> None:
     await async_load(hass, "long-history", hass_admin_user)
-    runs = (await panel.call("wattbill/runs/list"))["runs"]
+    runs = (await panel.call("coinop/runs/list"))["runs"]
     devices, materials, _, _ = await counts(panel)
     thumbnails = await hass.async_add_executor_job(
         lambda: list(files.glob("images/*/*"))

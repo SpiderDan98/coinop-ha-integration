@@ -158,9 +158,9 @@ Notes:
   - The auth middleware accepts signed requests **only for `GET`/`HEAD`**.
   - The path and all query parameters except `height`/`width` are part of the signature and must match exactly ([`components/http/auth.py`](https://github.com/home-assistant/core/blob/dev/homeassistant/components/http/auth.py)).
 - The HA frontend uses exactly this pattern: `getSignedPath(hass, url)` followed by `fileDownload(signedUrl.path)`, which clicks a hidden `<a download>` ([`download_backup.ts`](https://github.com/home-assistant/frontend/blob/dev/src/panels/config/backup/helper/download_backup.ts), [`src/data/auth.ts`](https://github.com/home-assistant/frontend/blob/dev/src/data/auth.ts), [`src/util/file_download.ts`](https://github.com/home-assistant/frontend/blob/dev/src/util/file_download.ts)).
-- **For WattBill:** the selected Runs must reach the server in one of two ways:
+- **For Coin-op:** the selected Runs must reach the server in one of two ways:
   1. In the GET query, where they become part of the signature (e.g. `?runs=1,2,3`).
-  2. Stored server-side first: a "create Cost Statement" WebSocket command returns an ID, followed by GET `/api/wattbill/statement/{id}`. This keeps the URL short and avoids long query strings.
+  2. Stored server-side first: a "create Cost Statement" WebSocket command returns an ID, followed by GET `/api/coinop/statement/{id}`. This keeps the URL short and avoids long query strings.
 
 ### 4.2 Blob in the browser
 - How it works:

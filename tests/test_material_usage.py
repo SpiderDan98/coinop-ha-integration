@@ -12,7 +12,7 @@ import pytest
 from .clock import Clock
 from .devices import MAPPING, add_device, add_hub, configure, walk_to_mapping
 from .stored import place_materials, stored_material
-from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_persistence import live_runs
 from .test_runs import set_status, stored_runs, value
 from .websocket import PanelClient
@@ -51,7 +51,7 @@ async def add_measuring_device(
     device = await add_device(hass, entry, **({"material": FILAMENT} | inputs))
     if default:
         await panel.call(
-            "wattbill/devices/update_settings",
+            "coinop/devices/update_settings",
             device_id=device.subentry_id,
             settings={"default_material": default},
         )
@@ -173,8 +173,8 @@ async def test_material_usage_is_live_while_the_run_is_open(
 
     await set_usage(hass, 1000)
 
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     [item] = material_items(detail)
     assert item["quantity"] == pytest.approx(GRAMS_PER_METRE)
     assert (item["locked"], item["deletable"]) == (True, False)
@@ -283,7 +283,7 @@ async def test_repricing_or_renaming_a_material_never_changes_past_runs(
     [before] = stored_runs(hass_storage)
 
     await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id="pla",
         material={
             "name": "PLA (new brand)",
@@ -297,7 +297,7 @@ async def test_repricing_or_renaming_a_material_never_changes_past_runs(
     assert value(hass, MATERIAL_COST) == pytest.approx(GRAMS_PER_METRE * 0.02)
 
 
-async def test_usage_reported_while_wattbill_was_stopped_still_counts(
+async def test_usage_reported_while_coinop_was_stopped_still_counts(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     place_materials(hass_storage, stored_material("pla"))
@@ -306,11 +306,11 @@ async def test_usage_reported_while_wattbill_was_stopped_still_counts(
     await set_usage(hass, 1000)
     await clock.advance(hours=1)
     await set_status(hass, "finished")
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
 
     await clock.advance(minutes=2)
     await set_usage(hass, 1500)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [run] = stored_runs(hass_storage)
     [item] = material_items(run)
@@ -374,8 +374,8 @@ async def test_without_a_default_material_the_measurement_is_kept_at_price_0(
     await set_status(hass, "finished")
     await clock.advance(minutes=5)
 
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     [item] = material_items(detail)
     assert {
         key: item[key]
@@ -411,8 +411,8 @@ async def measured_run(
     await set_usage(hass, 1000)
     await set_status(hass, "finished")
     await clock.advance(minutes=5)
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     [item] = material_items(detail)
     return detail, item
 
@@ -420,7 +420,7 @@ async def measured_run(
 async def pick(panel: PanelClient, run: Any, item: Any, material_id: str) -> Any:
     """Change the Line Item's Material; the Line Item as the Run now has it."""
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         material_id=material_id,
@@ -450,7 +450,7 @@ async def test_an_overridden_quantity_survives_a_change_of_material(
 ) -> None:
     run, item = await measured_run(hass, clock, panel, hass_storage)
     await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         quantity=5,
@@ -462,7 +462,7 @@ async def test_an_overridden_quantity_survives_a_change_of_material(
     assert changed["amount"] == 0.15
     assert changed["computed"]["quantity"] == pytest.approx(PETG_GRAMS_PER_METRE)
     reset = await panel.call(
-        "wattbill/line_items/reset", run_id=run["id"], line_item_id=item["id"]
+        "coinop/line_items/reset", run_id=run["id"], line_item_id=item["id"]
     )
     [back] = material_items(reset["run"])
     assert back["quantity"] == pytest.approx(PETG_GRAMS_PER_METRE)
@@ -474,10 +474,10 @@ async def test_material_line_items_are_added_and_deleted_while_the_run_is_open(
     place_materials(hass_storage, RESIN)
     await add_measuring_device(hass, panel, default=None, material=None)
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
 
     result = await panel.call(
-        "wattbill/line_items/add",
+        "coinop/line_items/add",
         run_id=run["id"],
         kind="material",
         material_id="resin",
@@ -500,7 +500,7 @@ async def test_material_line_items_are_added_and_deleted_while_the_run_is_open(
     assert added["material"]["name"] == "RESIN"
     assert value(hass, MATERIAL_USED) == pytest.approx(27.5)
     result = await panel.call(
-        "wattbill/line_items/delete", run_id=run["id"], line_item_id=added["id"]
+        "coinop/line_items/delete", run_id=run["id"], line_item_id=added["id"]
     )
     assert material_items(result["run"]) == []
     assert value(hass, MATERIAL_USED) == 0
@@ -512,9 +512,9 @@ async def test_a_material_line_item_added_during_the_run_needs_no_other(
     place_materials(hass_storage, RESIN)
     await add_measuring_device(hass, panel, default="resin", material=None)
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
     await panel.call(
-        "wattbill/line_items/add",
+        "coinop/line_items/add",
         run_id=run["id"],
         kind="material",
         material_id="resin",
@@ -551,10 +551,10 @@ async def test_a_material_line_item_needs_a_current_material_and_g_or_ml(
     )
     await add_measuring_device(hass, panel)
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
 
     error = await panel.error(
-        "wattbill/line_items/add", run_id=run["id"], kind="material", **fields
+        "coinop/line_items/add", run_id=run["id"], kind="material", **fields
     )
 
     assert error["code"] == code
@@ -571,14 +571,14 @@ async def test_only_material_line_items_change_their_material(
         (item["id"], "nope", "not_found"),
     ):
         error = await panel.error(
-            "wattbill/line_items/update",
+            "coinop/line_items/update",
             run_id=run["id"],
             line_item_id=line_item_id,
             material_id=material_id,
         )
         assert error["code"] == code, material_id
     error = await panel.error(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         unit="ml",

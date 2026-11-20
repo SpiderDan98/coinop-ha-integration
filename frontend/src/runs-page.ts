@@ -21,7 +21,7 @@ import { RunsTotal } from "./runs-total";
 import "./statement-dialog";
 import { shared } from "./styles";
 
-@customElement("wattbill-runs-page")
+@customElement("coinop-runs-page")
 export class RunsPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Replaced, not changed, whenever a Run changes. */
@@ -91,7 +91,7 @@ export class RunsPage extends LitElement {
     const format = formatter(this.hass);
     const selected = this.selectedRuns();
     return html`
-      <wattbill-run-list
+      <coinop-run-list
         .hass=${this.hass}
         .runs=${[...this.runs.values()]}
         .devices=${this.devices}
@@ -105,16 +105,16 @@ export class RunsPage extends LitElement {
         @sort-changed=${(event: CustomEvent<Sort>) =>
           navigate(runsPath(this.basePath, this.filter, event.detail))}
         @selection-changed=${(event: CustomEvent<Set<string>>) => (this.selected = event.detail)}
-      ></wattbill-run-list>
+      ></coinop-run-list>
       ${selected.length ? this.renderBasket(selected, t, format) : nothing}
       ${
         this.exporting && selected.length
-          ? html`<wattbill-statement-dialog
+          ? html`<coinop-statement-dialog
               .hass=${this.hass}
               .runIds=${selected.map((run) => run.id)}
               .tag=${this.filter.tags.length === 1 && !this.filter.untagged ? this.filter.tags[0] : undefined}
               @close=${() => (this.exporting = false)}
-            ></wattbill-statement-dialog>`
+            ></coinop-statement-dialog>`
           : nothing
       }
       ${
@@ -211,6 +211,6 @@ export class RunsPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-runs-page": RunsPage;
+    "coinop-runs-page": RunsPage;
   }
 }

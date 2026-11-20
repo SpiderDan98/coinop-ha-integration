@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { back, click, fill, mountPanel, query, queryAll, settle, text } from "./render";
 
-const SUBSCRIBE = "wattbill/runs/subscribe";
+const SUBSCRIBE = "coinop/runs/subscribe";
 const RUNS = { path: "/runs" };
 const [started] = recorded.changes;
 
@@ -19,12 +19,12 @@ describe("Runs tab", () => {
   it("opens from the toolbar with every Run, its filters and no tiles or charts", async () => {
     const panel = await mountPanel(recordedBackend());
 
-    await click(panel, query(panel, `a.tab[href="/wattbill/runs"]`));
+    await click(panel, query(panel, `a.tab[href="/coinop/runs"]`));
 
-    expect(url()).toBe("/wattbill/runs");
+    expect(url()).toBe("/coinop/runs");
     expect(query(panel, "a.tab.on").title).toBe("Runs");
     expect(text(query(panel, ".page-title"))).toBe("Runs");
-    expect(text(query(panel, "wattbill-run-list .head"))).toBe("3 Runs · €1.23");
+    expect(text(query(panel, "coinop-run-list .head"))).toBe("3 Runs · €1.23");
     expect(names(panel)).toEqual(["Untitled Run", "Helmet", "Benchy"]);
     expect(queryAll(panel, ".name-filter, ha-button.manual-run")).toHaveLength(2);
     expect(queryAll(panel, ".stat, .charts")).toEqual([]);
@@ -33,7 +33,7 @@ describe("Runs tab", () => {
   it("is a tab of its own on a phone", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { narrow: true });
 
-    await click(panel, query(panel, `a.tab[href="/wattbill/runs"]`));
+    await click(panel, query(panel, `a.tab[href="/coinop/runs"]`));
 
     expect(text(query(panel, "a.tab.on"))).toBe("Läufe");
     expect(names(panel)).toHaveLength(3);
@@ -53,17 +53,17 @@ describe("Runs tab", () => {
     const panel = await mountPanel(recordedBackend(), RUNS);
 
     await fill(panel, query(panel, ".outcome-filter"), "failed");
-    expect(url()).toBe("/wattbill/runs?outcome=failed");
+    expect(url()).toBe("/coinop/runs?outcome=failed");
     await fill(panel, query(panel, ".flagged-filter input"), "on");
-    expect(url()).toBe("/wattbill/runs?outcome=failed&flagged=1");
+    expect(url()).toBe("/coinop/runs?outcome=failed&flagged=1");
     expect(names(panel)).toEqual(["Helmet"]);
 
     await back(panel);
-    expect(url()).toBe("/wattbill/runs?outcome=failed");
+    expect(url()).toBe("/coinop/runs?outcome=failed");
     expect(names(panel)).toEqual(["Helmet"]);
     expect((query(panel, ".flagged-filter input") as HTMLInputElement).checked).toBe(false);
     await back(panel);
-    expect(url()).toBe("/wattbill/runs");
+    expect(url()).toBe("/coinop/runs");
     expect(names(panel)).toHaveLength(3);
   });
 
@@ -75,7 +75,7 @@ describe("Runs tab", () => {
     await fill(panel, query(panel, ".name-filter"), "he");
     await fill(panel, query(panel, ".name-filter"), "hel");
 
-    expect(url()).toBe("/wattbill/runs?q=hel");
+    expect(url()).toBe("/coinop/runs?q=hel");
     expect(history.length).toBe(length + 1);
   });
 });
@@ -157,28 +157,28 @@ describe("Selection basket", () => {
     await fill(panel, query(panel, ".name-filter"), "e");
     await fill(panel, pick(panel, "Helmet"), "on");
 
-    await click(panel, query(panel, ".tile[href='/wattbill/run/benchy']"));
+    await click(panel, query(panel, ".tile[href='/coinop/run/benchy']"));
     expect(queryAll(panel, ".basket")).toHaveLength(0);
     expect(query(panel, "a.tab.on").title).toBe("Runs");
-    expect(text(query(panel, ".title"))).toBe("WattBill › Runs › Benchy");
+    expect(text(query(panel, ".title"))).toBe("Coin-op › Runs › Benchy");
     await click(panel, query(panel, ".title a.runs-link"));
 
-    expect(location.pathname + location.search).toBe("/wattbill/runs?q=e");
+    expect(location.pathname + location.search).toBe("/coinop/runs?q=e");
     expect((query(panel, ".name-filter") as HTMLInputElement).value).toBe("e");
     expect(basket(panel)).toMatch(/^1 Run €0.30 Helmet/);
   });
 
   it("deletes the selection after confirming what the sensor totals lose", async () => {
     const backend = recordedBackend()
-      .reply("wattbill/runs/delete_preview", () => recorded.deletePreview)
-      .reply("wattbill/runs/delete", () => recorded.deletePreview);
+      .reply("coinop/runs/delete_preview", () => recorded.deletePreview)
+      .reply("coinop/runs/delete", () => recorded.deletePreview);
     const panel = await mountPanel(backend, RUNS);
     await fill(panel, pick(panel, "Helmet"), "on");
     await fill(panel, pick(panel, "Benchy"), "on");
 
     await click(panel, query(panel, ".basket .delete"));
-    expect(backend.sent("wattbill/runs/delete_preview")).toEqual([
-      { type: "wattbill/runs/delete_preview", run_ids: ["benchy", "helmet"] },
+    expect(backend.sent("coinop/runs/delete_preview")).toEqual([
+      { type: "coinop/runs/delete_preview", run_ids: ["benchy", "helmet"] },
     ]);
     expect(text(query(panel, ".dialog"))).toBe(
       "Delete 2 Runs? The sensor totals drop at once by: Total cost €0.30 Energy in Runs 1.08 kWh " +
@@ -186,19 +186,19 @@ describe("Selection basket", () => {
         "This cannot be undone. Cancel Delete",
     );
     await click(panel, query(panel, ".dialog .cancel"));
-    expect(backend.sent("wattbill/runs/delete")).toEqual([]);
+    expect(backend.sent("coinop/runs/delete")).toEqual([]);
 
     await click(panel, query(panel, ".basket .delete"));
     await click(panel, query(panel, ".dialog .confirm"));
 
-    expect(backend.sent("wattbill/runs/delete")).toEqual([
-      { type: "wattbill/runs/delete", run_ids: ["benchy", "helmet"] },
+    expect(backend.sent("coinop/runs/delete")).toEqual([
+      { type: "coinop/runs/delete", run_ids: ["benchy", "helmet"] },
     ]);
     expect(queryAll(panel, ".dialog, .basket")).toHaveLength(0);
   });
 
   it("says when the selection can't be deleted", async () => {
-    const backend = recordedBackend().reply("wattbill/runs/delete_preview", () => {
+    const backend = recordedBackend().reply("coinop/runs/delete_preview", () => {
       throw new WsError("not_allowed");
     });
     const panel = await mountPanel(backend, RUNS);

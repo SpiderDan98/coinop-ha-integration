@@ -1,1 +1,1 @@
-"""Tests for the WattBill integration."""
+"""Tests for the Coin-op integration."""

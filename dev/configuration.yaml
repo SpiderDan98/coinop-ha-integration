@@ -2,7 +2,7 @@
 default_config:
 
 homeassistant:
-  name: WattBill dev
+  name: CoinOp dev
   # The host's time zone, which scripts/devenv.py hands over.
   time_zone: !env_var TZ UTC
   currency: EUR
@@ -19,9 +19,9 @@ homeassistant:
 logger:
   default: warning
   logs:
-    custom_components.wattbill: debug
+    custom_components.coinop: debug
 
-wattbill_dev:
+coinop_dev:
 
 # The printers' Status and job inputs; the Scenarios refer to them by these ids.
 input_select:

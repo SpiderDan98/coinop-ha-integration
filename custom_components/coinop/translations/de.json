@@ -1,0 +1,351 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Coin-op erfasst, was jeder Druck deiner 3D-Drucker kostet. Füge nach der Einrichtung jeden Drucker als Gerät hinzu."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Coin-op ist bereits eingerichtet. Füge weitere Drucker als Geräte zum bestehenden Eintrag hinzu."
+    }
+  },
+  "config_subentries": {
+    "device": {
+      "entry_type": "Gerät",
+      "initiate_flow": {
+        "user": "Gerät hinzufügen",
+        "reconfigure": "Gerät neu konfigurieren"
+      },
+      "step": {
+        "reconfigure": {
+          "title": "Gerät neu konfigurieren",
+          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch Status, Auftrag und Bilder, vorausgefüllt aus dem Integrationsprofil der Drucker-Integration, z. B. wenn ein Update ihre Entitäten umbenannt hat; Verbrauchsquelle und Preis bleiben unverändert.",
+          "menu_options": {
+            "status": "Status & Zuordnung",
+            "job": "Auftrag & Material",
+            "images": "Bilder",
+            "consumption": "Verbrauchsquelle",
+            "price": "Strompreis",
+            "detect": "Erneut erkennen",
+            "save": "Speichern"
+          }
+        },
+        "user": {
+          "title": "Gerät hinzufügen",
+          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe Coin-op erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die Coin-op kennt (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "data": {
+            "device": "Home-Assistant-Gerät des Druckers (optional)"
+          },
+          "data_description": {
+            "device": "Das eigene Gerät von Coin-op für diesen Drucker wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
+          }
+        },
+        "name": {
+          "title": "Name",
+          "description": "Name des Geräts. Du kannst es später auf seiner Home-Assistant-Geräteseite umbenennen.",
+          "data": {
+            "name": "Name"
+          }
+        },
+        "status": {
+          "title": "Druckstatus",
+          "description": "Wähle die Entität, die den Status des Druckers meldet. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Status-Entität",
+            "attribute": "Attribut (optional)"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen."
+          }
+        },
+        "mapping": {
+          "title": "Status-Zuordnung",
+          "description": "Ordne jedem Statuswert zu, was er für einen Lauf bedeutet. Ein Lauf beginnt beim ersten Wert für Läuft und endet beim ersten Wert für Fertig, Abgebrochen oder Beendet. Nicht angebotene Werte kannst du eintippen.",
+          "data": {
+            "running": "Läuft",
+            "paused": "Pausiert",
+            "finished": "Fertig",
+            "cancelled": "Abgebrochen",
+            "ended": "Beendet (Ausgang unbekannt)",
+            "fault": "Störung",
+            "ignored": "Ignoriert"
+          },
+          "data_description": {
+            "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn der Drucker nur „druckt / druckt nicht“ meldet."
+          }
+        },
+        "job": {
+          "title": "Auftrag & Material",
+          "description": "Wähle optional die Entität, die den Namen des aktuellen Druckauftrags meldet, und die, die meldet, wie viel Material der Auftrag verbraucht hat. Ein Lauf wird nach seinem Auftrag benannt, und ein Druck, der mit demselben Auftragsnamen wieder startet, z. B. nach einem Stromausfall, setzt denselben Lauf fort.",
+          "data": {
+            "entity_id": "Auftragsname-Entität (optional)",
+            "attribute": "Attribut (optional)",
+            "material_entity_id": "Materialverbrauch-Entität (optional)",
+            "material_attribute": "Materialverbrauch-Attribut (optional)",
+            "slots": "Fach-Entitäten (optional)",
+            "colour_attribute": "Farb-Attribut der Fächer (optional)",
+            "loaded_slot": "Entität für das geladene Fach (optional)"
+          },
+          "data_description": {
+            "entity_id": "Ohne Auftragsnamen setzt ein Druck, der bei offenem Lauf wieder startet, immer diesen Lauf fort.",
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Druckereignis-Entität.",
+            "material_entity_id": "Die vom Drucker gemessene Gesamtmenge des Auftrags, als Länge (z. B. mm Filament) oder Masse (g). Eine Länge wird über Durchmesser und Dichte des Materials in Gramm umgerechnet. Ohne sie bekommt jeder Lauf einen Material-Posten mit leerer Menge zum Ausfüllen.",
+            "material_attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Längen-Attribut eines Filament-Sensors.",
+            "slots": "Eine Entität je Fach einer Mehrmaterial-Einheit, in Fach-Reihenfolge: die erste ist Fach 1. Jede meldet als Zustand den Typ des eingelegten Materials (z. B. PLA).",
+            "colour_attribute": "Das Attribut der Fach-Entitäten, das die Farbe des Materials als Hex-Code enthält, z. B. color_hex.",
+            "loaded_slot": "Meldet die Nummer des Fachs, aus dem gerade gedruckt wird; jeder andere Wert bedeutet kein Fach. Jedes während eines Laufs geladene Fach wird über Typ und Farbe einem Material zugeordnet."
+          }
+        },
+        "material_unit": {
+          "title": "Einheit des Materialverbrauch-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Materialverbrauch? Es muss eine Länge oder eine Masse sein.",
+          "data": {
+            "unit": "Einheit"
+          }
+        },
+        "images": {
+          "title": "Bilder",
+          "description": "Wähle optional, woher die Bilder eines Laufs kommen. Das Vorschaubild wird kopiert, solange der Lauf offen ist; das Kamerabild nimmt die Kamera am Ende des Laufs auf. Bilder werden verkleinert und ohne Metadaten gespeichert.",
+          "data": {
+            "thumbnail": "Vorschaubild-Entität (optional)",
+            "camera": "Kamera (optional)",
+            "snapshot": "Kamerabild am Ende eines Laufs aufnehmen"
+          },
+          "data_description": {
+            "thumbnail": "Die Bild-Entität der Drucker-Integration, die das gedruckte Modell zeigt.",
+            "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
+          }
+        },
+        "consumption": {
+          "title": "Stromverbrauch",
+          "description": "Wie soll Coin-op den Strom bestimmen, den ein Lauf verbraucht?",
+          "menu_options": {
+            "energy": "Energiezähler",
+            "power": "Leistungssensor",
+            "estimate": "Aus Durchschnittsleistung schätzen"
+          }
+        },
+        "energy": {
+          "title": "Energiezähler",
+          "description": "Wähle die Entität, die die Energie des Druckers zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Energie-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Messwert wird damit multipliziert, um kWh zu erhalten."
+          }
+        },
+        "power": {
+          "title": "Leistungssensor",
+          "description": "Wähle die Entität, die die Leistungsaufnahme des Druckers meldet. Coin-op integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Leistungs-Entität",
+            "attribute": "Attribut (optional)",
+            "running_power": "Durchschnittliche Leistung im Betrieb (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "running_power": "Füllt Lücken, in denen der Sensor nichts meldet. Leer lassen, um seinen letzten Wert zu halten.",
+            "factor": "Jeder Messwert wird damit multipliziert, um W zu erhalten."
+          }
+        },
+        "energy_unit": {
+          "title": "Einheit des Energie-Attributs",
+          "description": "In welcher Einheit zählt das Attribut die Energie?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um kWh zu erhalten."
+          }
+        },
+        "power_unit": {
+          "title": "Einheit des Leistungs-Attributs",
+          "description": "In welcher Einheit meldet das Attribut die Leistung?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Messwert wird damit multipliziert, um W zu erhalten."
+          }
+        },
+        "estimate": {
+          "title": "Aus Durchschnittsleistung schätzen",
+          "data": {
+            "running_power": "Durchschnittliche Leistung im Betrieb",
+            "paused_power": "Leistung in Pause (optional)"
+          },
+          "data_description": {
+            "running_power": "Die durchschnittliche Leistung über einen ganzen Druck, typisch 80–150 W für einen FDM-Tischdrucker mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt weit über dem echten Durchschnitt.",
+            "paused_power": "Leistung während einer Pause. Leer lassen, um die Betriebsleistung zu verwenden."
+          }
+        },
+        "price": {
+          "title": "Strompreis",
+          "description": "Zahlst du einen festen Preis pro kWh, oder meldet eine Entität den aktuellen Preis, z. B. bei einem dynamischen Tarif?",
+          "menu_options": {
+            "fixed_price": "Fester Preis",
+            "price_entity": "Preis-Entität"
+          }
+        },
+        "fixed_price": {
+          "title": "Fester Strompreis",
+          "data": {
+            "price": "Preis pro kWh"
+          },
+          "data_description": {
+            "price": "Was du pro kWh zahlst, in {currency}."
+          }
+        },
+        "price_entity": {
+          "title": "Preis-Entität",
+          "description": "Wähle die Entität, die den aktuellen Preis pro kWh oder MWh meldet, in {currency} oder einer Untereinheit wie ct. Jede kWh eines Laufs kostet den Preis, der galt, als sie verbraucht wurde. Sie muss jetzt nicht verfügbar sein.",
+          "data": {
+            "entity_id": "Preis-Entität",
+            "attribute": "Attribut (optional)",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
+          }
+        },
+        "price_unit": {
+          "title": "Einheit des Preis-Attributs",
+          "description": "In welcher Einheit meldet das Attribut den Preis?",
+          "data": {
+            "unit": "Einheit",
+            "factor": "Umrechnungsfaktor"
+          },
+          "data_description": {
+            "factor": "Jeder Preis wird damit multipliziert, um {currency}/kWh zu erhalten."
+          }
+        }
+      },
+      "error": {
+        "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
+        "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
+        "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
+        "unknown_unit": "Coin-op erkennt diese Einheit nicht. Gib einen Umrechnungsfaktor ein oder wähle eine andere Entität.",
+        "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Druckstatus. Jeder Druck würde doppelt erfasst.",
+        "not_length_or_mass": "Coin-op kann als Materialverbrauch nur eine Länge (z. B. mm) oder eine Masse (z. B. g) nutzen. Wähle eine andere Entität oder Einheit."
+      },
+      "abort": {
+        "reconfigure_successful": "Das Gerät wurde gespeichert."
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Coin-op-Optionen",
+        "data": {
+          "spoolman_url": "Spoolman-URL",
+          "markup": "Standard-Aufschlag"
+        },
+        "data_description": {
+          "spoolman_url": "Optional. Die Adresse deines Spoolman-Servers, z. B. http://192.168.1.20:7912. Materialien, die mit einem Spoolman-Filament verknüpft sind, beziehen ihren Preis pro Gramm von dort. Leer lassen, um Spoolman nicht mehr zu lesen: Verknüpfte Materialien behalten den zuletzt gelesenen Preis.",
+          "markup": "Der Aufschlag, mit dem eine neue Kostenaufstellung beginnt: ein Prozentsatz auf ihre Zwischensumme. Du kannst ihn bei jedem Export ändern."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unter dieser URL hat kein Spoolman geantwortet. Prüfe die Adresse und ob Spoolman läuft."
+    }
+  },
+  "entity": {
+    "event": {
+      "run": {
+        "name": "Lauf",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "started": "Gestartet",
+              "ended": "Beendet"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "total_cost": {
+        "name": "Gesamtkosten"
+      },
+      "electricity_cost": {
+        "name": "Stromkosten"
+      },
+      "material_cost": {
+        "name": "Materialkosten"
+      },
+      "other_cost": {
+        "name": "Sonstige Kosten"
+      },
+      "material_used": {
+        "name": "Materialverbrauch"
+      },
+      "energy_in_runs": {
+        "name": "Energie in Läufen"
+      },
+      "running_time": {
+        "name": "Laufzeit"
+      },
+      "current_run_cost": {
+        "name": "Kosten aktueller Lauf"
+      },
+      "last_run_cost": {
+        "name": "Kosten letzter Lauf"
+      },
+      "flagged_runs": {
+        "name": "Läufe mit Hinweisen"
+      },
+      "runs": {
+        "name": "Läufe"
+      }
+    }
+  },
+  "exceptions": {
+    "data_missing": {
+      "message": "Die gespeicherten Daten von Coin-op fehlen ({stores}), vermutlich weil die Datei beschädigt war. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird. Öffne die Reparatur, um ein Backup wiederherzustellen oder neu zu beginnen."
+    },
+    "data_too_new": {
+      "message": "{store} wurde von einer neueren Coin-op-Version geschrieben. Aktualisiere Coin-op oder stelle ein Backup wieder her, das mit dieser Version erstellt wurde."
+    },
+    "data_corrupt": {
+      "message": "Die gespeicherten Daten von Coin-op in {store} sind beschädigt. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird. Stelle ein Backup von vor der Beschädigung wieder her."
+    }
+  },
+  "issues": {
+    "data_missing": {
+      "title": "Die gespeicherten Daten von Coin-op fehlen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Die gespeicherten Daten von Coin-op fehlen",
+            "description": "Coin-op konnte {stores} nicht lesen, vermutlich weil die Datei beschädigt war; Home Assistant hat eine Kopie mit der Endung `.corrupt` behalten. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle ein Backup wieder her, um die Daten zurückzuholen, oder beginne mit diesen Daten leer neu.",
+            "menu_options": {
+              "restore": "Backup wiederherstellen",
+              "fresh_start": "Neu beginnen"
+            }
+          },
+          "fresh_start": {
+            "title": "Neu beginnen",
+            "description": "Coin-op startet mit {stores} leer. Was darin stand, ist verloren, außer du stellst später ein Backup wieder her; alle anderen Daten von Coin-op bleiben erhalten."
+          }
+        },
+        "abort": {
+          "restore": "Stelle unter Einstellungen > System > Backups ein Backup von vor dem Datenverlust wieder her. Dadurch kommen alle Daten von Coin-op so zurück, wie sie damals waren. Bis dahin bleibt Coin-op gestoppt."
+        }
+      }
+    },
+    "data_corrupt": {
+      "title": "Die gespeicherten Daten von Coin-op sind beschädigt",
+      "description": "Coin-op konnte {store} lesen, aber der Inhalt ist nicht das, was Coin-op schreibt, etwa nach einer Bearbeitung von Hand. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle unter Einstellungen > System > Backups ein Backup von vor der Beschädigung wieder her oder lege eine aufbewahrte Kopie der Datei zurück. Bis dahin bleibt Coin-op gestoppt."
+    }
+  }
+}

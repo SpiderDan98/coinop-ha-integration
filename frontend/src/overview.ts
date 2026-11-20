@@ -55,7 +55,7 @@ function monthsBetween(first: string, last: string) {
   return months;
 }
 
-@customElement("wattbill-overview")
+@customElement("coinop-overview")
 export class Overview extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Replaced, not changed, whenever a Run changes. */
@@ -188,7 +188,7 @@ export class Overview extends LitElement {
             monthKind.find((group) => group.month === key && group.kind === kind)?.cost ?? 0;
           return {
             amount,
-            colour: `var(--wattbill-${kind})`,
+            colour: `var(--coinop-${kind})`,
             title: `${t(`kind.${kind}`)}: ${format.money(amount)}`,
           };
         }),
@@ -199,7 +199,7 @@ export class Overview extends LitElement {
         <span class="muted small">${t("overview.per_month_hint")}</span>
       </div>
       ${stackedColumns(columns)}
-      ${legend(KINDS.map((kind) => ({ label: t(`kind.${kind}`), colour: `var(--wattbill-${kind})` })))}
+      ${legend(KINDS.map((kind) => ({ label: t(`kind.${kind}`), colour: `var(--coinop-${kind})` })))}
     </div>`;
   }
 
@@ -218,7 +218,7 @@ export class Overview extends LitElement {
                 label: row.label,
                 value: format.money(row.cost),
                 amount: row.cost,
-                colour: "var(--wattbill-material)",
+                colour: "var(--coinop-material)",
               })),
             )
           : html`<p class="muted small">${t("overview.no_material_cost")}</p>`
@@ -315,6 +315,6 @@ export class Overview extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-overview": Overview;
+    "coinop-overview": Overview;
   }
 }

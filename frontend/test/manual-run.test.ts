@@ -3,8 +3,8 @@ import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
 const RUNS = { path: "/runs" };
-const CREATE = "wattbill/runs/create";
-const SUBSCRIBE = "wattbill/runs/subscribe";
+const CREATE = "coinop/runs/create";
+const SUBSCRIBE = "coinop/runs/subscribe";
 
 const creating = (options?: ConstructorParameters<typeof FakeBackend>[0]) => {
   const backend = recordedBackend(options);
@@ -14,7 +14,7 @@ const creating = (options?: ConstructorParameters<typeof FakeBackend>[0]) => {
       backend.push(SUBSCRIBE, { change: "created", run: created });
       return { run: created };
     })
-    .reply("wattbill/runs/get", (msg) => {
+    .reply("coinop/runs/get", (msg) => {
       const run = [...recorded.runs, created].find((candidate) => candidate.id === msg.run_id);
       if (!run) throw new WsError("not_found");
       return { run };
@@ -48,13 +48,13 @@ describe("A manual Run", () => {
     expect(field(dialog, "started").type).toBe("datetime-local");
     expect(field(dialog, "ended").type).toBe("datetime-local");
     expect(field(dialog, "outcome").value).toBe("completed");
-    expect(text(query(dialog, "wattbill-tag-input"))).toContain("Batch 7");
+    expect(text(query(dialog, "coinop-tag-input"))).toContain("Batch 7");
   });
 
   it("asks for the Device when there is more than one", async () => {
     const [kobra] = recorded.devices;
     const mini = { ...kobra, id: "device-mini", name: "Mini" };
-    const backend = creating().reply("wattbill/devices/list", () => ({ devices: [kobra, mini] }));
+    const backend = creating().reply("coinop/devices/list", () => ({ devices: [kobra, mini] }));
     const panel = await mountPanel(backend, RUNS);
 
     const dialog = await open(panel);
@@ -87,7 +87,7 @@ describe("A manual Run", () => {
       },
     ]);
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
-    expect(location.pathname).toBe("/wattbill/run/manual");
+    expect(location.pathname).toBe("/coinop/run/manual");
     expect(text(query(panel, ".item"))).toContain("Estimated from average power");
   });
 
@@ -116,7 +116,7 @@ describe("A manual Run", () => {
     await click(panel, query(dialog, "ha-button.create"));
 
     expect(text(query(panel, ".manual-dialog"))).toContain("could not be created");
-    expect(location.pathname).toBe("/wattbill/runs");
+    expect(location.pathname).toBe("/coinop/runs");
   });
 
   it("is dropped on cancel", async () => {
@@ -160,12 +160,12 @@ describe("The Manual Run dialog", () => {
     const panel = await mountPanel(creating(), RUNS);
     await open(panel);
 
-    query(panel, "wattbill-dialog dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
+    query(panel, "coinop-dialog dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
     await settle(panel);
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
 
     await open(panel);
-    await click(panel, query(panel, "wattbill-dialog dialog"));
+    await click(panel, query(panel, "coinop-dialog dialog"));
     expect(queryAll(panel, ".manual-dialog")).toEqual([]);
   });
 
@@ -188,20 +188,18 @@ describe("The Manual Run dialog", () => {
     const panel = await mountPanel(creating(), RUNS);
     const dialog = await open(panel);
 
-    expect((query(panel, "wattbill-dialog dialog") as HTMLDialogElement).open).toBe(true);
+    expect((query(panel, "coinop-dialog dialog") as HTMLDialogElement).open).toBe(true);
     expect(dialog.getRootNode()).toHaveProperty("activeElement", field(dialog, "name"));
   });
 
   it("explains how to add a Device when there is none", async () => {
-    const backend = creating().reply("wattbill/devices/list", () => ({ devices: [] }));
+    const backend = creating().reply("coinop/devices/list", () => ({ devices: [] }));
     const panel = await mountPanel(backend, RUNS);
 
     const dialog = await open(panel);
 
     expect(text(dialog)).toContain("No Devices yet.");
-    expect(query(dialog, "a").getAttribute("href")).toBe(
-      "/config/integrations/integration/wattbill",
-    );
+    expect(query(dialog, "a").getAttribute("href")).toBe("/config/integrations/integration/coinop");
     expect(queryAll(dialog, "ha-button.create")).toEqual([]);
   });
 

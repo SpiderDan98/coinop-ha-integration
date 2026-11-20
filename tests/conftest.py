@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.typing import (
 
 # Imported first so `custom_components` resolves to this repo, not to the test
 # config dir that HA puts on sys.path.
-import custom_components.wattbill  # noqa: F401
+import custom_components.coinop  # noqa: F401
 
 from .clock import CLOCK_START, Clock
 from .http import HttpClient, http_client
@@ -24,7 +24,7 @@ from .websocket import PanelClient, panel_client
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
-    """Let HA load `custom_components/wattbill` in every test."""
+    """Let HA load `custom_components/coinop` in every test."""
 
 
 @pytest.fixture
@@ -71,9 +71,9 @@ def browser(hass_client_no_auth: ClientSessionGenerator) -> HttpClient:
 
 @pytest.fixture
 def files(hass: HomeAssistant, tmp_path: Path) -> Path:
-    """WattBill's file folder, in a config directory of the test's own."""
+    """Coin-op's file folder, in a config directory of the test's own."""
     hass.config.config_dir = str(tmp_path)
-    return tmp_path / "wattbill"
+    return tmp_path / "coinop"
 
 
 @pytest.fixture

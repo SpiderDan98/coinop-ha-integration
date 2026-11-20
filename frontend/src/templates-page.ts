@@ -52,7 +52,7 @@ const fieldChange = (field: Field, value: string) => {
   }
 };
 
-@customElement("wattbill-templates-page")
+@customElement("coinop-templates-page")
 export class TemplatesPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Undefined until the catalogue arrives. */
@@ -334,6 +334,6 @@ export class TemplatesPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-templates-page": TemplatesPage;
+    "coinop-templates-page": TemplatesPage;
   }
 }

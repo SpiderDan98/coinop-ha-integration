@@ -25,8 +25,8 @@ async def printed(hass: HomeAssistant, clock: Clock, panel: PanelClient) -> Any:
     entry = await add_hub(hass)
     await add_device(hass, entry, running_power=100, price=1)
     await print_runs(hass, clock, [2])
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    return (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    return (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
 
 
 async def test_overriding_the_amount_back_computes_the_unit_price(
@@ -36,7 +36,7 @@ async def test_overriding_the_amount_back_computes_the_unit_price(
     [item, _material] = run["line_items"]
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         amount=0.5,
@@ -62,7 +62,7 @@ async def test_overriding_the_amount_back_computes_the_unit_price(
 async def update(panel: PanelClient, run: Any, **values: Any) -> Any:
     """Override the Run's first Line Item; the Line Items as the Run now has them."""
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=run["line_items"][0]["id"],
         **values,
@@ -78,7 +78,7 @@ async def test_reset_restores_the_computed_values(
     await update(panel, run, quantity=0.5)
 
     result = await panel.call(
-        "wattbill/line_items/reset", run_id=run["id"], line_item_id=computed["id"]
+        "coinop/line_items/reset", run_id=run["id"], line_item_id=computed["id"]
     )
 
     assert result["run"]["line_items"][0] == computed
@@ -132,7 +132,7 @@ async def test_electricity_has_no_negative_values(
     [item, _material] = run["line_items"]
 
     error = await panel.error(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         **values,
@@ -146,8 +146,8 @@ async def open_run(hass: HomeAssistant, panel: PanelClient) -> Any:
     entry = await add_hub(hass)
     await add_device(hass, entry, running_power=100, price=1)
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    return (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    return (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
 
 
 async def test_live_values_are_locked_while_the_run_is_open(
@@ -158,8 +158,8 @@ async def test_live_values_are_locked_while_the_run_is_open(
     assert item["locked"] is True
 
     for command, values in [
-        ("wattbill/line_items/update", {"amount": 0}),
-        ("wattbill/line_items/reset", {}),
+        ("coinop/line_items/update", {"amount": 0}),
+        ("coinop/line_items/reset", {}),
     ]:
         error = await panel.error(
             command, run_id=run["id"], line_item_id=item["id"], **values
@@ -167,14 +167,14 @@ async def test_live_values_are_locked_while_the_run_is_open(
         assert error["code"] == "not_allowed", command
 
     await set_status(hass, "finished")
-    final = await panel.call("wattbill/runs/get", run_id=run["id"])
+    final = await panel.call("coinop/runs/get", run_id=run["id"])
     assert final["run"]["line_items"][0]["locked"] is False
 
 
 async def add_other(panel: PanelClient, run: Any, **fields: Any) -> Any:
     """Add an Other Line Item; the one added, as the Run now lists it."""
     result = await panel.call(
-        "wattbill/line_items/add", run_id=run["id"], kind="other", **fields
+        "coinop/line_items/add", run_id=run["id"], kind="other", **fields
     )
     return result["run"]["line_items"][-1]
 
@@ -204,19 +204,19 @@ async def test_other_line_items_are_added_and_edited_while_the_run_is_open(
     assert value(hass, CURRENT) == pytest.approx(1.2)
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=inserts["id"],
         quantity=10,
     )
     await clock.advance(minutes=30)
 
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     assert detail["line_items"][1] == result["run"]["line_items"][1]
     assert detail["subtotals"]["other"] == 1.5
     assert detail["subtotals"]["electricity"] == 0.05
     assert value(hass, OTHER_COST) == pytest.approx(1.5)
-    [live] = hass_storage["wattbill.live"]["data"]["runs"]
+    [live] = hass_storage["coinop.live"]["data"]["runs"]
     assert live["line_items"][1]["label"] == "Threaded inserts"
 
 
@@ -243,17 +243,17 @@ async def test_other_line_items_are_deleted_electricity_is_not(
     assert (wear["deletable"], electricity["deletable"]) == (True, False)
 
     result = await panel.call(
-        "wattbill/line_items/delete", run_id=run["id"], line_item_id=wear["id"]
+        "coinop/line_items/delete", run_id=run["id"], line_item_id=wear["id"]
     )
 
     assert [item["id"] for item in result["run"]["line_items"]] == [electricity["id"]]
     assert value(hass, OTHER_COST) == 0
     await set_status(hass, "finished")
     error = await panel.error(
-        "wattbill/line_items/delete", run_id=run["id"], line_item_id=electricity["id"]
+        "coinop/line_items/delete", run_id=run["id"], line_item_id=electricity["id"]
     )
     assert error["code"] == "not_allowed"
-    final = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    final = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     assert final["line_items"][0]["deletable"] is False
 
 
@@ -265,7 +265,7 @@ async def test_labels_and_units_entered_by_hand_are_kept_verbatim(
     assert (wear["label"], wear["unit"]) == ("Nozzle wear", "h")
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=wear["id"],
         label="Hotend wear",
@@ -276,14 +276,14 @@ async def test_labels_and_units_entered_by_hand_are_kept_verbatim(
     assert electricity["label"] is None
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=wear["id"],
         label="",
     )
     assert result["run"]["line_items"][2]["label"] is None
     error = await panel.error(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=electricity["id"],
         unit="Wh",
@@ -299,7 +299,7 @@ async def test_overrides_survive_a_restart_and_tell_open_panels(
 ) -> None:
     run = await printed(hass, clock, panel)
     fired = record_events(hass)
-    await watcher.subscribe("wattbill/runs/subscribe")
+    await watcher.subscribe("coinop/runs/subscribe")
     await watcher.event()
 
     [overridden, _material] = await update(panel, run, amount=0.5)
@@ -307,10 +307,10 @@ async def test_overrides_survive_a_restart_and_tell_open_panels(
     event = await watcher.event()
     assert (event["change"], event["run"]["total"]) == ("updated", 0.5)
     assert fired == []
-    [entry] = hass.config_entries.async_entries("wattbill")
+    [entry] = hass.config_entries.async_entries("coinop")
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    restarted = await panel.call("wattbill/runs/get", run_id=run["id"])
+    restarted = await panel.call("coinop/runs/get", run_id=run["id"])
     assert restarted["run"]["line_items"][0] == overridden
     assert value(hass, TOTAL_COST) == pytest.approx(0.5)
 
@@ -339,13 +339,13 @@ async def test_line_items_that_dont_exist_are_not_found(
     for command in ("update", "reset", "delete"):
         for run_id, item_id in [("nope", "x"), (run["id"], "nope")]:
             error = await panel.error(
-                f"wattbill/line_items/{command}", run_id=run_id, line_item_id=item_id
+                f"coinop/line_items/{command}", run_id=run_id, line_item_id=item_id
             )
             assert error["code"] == "not_found", (command, run_id)
-    error = await panel.error("wattbill/line_items/add", run_id="nope", kind="other")
+    error = await panel.error("coinop/line_items/add", run_id="nope", kind="other")
     assert error["code"] == "not_found"
     error = await panel.error(
-        "wattbill/line_items/add", run_id=run["id"], kind="electricity"
+        "coinop/line_items/add", run_id=run["id"], kind="electricity"
     )
     assert error["code"] == "invalid_format"
 
@@ -365,7 +365,7 @@ async def test_filling_in_the_material_leaves_a_fault_flagged(
     [item] = material_items(run)
 
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         material_id="pla",
