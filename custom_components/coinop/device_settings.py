@@ -11,6 +11,7 @@ from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE
 
+from .device_inputs import stock_scale
 from .schema import vol
 from .store import CoinOpStore
 from .tags import retag, tag_name
@@ -27,6 +28,24 @@ def _unique_ids(doses: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raise vol.Invalid("Dose ids must be unique")
     return doses
 
+
+def _stock_unit(stock: dict[str, Any]) -> dict[str, Any]:
+    if stock["attribute"] is not None and stock_scale(stock["unit"]) is None:
+        raise vol.Invalid("A stock input's attribute needs a mass or volume unit")
+    return stock
+
+
+# An entity reporting how much of a Dose's Material is left; an attribute has no unit.
+_STOCK = vol.All(
+    {
+        vol.Required("entity_id"): vol.All(str, vol.Length(min=1)),
+        vol.Optional("attribute", default=None): vol.Any(
+            None, vol.All(str, vol.Length(min=1))
+        ),
+        vol.Optional("unit", default=None): vol.Any(None, str),
+    },
+    _stock_unit,
+)
 
 # A row's amount per Dose id, in its Material's unit; a missing one is not dosed.
 _ROW = {
@@ -46,12 +65,22 @@ FIELDS: dict[str, tuple[Any, Any]] = {
                 {
                     vol.Required("id"): vol.All(str, vol.Length(min=1)),
                     vol.Required("material_id"): str,
+                    vol.Optional("stock"): _STOCK,
                 }
             ],
             _unique_ids,
         ),
     ),
-    PROGRAM_DEFAULTS: ({"default": {"doses": {}}}, {vol.Required("default"): _ROW}),
+    PROGRAM_DEFAULTS: (
+        {"default": {"doses": {}}, "programs": {}},
+        {
+            vol.Required("default"): _ROW,
+            # By Program, matched by its exact trimmed text.
+            vol.Optional("programs", default=dict): {
+                vol.All(str, vol.Strip, vol.Length(min=1)): _ROW
+            },
+        },
+    ),
 }
 
 
@@ -60,8 +89,11 @@ def _drop_removed_doses(settings: dict[str, Any]) -> None:
     if PROGRAM_DEFAULTS not in settings:
         return
     ids = {dose["id"] for dose in settings.get(DOSES, [])}
-    row = settings[PROGRAM_DEFAULTS]["default"]
-    row["doses"] = {id_: amount for id_, amount in row["doses"].items() if id_ in ids}
+    defaults = settings[PROGRAM_DEFAULTS]
+    for row in [defaults["default"], *defaults.get("programs", {}).values()]:
+        row["doses"] = {
+            id_: amount for id_, amount in row["doses"].items() if id_ in ids
+        }
 
 
 class DeviceSettings:

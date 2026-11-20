@@ -19,7 +19,7 @@ NO_SETTINGS: dict[str, Any] = {
     "automatic_templates": [],
     "default_material": None,
     "doses": [],
-    "program_defaults": {"default": {"doses": {}}},
+    "program_defaults": {"default": {"doses": {}}, "programs": {}},
 }
 
 
@@ -81,6 +81,7 @@ async def test_each_device_lists_its_ha_side_settings(
                 "price": {"source": "fixed", "value": 0.30},
             },
             "settings": NO_SETTINGS,
+            "known_programs": [],
         },
         {
             "id": mini.subentry_id,
@@ -89,6 +90,7 @@ async def test_each_device_lists_its_ha_side_settings(
             "capabilities": result["devices"][1]["capabilities"],
             "ha_settings": result["devices"][1]["ha_settings"],
             "settings": NO_SETTINGS,
+            "known_programs": [],
         },
     ]
     assert result["devices"][1]["ha_settings"]["status"]["entity_id"] == (

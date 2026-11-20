@@ -114,6 +114,11 @@ One product a washing machine's Runs use, such as detergent or fabric softener, 
 _Avoid_: Additive, dosage, detergent (as the generic term)
 _German UI_: Dosierung
 
+**Stock input**:
+An entity reporting how much of a Dose's product is left, in g or ml (for example a scale under the bottle); what it loses during a Run, refills ignored, is the Dose's amount.
+_Avoid_: Level sensor, fill level
+_German UI_: Bestandssensor
+
 **Program Defaults**:
 A Device's kWh, litres and Dose amounts for each Program, plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
 _Avoid_: Presets, program profiles, estimates
