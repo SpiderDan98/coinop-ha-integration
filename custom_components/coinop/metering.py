@@ -323,19 +323,33 @@ class Metering:
         elif fallback:
             if metered:
                 add_flag(run, Flag.CONSUMPTION_GAP)
-            value, method = fallback
-            item = self.priced(
-                run,
-                until,
-                value if callable(value) else spread(value or 0.0, run.started, until),
-                method,
-            )
-            if value is None:
-                item.quantity, item.segments = None, []
+            item = self._fallen_back(run, until, fallback)
         else:
             return None
         if price_gap(run.started, until, self.timeline(run).prices):
             add_flag(run, Flag.PRICE_GAP)
+        return item
+
+    def fallen_back(self, run: Run, until: datetime) -> LineItem | None:
+        """The Run's Line Item by the fallback alone; None without one."""
+        fallback = self._fallback(run)
+        return self._fallen_back(run, until, fallback) if fallback else None
+
+    def _fallen_back(
+        self,
+        run: Run,
+        until: datetime,
+        fallback: tuple[Model | float | None, ConsumptionMethod],
+    ) -> LineItem:
+        value, method = fallback
+        item = self.priced(
+            run,
+            until,
+            value if callable(value) else spread(value or 0.0, run.started, until),
+            method,
+        )
+        if value is None:
+            item.quantity, item.segments = None, []
         return item
 
     def _item(self, run: Run) -> LineItem:
