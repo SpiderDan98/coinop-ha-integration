@@ -83,7 +83,9 @@ def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
 
 def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
     # Meter readings are long on an open Run and of no use to the panel.
-    stored = {key: value for key, value in run.as_dict().items() if key != "readings"}
+    stored = run.as_dict()
+    for timeline in stored.get("timelines", {}).values():
+        del timeline["readings"]
     return {
         **stored,
         **_summary(run, now, decimals),
