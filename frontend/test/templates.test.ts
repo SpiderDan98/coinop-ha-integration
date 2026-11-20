@@ -33,14 +33,16 @@ describe("Line Item Templates tab", () => {
     await click(panel, query(panel, `a.tab[href$="/templates"]`));
 
     expect(location.pathname).toBe("/wattbill/templates");
-    expect(queryAll(panel, "a.tab").map(text)).toEqual([
+    expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
+      "Runs",
       "Analysis",
       "Materials",
       "Line Item Templates",
       "Tags",
       "Devices",
     ]);
-    expect(text(query(panel, "a.tab.on"))).toBe("Line Item Templates");
+    expect(query(panel, "a.tab.on").title).toBe("Line Item Templates");
+    expect(text(query(panel, ".title"))).toBe("Line Item Templates");
   });
 
   it("lists every template as an editable row with the Devices using it automatically", async () => {
@@ -149,7 +151,7 @@ describe("Line Item Templates tab", () => {
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/templates" });
 
-    expect(text(query(panel, "a.tab.on"))).toBe("Postenvorlagen");
+    expect(text(query(panel, ".title"))).toBe("Postenvorlagen");
     expect(text(row(panel, "template-wear"))).toContain("Aus der Laufzeit des Laufs");
   });
 });

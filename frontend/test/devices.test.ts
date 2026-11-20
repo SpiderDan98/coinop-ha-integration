@@ -16,14 +16,14 @@ const filterBy = async (panel: Element, deviceId: string) => {
 };
 
 describe("Devices tab", () => {
-  it("opens from the toolbar, and the title leads back to the Runs", async () => {
+  it("opens from the toolbar, and the Runs tab leads back", async () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, `a.tab[href$="/devices"]`));
 
     expect(location.pathname).toBe("/wattbill/devices");
     expect(cards(panel)).toHaveLength(1);
-    await click(panel, query(panel, ".title a"));
+    await click(panel, query(panel, 'a.tab[title="Runs"]'));
     expect(location.pathname).toBe("/wattbill");
   });
 

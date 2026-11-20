@@ -1,4 +1,13 @@
-import { mdiMenu, mdiPlus } from "@mdi/js";
+import {
+  mdiChartBar,
+  mdiDevices,
+  mdiMenu,
+  mdiPackageVariantClosed,
+  mdiPlus,
+  mdiTagMultiple,
+  mdiTextBoxMultiple,
+  mdiViewDashboard,
+} from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { cache } from "lit/directives/cache.js";
@@ -25,6 +34,15 @@ import { runName } from "./run-parts";
 import { shared } from "./styles";
 
 const TABS = ["analysis", "materials", "templates", "tags", "devices"] as const;
+
+const ICONS = {
+  overview: mdiViewDashboard,
+  analysis: mdiChartBar,
+  materials: mdiPackageVariantClosed,
+  templates: mdiTextBoxMultiple,
+  tags: mdiTagMultiple,
+  devices: mdiDevices,
+} satisfies Record<(typeof TABS)[number] | "overview", string>;
 
 const page = (route: PanelRoute) => {
   const [, section, id] = route.path.split("/");
@@ -135,28 +153,35 @@ export class WattbillPanel extends LitElement {
               ></ha-icon-button>`
             : nothing
         }
-        <nav class="title">
-          ${
-            current.name === "overview"
-              ? "WattBill"
-              : html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>${
-                    current.name === "run"
-                      ? html`<span class="muted"> › </span
-                          ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`
-                      : nothing
-                  }`
-          }
-        </nav>
+        <nav class="title">${this.renderTitle(current, run)}</nav>
         <nav class="tabs">
-          ${TABS.map(
-            (tab) =>
-              html`<a
-                class="tab ${current.name === tab ? "on" : ""}"
-                href="${this.route.prefix}/${tab}"
-                @click=${followLink}
-                >${t(`tab.${tab}`)}</a
-              >`,
-          )}
+          ${
+            this.narrow
+              ? TABS.map(
+                  (tab) =>
+                    html`<a
+                      class="tab ${current.name === tab ? "on" : ""}"
+                      href="${this.route.prefix}/${tab}"
+                      @click=${followLink}
+                      >${t(`tab.${tab}`)}</a
+                    >`,
+                )
+              : // Icons only, as HA's dashboards show their views; the title names the open one.
+                (["overview", ...TABS] as const).map(
+                  (tab) =>
+                    html`<a
+                      class="tab icon ${
+                        current.name === tab || (tab === "overview" && current.name === "run")
+                          ? "on"
+                          : ""
+                      }"
+                      href=${tab === "overview" ? this.route.prefix : `${this.route.prefix}/${tab}`}
+                      title=${tab === "overview" ? t("runs.title") : t(`tab.${tab}`)}
+                      @click=${followLink}
+                      ><ha-svg-icon .path=${ICONS[tab]}></ha-svg-icon
+                    ></a>`,
+                )
+          }
         </nav>
       </header>
       <main>
@@ -199,6 +224,16 @@ export class WattbillPanel extends LitElement {
           : nothing
       }
     `;
+  }
+
+  private renderTitle(current: ReturnType<typeof page>, run: RunSummary | undefined) {
+    const t = localize(this.hass);
+    if (current.name === "overview") return "WattBill";
+    if (current.name !== "run" && !this.narrow) return t(`tab.${current.name}`);
+    const home = html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>`;
+    if (current.name !== "run") return home;
+    return html`${home}<span class="muted"> › </span
+      ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`;
   }
 
   private renderPage(current: ReturnType<typeof page>, run: RunSummary | undefined) {
@@ -314,6 +349,9 @@ export class WattbillPanel extends LitElement {
       .tab.on {
         color: var(--primary-color);
         border-bottom-color: var(--primary-color);
+      }
+      .tab.icon {
+        padding: 0 12px;
       }
       .title a {
         color: inherit;

@@ -17,6 +17,23 @@ describe("Analysis tab", () => {
     await click(panel, query(panel, `a.tab[href$="/analysis"]`));
 
     expect(location.pathname).toBe("/wattbill/analysis");
+    expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
+      "Runs",
+      "Analysis",
+      "Materials",
+      "Line Item Templates",
+      "Tags",
+      "Devices",
+    ]);
+    expect(query(panel, "a.tab.on").title).toBe("Analysis");
+    expect(text(query(panel, ".title"))).toBe("Analysis");
+  });
+
+  it("on a phone, names its tabs and leads back through the title", async () => {
+    const panel = await mountPanel(recordedBackend(), { narrow: true });
+
+    await click(panel, query(panel, `a.tab[href$="/analysis"]`));
+
     expect(queryAll(panel, "a.tab").map(text)).toEqual([
       "Analysis",
       "Materials",
@@ -25,6 +42,8 @@ describe("Analysis tab", () => {
       "Devices",
     ]);
     expect(text(query(panel, "a.tab.on"))).toBe("Analysis");
+    await click(panel, query(panel, ".title a"));
+    expect(location.pathname).toBe("/wattbill");
   });
 
   it("totals the cost by kind with each kind's share", async () => {
