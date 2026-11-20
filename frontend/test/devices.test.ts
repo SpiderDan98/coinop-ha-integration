@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, mountPanel, query, queryAll, settle, text } from "./render";
+import { click, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
 const SUBSCRIBE = "wattbill/runs/subscribe";
 const LIST = "wattbill/devices/list";
@@ -27,29 +27,40 @@ describe("Devices tab", () => {
     expect(location.pathname).toBe("/wattbill");
   });
 
-  it("shows each Device's HA-side settings read-only with a link to change them", async () => {
+  it("shows each Device's HA-side settings and its own settings read-only", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/devices" });
 
     expect(cards(panel)).toEqual([
       "Kobra " +
         "Print status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
-        "Material used sensor.kobra_filament_used mm " +
+        "Material used sensor.kobra_filament_used · mm " +
         "Not used Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
         "Electricity price €0.30 per kWh " +
-        "Device Inputs, consumption source and price are changed in Home Assistant. " +
         "Reconfigure in Home Assistant " +
-        "Default Material None eSun PLA+ black Standard Resin grey " +
-        "Charged for a Run's measured usage, and pre-filled when the printer reports none. " +
-        "Tags for new Runs Batch 7 Copied onto every Run that starts on this Device. " +
-        "Automatic templates Wear Kobra + Add template Threaded inserts Packaging " +
-        "Added to every Run that starts on this Device. Changes affect future Runs only.",
+        "Default Material None " +
+        "Tags for new Runs Batch 7 " +
+        "Automatic templates Wear Kobra",
     ]);
-    expect(queryAll(panel, ".device dl input, .device dl select")).toHaveLength(0);
+    expect(queryAll(panel, ".device input, .device select")).toHaveLength(0);
     expect(query(panel, ".device a").getAttribute("href")).toBe(
       "/config/integrations/integration/wattbill",
     );
+  });
+
+  it("groups the Devices by their Device Type", async () => {
+    const [kobra] = recorded.devices;
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [kobra, { ...kobra, id: "device-mini", name: "Mini" }],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device-type").map((section) => text(query(section, "h2")))).toEqual([
+      "3D printers",
+    ]);
+    expect(queryAll(panel, ".device-type .device h3").map(text)).toEqual(["Kobra", "Mini"]);
   });
 
   it("names the Status and job attribute and an unused job input", async () => {
@@ -71,7 +82,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Print status event.kobra_print event_type " +
+      "Print status event.kobra_print · event_type " +
         "Not used Print job, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
@@ -90,16 +101,16 @@ describe("Devices tab", () => {
 
     const on = await mountPanel(withImages(true), { path: "/devices" });
     expect(text(query(on, ".device dl"))).toContain(
-      "Thumbnail image.kobra_preview Camera camera.kobra Snapshot when a Run ends Not used Slots",
+      "Thumbnail image.kobra_preview Camera camera.kobra · Snapshot when a Run ends Not used Slots",
     );
     on.remove();
     const off = await mountPanel(withImages(false), { path: "/devices" });
     expect(text(query(off, ".device dl"))).toContain(
-      "Camera camera.kobra No Snapshot Not used Slots",
+      "Camera camera.kobra · No Snapshot Not used Slots",
     );
   });
 
-  it("names each input's entity by its friendly name, its entity id below", async () => {
+  it("names each input's entity by its friendly name, its entity id as tooltip", async () => {
     const backend = recordedBackend();
     backend.hass.states = {
       "sensor.kobra_status": { attributes: { friendly_name: "Kobra Print status" } },
@@ -107,10 +118,11 @@ describe("Devices tab", () => {
 
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    expect(text(query(panel, ".device dd"))).toBe("Kobra Print status sensor.kobra_status");
+    expect(text(query(panel, ".device dd"))).toBe("Kobra Print status");
+    expect(query(panel, ".device dd .entity").title).toBe("sensor.kobra_status");
   });
 
-  it("names the price, consumption and Slot entities too, their entity ids below", async () => {
+  it("names the price, consumption and Slot entities too, their entity ids as tooltips", async () => {
     const [kobra] = recorded.devices;
     const named = {
       "sensor.tibber_price": "Tibber price",
@@ -153,13 +165,18 @@ describe("Devices tab", () => {
 
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    expect(text(query(panel, ".device .slots"))).toBe(
-      "ACE Slot 1 sensor.ace_slot_1 Loaded slot ACE Loaded slot sensor.ace_loaded_slot",
-    );
-    expect(text(query(panel, ".device .consumption"))).toBe(
-      "Power sensor Plug power sensor.plug_power",
-    );
-    expect(text(query(panel, ".device .price"))).toBe("From Tibber price sensor.tibber_price");
+    expect(text(query(panel, ".device .slots"))).toBe("ACE Slot 1 Loaded slot ACE Loaded slot");
+    expect(text(query(panel, ".device .consumption"))).toBe("Power sensor Plug power");
+    expect(text(query(panel, ".device .price"))).toBe("From Tibber price");
+    expect(queryAll(panel, ".device .entity").map((name) => name.title)).toEqual([
+      "sensor.kobra_status",
+      "sensor.kobra_job",
+      "sensor.kobra_filament_used",
+      "sensor.ace_slot_1",
+      "sensor.ace_loaded_slot",
+      "sensor.plug_power",
+      "sensor.tibber_price",
+    ]);
   });
 
   it("shows no images for a Device added before they existed", async () => {
@@ -214,7 +231,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toContain(
-      "Electricity price From sensor.electricity_price current",
+      "Electricity price From sensor.electricity_price · current",
     );
   });
 
@@ -252,7 +269,7 @@ describe("Devices tab", () => {
 
     expect(queryAll(panel, ".device .consumption").map(text)).toEqual([
       "Energy meter sensor.plug_energy",
-      "Power sensor sensor.plug power · 60 W running",
+      "Power sensor sensor.plug · power · 60 W running",
     ]);
   });
 
@@ -294,7 +311,7 @@ describe("Devices tab", () => {
     expect(text(query(panel, ".device dl"))).toBe(
       "Druckstatus sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
-        "Materialverbrauch sensor.kobra_filament_used mm " +
+        "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Nicht verwendet Fächer, Vorschaubild, Kamera " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +
         "Strompreis 0,30 € pro kWh",
@@ -345,6 +362,39 @@ describe("Runs of removed Devices", () => {
   });
 });
 
+describe("A Device's settings dialog", () => {
+  const SETTINGS = "wattbill/devices/update_settings";
+  const open = (panel: Element) => click(panel, iconButton(panel, "Edit settings of Kobra"));
+
+  it("is titled after the Device and points to HA for its other settings", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/devices" });
+    await open(panel);
+
+    const dialog = query(panel, ".settings-dialog") as HTMLElement & { label: string };
+    expect(dialog.label).toBe("Settings of Kobra");
+    expect(text(query(dialog, ".ha-settings"))).toBe(
+      "Device Inputs, consumption source and price are changed in Home Assistant. " +
+        "Reconfigure in Home Assistant",
+    );
+  });
+
+  it("closes without saving when nothing changed or on Cancel", async () => {
+    const backend = recordedBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    await open(panel);
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
+    expect(queryAll(panel, ".settings-dialog")).toEqual([]);
+    await open(panel);
+    await click(panel, iconButton(panel, "Remove Wear Kobra"));
+    await click(panel, query(panel, ".settings-dialog ha-button.cancel"));
+
+    expect(queryAll(panel, ".settings-dialog")).toEqual([]);
+    expect(backend.sent(SETTINGS)).toEqual([]);
+    expect(text(query(panel, ".device .automatic-templates"))).toBe("Wear Kobra");
+  });
+});
+
 describe("Device settings without a catalogue", () => {
   it("link to the Materials and Line Item Templates tabs instead of empty selects", async () => {
     const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
@@ -352,6 +402,7 @@ describe("Device settings without a catalogue", () => {
     ]);
 
     const panel = await mountPanel(backend, { path: "/devices" });
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
 
     expect(queryAll(panel, ".default-material select")).toEqual([]);
     expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/wattbill/materials");

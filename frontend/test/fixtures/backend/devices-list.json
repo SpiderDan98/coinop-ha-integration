@@ -3,6 +3,7 @@
     {
       "id": "device-kobra",
       "name": "Kobra",
+      "type": "3d_printer",
       "ha_settings": {
         "printer_device_id": null,
         "status": {
