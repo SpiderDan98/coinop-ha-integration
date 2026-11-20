@@ -72,10 +72,12 @@ async def test_without_grouping_everything_adds_up_to_one_total(
     assert total == {
         "cost": 0.31,
         "electricity_cost": 0.3,
+        "water_cost": 0.0,
         "material_cost": 0.51,
         "other_cost": -0.5,
         "material_grams": pytest.approx(20.2),
         "energy_kwh": pytest.approx(1.2),
+        "water_litres": 0.0,
         "runs": 2,
         "running_hours": pytest.approx(6),
         "flagged_runs": 1,
@@ -216,6 +218,29 @@ async def test_a_run_counts_once_in_each_of_its_tags(
     assert pick(by_device, "device_id", "device_name", "runs") == [
         {"device_id": "device-kobra", "device_name": "Kobra", "runs": 2},
         {"device_id": "device-mini", "device_name": "Mini", "runs": 1},
+    ]
+
+
+async def test_runs_group_by_their_program_none_as_no_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    started = CLOCK_START - DAY
+    rinse = receipt(started, 2, 0.24, line_item("other", 0.5, id="rinse"))
+    place_runs(
+        hass_storage,
+        stored_run("monday", program="Cotton 60°"),
+        stored_run("tuesday", program="Cotton 60°", line_items=rinse),
+        stored_run("wednesday", program="Eco 40-60"),
+        stored_run("thursday"),
+    )
+    await add_hub(hass)
+
+    by_program = await groups(panel, "program")
+
+    assert pick(by_program, "program", "runs", "cost") == [
+        {"program": "Cotton 60°", "runs": 2, "cost": 0.63},
+        {"program": "Eco 40-60", "runs": 1, "cost": 0.07},
+        {"program": None, "runs": 1, "cost": 0.07},
     ]
 
 

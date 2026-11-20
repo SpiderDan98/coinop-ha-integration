@@ -18,6 +18,7 @@ import type {
   RunImage,
   RunSummary,
 } from "../src/api";
+import aggregatesByProgram from "./fixtures/backend/aggregates-by-program.json";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
@@ -32,6 +33,7 @@ import lineItemsAdd from "./fixtures/backend/line-items-add.json";
 import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
 import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
+import lineItemsAddWater from "./fixtures/backend/line-items-add-water.json";
 import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
@@ -43,6 +45,7 @@ import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
+import runsGetWater from "./fixtures/backend/runs-get-water.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
 import spoolmanFilamentsUnavailable from "./fixtures/backend/spoolman-filaments-unavailable.json";
 import spoolmanFilaments from "./fixtures/backend/spoolman-filaments.json";
@@ -70,6 +73,13 @@ export const recorded = {
    * grouping the Overview and Analysis ask for, then ungrouped for each selection of them
    * (`run_ids`, sorted). */
   aggregates: aggregatesGet as { group_by: Dimension[]; run_ids?: string[]; groups: Group[] }[],
+  /** `coinop/runs/list` of Kobra's "vase" and the "device-washer" Runs "monday" and
+   * "tuesday" (Cotton 60°, 0.07 and 0.57), "eco" (Eco 40-60, 0.07) and "unknown" (no
+   * Program, 0.07), with `coinop/aggregates/get` of those four by Program. */
+  programs: aggregatesByProgram as {
+    runs: RunSummary[];
+    aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
+  },
   /** `coinop/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
@@ -113,6 +123,12 @@ export const recorded = {
   washer: devicesListWashingMachine.devices[0] as Device,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
+  /** `coinop/runs/get` of "water-wash" on "device-washer" with a water meter: 50 L measured,
+   * 20 L at 4.00 and 30 L at 5.00 per m³ ("water-wash-water"). */
+  waterWash: runsGetWater.run as RunDetail,
+  /** `coinop/line_items/add`: 60 L at 4.50 per m³ ("basement-wash-water") added by hand to
+   * "basement-wash" of "device-basement", a washing machine without water source. */
+  lineItemsAddWater: lineItemsAddWater as { run: RunDetail },
   /**
    * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
@@ -295,7 +311,7 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       const asked = `${String(msg.group_by)} of ${String(runIds)}`;
       return {
         groups: found(
-          recorded.aggregates.find(
+          [...recorded.aggregates, ...recorded.programs.aggregates].find(
             (answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked,
           ),
           `grouping ${asked}`,

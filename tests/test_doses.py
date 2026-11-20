@@ -149,7 +149,8 @@ async def test_a_removed_dose_leaves_the_default_row(
 
     assert result["settings"]["doses"] == DOSES[1:]
     assert result["settings"]["program_defaults"] == {
-        "default": {"doses": {"dose-pods": 1}}
+        "default": {"doses": {"dose-pods": 1}},
+        "programs": {},
     }
 
 

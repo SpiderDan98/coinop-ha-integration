@@ -2,7 +2,14 @@
 import type { HomeAssistant } from "./hass";
 import { localize } from "./localize";
 
-const QUANTITY_DECIMALS: Record<string, number> = { kWh: 3, g: 1, ml: 1, h: 2, pcs: 0 };
+const QUANTITY_DECIMALS: Record<string, number> = { kWh: 3, L: 1, g: 1, ml: 1, h: 2, pcs: 0 };
+/** Units priced per a larger one, as bills are: a litre's price is shown per m³. */
+const PRICE_UNITS: Record<string, { unit: string; factor: number }> = {
+  L: { unit: "m³", factor: 1000 },
+};
+
+/** The unit a price per `unit` is shown in, and what a price per `unit` is multiplied by. */
+export const priceUnit = (unit: string) => PRICE_UNITS[unit] ?? { unit, factor: 1 };
 
 export function formatter(hass: HomeAssistant) {
   const locale = hass.language;

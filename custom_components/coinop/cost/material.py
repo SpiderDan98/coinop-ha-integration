@@ -104,11 +104,7 @@ def material_line_item(
 
 
 def dose_line_item(
-    item_id: str,
-    dose_id: str,
-    material: Material,
-    amount: float,
-    source: DoseSource = DoseSource.DEFAULT_ROW,
+    item_id: str, dose_id: str, material: Material, amount: float, source: DoseSource
 ) -> LineItem:
     """A Dose's Line Item: `amount` in the Material's pack unit at its current price."""
     item = material_line_item(

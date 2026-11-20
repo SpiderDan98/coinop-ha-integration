@@ -141,6 +141,7 @@
     },
     "subtotals": {
       "electricity": 0.05,
+      "water": 0.0,
       "material": 0.31,
       "other": 0.5
     }

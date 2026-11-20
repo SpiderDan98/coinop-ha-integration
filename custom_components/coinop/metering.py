@@ -2,7 +2,8 @@
 
 Its meter or rate input and its price become the Run's timeline (missed
 reports filled from recorder history), and the timeline its priced Line Item.
-Only the fallback without measurement is the quantity's own.
+Only the fallback without measurement is the quantity's own; without a
+measurement or a fallback the Run gets no Line Item of the quantity.
 """
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -43,7 +44,8 @@ class Metering:
     """One quantity of a Device's Runs.
 
     `gap_rates(run)` are the (since, rate) a rate input's gaps hold, None for its
-    last value; `fallback(run)` is the model and method without measurement.
+    last value; `fallback(run)` is the model and method without measurement, None
+    for none.
     """
 
     def __init__(
@@ -52,12 +54,13 @@ class Metering:
         quantity: Quantity,
         config: DeviceConfig,
         gap_rates: Callable[[Run], Sequence[tuple[datetime, float | None]]],
-        fallback: Callable[[Run], tuple[Model, ConsumptionMethod]],
+        fallback: Callable[[Run], tuple[Model, ConsumptionMethod] | None],
     ) -> None:
         self._hass = hass
         self.quantity = quantity
         self._source: Mapping[str, Any] = config.flow_data[quantity.source_key]
-        self._price: Mapping[str, Any] = config.flow_data[quantity.price_key]
+        # Without a source there may be no price section.
+        self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
         self._gap_rates = gap_rates
         self._fallback = fallback
         # The price entity's last valid report, for a Run starting while it has none.
@@ -68,6 +71,10 @@ class Metering:
 
     def meter(self, run: Run) -> Mapping[str, Any] | None:
         return meter_of(self.quantity, self.timeline(run).source)
+
+    def counts(self, run: Run) -> bool:
+        """Whether the Run gets a Line Item of the quantity: measured or by its fallback."""
+        return self.meter(run) is not None or self._fallback(run) is not None
 
     def meter_entities(self, runs: Iterable[Run]) -> set[str]:
         """The meters of these Runs and of the Device's current source."""
@@ -86,7 +93,7 @@ class Metering:
     def pin(self, run: Run) -> None:
         """The new Run follows the Device's current source and price."""
         run.timelines[self.quantity.kind] = Timeline(
-            source=dict(self._source), cost_source=dict(self._price)
+            source=dict(self._source), cost_source=dict(self._price) or None
         )
 
     def open(self, run: Run, at: datetime) -> None:
@@ -94,7 +101,8 @@ class Metering:
         self.pin(run)
         if meter := self.meter(run):
             self.record(run, self._hass.states.get(meter["entity_id"]))
-        self._open_prices(run, at)
+        if self.counts(run):
+            self._open_prices(run, at)
 
     def finish(self, run: Run) -> None:
         """The Run's values are frozen; its timelines are of no more use."""
@@ -107,6 +115,8 @@ class Metering:
 
         The same price entity as before only catches up on missed reports.
         """
+        if not self.counts(run):
+            return
         timeline = self.timeline(run)
         price = dict(self._price)
         if timeline.cost_source != price:
@@ -196,8 +206,7 @@ class Metering:
 
     def _current_price(self) -> float | None:
         if (entity_id := self.price_entity_id) is None:
-            value: float = self._price["value"]
-            return value
+            return self.quantity.per_unit(self._price["value"])
         return self._price_of(self._hass.states.get(entity_id))
 
     def remember_price(self, state: State | None) -> None:
@@ -264,11 +273,12 @@ class Metering:
 
     def model(self, run: Run) -> Model:
         """The Run's consumption model: its meter, else the fallback."""
+        fallback = self._fallback(run)
         return model(
             self.quantity,
             self.timeline(run),
             self._gap_rates(run),
-            self._fallback(run)[0],
+            (lambda _, __: 0.0) if fallback is None else fallback[0],
         )
 
     def priced(
@@ -289,11 +299,15 @@ class Metering:
             method,
         )
 
-    def refresh(self, run: Run, until: datetime) -> LineItem:
-        """The Run's live Line Item up to `until`, flagging a price gap."""
-        method = (
-            ConsumptionMethod.MEASURED if self.meter(run) else self._fallback(run)[1]
-        )
+    def refresh(self, run: Run, until: datetime) -> LineItem | None:
+        """The Run's live Line Item up to `until`, flagging a price gap; None
+        without measurement and fallback."""
+        if self.meter(run):
+            method = ConsumptionMethod.MEASURED
+        elif fallback := self._fallback(run):
+            method = fallback[1]
+        else:
+            return None
         item = self.priced(run, until, self.model(run), method)
         if price_gap(run.started, until, self.timeline(run).prices):
             add_flag(run, Flag.PRICE_GAP)

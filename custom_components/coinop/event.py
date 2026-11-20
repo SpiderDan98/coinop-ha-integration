@@ -59,6 +59,11 @@ class RunEvent(DeviceEntity, EventEntity):
                 if Capability.MATERIAL in self._capabilities
                 else {}
             )
+            litres = (
+                {"water_litres": totals.water_litres}
+                if Capability.WATER in self._capabilities
+                else {}
+            )
             program = (
                 {"program": run.program}
                 if Capability.PROGRAM in self._capabilities
@@ -76,6 +81,7 @@ class RunEvent(DeviceEntity, EventEntity):
                     "total_cost": totals.cost,
                     **parts,
                     "energy_kwh": totals.energy_kwh,
+                    **litres,
                     **grams,
                     "has_flags": bool(run.flags),
                     "tags": list(run.tags),

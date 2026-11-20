@@ -9,6 +9,11 @@ const groups = (key: string) =>
   recorded.aggregates.find(({ group_by }) => group_by.join() === key)?.groups ?? [];
 const rows = (panel: Element, table: string) =>
   queryAll(panel, `.${table} tbody tr, .${table} tfoot tr`).map(text);
+/** Kobra's and the washing machine's Runs, by Program. */
+const washing = (options?: Parameters<typeof recordedBackend>[0]) =>
+  recordedBackend(options)
+    .subscription("coinop/runs/subscribe", () => [{ runs: recorded.programs.runs }])
+    .reply("coinop/devices/list", () => ({ devices: [...recorded.devices, recorded.washer] }));
 
 describe("Analysis tab", () => {
   it("opens from the toolbar as its first tab", async () => {
@@ -129,6 +134,28 @@ describe("Analysis tab", () => {
     expect(queryAll(panel, ".by-tag tfoot")).toEqual([]);
   });
 
+  it("totals the washing machine Runs of each Program, those without one as No Program", async () => {
+    const panel = await mountPanel(washing(), { path: "/analysis" });
+
+    expect(queryAll(panel, ".by-program th").map(text)).toEqual([
+      "Program",
+      "Runs",
+      "Cost",
+      "Per Run",
+    ]);
+    expect(rows(panel, "by-program")).toEqual([
+      "Cotton 60° 2 €0.64 €0.32",
+      "Eco 40-60 1 €0.07 €0.07",
+      "No Program 1 €0.07 €0.07",
+    ]);
+  });
+
+  it("has no Program table without a Device that records Programs", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/analysis" });
+
+    expect(queryAll(panel, ".by-program")).toEqual([]);
+  });
+
   it("reads the totals afresh when a Run changes", async () => {
     let extra = 0;
     const backend = recordedBackend().reply(AGGREGATES, (msg) => ({
@@ -170,6 +197,19 @@ describe("Analysis tab", () => {
     ]);
     expect(rows(panel, "by-tag")).toContain("Ohne Tag 1 0,07 €");
   });
+
+  it("names the Program table in German too", async () => {
+    const panel = await mountPanel(washing({ language: "de" }), { path: "/analysis" });
+
+    expect(text(query(panel, ".by-program h3"))).toBe("Nach Programm");
+    expect(queryAll(panel, ".by-program th").map(text)).toEqual([
+      "Programm",
+      "Läufe",
+      "Kosten",
+      "Pro Lauf",
+    ]);
+    expect(rows(panel, "by-program").at(-1)).toBe("Ohne Programm 1 0,07 € 0,07 €");
+  });
 });
 
 describe("Analysis rows", () => {
@@ -195,6 +235,16 @@ describe("Analysis rows", () => {
       "/coinop/runs?untagged=1",
     ]);
     expect(queryAll(panel, ".by-kind a, .by-material a")).toEqual([]);
+  });
+
+  it("link to the Runs of their Program", async () => {
+    const panel = await mountPanel(washing(), { path: "/analysis" });
+
+    expect(links(panel, "by-program")).toEqual([
+      "/coinop/runs?program=Cotton+60%C2%B0",
+      "/coinop/runs?program=Eco+40-60",
+      "/coinop/runs?no_program=1",
+    ]);
   });
 
   it("open the Runs tab filtered, a removed Device's too", async () => {

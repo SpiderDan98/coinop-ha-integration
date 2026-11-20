@@ -83,6 +83,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
         "printer_device_id",
         "program",
         "status",
+        "water",
     ]
 
 
@@ -118,6 +119,7 @@ async def test_reconfiguring_a_washing_machine_offers_its_sections(
         "program",
         "consumption",
         "price",
+        "water",
         "save",
     ]
 
@@ -173,7 +175,7 @@ async def washer(hass: HomeAssistant, clock: Clock) -> ConfigSubentry:
 
 
 @pytest.mark.usefixtures("washer")
-async def test_a_washing_machine_has_the_printer_entities_without_material_used(
+async def test_a_washing_machine_has_the_printer_entities_with_water_for_material_used(
     hass: HomeAssistant, entity_registry: er.EntityRegistry
 ) -> None:
     assert sorted(
@@ -192,6 +194,8 @@ async def test_a_washing_machine_has_the_printer_entities_without_material_used(
         "sensor.washer_running_time",
         "sensor.washer_runs",
         "sensor.washer_total_cost",
+        "sensor.washer_water_cost",
+        "sensor.washer_water_in_runs",
     ]
 
 
@@ -236,7 +240,7 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
     devices = (await panel.call("coinop/devices/list"))["devices"]
 
     assert [(d["type"], d["capabilities"]) for d in devices] == [
-        ("washing_machine", ["doses", "program"]),
+        ("washing_machine", ["doses", "program", "water"]),
         ("3d_printer", ["average_power", "images", "job", "material", "part_count"]),
     ]
     assert devices[0]["ha_settings"] == {
@@ -252,6 +256,7 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
             "factor": None,
         },
         "price": {"source": "fixed", "value": 0.5},
+        "water": {"source": "none"},
     }
 
 

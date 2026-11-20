@@ -44,6 +44,7 @@ class UsageUnit(StrEnum):
 
 class LineItemKind(StrEnum):
     ELECTRICITY = "electricity"
+    WATER = "water"
     MATERIAL = "material"
     OTHER = "other"
 
@@ -55,8 +56,12 @@ class QuantityBasis(StrEnum):
     RUNNING_HOURS = "running_hours"
 
 
+# Consumed quantities: at most one Line Item each per Run.
+CONSUMED_KINDS = frozenset({LineItemKind.ELECTRICITY, LineItemKind.WATER})
+
+
 class ConsumptionMethod(StrEnum):
-    """Where a consumed quantity's Line Item (electricity) came from."""
+    """Where a consumed quantity's Line Item (electricity, water) came from."""
 
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
@@ -67,6 +72,7 @@ class ConsumptionMethod(StrEnum):
 class DoseSource(StrEnum):
     """Where a Dose Line Item's amount came from."""
 
+    PROGRAM_DEFAULT = "program_default"
     DEFAULT_ROW = "default_row"
     STOCK_INPUT = "stock_input"
 
@@ -327,7 +333,7 @@ class LineItem:
         """Coin-op computes its values, live while the Run is open."""
         return (
             (
-                self.kind is LineItemKind.ELECTRICITY
+                self.kind in CONSUMED_KINDS
                 and self.method is not ConsumptionMethod.ENTERED
             )
             or self.measured
@@ -338,7 +344,7 @@ class LineItem:
     @property
     def from_defaults(self) -> bool:
         """Its quantity is a default for a whole cycle, not what was measured."""
-        return self.dose_source is DoseSource.DEFAULT_ROW
+        return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
     def grams(self) -> float:
@@ -566,8 +572,12 @@ class Run:
         return not self.finalised and item.is_computed
 
     def deletable(self, item: LineItem) -> bool:
-        """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
-        return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
+        """Every Run keeps its one Electricity Line Item and a computed Water one,
+        overridden down to 0 at most."""
+        kept = item.kind is LineItemKind.ELECTRICITY or (
+            item.kind is LineItemKind.WATER and item.is_computed
+        )
+        return not kept and not self.locked(item)
 
     def drop_fixed_flags(self) -> None:
         """Drops the Flags the user's corrections fixed; the others wait for "Mark as checked"."""

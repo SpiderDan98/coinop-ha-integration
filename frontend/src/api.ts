@@ -3,9 +3,13 @@
 import type { HomeAssistant, Message } from "./hass";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
-export const KINDS = ["electricity", "material", "other"] as const;
+export const KINDS = ["electricity", "water", "material", "other"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
+/** The kinds to show: Water only where a Device has water or a Line Item counts it. */
+export const shownKinds = (water: boolean) => KINDS.filter((kind) => kind !== "water" || water);
+export const hasWater = (devices: Device[] | undefined) =>
+  devices?.some((device) => device.capabilities.includes("water")) ?? false;
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
@@ -68,7 +72,7 @@ export interface LineItem {
   share: number | null;
   /** A Dose's Line Item: its Dose and where its amount came from. */
   dose_id?: string;
-  dose_source?: "default_row" | "stock_input";
+  dose_source?: "program_default" | "default_row" | "stock_input";
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -96,7 +100,7 @@ export interface Device {
   type: "3d_printer" | "washing_machine";
   /** What its Device Type has; the panel shows a part only for these. */
   capabilities: (
-    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses"
+    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses" | "water"
   )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
@@ -146,9 +150,15 @@ export interface Device {
       /** An entity reporting how much is left in g or ml; an attribute names its unit. */
       stock?: { entity_id: string; attribute: string | null; unit: string | null };
     }[];
-    /** The amount per Dose id in its Material's unit; a missing one is not dosed. */
-    program_defaults: { default: { doses: Record<string, number> } };
+    /** The amount per Dose id in its Material's unit; a missing one is not dosed. A Run
+     * uses the row of its Program, else the Default row. */
+    program_defaults: {
+      default: { doses: Record<string, number> };
+      programs: Record<string, { doses: Record<string, number> }>;
+    };
   };
+  /** What its Program input offers, then the other Programs its Runs had. */
+  known_programs: string[];
 }
 
 export type RunChange = "started" | "created" | "updated" | "ended" | "deleted";
@@ -158,22 +168,25 @@ export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSu
 export interface Totals {
   cost: number;
   electricity_cost: number;
+  water_cost: number;
   material_cost: number;
   other_cost: number;
   material_grams: number;
   energy_kwh: number;
+  water_litres: number;
   runs: number;
   running_hours: number;
   flagged_runs: number;
 }
 
-export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag";
+export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag" | "program";
 
 /**
  * One group's values along the dimensions asked for, then its totals. Cost, grams and
  * kWh sum the group's Line Items; a Run counts once in every group holding one of its
  * Line Items, so Material and Tag groups overlap. `month` is "YYYY-MM" of the Run's
- * start in HA's time zone; `null` is "none" (no Material, no Tag, Run still open).
+ * start in HA's time zone; `null` is "none" (no Material, no Tag, no Program, Run still
+ * open).
  */
 export type Group = Totals &
   Partial<{
@@ -185,6 +198,7 @@ export type Group = Totals &
     material_name: string | null;
     outcome: Outcome | null;
     tag: string | null;
+    program: string | null;
   }>;
 
 /** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some

@@ -30,6 +30,7 @@
   "page": "Seite {page} von {pages}",
   "kind": {
     "electricity": "Strom",
+    "water": "Wasser",
     "material": "Material",
     "other": "Sonstiges"
   },
