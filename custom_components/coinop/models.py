@@ -29,7 +29,7 @@ class Flag(StrEnum):
     SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
-    # A Cancelled or Failed Run charged defaults meant for a whole cycle.
+    # A Cancelled or Failed Run charged water or Dose defaults meant for a whole Run.
     ENDED_EARLY_DEFAULTS = "ended_early_defaults"
     # A Dose's stock input reported nothing usable: its default was charged.
     STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
@@ -547,7 +547,6 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
-    # None for a Device Type without Part Count.
     part_count: int | None = 1
     note: str | None = None
     tags: list[str] = field(default_factory=list)

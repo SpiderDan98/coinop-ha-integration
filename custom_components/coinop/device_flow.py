@@ -128,7 +128,6 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "water_price": Capability.WATER,
         }
         if (self._data.get("water") or {}).get("source") == WaterSource.NONE:
-            # Nothing to price.
             del needs["water_price"], sections["water_price"]
         return {
             name: step

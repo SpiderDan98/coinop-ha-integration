@@ -384,7 +384,7 @@
   "device.default_row": "Default",
   "device.default_amount": "Default amount of {dose}",
   "device.program_defaults_hint": "Amounts per Run: kWh and litres when nothing measures them, Doses in the Material's unit. An empty cell means not set or not dosed. A Run uses the row of its Program, else the Default row.",
-  "flag.ended_early_defaults": "The Run ended early but was charged defaults for a whole cycle: check the amounts",
+  "flag.ended_early_defaults": "The Run ended early but was charged water or Dose defaults meant for a whole Run: check the amounts",
   "dose_source.default_row": "From the Default row",
   "device.measured_by": "measured by {entity}",
   "device.stock_input": "Stock input of {dose}",

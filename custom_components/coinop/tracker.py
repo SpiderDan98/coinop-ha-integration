@@ -386,7 +386,6 @@ class DeviceTracker:
         ]
         for run in self._unfinalised_runs():
             if run.ended is not None and run.id not in self._final_waits:
-                # Already being finalised.
                 continue
             recorded = [
                 self._record_stock(run, dose, event.data["new_state"]) for dose in doses
