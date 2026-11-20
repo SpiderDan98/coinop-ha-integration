@@ -7,6 +7,8 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
 
+from .const import DEVICE_TYPE_3D_PRINTER, DEVICE_TYPE_WASHING_MACHINE
+
 
 class Target(StrEnum):
     """What a value of the Status input means for the Run lifecycle."""
@@ -25,6 +27,25 @@ class ConsumptionSource(StrEnum):
     POWER = "power"
     ESTIMATE = "estimate"
 
+
+class Capability(StrEnum):
+    """What a Device Type has; code branches on these, not on the type."""
+
+    # The job name, Material used, Slots and Loaded slot inputs.
+    JOB = "job"
+    # Thumbnail, Camera and Snapshot.
+    IMAGES = "images"
+    # A Material Line Item on every Run, a default Material and the grams used.
+    MATERIAL = "material"
+    PART_COUNT = "part_count"
+    # Electricity estimated from average powers when nothing measures it.
+    AVERAGE_POWER = "average_power"
+
+
+CAPABILITIES = {
+    DEVICE_TYPE_3D_PRINTER: frozenset(Capability),
+    DEVICE_TYPE_WASHING_MACHINE: frozenset[Capability](),
+}
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 
@@ -83,6 +104,10 @@ class DeviceConfig:
             consumption=data["consumption"],
             flow_data=data,
         )
+
+    @property
+    def capabilities(self) -> frozenset[Capability]:
+        return CAPABILITIES[self.device_type]
 
     def target(self, value: str) -> Target:
         return self.mapping.get(value, Target.IGNORED)

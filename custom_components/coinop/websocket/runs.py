@@ -63,7 +63,9 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "running_seconds": round(running_time(run, now).total_seconds()),
         "total": float(total),
         "part_count": run.part_count,
-        "cost_per_part": float(round_amount(float(total) / run.part_count, decimals)),
+        "cost_per_part": None
+        if run.part_count is None
+        else float(round_amount(float(total) / run.part_count, decimals)),
         "flags": list(run.flags),
         "tags": list(run.tags),
         "cover": None if (cover := run.cover) is None else image_info(run, cover),
@@ -219,6 +221,11 @@ async def _update(
     if not run.finalised and any(key in msg for key in _FINAL_FIELDS):
         connection.send_error(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run is not final yet"
+        )
+        return
+    if "part_count" in msg and run.part_count is None:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has no Part Count"
         )
         return
     started, ended = msg.get("started", run.started), msg.get("ended", run.ended)

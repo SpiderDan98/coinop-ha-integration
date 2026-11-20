@@ -29,7 +29,7 @@ from .cost import consumption
 from .cost.electricity import estimate
 from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
 from .cost.slots import slot_material, slot_shares
-from .device_config import DeviceConfig, Target
+from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
@@ -439,6 +439,7 @@ class DeviceTracker:
             last_seen=at,
             line_items=[],
             tags=settings[TAGS_FOR_NEW_RUNS],
+            part_count=self._part_count(),
         )
         for metering in self._meterings:
             metering.open(run, at)
@@ -476,6 +477,7 @@ class DeviceTracker:
             finalised=True,
             line_items=[],
             tags=settings[TAGS_FOR_NEW_RUNS] if tags is None else tags,
+            part_count=self._part_count(),
         )
         for metering in self._meterings:
             metering.pin(run)
@@ -489,6 +491,9 @@ class DeviceTracker:
         )
         await self._book.async_add(run)
         return run
+
+    def _part_count(self) -> int | None:
+        return 1 if Capability.PART_COUNT in self._config.capabilities else None
 
     async def _async_past_electricity(self, run: Run, covered: bool) -> LineItem:
         """From the meter's history if it covers the Run, else estimated from the
@@ -624,6 +629,8 @@ class DeviceTracker:
         """Flag missing usage or Material; without a Material used input (or a
         measurement, as on a manual Run), add a Material Line Item to fill in
         unless the user already added one."""
+        if Capability.MATERIAL not in self._config.capabilities:
+            return
         items = [i for i in run.line_items if i.measured]
         if not (measuring and self._config.material) and not any(
             i.kind is LineItemKind.MATERIAL for i in run.line_items

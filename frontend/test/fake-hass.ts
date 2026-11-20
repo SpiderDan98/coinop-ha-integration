@@ -23,6 +23,7 @@ import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
@@ -41,6 +42,7 @@ import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
+import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
 import spoolmanFilamentsUnavailable from "./fixtures/backend/spoolman-filaments-unavailable.json";
 import spoolmanFilaments from "./fixtures/backend/spoolman-filaments.json";
@@ -107,6 +109,10 @@ export const recorded = {
    * Material used input in mm, default Material "pla-black"); "device-mini" (Runs only)
    * was removed. */
   devices: devicesList.devices as Device[],
+  /** `coinop/devices/list` with only "device-washer", a washing machine on an energy meter. */
+  washer: devicesListWashingMachine.devices[0] as Device,
+  /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
+  wash: runsGetWashingMachine.run as RunDetail,
   /**
    * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard

@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+from .const import DEVICE_TYPE_3D_PRINTER
 from .device_config import Target
 
 # Finds the entity of a platform whose unique id ends in one of the suffixes, in order.
@@ -108,15 +109,22 @@ def _anycubic_cloud(find: Find) -> dict[str, Any]:
     }
 
 
-PROFILES = {"anycubic": _anycubic, "anycubic_cloud": _anycubic_cloud}
+# By Device Type, then integration domain.
+PROFILES = {
+    DEVICE_TYPE_3D_PRINTER: {"anycubic": _anycubic, "anycubic_cloud": _anycubic_cloud}
+}
 
 
-def detect(hass: HomeAssistant, device_id: str | None) -> dict[str, Any] | None:
-    """The Device Input sections the printer's HA device's profile fills in.
+def detect(
+    hass: HomeAssistant, device_type: str, device_id: str | None
+) -> dict[str, Any] | None:
+    """The Device Input sections the HA device's profile fills in.
 
-    None if the device belongs to no known integration. Inputs the profile can't find
-    are left out of their section, and the mapping with the Status.
+    None if the device belongs to no integration known for the Device Type. Inputs
+    the profile can't find are left out of their section, and the mapping with the
+    Status.
     """
+    profiles = PROFILES.get(device_type, {})
     devices = dr.async_get(hass)
     printer = devices.async_get(device_id) if device_id else None
     if printer is None:
@@ -126,7 +134,7 @@ def detect(hass: HomeAssistant, device_id: str | None) -> dict[str, Any] | None:
             config_entry
             for entry_id in printer.config_entries
             if (config_entry := hass.config_entries.async_get_entry(entry_id))
-            and config_entry.domain in PROFILES
+            and config_entry.domain in profiles
         ),
         None,
     )
@@ -158,4 +166,4 @@ def detect(hass: HomeAssistant, device_id: str | None) -> dict[str, Any] | None:
             None,
         )
 
-    return PROFILES[domain](find)
+    return profiles[domain](find)

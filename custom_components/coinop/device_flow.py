@@ -1,4 +1,4 @@
-"""Add Device and reconfigure: the subentry flow that maps a printer's Device Inputs."""
+"""Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -19,11 +19,18 @@ from homeassistant.helpers.selector import (
     NumberSelectorMode,
     SelectSelector,
     SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
 )
 
-from .const import DEVICE_TYPE_3D_PRINTER, SUBENTRY_DEVICE
-from .device_config import ENDING_TARGETS, ConsumptionSource, Target
+from .const import SUBENTRY_DEVICE
+from .device_config import (
+    CAPABILITIES,
+    ENDING_TARGETS,
+    Capability,
+    ConsumptionSource,
+    Target,
+)
 from .device_inputs import (
     entity_unit,
     offered_values,
@@ -85,14 +92,23 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         # The profile's sections while Detect again walks them.
         self._detecting: dict[str, Any] = {}
 
+    def _capabilities(self) -> frozenset[Capability]:
+        return CAPABILITIES[self._data["device_type"]]
+
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
-        """Each section's first step, in Add Device order."""
-        return {
+        """Each section's first step, in Add Device order, as the Device Type has them."""
+        sections = {
             "status": self.async_step_status,
             "job": self.async_step_job,
             "images": self.async_step_images,
             "consumption": self.async_step_consumption,
             "price": self.async_step_price,
+        }
+        needs = {"job": Capability.JOB, "images": Capability.IMAGES}
+        return {
+            name: step
+            for name, step in sections.items()
+            if name not in needs or needs[name] in self._capabilities()
         }
 
     async def _section_done(self, section: str) -> SubentryFlowResult:
@@ -120,7 +136,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
 
     def _detected(self) -> dict[str, Any] | None:
-        return detect(self.hass, self._data.get("printer_device_id"))
+        return detect(
+            self.hass, self._data["device_type"], self._data.get("printer_device_id")
+        )
 
     async def async_step_detect(
         self, user_input: dict[str, Any] | None = None
@@ -141,13 +159,32 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        """The Device Type, fixed once the Device is added."""
         if user_input is not None:
-            self._data["device_type"] = DEVICE_TYPE_3D_PRINTER
+            self._data["device_type"] = user_input["device_type"]
+            return await self.async_step_device()
+        schema = vol.Schema(
+            {
+                vol.Required("device_type"): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(CAPABILITIES),
+                        translation_key="device_type",
+                        mode=SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="user", data_schema=schema)
+
+    async def async_step_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
             self._data["printer_device_id"] = user_input.get("device")
-            self._data |= detect(self.hass, self._data["printer_device_id"]) or {}
+            self._data |= self._detected() or {}
             return await self.async_step_name()
         return self.async_show_form(
-            step_id="user",
+            step_id="device",
             data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
         )
 
@@ -361,8 +398,11 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_consumption(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        sources = [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
+        if Capability.AVERAGE_POWER in self._capabilities():
+            sources.append(ConsumptionSource.ESTIMATE)
         return self.async_show_menu(
-            step_id="consumption", menu_options=[s.value for s in ConsumptionSource]
+            step_id="consumption", menu_options=[s.value for s in sources]
         )
 
     async def async_step_energy(
@@ -397,7 +437,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 "unit": None,
                 "factor": None,
             }
-            if source is ConsumptionSource.POWER:
+            if self._fills_power_gaps(source):
                 self._meter["running_power"] = user_input.get("running_power")
             if self._meter["attribute"]:
                 return await (
@@ -417,7 +457,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             vol.Required("entity_id"): EntitySelector(),
             vol.Optional("attribute"): TextSelector(),
         }
-        if source is ConsumptionSource.POWER:
+        if self._fills_power_gaps(source):
             schema[vol.Optional("running_power")] = _watts(1)
         if errors:
             schema[vol.Optional("factor")] = FACTOR
@@ -427,6 +467,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 vol.Schema(schema), user_input or self._stored_meter(source)
             ),
             errors=errors,
+        )
+
+    def _fills_power_gaps(self, source: ConsumptionSource) -> bool:
+        return (
+            source is ConsumptionSource.POWER
+            and Capability.AVERAGE_POWER in self._capabilities()
         )
 
     async def _async_unit_step(

@@ -32,7 +32,7 @@ describe("Devices tab", () => {
 
     expect(cards(panel)).toEqual([
       "Kobra " +
-        "Print status sensor.kobra_status " +
+        "Status sensor.kobra_status " +
         "Print job sensor.kobra_job " +
         "Material used sensor.kobra_filament_used · mm " +
         "Not used Slots, Thumbnail, Camera " +
@@ -82,7 +82,7 @@ describe("Devices tab", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Print status event.kobra_print · event_type " +
+      "Status event.kobra_print · event_type " +
         "Not used Print job, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
@@ -305,11 +305,36 @@ describe("Devices tab", () => {
     expect(text(panel)).toContain("Coin-op could not load its Devices.");
   });
 
+  it("shows a washing machine without the printer-only parts", async () => {
+    const [kobra] = recorded.devices;
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [kobra, recorded.washer] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(queryAll(panel, ".device-type h2").map(text)).toEqual([
+      "3D printers",
+      "Washing machines",
+    ]);
+    expect(cards(panel)[1]).toBe(
+      "Washer " +
+        "Status sensor.washer_status " +
+        "Consumption source Energy meter sensor.washer_plug_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    );
+    await click(panel, iconButton(panel, "Edit settings of Washer"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(queryAll(dialog, ".default-material")).toHaveLength(0);
+    expect(queryAll(dialog, ".new-run-tags, .automatic-templates")).toHaveLength(2);
+  });
+
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/devices" });
 
     expect(text(query(panel, ".device dl"))).toBe(
-      "Druckstatus sensor.kobra_status " +
+      "Status sensor.kobra_status " +
         "Druckauftrag sensor.kobra_job " +
         "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Nicht verwendet Fächer, Vorschaubild, Kamera " +
