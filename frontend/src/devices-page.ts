@@ -1,11 +1,12 @@
 // The Devices tab: a card per Device with its HA-side settings, which only the
 // Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
-import { mdiClose } from "@mdi/js";
+// Devices are added in HA too, on the integration's page.
+import { mdiClose, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
 import { formatter, type Format } from "./format";
-import { followLink, type HomeAssistant } from "./hass";
+import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
 import "./tag-input";
@@ -84,6 +85,10 @@ export class DevicesPage extends LitElement {
     if (this.devices === null) return html`<p class="muted">${t("devices.error")}</p>`;
     if (!this.devices) return html`<p class="muted">${t("devices.loading")}</p>`;
     return html`
+      <ha-button class="new-device fab" @click=${() => navigate(RECONFIGURE)}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+        ${t("devices.add")}
+      </ha-button>
       ${
         this.devices.length
           ? html`<div class="cards">

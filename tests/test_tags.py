@@ -169,6 +169,24 @@ async def test_deleting_a_tag_removes_it_from_every_run(
     assert catalogue(hass_storage) == ["Cosplay"]
 
 
+async def test_a_tag_can_be_created_without_a_run_and_existing_names_are_kept(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await tagged(hass, hass_storage, vase=["Gift"])
+
+    created = await panel.call("wattbill/tags/create", name=" Spare parts ")
+    existing = await panel.call("wattbill/tags/create", name="GIFT")
+    errors = [
+        await panel.error("wattbill/tags/create", name=name)
+        for name in ("x" * 41, "   ")
+    ]
+
+    assert (created, existing) == ({"tag": "Spare parts"}, {"tag": "Gift"})
+    assert [error["code"] for error in errors] == ["invalid_format"] * 2
+    assert catalogue(hass_storage) == ["Gift", "Spare parts"]
+    assert run_tags(hass_storage) == {"vase": ["Gift"]}
+
+
 async def test_a_tag_that_does_not_exist_cannot_be_renamed_or_deleted(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

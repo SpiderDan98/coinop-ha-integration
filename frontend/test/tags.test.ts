@@ -79,6 +79,40 @@ describe("Tags tab", () => {
     expect(queryAll(panel, "tr.tag input")).toHaveLength(0);
   });
 
+  it("creates a Tag from the floating button, but not one that already exists", async () => {
+    const backend = recordedBackend().reply("wattbill/tags/create", (msg) => ({ tag: msg.name }));
+    const panel = await mountPanel(backend, { path: "/tags" });
+
+    await click(panel, query(panel, "ha-button.new-tag.fab"));
+    const input = query(panel, "form.new input");
+    expect(queryAll(panel, "ha-button.new-tag")).toHaveLength(0);
+
+    await fill(panel, input, "gift");
+    expect(text(query(panel, ".exists-hint"))).toBe("“Gift” already exists.");
+    expect(button(panel, "Create").hasAttribute("disabled")).toBe(true);
+
+    await fill(panel, input, " Batch 8 ");
+    expect(queryAll(panel, ".exists-hint")).toHaveLength(0);
+    await click(panel, button(panel, "Create"));
+
+    expect(backend.sent("wattbill/tags/create")).toEqual([
+      { type: "wattbill/tags/create", name: "Batch 8" },
+    ]);
+    expect(queryAll(panel, "form.new")).toHaveLength(0);
+    expect(queryAll(panel, "ha-button.new-tag.fab")).toHaveLength(1);
+  });
+
+  it("closes the new Tag form on Escape without creating one", async () => {
+    const backend = recordedBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+    await click(panel, query(panel, "ha-button.new-tag"));
+
+    await press(panel, query(panel, "form.new input"), "Escape");
+
+    expect(queryAll(panel, "form.new")).toHaveLength(0);
+    expect(backend.sent("wattbill/tags/create")).toEqual([]);
+  });
+
   it("deletes a Tag only once confirmed", async () => {
     const backend = tagsBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
@@ -114,7 +148,7 @@ describe("Tags tab", () => {
 
     const panel = await mountPanel(backend, { path: "/tags" });
 
-    expect(text(panel)).toContain("No Tags yet. Type a name in a Run's Tags to create one.");
+    expect(text(panel)).toContain("No Tags yet. Create one here or type a name in a Run's Tags.");
   });
 
   it("is in German when Home Assistant is", async () => {

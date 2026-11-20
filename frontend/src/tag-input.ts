@@ -155,9 +155,9 @@ export class TagInput extends LitElement {
       /* Looks like the shared text field around its chips and input. */
       .chips {
         gap: 4px;
-        min-height: 40px;
+        min-height: 56px;
         box-sizing: border-box;
-        padding: 4px 8px;
+        padding: 4px 12px;
         border-bottom: 1px solid var(--input-idle-line-color, rgba(0, 0, 0, 0.42));
         border-radius: 4px 4px 0 0;
         background: var(--ha-color-form-background, var(--secondary-background-color, #ededed));

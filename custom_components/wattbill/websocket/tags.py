@@ -1,7 +1,7 @@
-"""The Tags tab: rename (or merge) and delete a Tag on every Run and Device.
+"""The Tags tab: create a Tag, rename (or merge) and delete one on every Run and Device.
 
-Tags are created by naming them on a Run or Device; the catalogue reaches open
-panels through the catalogue subscription (`catalog.py`).
+Naming a Tag on a Run or Device creates it too; the catalogue reaches open panels
+through the catalogue subscription (`catalog.py`).
 """
 
 from typing import Any
@@ -20,6 +20,18 @@ def _found(
     connection: websocket_api.ActiveConnection, msg: dict[str, Any], wattbill: WattBill
 ) -> str | None:
     return found(connection, msg, wattbill.catalog.tag(msg["tag"]), "Tag", "name")
+
+
+@command({vol.Required("type"): "wattbill/tags/create", vol.Required("name"): tag_name})
+async def _create(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    wattbill: WattBill,
+) -> None:
+    """A name another Tag has, ignoring case, is that Tag; returns the resulting Tag."""
+    [tag] = await wattbill.catalog.async_add_tags([msg["name"]])
+    connection.send_result(msg["id"], {"tag": tag})
 
 
 @command(
@@ -59,4 +71,4 @@ async def _delete(
     connection.send_result(msg["id"], {})
 
 
-COMMANDS = (_rename, _delete)
+COMMANDS = (_create, _rename, _delete)
