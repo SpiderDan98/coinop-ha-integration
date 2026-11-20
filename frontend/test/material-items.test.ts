@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
-import { change, click, fill, mountPanel, query, queryAll, text } from "./render";
+import { change, click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
 
 const UPDATE = "wattbill/line_items/update";
 const ADD = "wattbill/line_items/add";
@@ -102,13 +102,19 @@ describe("Default Material", () => {
       settings: { ...kobra.settings, ...(msg.settings as object) },
     }));
     const panel = await mountPanel(backend, { path: "/devices" });
-    const select = query(panel, ".default-material select") as HTMLSelectElement;
-    expect(options(select)).toEqual(["None", "eSun PLA+ black", "Standard Resin grey"]);
     // "pla-black" is not in this catalogue, so no default applies.
+    expect(text(query(panel, ".device .default-material"))).toBe("None");
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
+    const select = query(panel, ".settings-dialog .default-material select") as HTMLSelectElement;
+    expect(options(select)).toEqual(["None", "eSun PLA+ black", "Standard Resin grey"]);
     expect(select.value).toBe("");
 
     await fill(panel, select, "material-1");
-    await fill(panel, query(panel, ".default-material select"), "");
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
+    expect(text(query(panel, ".device .default-material"))).toBe("eSun PLA+ black");
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
+    await fill(panel, query(panel, ".settings-dialog .default-material select"), "");
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
 
     expect(backend.sent(SETTINGS)).toEqual([
       { type: SETTINGS, device_id: "device-kobra", settings: { default_material: "material-1" } },

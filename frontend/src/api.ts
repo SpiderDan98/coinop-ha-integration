@@ -86,6 +86,8 @@ export interface RunDetail extends RunSummary {
 export interface Device {
   id: string;
   name: string;
+  /** The Device Type, which the Devices tab groups by. */
+  type: "3d_printer";
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };

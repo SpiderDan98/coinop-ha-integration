@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
+from custom_components.wattbill.const import DEVICE_TYPE_3D_PRINTER
 from custom_components.wattbill.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
@@ -34,6 +35,7 @@ def _list(
                 {
                     "id": device.device_id,
                     "name": device.name,
+                    "type": DEVICE_TYPE_3D_PRINTER,
                     "ha_settings": dict(device.flow_data),
                     "settings": wattbill.settings.get(device.device_id),
                 }

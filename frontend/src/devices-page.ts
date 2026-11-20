@@ -1,10 +1,11 @@
-// The Devices tab: a card per Device with its HA-side settings, which only the
-// Device's reconfigure flow in HA changes, and WattBill's own settings, saved at once.
-// Devices are added in HA too, on the integration's page.
-import { mdiClose, mdiPlus } from "@mdi/js";
+// The Devices tab: a section per Device Type with a card per Device. A card shows the
+// HA-side settings, which only the Device's reconfigure flow in HA changes, and a summary
+// of WattBill's own settings, edited in a dialog. Devices are added in HA too.
+import { mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
+import "./dialog";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
@@ -16,17 +17,17 @@ export const RECONFIGURE = "/config/integrations/integration/wattbill";
 const entityName = (hass: HomeAssistant, entityId: string) =>
   hass.states[entityId]?.attributes.friendly_name ?? entityId;
 
-/** `title` wraps the entity's name, e.g. "From {entity}". */
+/** One line: the entity's name, its id as tooltip. `title` wraps the name, e.g. "From {entity}". */
 const entity = (
   hass: HomeAssistant,
   entityId: string,
   details: unknown[] = [],
   title = (name: string) => name,
 ) => {
-  const name = entityName(hass, entityId);
-  const below = [name !== entityId && entityId, ...details].filter(Boolean).join(" · ");
-  return html`<div>${title(name)}</div>
-    ${below ? html`<div class="muted small">${below}</div>` : nothing}`;
+  const extra = details.filter(Boolean).join(" · ");
+  return html`<span class="entity" title=${entityId}>${title(entityName(hass, entityId))}</span>${
+      extra ? html` <span class="muted small">· ${extra}</span>` : nothing
+    }`;
 };
 
 const consumptionDetails = (
@@ -38,10 +39,12 @@ const consumptionDetails = (
   const running = (power: number | null) =>
     power !== null && t("consumption.running", { power: format.quantity(power, "W") });
   if (consumption.source !== "estimate")
-    return entity(hass, consumption.entity_id, [
-      consumption.attribute,
-      consumption.source === "power" && running(consumption.running_power),
-    ]);
+    return html`<div>
+      ${entity(hass, consumption.entity_id, [
+        consumption.attribute,
+        consumption.source === "power" && running(consumption.running_power),
+      ])}
+    </div>`;
   const details = [
     running(consumption.running_power),
     consumption.paused_power !== null &&
@@ -49,6 +52,13 @@ const consumptionDetails = (
   ];
   return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
 };
+
+const chips = (names: string[], kind: "tag" | "template", none: string) =>
+  names.length
+    ? names.map(
+        (name) => html`<span class="${kind}-chip"><span class="${kind}-name">${name}</span></span>`,
+      )
+    : html`<span class="muted">${none}</span>`;
 
 @customElement("wattbill-devices-page")
 export class DevicesPage extends LitElement {
@@ -67,48 +77,64 @@ export class DevicesPage extends LitElement {
 
   /** Settings saved since the Devices were loaded, by Device id. */
   @state() private saved = new Map<string, Device["settings"]>();
-  /** The Device whose last change could not be saved. */
-  @state() private failed?: string;
+  /** The Device whose settings the dialog edits, and the settings as edited so far. */
+  @state() private editing?: { device: Device; draft: Device["settings"] };
+  @state() private saving = false;
+  @state() private failed = false;
 
-  private async save(deviceId: string, changes: Partial<Device["settings"]>) {
-    this.failed = undefined;
-    try {
-      const settings = await updateDeviceSettings(this.hass, deviceId, changes);
-      this.saved = new Map(this.saved).set(deviceId, settings);
-    } catch {
-      this.failed = deviceId;
-    }
+  /** As last saved; a default Material no longer in the catalogue counts as none, as in the backend. */
+  private settingsOf({ id, settings }: Device) {
+    const current = this.saved.get(id) ?? settings;
+    const known = this.materials.some((material) => material.id === current.default_material);
+    return { ...current, default_material: known ? current.default_material : null };
+  }
+
+  private materialName(id: string | null) {
+    const material = this.materials.find((candidate) => candidate.id === id);
+    if (!material) return undefined;
+    const t = localize(this.hass);
+    return material.archived
+      ? t("materials.archived_name", { name: material.name })
+      : material.name;
   }
 
   override render() {
     const t = localize(this.hass);
     if (this.devices === null) return html`<p class="muted">${t("devices.error")}</p>`;
     if (!this.devices) return html`<p class="muted">${t("devices.loading")}</p>`;
+    const devices = this.devices;
+    const types = [...new Set(devices.map((device) => device.type))];
     return html`
       <ha-button class="new-device fab" @click=${() => navigate(RECONFIGURE)}>
         <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
         ${t("devices.add")}
       </ha-button>
       ${
-        this.devices.length
-          ? html`<div class="cards">
-              ${this.devices.map((device) => this.renderDevice(device, t))}
-            </div>`
+        devices.length
+          ? types.map(
+              (type) =>
+                html`<section class="device-type" data-type=${type}>
+                  <h2>${t(`device_type.${type}`)}</h2>
+                  <div class="cards">
+                    ${devices
+                      .filter((device) => device.type === type)
+                      .map((device) => this.renderDevice(device, t))}
+                  </div>
+                </section>`,
+            )
           : html`<p class="muted">${t("devices.empty")}</p>`
       }
+      ${this.editing ? this.renderDialog(this.editing.device, this.editing.draft, t) : nothing}
     `;
   }
 
-  private renderDevice({ id, name, ha_settings: ha, settings }: Device, t: Localize) {
+  private renderDevice(device: Device, t: Localize) {
+    const { name, ha_settings: ha } = device;
     const format = formatter(this.hass);
-    const current = this.saved.get(id) ?? settings;
-    // A default Material no longer in the catalogue counts as none, as in the backend.
-    const defaults = this.materials.filter(
-      (material) => !material.archived || material.id === current.default_material,
+    const settings = this.settingsOf(device);
+    const templates = settings.automatic_templates.flatMap((id) =>
+      this.templates.filter((template) => template.id === id).map(({ label }) => label),
     );
-    const defaultMaterial = defaults.some(({ id }) => id === current.default_material)
-      ? current.default_material
-      : null;
     return html`<div class="card device">
       <h3>${name}</h3>
       <dl>
@@ -131,36 +157,35 @@ export class DevicesPage extends LitElement {
           }
         </dd>
       </dl>
-      <p class="muted small">${t("device.ha_settings")}</p>
-      <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
-      <div class="setting default-material">
-        <h4>${t("device.default_material")}</h4>
-        ${
-          defaults.length
-            ? this.renderDefaultMaterial(id, defaults, defaultMaterial, t)
-            : html`<p class="muted small no-materials">
-                ${t("device.no_materials")}
-                <a href="${this.basePath}/materials" @click=${followLink}
-                  >${t("item.to_materials")}</a
-                >
-              </p>`
-        }
-        <p class="muted small">${t("device.default_material_hint")}</p>
+      <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
+        >${t("device.reconfigure")}</a
+      >
+      <div class="settings">
+        <dl>
+          <dt>${t("device.default_material")}</dt>
+          <dd class="default-material">
+            ${
+              this.materialName(settings.default_material) ??
+              html`<span class="muted">${t("device.no_default_material")}</span>`
+            }
+          </dd>
+          <dt>${t("device.tags_for_new_runs")}</dt>
+          <dd class="new-run-tags">
+            ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
+          </dd>
+          <dt>${t("device.automatic_templates")}</dt>
+          <dd class="automatic-templates">${chips(templates, "template", t("device.none"))}</dd>
+        </dl>
+        <ha-icon-button
+          class="edit"
+          .label=${t("device.edit", { device: name })}
+          .path=${mdiPencil}
+          @click=${() => {
+            this.failed = false;
+            this.editing = { device, draft: settings };
+          }}
+        ></ha-icon-button>
       </div>
-      <div class="setting new-run-tags">
-        <h4>${t("device.tags_for_new_runs")}</h4>
-        <wattbill-tag-input
-          .hass=${this.hass}
-          .tags=${current.tags_for_new_runs}
-          .catalog=${this.tags}
-          .label=${t("device.tags_for_new_runs")}
-          @tags-change=${(event: CustomEvent<string[]>) =>
-            this.save(id, { tags_for_new_runs: event.detail })}
-        ></wattbill-tag-input>
-        <p class="muted small">${t("device.tags_hint")}</p>
-      </div>
-      ${this.renderAutomatic(id, current.automatic_templates, t)}
-      ${this.failed === id ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
     </div>`;
   }
 
@@ -224,41 +249,91 @@ export class DevicesPage extends LitElement {
     }`;
   }
 
-  private renderDefaultMaterial(
-    id: string,
-    defaults: Material[],
-    defaultMaterial: string | null,
-    t: Localize,
-  ) {
-    return html`<select
-      aria-label=${t("device.default_material")}
-      @change=${(event: Event) =>
-        this.save(id, {
-          default_material: (event.target as HTMLSelectElement).value || null,
-        })}
+  private renderDialog(device: Device, draft: Device["settings"], t: Localize) {
+    const change = (changes: Partial<Device["settings"]>) =>
+      (this.editing = { device, draft: { ...draft, ...changes } });
+    // The Device's archived default stays pickable; other archived Materials don't.
+    const original = this.settingsOf(device).default_material;
+    const pickable = this.materials.filter(
+      (material) => !material.archived || material.id === original,
+    );
+    return html`<wattbill-dialog
+      class="settings-dialog dialog"
+      .label=${t("device.settings_title", { device: device.name })}
+      .closeLabel=${t("dialog.close")}
+      @cancel=${this.close}
     >
-      <option value="" ?selected=${defaultMaterial === null}>
-        ${t("device.no_default_material")}
-      </option>
-      ${defaults.map(
-        (material) =>
-          html`<option value=${material.id} ?selected=${material.id === defaultMaterial}>
-            ${
-              material.archived
-                ? t("materials.archived_name", { name: material.name })
-                : material.name
-            }
-          </option>`,
-      )}
-    </select>`;
+      <div class="field default-material">
+        <span class="label">${t("device.default_material")}</span>
+        ${
+          pickable.length
+            ? html`<select
+                aria-label=${t("device.default_material")}
+                autofocus
+                @change=${(event: Event) =>
+                  change({ default_material: (event.target as HTMLSelectElement).value || null })}
+              >
+                <option value="" ?selected=${draft.default_material === null}>
+                  ${t("device.no_default_material")}
+                </option>
+                ${pickable.map(
+                  (material) =>
+                    html`<option
+                      value=${material.id}
+                      ?selected=${material.id === draft.default_material}
+                    >
+                      ${this.materialName(material.id)}
+                    </option>`,
+                )}
+              </select>`
+            : html`<p class="no-materials">
+                ${t("device.no_materials")}
+                <a href="${this.basePath}/materials" @click=${followLink}
+                  >${t("item.to_materials")}</a
+                >
+              </p>`
+        }
+        <p class="muted small">${t("device.default_material_hint")}</p>
+      </div>
+      <div class="field new-run-tags">
+        <span class="label">${t("device.tags_for_new_runs")}</span>
+        <wattbill-tag-input
+          .hass=${this.hass}
+          .tags=${draft.tags_for_new_runs}
+          .catalog=${this.tags}
+          .label=${t("device.tags_for_new_runs")}
+          @tags-change=${(event: CustomEvent<string[]>) =>
+            change({ tags_for_new_runs: event.detail })}
+        ></wattbill-tag-input>
+        <p class="muted small">${t("device.tags_hint")}</p>
+      </div>
+      ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
+      <p class="muted small ha-settings">
+        ${t("device.ha_settings")}
+        <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
+      </p>
+      ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+      <div slot="footer" class="row end">
+        <ha-button class="cancel" appearance="plain" @click=${this.close}>
+          ${t("device.cancel")}
+        </ha-button>
+        <ha-button
+          class="save"
+          ?disabled=${this.saving}
+          .loading=${this.saving}
+          @click=${() => this.save(device, draft)}
+        >
+          ${t("device.save")}
+        </ha-button>
+      </div>
+    </wattbill-dialog>`;
   }
 
-  private renderAutomatic(deviceId: string, chosen: string[], t: Localize) {
+  private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
     const picked = chosen.flatMap((id) => this.templates.filter((template) => template.id === id));
-    const save = (ids: string[]) => this.save(deviceId, { automatic_templates: ids });
     const addable = this.templates.filter((template) => !chosen.includes(template.id));
-    return html`<div class="automatic-templates">
-      <h4>${t("device.automatic_templates")}</h4>
+    return html`<div class="field automatic-templates">
+      <span class="label">${t("device.automatic_templates")}</span>
       <div class="row">
         ${picked.map(
           ({ id, label }) =>
@@ -268,7 +343,7 @@ export class DevicesPage extends LitElement {
                 class="remove"
                 .label=${t("device.remove_template", { template: label })}
                 .path=${mdiClose}
-                @click=${() => save(chosen.filter((own) => own !== id))}
+                @click=${() => change(chosen.filter((own) => own !== id))}
               ></ha-icon-button
             ></span>`,
         )}
@@ -278,7 +353,7 @@ export class DevicesPage extends LitElement {
                 aria-label=${t("device.add_template")}
                 @change=${(event: Event) => {
                   const select = event.target as HTMLSelectElement;
-                  if (select.value) void save([...chosen, select.value]);
+                  if (select.value) change([...chosen, select.value]);
                   select.value = "";
                 }}
               >
@@ -293,7 +368,7 @@ export class DevicesPage extends LitElement {
       ${
         this.templates.length
           ? nothing
-          : html`<p class="muted small no-templates">
+          : html`<p class="no-templates">
               ${t("device.no_templates")}
               <a href="${this.basePath}/templates" @click=${followLink}
                 >${t("device.to_templates")}</a
@@ -304,9 +379,42 @@ export class DevicesPage extends LitElement {
     </div>`;
   }
 
+  /** Sends only what changed: re-sending an archived default Material would be refused. */
+  private async save(device: Device, draft: Device["settings"]) {
+    const before = this.settingsOf(device);
+    const changes = Object.fromEntries(
+      Object.entries(draft).filter(
+        ([key, value]) =>
+          JSON.stringify(value) !== JSON.stringify(before[key as keyof typeof before]),
+      ),
+    );
+    if (!Object.keys(changes).length) return this.close();
+    this.saving = true;
+    this.failed = false;
+    try {
+      const settings = await updateDeviceSettings(this.hass, device.id, changes);
+      this.saved = new Map(this.saved).set(device.id, settings);
+      this.close();
+    } catch {
+      this.failed = true;
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  private close() {
+    this.editing = undefined;
+  }
+
   static override styles = [
     shared,
     css`
+      .device-type + .device-type {
+        margin-top: 24px;
+      }
+      .device-type h2 {
+        margin-bottom: 12px;
+      }
       .cards {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -314,6 +422,10 @@ export class DevicesPage extends LitElement {
       }
       :host([narrow]) .cards {
         grid-template-columns: 1fr;
+      }
+      .device {
+        display: flex;
+        flex-direction: column;
       }
       dl {
         display: grid;
@@ -324,31 +436,44 @@ export class DevicesPage extends LitElement {
       dt {
         color: var(--secondary-text-color);
       }
-      .slots ol {
-        margin: 0;
-        padding-left: 20px;
-      }
       dd {
         margin: 0;
         min-width: 0;
         overflow-wrap: anywhere;
       }
-      p {
-        margin: 0 0 8px;
+      .slots ol {
+        display: flex;
+        flex-wrap: wrap;
+        margin: 0;
+        padding: 0;
+        list-style: none;
       }
-      .setting,
-      .automatic-templates {
-        margin-top: 16px;
-        padding-top: 12px;
+      .slots li:not(:last-child)::after {
+        content: ",\\00a0";
+      }
+      .settings {
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+        margin-top: auto;
+        padding-top: 4px;
         border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
       }
-      h4 {
-        margin: 0 0 6px;
-        font-weight: 500;
+      .settings dl {
+        flex: 1;
+        min-width: 0;
       }
-      .setting p,
-      .automatic-templates p {
-        margin: 6px 0 0;
+      .settings dd {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .settings .edit {
+        margin: 4px -8px 0 0;
+      }
+      .reconfigure {
+        align-self: flex-start;
+        margin-bottom: 12px;
       }
       .template-chip {
         display: inline-flex;
@@ -363,8 +488,20 @@ export class DevicesPage extends LitElement {
         --mdc-icon-size: 16px;
         margin-inline-end: -6px;
       }
-      .default-material select {
-        width: 100%;
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .field .label {
+        font-size: 12px;
+        color: var(--secondary-text-color);
+      }
+      .field p {
+        margin: 0;
+      }
+      .ha-settings {
+        margin: 4px 0 0;
       }
       .error {
         color: var(--error-color, #db4437);

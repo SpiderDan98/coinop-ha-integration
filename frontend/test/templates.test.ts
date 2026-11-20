@@ -230,14 +230,15 @@ describe("Automatic templates", () => {
     }));
   const chosen = (panel: Element) => queryAll(panel, ".template-chip .template-name").map(text);
 
-  it("are picked per Device in the Devices tab and saved at once", async () => {
+  it("are picked per Device in its settings dialog and saved with it", async () => {
     const backend = settingsBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const section = query(panel, ".device .automatic-templates");
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
+    const section = query(panel, ".settings-dialog .automatic-templates");
     expect(text(section)).toContain(
       "Added to every Run that starts on this Device. Changes affect future Runs only.",
     );
-    expect(chosen(panel)).toEqual(["Wear Kobra"]);
+    expect(chosen(section)).toEqual(["Wear Kobra"]);
     const picker = query(section, "select") as HTMLSelectElement;
     expect(queryAll(picker, "option").map(text)).toEqual([
       "+ Add template",
@@ -246,15 +247,11 @@ describe("Automatic templates", () => {
     ]);
 
     await fill(panel, picker, "template-inserts");
-    expect(chosen(panel)).toEqual(["Wear Kobra", "Threaded inserts"]);
+    expect(chosen(section)).toEqual(["Wear Kobra", "Threaded inserts"]);
     await click(panel, iconButton(panel, "Remove Wear Kobra"));
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
 
     expect(backend.sent(SETTINGS)).toEqual([
-      {
-        type: SETTINGS,
-        device_id: "device-kobra",
-        settings: { automatic_templates: ["template-wear", "template-inserts"] },
-      },
       {
         type: SETTINGS,
         device_id: "device-kobra",
@@ -269,10 +266,12 @@ describe("Automatic templates", () => {
       throw new WsError("not_found");
     });
     const panel = await mountPanel(backend, { path: "/devices" });
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
 
     await click(panel, iconButton(panel, "Remove Wear Kobra"));
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
 
-    expect(chosen(panel)).toEqual(["Wear Kobra"]);
-    expect(text(query(panel, ".device .error"))).toBe("This change could not be saved.");
+    expect(text(query(panel, ".settings-dialog .error"))).toBe("This change could not be saved.");
+    expect(text(query(panel, ".device .automatic-templates"))).toBe("Wear Kobra");
   });
 });

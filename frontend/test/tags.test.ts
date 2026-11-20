@@ -218,18 +218,21 @@ describe("Tags in the gallery", () => {
 describe("Tags for new Runs", () => {
   const UPDATE = "wattbill/devices/update_settings";
 
-  it("are set per Device and saved at once", async () => {
+  it("are set per Device in its settings dialog and saved with it", async () => {
     const backend = recordedBackend().reply(UPDATE, (msg) => ({
       settings: { ...recorded.devices[0]?.settings, ...(msg.settings as object) },
     }));
     const panel = await mountPanel(backend, { path: "/devices" });
-    const card = query(panel, ".device");
-    expect(text(query(card, ".new-run-tags"))).toBe(
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(text(query(dialog, ".new-run-tags"))).toBe(
       "Tags for new Runs Batch 7 Copied onto every Run that starts on this Device.",
     );
 
-    await fill(panel, query(card, ".tag-input input"), "gif");
-    await click(panel, button(card, "Gift"));
+    await fill(panel, query(dialog, ".tag-input input"), "gif");
+    await click(panel, button(dialog, "Gift"));
+    expect(backend.sent(UPDATE)).toEqual([]);
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
 
     expect(backend.sent(UPDATE)).toEqual([
       {
@@ -238,7 +241,8 @@ describe("Tags for new Runs", () => {
         settings: { tags_for_new_runs: ["Batch 7", "Gift"] },
       },
     ]);
-    expect(chips(card)).toEqual(["Batch 7", "Gift"]);
+    expect(queryAll(panel, ".settings-dialog")).toEqual([]);
+    expect(chips(query(panel, ".device .new-run-tags"))).toEqual(["Batch 7", "Gift"]);
   });
 
   it("say when they could not be saved and keep what was saved", async () => {
@@ -246,11 +250,13 @@ describe("Tags for new Runs", () => {
       throw new WsError("invalid_format");
     });
     const panel = await mountPanel(backend, { path: "/devices" });
+    await click(panel, iconButton(panel, "Edit settings of Kobra"));
 
     await click(panel, iconButton(panel, "Remove Batch 7"));
+    await click(panel, query(panel, ".settings-dialog ha-button.save"));
 
-    expect(chips(panel)).toEqual(["Batch 7"]);
-    expect(text(query(panel, ".device .error"))).toBe("This change could not be saved.");
+    expect(text(query(panel, ".settings-dialog .error"))).toBe("This change could not be saved.");
+    expect(chips(query(panel, ".device .new-run-tags"))).toEqual(["Batch 7"]);
   });
 });
 

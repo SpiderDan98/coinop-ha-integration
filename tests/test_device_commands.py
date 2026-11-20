@@ -42,6 +42,7 @@ async def test_each_device_lists_its_ha_side_settings(
         {
             "id": kobra.subentry_id,
             "name": "Kobra",
+            "type": "3d_printer",
             "ha_settings": {
                 "printer_device_id": None,
                 "status": {"entity_id": STATUS, "attribute": None},
@@ -75,6 +76,7 @@ async def test_each_device_lists_its_ha_side_settings(
         {
             "id": mini.subentry_id,
             "name": "Mini",
+            "type": "3d_printer",
             "ha_settings": result["devices"][1]["ha_settings"],
             "settings": NO_SETTINGS,
         },
