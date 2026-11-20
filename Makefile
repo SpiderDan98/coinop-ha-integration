@@ -3,7 +3,8 @@ SCENARIO ?= few-runs
 
 .PHONY: dev dev-build dev-restart dev-scenario dev-logs dev-down
 
-# Build the panel, (re)start the container and load $(SCENARIO).
+# Build the panel, (re)start the container, load $(SCENARIO) and show the log;
+# Ctrl+C stops Home Assistant and removes the container.
 dev:
 	uv run scripts/devenv.py up $(SCENARIO)
 

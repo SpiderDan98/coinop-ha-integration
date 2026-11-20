@@ -2,7 +2,9 @@
 
 Usage: uv run scripts/devenv.py <command>
 
-  up [scenario]     build the panel, (re)start the container, load a Scenario
+  up [scenario]     build the panel, (re)start the container, load a Scenario and
+                    show Home Assistant's log until Ctrl+C stops it (--detach: keep
+                    it running in the background instead)
   build             build the panel and reload WattBill
   restart           restart Home Assistant, e.g. after a change to the Python code
   scenario <name>   load a Scenario (also in the panel: the flask button at the bottom left)
@@ -14,10 +16,12 @@ config in .dev/ and is reachable on http://localhost:8124 only from this machine
 """
 
 import argparse
+from collections.abc import Callable
 from importlib.metadata import version
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -38,9 +42,9 @@ DEFAULT_SCENARIO = "few-runs"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("up").add_argument(
-        "scenario", nargs="?", default=DEFAULT_SCENARIO
-    )
+    up = commands.add_parser("up")
+    up.add_argument("scenario", nargs="?", default=DEFAULT_SCENARIO)
+    up.add_argument("--detach", action="store_true")
     commands.add_parser("build")
     commands.add_parser("restart")
     commands.add_parser("scenario").add_argument("name")
@@ -51,8 +55,10 @@ def main() -> None:
         case "up":
             build_panel()
             start()
-            load(args.scenario)
-            print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/wattbill")
+            if args.detach:
+                prepare(args.scenario)
+            else:
+                attached(lambda: prepare(args.scenario, quiet=True))
         case "build":
             build_panel()
             reload_wattbill()
@@ -64,7 +70,7 @@ def main() -> None:
         case "logs":
             os.execvp("docker", ["docker", "logs", "-f", "--tail", "100", CONTAINER])
         case "down":
-            run("docker", "rm", "-f", CONTAINER)
+            stop()
 
 
 def run(*command: str, cwd: Path = ROOT) -> None:
@@ -106,8 +112,67 @@ def start() -> None:
         ),
         f"ghcr.io/home-assistant/home-assistant:{version('homeassistant')}",
     )
-    wait_until_up()
+
+
+def prepare(scenario: str, *, quiet: bool = False) -> None:
+    wait_until_up(quiet=quiet)
     onboard()
+    load(scenario)
+    print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/wattbill", flush=True)
+
+
+def attached(setup: Callable[[], None]) -> None:
+    """Show the log while `setup` runs and after; Ctrl+C stops Home Assistant."""
+    since: str | None = None
+    logs = follow_logs(since)
+    try:
+        setup()
+        print("Ctrl+C stops Home Assistant.", flush=True)
+        while True:
+            logs.wait()
+            since = str(time.time())
+            # The log ends at every stop, also for a restart from another terminal.
+            if not comes_back():
+                break
+            logs = follow_logs(since)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        logs.terminate()
+        stop()
+
+
+def follow_logs(since: str | None) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        ["docker", "logs", "-f", *(["--since", since] if since else []), CONTAINER]
+    )
+
+
+def comes_back() -> bool:
+    """Whether the container runs again within half a minute."""
+    for _ in range(30):
+        state = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", CONTAINER],
+            capture_output=True,
+            text=True,
+        )
+        if state.returncode:
+            return False
+        if state.stdout.strip() == "true":
+            return True
+        time.sleep(1)
+    return False
+
+
+def stop() -> None:
+    """Stop Home Assistant gracefully, so WattBill saves what it holds, then remove it."""
+    # A second Ctrl+C must not cut the shutdown short.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    if subprocess.run(["docker", "inspect", CONTAINER], capture_output=True).returncode:
+        return
+    print("Stopping Home Assistant", flush=True)
+    subprocess.run(["docker", "stop", "-t", "60", CONTAINER], capture_output=True)
+    subprocess.run(["docker", "rm", CONTAINER], capture_output=True)
 
 
 def host_time_zone() -> str:
@@ -115,20 +180,24 @@ def host_time_zone() -> str:
     return zone or "UTC"
 
 
-def wait_until_up() -> None:
-    print("Waiting for Home Assistant", end="", flush=True)
+def wait_until_up(*, quiet: bool = False) -> None:
+    def progress(text: str) -> None:
+        if not quiet:
+            print(text, end="", flush=True)
+
+    progress("Waiting for Home Assistant")
     for _ in range(180):
         try:
             urllib.request.urlopen(f"{URL}/api/onboarding", timeout=2)
-            print()
-            return
         except urllib.error.HTTPError:
             # Answering at all means the HTTP server is up.
-            print()
-            return
+            pass
         except OSError:
-            print(".", end="", flush=True)
+            progress(".")
             time.sleep(1)
+            continue
+        progress("\n")
+        return
     sys.exit("\nHome Assistant did not start; see: uv run scripts/devenv.py logs")
 
 
@@ -171,7 +240,7 @@ def wait_for_service(domain: str, access: str) -> None:
 
 
 def load(scenario: str) -> None:
-    print(f"Loading the Scenario {scenario}")
+    print(f"Loading the Scenario {scenario}", flush=True)
     request(
         "POST",
         "/api/services/wattbill_dev/load",
