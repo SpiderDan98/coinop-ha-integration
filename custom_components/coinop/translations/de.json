@@ -24,6 +24,7 @@
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
             "images": "Bilder",
+            "program": "Programm",
             "consumption": "Verbrauchsquelle",
             "price": "Strompreis",
             "detect": "Erneut erkennen",
@@ -121,6 +122,17 @@
           "data_description": {
             "thumbnail": "Die Bild-Entität der Drucker-Integration, die das gedruckte Modell zeigt.",
             "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
+          }
+        },
+        "program": {
+          "title": "Programm",
+          "description": "Wähle optional die Entität, die meldet, welches Programm die Maschine ausführt. Ein Lauf speichert sein Programm und wird danach benannt, bis du ihn umbenennst. Das Programm folgt der Eingabe, solange der Lauf offen ist, sodass eine späte oder korrigierte Erkennung übernommen wird; ein Programmwechsel beendet den Lauf nie.",
+          "data": {
+            "entity_id": "Programm-Entität (optional)",
+            "attribute": "Attribut (optional)"
+          },
+          "data_description": {
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen."
           }
         },
         "consumption": {

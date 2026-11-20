@@ -220,12 +220,13 @@ async def add_washing_machine(
     device: str | None = None,
     status: str = WASHER_STATUS,
     mapping: dict[str, list[str]] = WASHER_MAPPING,
+    program: dict[str, Any] | None = None,
     source: str = "energy",
     meter: dict[str, Any] | None = None,
     price: float | dict[str, Any] = 0.30,
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
-    energy meter."""
+    energy meter and no Program input."""
     result = await walk_to_mapping(
         hass,
         entry,
@@ -235,6 +236,8 @@ async def add_washing_machine(
         device_type="washing_machine",
     )
     result = await configure(hass, result, mapping)
+    assert result["step_id"] == "program", result.get("errors")
+    result = await configure(hass, result, program or {})
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})

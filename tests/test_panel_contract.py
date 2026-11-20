@@ -374,7 +374,13 @@ async def test_record_a_washing_machine_and_its_run(
     )
     hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
     hass.states.async_set(WASHER_STATUS, "off")
-    subentry = await add_washing_machine(hass, await add_hub(hass), price=0.30)
+    hass.states.async_set("sensor.washer_program", "Cotton 60°")
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": "sensor.washer_program"},
+        price=0.30,
+    )
     await panel.call(
         "coinop/devices/update_settings",
         device_id=subentry.subentry_id,

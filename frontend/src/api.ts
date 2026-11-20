@@ -24,6 +24,8 @@ export interface RunSummary {
   device_id: string;
   device_name: string;
   name: string | null;
+  /** The Program it ran; always null for a Device Type without Programs. */
+  program: string | null;
   started: string;
   ended: string | null;
   outcome: Outcome | null;
@@ -93,7 +95,9 @@ export interface Device {
   /** The Device Type, which the Devices tab groups by. */
   type: "3d_printer" | "washing_machine";
   /** What its Device Type has; the panel shows a part only for these. */
-  capabilities: ("job" | "images" | "material" | "part_count" | "average_power" | "doses")[];
+  capabilities: (
+    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses"
+  )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
@@ -221,7 +225,10 @@ export const updateRun = (
   hass: HomeAssistant,
   runId: string,
   changes: Partial<
-    Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
+    Pick<
+      RunDetail,
+      "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "program" | "tags"
+    >
   >,
 ) => runResult(hass, { type: "coinop/runs/update", run_id: runId, ...changes });
 

@@ -16,6 +16,7 @@ class DeviceEntity(Entity):
     def __init__(self, book: RunBook, device: DeviceConfig, key: str) -> None:
         self._book = book
         self._device_id = device.device_id
+        self._capabilities = device.capabilities
         self._attr_unique_id = f"{device.device_id}_{key}"
         self._attr_device_info = device_info(device)
 

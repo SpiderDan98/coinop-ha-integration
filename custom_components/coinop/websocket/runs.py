@@ -27,6 +27,7 @@ from custom_components.coinop.cost.rounding import (
     rounded_sum,
 )
 from custom_components.coinop.cost.running_time import running_time
+from custom_components.coinop.device_config import Capability
 from custom_components.coinop.images import image_info, upload_rules
 from custom_components.coinop.models import LineItem, LineItemKind, Outcome, Run
 from custom_components.coinop.run_book import RunBook, RunChange
@@ -56,6 +57,7 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         "device_id": run.device_id,
         "device_name": run.device_name,
         "name": run.name,
+        "program": run.program,
         "started": run.started.isoformat(),
         "ended": None if run.ended is None else run.ended.isoformat(),
         "outcome": run.outcome,
@@ -207,6 +209,7 @@ _FINAL_FIELDS = ("started", "ended", "outcome")
         vol.Optional("ended"): _moment,
         vol.Optional("outcome"): vol.Coerce(Outcome),
         vol.Optional("part_count"): vol.All(int, vol.Range(min=1)),
+        vol.Optional("program"): vol.Any(None, str),
         vol.Optional("tags"): [tag_name],
     }
 )
@@ -228,6 +231,11 @@ async def _update(
             msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has no Part Count"
         )
         return
+    if "program" in msg and not _has_program(coinop, run):
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has no Program"
+        )
+        return
     started, ended = msg.get("started", run.started), msg.get("ended", run.ended)
     if ended is not None and ended <= started:
         connection.send_error(
@@ -241,6 +249,12 @@ async def _update(
         run.note = _text(msg["note"])
     run.outcome = msg.get("outcome", run.outcome)
     run.part_count = msg.get("part_count", run.part_count)
+    if "program" in msg:
+        program = _text(msg["program"])
+        if run.ended is None:
+            run.follow_program(program)
+        else:
+            run.program = program
     if "tags" in msg:
         run.tags = await coinop.catalog.async_add_tags(msg["tags"])
     await coinop.book.async_correct(run)
@@ -304,6 +318,14 @@ async def _clear_flag(
         run.flags.remove(msg["flag"])
         await coinop.book.async_correct(run)
     _send_run(hass, connection, msg["id"], run)
+
+
+def _has_program(coinop: CoinOp, run: Run) -> bool:
+    """Whether the Run's Device Type has Programs; for a removed Device, whether it had one."""
+    device = next((d for d in coinop.devices if d.device_id == run.device_id), None)
+    if device is None:
+        return run.program is not None
+    return Capability.PROGRAM in device.capabilities
 
 
 def _tracker(coinop: CoinOp, device_id: str) -> DeviceTracker | None:
