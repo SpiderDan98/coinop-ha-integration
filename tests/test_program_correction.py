@@ -368,3 +368,29 @@ async def test_a_stocked_dose_that_measured_nothing_used_stays_without_one(
     assert costs(corrected)[2:] == [
         ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
     ]
+
+
+async def test_a_dose_whose_material_the_user_changed_stays_as_they_left_it(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer)
+    await washed(hass, clock, "Cotton 40°")
+    [run] = stored_runs(hass_storage)
+    liquid = next(i for i in run["line_items"] if i.get("dose_id") == "dose-liquid")
+    changed = await panel.call(
+        "coinop/line_items/update",
+        run_id=run["id"],
+        line_item_id=liquid["id"],
+        material_id="whitener",
+    )
+    before = next(i for i in changed["run"]["line_items"] if i["id"] == liquid["id"])
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    after = next(i for i in corrected["line_items"] if i["id"] == liquid["id"])
+    assert after == before
+    assert (after["material_id"], after["quantity"]) == ("whitener", 60)

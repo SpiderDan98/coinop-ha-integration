@@ -468,7 +468,8 @@ class DeviceTracker:
 
     def _reapply_doses(self, run: Run, row: dict[str, Any], source: DoseSource) -> None:
         """Each Dose's Line Item from defaults as the row doses it now: changed,
-        added or dropped. Overridden, measured and removed Doses' ones stay."""
+        added or dropped. Overridden, measured and removed Doses' ones stay, and
+        so do those the user gave another Material."""
         items = {i.dose_id: i for i in run.line_items if i.dose_id}
         chargeable = {dose["id"]: material for dose, material in self._dose_materials()}
         doses = (
@@ -480,7 +481,11 @@ class DeviceTracker:
         for dose in doses:
             item = items.pop(dose["id"], None)
             amount = row["doses"].get(dose["id"])
-            if item is not None and not (item.from_defaults and item.computed is None):
+            if item is not None and not (
+                item.from_defaults
+                and item.computed is None
+                and item.material_id == dose["material_id"]
+            ):
                 reapplied.append(item)
             elif item is not None:
                 if amount:
