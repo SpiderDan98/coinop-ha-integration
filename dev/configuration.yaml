@@ -23,7 +23,7 @@ logger:
 
 coinop_dev:
 
-# The printers' Status and job inputs; the Scenarios refer to them by these ids.
+# The Devices' inputs; the Scenarios refer to them by these ids.
 input_select:
   prusa_status:
     name: Prusa MK4 status
@@ -31,9 +31,38 @@ input_select:
   bambu_status:
     name: Bambu Lab X1C status
     options: [idle, printing, paused, finished, cancelled, error]
+  washer_status:
+    name: Washing machine status
+    options: ["off", running, paused, finished, cancelled]
+  washer_program:
+    name: Washing machine program
+    options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
 
 input_text:
   prusa_job:
     name: Prusa MK4 job
   bambu_job:
     name: Bambu Lab X1C job
+
+input_number:
+  washer_energy:
+    name: Washing machine energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washer_water:
+    name: Washing machine water
+    min: 0
+    max: 1000000
+    step: 0.1
+    mode: box
+    unit_of_measurement: L
+  detergent_scale:
+    name: Detergent scale
+    min: 0
+    max: 5000
+    step: 1
+    mode: box
+    unit_of_measurement: g
