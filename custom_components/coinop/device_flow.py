@@ -40,7 +40,7 @@ from .device_inputs import (
     usage_scale,
 )
 from .models import LineItemKind
-from .profiles import detect
+from .profiles import METERS, detect
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
 
@@ -169,7 +169,11 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Walk the sections the profile fills, pre-filled with what it finds now."""
-        self._detecting = self._detected() or {}
+        self._detecting = {
+            section: values
+            for section, values in (self._detected() or {}).items()
+            if section not in METERS
+        }
         for section, values in self._detecting.items():
             self._data[section] = (self._data.get(section) or {}) | values
         return await self.async_step_status()
