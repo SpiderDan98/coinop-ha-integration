@@ -1,6 +1,7 @@
 import {
   mdiChartBar,
   mdiDevices,
+  mdiFlaskOutline,
   mdiMenu,
   mdiPackageVariantClosed,
   mdiPlus,
@@ -23,6 +24,7 @@ import {
 import { followLink, type HomeAssistant, type PanelInfo, type PanelRoute } from "./hass";
 import { localize } from "./localize";
 import "./analysis-page";
+import { DEV_INTEGRATION } from "./dev-scenarios-dialog";
 import "./devices-page";
 import "./manual-run-dialog";
 import "./materials-page";
@@ -65,6 +67,7 @@ export class WattbillPanel extends LitElement {
   /** Undefined until loaded, null if loading failed. */
   @state() private devices?: Device[] | null;
   @state() private manualRun = false;
+  @state() private devScenarios = false;
   private unsubscribe?: Promise<() => Promise<void>>[];
   private devicesRequest = 0;
 
@@ -201,6 +204,16 @@ export class WattbillPanel extends LitElement {
         )}
       </main>
       ${
+        this.hass.config.components.includes(DEV_INTEGRATION)
+          ? html`<ha-icon-button
+              class="dev"
+              .label=${t("dev.title")}
+              .path=${mdiFlaskOutline}
+              @click=${() => (this.devScenarios = true)}
+            ></ha-icon-button>`
+          : nothing
+      }
+      ${
         current.name === "overview"
           ? html`<ha-button
               class="manual-run fab"
@@ -221,6 +234,15 @@ export class WattbillPanel extends LitElement {
               .basePath=${this.route.prefix}
               @close=${() => (this.manualRun = false)}
             ></wattbill-manual-run-dialog>`
+          : nothing
+      }
+      ${
+        this.devScenarios
+          ? html`<wattbill-dev-scenarios-dialog
+              .hass=${this.hass}
+              .basePath=${this.route.prefix}
+              @close=${() => (this.devScenarios = false)}
+            ></wattbill-dev-scenarios-dialog>`
           : nothing
       }
     `;
@@ -386,6 +408,20 @@ export class WattbillPanel extends LitElement {
       main {
         padding: 16px 24px 88px;
         max-width: 1400px;
+      }
+      /* The create buttons' counterpart; HA's docked sidebar is --ha-sidebar-width wide. */
+      ha-icon-button.dev {
+        position: fixed;
+        z-index: 3;
+        bottom: calc(16px + var(--safe-area-inset-bottom, 0px));
+        inset-inline-start: calc(16px + var(--ha-sidebar-width, var(--safe-area-inset-left, 0px)));
+        --mdc-icon-button-size: 48px;
+        border-radius: 50%;
+        color: var(--primary-text-color);
+        background: var(--card-background-color, #fff);
+        box-shadow:
+          0 6px 12px -3px rgba(0, 0, 0, 0.4),
+          0 16px 32px -6px rgba(0, 0, 0, 0.55);
       }
       :host([narrow]) main {
         padding: 12px 16px 88px;

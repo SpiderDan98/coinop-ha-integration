@@ -176,7 +176,7 @@ export class FakeBackend {
   constructor({ language = "en", currency = "EUR", timeZone = "UTC" } = {}) {
     this.hass = {
       language,
-      config: { currency, time_zone: timeZone },
+      config: { currency, time_zone: timeZone, components: ["wattbill"] },
       states: {},
       callWS: async <T>(msg: Message) => {
         this.calls.push(msg);

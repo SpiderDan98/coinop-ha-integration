@@ -330,5 +330,11 @@
   "device.to_templates": "Zu den Postenvorlagen",
   "templates.delete_hint": "Löscht „{label}“. Vergangene Läufe behalten ihre Kopien.",
   "templates.delete_automatic": "Wird nicht mehr automatisch hinzugefügt für: {devices}.",
-  "templates.delete_confirm": "Endgültig löschen"
+  "templates.delete_confirm": "Endgültig löschen",
+  "dev.title": "Testdaten",
+  "dev.hint": "Nur im Dev-Container: Ein Szenario zu laden ersetzt alle Daten von WattBill.",
+  "dev.current": "geladen",
+  "dev.load": "Laden",
+  "dev.loading": "Wird geladen…",
+  "dev.failed": "Das Szenario konnte nicht geladen werden; siehe Home-Assistant-Log."
 }

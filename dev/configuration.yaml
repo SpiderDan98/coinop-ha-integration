@@ -1,0 +1,39 @@
+# The dev container's configuration (scripts/devenv.py); not for a real Home Assistant.
+default_config:
+
+homeassistant:
+  name: WattBill dev
+  # The host's time zone, which scripts/devenv.py hands over.
+  time_zone: !env_var TZ UTC
+  currency: EUR
+  unit_system: metric
+  auth_providers:
+    # Logs the browser in without a password; the port is bound to localhost only.
+    - type: trusted_networks
+      trusted_networks:
+        - 0.0.0.0/0
+        - ::/0
+      allow_bypass_login: true
+    - type: homeassistant
+
+logger:
+  default: warning
+  logs:
+    custom_components.wattbill: debug
+
+wattbill_dev:
+
+# The printers' Status and job inputs; the Scenarios refer to them by these ids.
+input_select:
+  prusa_status:
+    name: Prusa MK4 status
+    options: [idle, printing, paused, finished, cancelled, error]
+  bambu_status:
+    name: Bambu Lab X1C status
+    options: [idle, printing, paused, finished, cancelled, error]
+
+input_text:
+  prusa_job:
+    name: Prusa MK4 job
+  bambu_job:
+    name: Bambu Lab X1C job

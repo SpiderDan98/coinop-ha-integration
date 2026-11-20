@@ -330,5 +330,11 @@
   "device.to_templates": "Go to Line Item Templates",
   "templates.delete_hint": "Deletes “{label}”. Past Runs keep their copies.",
   "templates.delete_automatic": "No longer added automatically for: {devices}.",
-  "templates.delete_confirm": "Delete for good"
+  "templates.delete_confirm": "Delete for good",
+  "dev.title": "Test data",
+  "dev.hint": "Dev container only: loading a Scenario replaces everything WattBill holds.",
+  "dev.current": "loaded",
+  "dev.load": "Load",
+  "dev.loading": "Loading…",
+  "dev.failed": "The Scenario could not be loaded; see Home Assistant's log."
 }
