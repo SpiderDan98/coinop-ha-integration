@@ -64,11 +64,11 @@ export const shared = css`
     border-radius: 12px;
     padding: 16px;
   }
-  /* HA's filled text field; :where() lets every page's own field rules win. */
+  /* HA's filled text field (ha-input is 56px); :where() lets every page's own field rules win. */
   :where(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea) {
     box-sizing: border-box;
-    min-height: 40px;
-    padding: 8px 12px;
+    min-height: 56px;
+    padding: 8px 16px;
     font: inherit;
     font-size: 14px;
     color: var(--primary-text-color);

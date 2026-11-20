@@ -697,8 +697,8 @@ export class MaterialsPage extends LitElement {
       }
       .colour-picker {
         flex: none;
-        width: 40px;
-        height: 40px;
+        width: 56px;
+        height: 56px;
         padding: 4px;
         cursor: pointer;
       }

@@ -939,9 +939,6 @@ export class RunPage extends LitElement {
       textarea {
         width: 100%;
       }
-      textarea {
-        min-height: 56px;
-      }
       :disabled {
         opacity: 0.6;
       }
