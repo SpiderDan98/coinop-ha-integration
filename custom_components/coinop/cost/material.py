@@ -9,6 +9,7 @@ import math
 
 from custom_components.coinop.materials import Material, PackUnit
 from custom_components.coinop.models import (
+    DoseSource,
     LineItem,
     LineItemKind,
     MaterialCopy,
@@ -100,6 +101,18 @@ def material_line_item(
         slots=slots or [],
         share=share,
     )
+
+
+def dose_line_item(
+    item_id: str, dose_id: str, material: Material, amount: float
+) -> LineItem:
+    """A Dose's Line Item: `amount` in the Material's pack unit at its current price."""
+    item = material_line_item(
+        item_id, None, material, measured=False, unit=material.price.pack_unit.value
+    )
+    item.quantity, item.amount = amount, _amount(amount, item.unit_price)
+    item.dose_id, item.dose_source = dose_id, DoseSource.DEFAULT_ROW
+    return item
 
 
 def slot_line_items(

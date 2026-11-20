@@ -351,5 +351,20 @@
   "runs.per_part": "Pro Teil",
   "runs.view": "Ansicht",
   "runs.view_gallery": "Galerie",
-  "runs.view_table": "Tabelle"
+  "runs.view_table": "Tabelle",
+  "device.doses": "Dosierungen",
+  "device.not_dosed": "Nicht dosiert",
+  "device.material_gone": "Gelöschtes Material",
+  "device.add_dose": "+ Dosierung hinzufügen",
+  "device.move_dose_up": "{dose} nach oben",
+  "device.move_dose_down": "{dose} nach unten",
+  "device.remove_dose": "{dose} entfernen",
+  "device.doses_hint": "Jede Dosierung, die ein Lauf verwendet, wird zu einem Material-Posten. Änderungen gelten für den laufenden und künftige Läufe.",
+  "device.program_defaults": "Programmvorgaben",
+  "device.program": "Programm",
+  "device.default_row": "Standard",
+  "device.default_amount": "Standardmenge von {dose}",
+  "device.program_defaults_hint": "Mengen pro Lauf in der Einheit des Materials. Ein leeres Feld heißt nicht dosiert.",
+  "flag.ended_early_defaults": "Der Lauf endete vorzeitig, wurde aber mit Vorgaben für einen ganzen Durchgang berechnet: Mengen prüfen",
+  "dose_source.default_row": "Aus der Standardzeile"
 }

@@ -40,11 +40,13 @@ class Capability(StrEnum):
     PART_COUNT = "part_count"
     # Electricity estimated from average powers when nothing measures it.
     AVERAGE_POWER = "average_power"
+    # A Dose list whose Program Defaults become Material Line Items.
+    DOSES = "doses"
 
 
 CAPABILITIES = {
-    DEVICE_TYPE_3D_PRINTER: frozenset(Capability),
-    DEVICE_TYPE_WASHING_MACHINE: frozenset[Capability](),
+    DEVICE_TYPE_3D_PRINTER: frozenset(Capability) - {Capability.DOSES},
+    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.DOSES}),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

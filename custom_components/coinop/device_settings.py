@@ -5,9 +5,11 @@ must pass). Settings of removed Devices are dropped at setup; fields this
 version doesn't know are kept as stored.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from copy import deepcopy
 from typing import Any
+
+from homeassistant.core import CALLBACK_TYPE
 
 from .schema import vol
 from .store import CoinOpStore
@@ -16,12 +18,50 @@ from .tags import retag, tag_name
 TAGS_FOR_NEW_RUNS = "tags_for_new_runs"
 AUTOMATIC_TEMPLATES = "automatic_templates"
 DEFAULT_MATERIAL = "default_material"
+DOSES = "doses"
+PROGRAM_DEFAULTS = "program_defaults"
+
+
+def _unique_ids(doses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len({dose["id"] for dose in doses}) != len(doses):
+        raise vol.Invalid("Dose ids must be unique")
+    return doses
+
+
+# A row's amount per Dose id, in its Material's unit; a missing one is not dosed.
+_ROW = {
+    vol.Required("doses"): {
+        str: vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
+    }
+}
 
 FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
     AUTOMATIC_TEMPLATES: ([], vol.All([str], vol.Unique())),
     DEFAULT_MATERIAL: (None, vol.Any(None, str)),
+    DOSES: (
+        [],
+        vol.All(
+            [
+                {
+                    vol.Required("id"): vol.All(str, vol.Length(min=1)),
+                    vol.Required("material_id"): str,
+                }
+            ],
+            _unique_ids,
+        ),
+    ),
+    PROGRAM_DEFAULTS: ({"default": {"doses": {}}}, {vol.Required("default"): _ROW}),
 }
+
+
+def _drop_removed_doses(settings: dict[str, Any]) -> None:
+    """A removed Dose takes its amounts with it."""
+    if PROGRAM_DEFAULTS not in settings:
+        return
+    ids = {dose["id"] for dose in settings.get(DOSES, [])}
+    row = settings[PROGRAM_DEFAULTS]["default"]
+    row["doses"] = {id_: amount for id_, amount in row["doses"].items() if id_ in ids}
 
 
 class DeviceSettings:
@@ -37,6 +77,7 @@ class DeviceSettings:
             device_id: stored.get(device_id, {}) for device_id in device_ids
         }
         self._removed = stored.keys() - self._devices.keys()
+        self._listeners: list[Callable[[str], None]] = []
 
     def __contains__(self, device_id: str) -> bool:
         return device_id in self._devices
@@ -60,9 +101,18 @@ class DeviceSettings:
         self, device_id: str, changes: Mapping[str, Any]
     ) -> dict[str, Any]:
         """Apply `changes` (raises `vol.Invalid` for an unknown field or value)."""
-        self._devices[device_id] = self._devices[device_id] | self.validate(changes)
+        settings = self._devices[device_id] | self.validate(changes)
+        _drop_removed_doses(settings)
+        self._devices[device_id] = settings
         await self._save()
+        for listener in list(self._listeners):
+            listener(device_id)
         return self.get(device_id)
+
+    def async_listen(self, listener: Callable[[str], None]) -> CALLBACK_TYPE:
+        """Call `listener` with the Device's id after each change of its settings."""
+        self._listeners.append(listener)
+        return lambda: self._listeners.remove(listener)
 
     async def async_retag(self, tag: str, new: str | None) -> None:
         """Replace `tag` by `new` in every Device's Tags for new Runs, or remove it."""

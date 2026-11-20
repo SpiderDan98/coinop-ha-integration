@@ -18,6 +18,8 @@ NO_SETTINGS: dict[str, Any] = {
     "tags_for_new_runs": [],
     "automatic_templates": [],
     "default_material": None,
+    "doses": [],
+    "program_defaults": {"default": {"doses": {}}},
 }
 
 
