@@ -6,6 +6,7 @@
 - `tests/`: backend tests, run inside a real Home Assistant test instance.
 - `frontend/`: the sidebar panel (TypeScript + Lit). It builds into `custom_components/wattbill/frontend/wattbill-panel.js`, which is gitignored and built by CI.
 - `scripts/test_ha.py`: runs the tests against the minimum, stable or beta Home Assistant release.
+- `scripts/devenv.py` and `dev/`: a local Home Assistant with test data (see [Dev container](#dev-container)).
 - `scripts/release.py`: builds the release asset `wattbill.zip` from a version tag (see [Release](#release)).
 - `GLOSSARY.md`: domain terms; use them in code, tests and docs. Decisions go in `docs/adr/`.
 
@@ -38,7 +39,7 @@
 - `src/api.ts`: the websocket commands and the shapes they return. `src/hass.ts`: the part of `hass` the panel uses (`states` only for entities' friendly names on the Devices tab), plus `navigate` / `followLink` for in-app links.
 - `src/overview.ts` (`<wattbill-overview>`): tiles and charts from `wattbill/aggregates/get` (drawn by `src/charts.ts` as inline SVG), the Runs running now, the gallery and the basket of selected final Runs (`selectedRuns()`, by start; its actions sit in the basket's `.actions` row, starting with "Cost Statement…" and ending with "Delete"; the basket sticks to the bottom while the gallery scrolls). It owns the gallery's filter and selection, and the panel keeps it (lit `cache`) while other pages show, so both survive a visit to a Run page. `src/run-gallery.ts`: filters (`Filter`, `NO_FILTER`, `matches`), tiles and checkboxes; it reports `filter-changed` / `selection-changed`.
 - `src/analysis-page.ts` (`<wattbill-analysis-page>`): the Analysis tab's tables of totals by kind, Device, month, Material, Outcome and Tag, each one `wattbill/aggregates/get` grouping, read afresh whenever a Run changes. Material comes from the `["kind", "material"]` grouping, so Electricity and Other Line Items don't count as "No Material"; the Tag table has no total row, since its groups overlap.
-- `src/run-page.ts`, `src/devices-page.ts`, `src/materials-page.ts`: the other views; `src/manual-run-dialog.ts`: the toolbar's "Manual Run" dialog; `src/statement-dialog.ts`: the basket's export dialog, which downloads the PDF with `download(path)` from `src/hass.ts` (built like HA's own `fileDownload`: an absolute link with `download` and `target="_blank"`, which the Android app hands to its download manager and the iOS app downloads or opens in the browser). The overview passes the one filtered Tag (`.tag`) for the default title. The options except title and note are kept in `localStorage` (`wattbill-statement-options`) after each statement made; every access is in `try`, and stored values that no longer fit are dropped. Every dialog is a `<wattbill-dialog>` (`src/dialog.ts`): a native modal `<dialog>` that fires `cancel` on Escape or a click on the backdrop and focuses the content's `[autofocus]` element. `src/run-parts.ts`: pieces several show (`deleteDialog` for the delete confirmation with what the sensor totals drop). `src/run-image.ts`: one Run image, fetched with `hass.fetchWithAuth` (the image views need authentication, which `<img src>` can't send) and shown from a blob URL, or the placeholder. `src/styles.ts`: shared styles on HA's theme variables. Buttons and icon buttons are HA's `ha-button`, `ha-icon-button` and `ha-svg-icon` with `@mdi/js` icons, used like HA's own pages do (cancel `appearance="plain"`, destructive `variant="danger"`, add actions `appearance="filled"` with `mdiPlus`); no other `ha-*` element is available to the panel (ADR 0007).
+- `src/run-page.ts`, `src/devices-page.ts`, `src/materials-page.ts`: the other views; `src/manual-run-dialog.ts`: the toolbar's "Manual Run" dialog; `src/dev-scenarios-dialog.ts`: the dev container's Scenario switcher, behind a round button at the bottom left, shown only when `hass.config.components` has `wattbill_dev`; `src/statement-dialog.ts`: the basket's export dialog, which downloads the PDF with `download(path)` from `src/hass.ts` (built like HA's own `fileDownload`: an absolute link with `download` and `target="_blank"`, which the Android app hands to its download manager and the iOS app downloads or opens in the browser). The overview passes the one filtered Tag (`.tag`) for the default title. The options except title and note are kept in `localStorage` (`wattbill-statement-options`) after each statement made; every access is in `try`, and stored values that no longer fit are dropped. Every dialog is a `<wattbill-dialog>` (`src/dialog.ts`): a native modal `<dialog>` that fires `cancel` on Escape or a click on the backdrop and focuses the content's `[autofocus]` element. `src/run-parts.ts`: pieces several show (`deleteDialog` for the delete confirmation with what the sensor totals drop). `src/run-image.ts`: one Run image, fetched with `hass.fetchWithAuth` (the image views need authentication, which `<img src>` can't send) and shown from a blob URL, or the placeholder. `src/styles.ts`: shared styles on HA's theme variables. Buttons and icon buttons are HA's `ha-button`, `ha-icon-button` and `ha-svg-icon` with `@mdi/js` icons, used like HA's own pages do (cancel `appearance="plain"`, destructive `variant="danger"`, add actions `appearance="filled"` with `mdiPlus`); no other `ha-*` element is available to the panel (ADR 0007).
 - `src/localize.ts` with `src/translations/{en,de}.json` (flat keys): panel strings, chosen by `hass.language`, falling back to English. `src/format.ts`: money, dates and durations.
 
 ## Setup
@@ -60,6 +61,23 @@ npm run build    # or: npm run watch
 ```
 
 Reload the browser after a rebuild; the bundle URL changes with its content when HA restarts or the entry reloads.
+
+## Dev container
+
+A Home Assistant in Docker with WattBill and test data, logged in without a password (trusted networks; the port is bound to localhost only). It runs the HA version of `.venv` and keeps its config in `.dev/` (gitignored).
+
+```sh
+uv run scripts/devenv.py up [scenario]    # build the panel, (re)start, load a Scenario (default: few-runs)
+uv run scripts/devenv.py build            # rebuild the panel and reload WattBill
+uv run scripts/devenv.py restart          # after a change to the Python code
+uv run scripts/devenv.py scenario long-history
+uv run scripts/devenv.py logs | down
+```
+
+Then open http://localhost:8124/wattbill. The round flask button at the panel's bottom left (shown only when the `wattbill_dev` integration is loaded) switches Scenarios too.
+
+- `dev/configuration.yaml`: the container's configuration, with the printers' Status and job helpers (`input_select.<printer>_status`, `input_text.<printer>_job`); set them in HA to drive a live Run.
+- `dev/wattbill_dev/`: the dev-only integration, mounted next to WattBill. Its `load` service removes the hub entry, creates it afresh with the Scenario's Devices as subentries and fills it through WattBill's own websocket commands on an in-process connection (`Api`), so the data takes the same path as a user's. Thumbnails are the only exception: no command adds one, so they go through `ImageLibrary`. A new Scenario is a fill function plus one entry in `SCENARIOS` (and in `services.yaml`). `tests/test_dev_scenarios.py` loads each one, so a changed command breaks the test, not the dev container.
 
 ## Test
 

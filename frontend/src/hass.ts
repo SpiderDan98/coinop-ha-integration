@@ -4,7 +4,7 @@ export type Message = { type: string } & Record<string, unknown>;
 
 export interface HomeAssistant {
   language: string;
-  config: { currency: string; time_zone: string };
+  config: { currency: string; time_zone: string; components: string[] };
   dockedSidebar?: "docked" | "always_hidden" | "auto";
   states: Record<string, { attributes: { friendly_name?: string } } | undefined>;
   callWS<T>(msg: Message): Promise<T>;

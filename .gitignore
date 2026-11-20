@@ -14,3 +14,6 @@ custom_components/wattbill/frontend/
 
 # Release asset, built by scripts/release.py
 dist/
+
+# Dev container (scripts/devenv.py)
+.dev/
