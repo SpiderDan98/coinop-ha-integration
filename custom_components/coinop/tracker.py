@@ -487,8 +487,12 @@ class DeviceTracker:
                     item.recompute(amount)
                     item.dose_source = source
                     reapplied.append(item)
-            # A stock input may have measured nothing used: no Line Item to add.
-            elif amount and dose["id"] in chargeable and "stock" not in dose:
+            # A stock input that measured nothing used gets no Line Item.
+            elif (
+                amount
+                and dose["id"] in chargeable
+                and dose["id"] not in run.measured_doses
+            ):
                 reapplied.append(
                     dose_line_item(
                         ulid_now(), dose["id"], chargeable[dose["id"]], amount, source
@@ -870,11 +874,13 @@ class DeviceTracker:
         self._refresh(run, run.ended)
         self._settle_material(run)
         self._flag_defaults(run)
-        if any(
-            self._stock_used(run, dose, material) is None
-            for dose, material in self._dose_materials()
-            if "stock" in dose
-        ):
+        stocked = [(d, m) for d, m in self._dose_materials() if "stock" in d]
+        run.measured_doses = [
+            dose["id"]
+            for dose, material in stocked
+            if self._stock_used(run, dose, material) is not None
+        ]
+        if len(run.measured_doses) < len(stocked):
             add_flag(run, Flag.STOCK_INPUT_UNAVAILABLE)
         linked = self._spoolman_prices(run)
         if not read and linked:

@@ -3,6 +3,7 @@
 from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -309,4 +310,61 @@ async def test_correcting_a_manual_runs_program_re_applies_its_defaults(
         ("water", "program_default", pytest.approx(55), pytest.approx(0.22)),
         ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
         ("dose-whitener", "program_default", 20, pytest.approx(0.08)),
+    ]
+
+
+async def weigh_whitener(panel: PanelClient, washer: ConfigSubentry) -> None:
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=washer.subentry_id,
+        settings={
+            "doses": [*DOSES[:2], DOSES[2] | {"stock": {"entity_id": SCALE}}],
+            "program_defaults": ROWS,
+        },
+    )
+
+
+async def test_a_stocked_dose_without_a_reading_takes_the_new_programs_amount(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_scale(hass, STATE_UNAVAILABLE)
+    await weigh_whitener(panel, washer)
+    await washed(hass, clock, "Cotton 40°")
+    await clock.advance(minutes=5)
+    [run] = stored_runs(hass_storage)
+    assert run["flags"] == ["stock_input_unavailable"]
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert costs(corrected)[2:] == [
+        ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
+        ("dose-whitener", "program_default", 20, pytest.approx(0.08)),
+    ]
+
+
+async def test_a_stocked_dose_that_measured_nothing_used_stays_without_one(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_scale(hass, 1000)
+    await weigh_whitener(panel, washer)
+    await set_program(hass, "Cotton 40°")
+    await set_washer(hass, "running")
+    await set_scale(hass, 1000)
+    await clock.advance(minutes=90)
+    await set_washer(hass, "finished")
+    await set_scale(hass, 1000)
+    [run] = stored_runs(hass_storage)
+
+    corrected = await correct(panel, run["id"], "White 60°")
+
+    assert costs(corrected)[2:] == [
+        ("dose-liquid", "program_default", 70, pytest.approx(0.42)),
     ]

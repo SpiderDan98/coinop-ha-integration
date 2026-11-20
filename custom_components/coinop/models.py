@@ -527,6 +527,8 @@ class Run:
     the Material used input last reported during the Run: its measured total.
     `loaded_slots` is the timeline of the Slot it printed from, kept until
     finalised; `stocks` what each Dose's stock input reported, by Dose id, too.
+    `measured_doses` are the Doses whose stock input measured the Run (nothing used
+    included), kept from finalisation on for a Program correction.
     `cover_id` is the image the user picked as Cover Image.
     """
 
@@ -557,6 +559,7 @@ class Run:
     usage: Usage | None = None
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
     stocks: dict[str, Stock] = field(default_factory=dict)
+    measured_doses: list[str] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -653,6 +656,11 @@ class Run:
                 if self.stocks
                 else {}
             ),
+            **(
+                {"measured_doses": list(self.measured_doses)}
+                if self.measured_doses
+                else {}
+            ),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
             "cover_id": self.cover_id,
@@ -696,6 +704,7 @@ class Run:
                 id_: Stock.from_dict(stock)
                 for id_, stock in data.get("stocks", {}).items()
             },
+            measured_doses=list(data.get("measured_doses", [])),
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             cover_id=data.get("cover_id"),
