@@ -61,6 +61,45 @@ const consumptionDetails = (
   return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
 };
 
+/** A price section: fixed per `unit`, or the entity it follows. */
+const priceOf = (
+  hass: HomeAssistant,
+  price: Device["ha_settings"]["price"],
+  unit: string,
+  t: Localize,
+  format: Format,
+) =>
+  price.source === "fixed"
+    ? t("price.fixed", { price: format.unitPrice(price.value), unit })
+    : entity(hass, price.entity_id, [price.attribute], (name) =>
+        t("price.entity", { entity: name }),
+      );
+
+/** The water source with its entity, and the water price unless there's no water. */
+const waterOf = (
+  hass: HomeAssistant,
+  { water, water_price }: Device["ha_settings"],
+  t: Localize,
+  format: Format,
+) =>
+  water
+    ? html`<dt>${t("device.water")}</dt>
+        <dd class="water">
+          <div>${t(`water.${water.source}`)}</div>
+          ${
+            "entity_id" in water
+              ? html`<div>${entity(hass, water.entity_id, [water.attribute])}</div>`
+              : nothing
+          }
+        </dd>
+        ${
+          water.source !== "none" && water_price
+            ? html`<dt>${t("device.water_price")}</dt>
+                <dd class="water-price">${priceOf(hass, water_price, "m³", t, format)}</dd>`
+            : nothing
+        }`
+    : nothing;
+
 type Settings = Device["settings"];
 
 /** The unit a Dose of the Material counts in; Spoolman prices by weight. */
@@ -194,15 +233,8 @@ export class DevicesPage extends LitElement {
           ${consumptionDetails(this.hass, ha, t, format)}
         </dd>
         <dt>${t("device.price")}</dt>
-        <dd class="price">
-          ${
-            ha.price.source === "fixed"
-              ? t("price.fixed", { price: format.unitPrice(ha.price.value) })
-              : entity(this.hass, ha.price.entity_id, [ha.price.attribute], (name) =>
-                  t("price.entity", { entity: name }),
-                )
-          }
-        </dd>
+        <dd class="price">${priceOf(this.hass, ha.price, "kWh", t, format)}</dd>
+        ${waterOf(this.hass, ha, t, format)}
       </dl>
       <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
         >${t("device.reconfigure")}</a
@@ -290,8 +322,13 @@ export class DevicesPage extends LitElement {
    * doesn't use in one line. */
   private renderOptionalInputs({ capabilities, ha_settings }: Device, t: Localize) {
     const hass = this.hass;
-    const { job = { entity_id: null, attribute: null }, images } = ha_settings;
+    const { job = { entity_id: null, attribute: null }, images, program } = ha_settings;
     const rows = [
+      [
+        "program",
+        t("device.program"),
+        program?.entity_id && entity(hass, program.entity_id, [program.attribute]),
+      ],
       ["job", t("device.job"), job.entity_id && entity(hass, job.entity_id, [job.attribute])],
       [
         "material-used",
@@ -333,8 +370,9 @@ export class DevicesPage extends LitElement {
           ]),
       ],
     ] as const;
+    const needs = { program: "program", thumbnail: "images", camera: "images" } as const;
     const offered = rows.filter(([name]) =>
-      capabilities.includes(name === "thumbnail" || name === "camera" ? "images" : "job"),
+      capabilities.includes(name in needs ? needs[name as keyof typeof needs] : "job"),
     );
     const unused = offered.filter(([, , shown]) => !shown).map(([, label]) => label);
     return html`${offered.map(([name, label, shown]) =>

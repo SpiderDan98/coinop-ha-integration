@@ -38,6 +38,15 @@ SHARED_TERMS = {
     "consumption.per_program": (
         "config_subentries.device.step.consumption.menu_options.per_program"
     ),
+    "device.program": "config_subentries.device.step.program.title",
+    "device.water": "config_subentries.device.step.reconfigure.menu_options.water",
+    "device.water_price": "config_subentries.device.step.water_price.title",
+    "water.meter": "config_subentries.device.step.water.menu_options.water_meter",
+    "water.flow": "config_subentries.device.step.water.menu_options.water_flow",
+    "water.per_program": (
+        "config_subentries.device.step.water.menu_options.water_per_program"
+    ),
+    "water.none": "config_subentries.device.step.water.menu_options.water_none",
 }
 
 # Terms the panel and the Cost Statement both show: panel key -> statement key.

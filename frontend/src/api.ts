@@ -138,9 +138,15 @@ export interface Device {
           /** Fills gaps in the power reports. */
           running_power: number | null;
         };
+    /** Missing for a Device Type without Program. */
+    program?: { entity_id: string | null; attribute: string | null };
     /** Missing for a Device Type without water. */
-    water?: { source: "meter" | "flow" | "per_program" | "none" };
-    price:
+    water?:
+      | { source: "per_program" | "none" }
+      | { source: "meter" | "flow"; entity_id: string; attribute: string | null };
+    price: NonNullable<Device["ha_settings"]["water_price"]>;
+    /** Per m³; missing without water. */
+    water_price?:
       | { source: "fixed"; value: number }
       | {
           source: "entity";
