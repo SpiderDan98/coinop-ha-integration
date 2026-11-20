@@ -34,7 +34,8 @@ from .materials import pickable
 def _known_programs(
     hass: HomeAssistant, coinop: CoinOp, device: DeviceConfig
 ) -> list[str]:
-    """The Program input's offered values, then other Programs of its Runs A-Z."""
+    """The Program input's offered values, then other Programs of its Runs A-Z;
+    never one the Program input ignores."""
     offered = (
         offered_values(hass, entity_id, device.program_attribute)
         if (entity_id := device.program_entity_id)
@@ -48,7 +49,7 @@ def _known_programs(
         },
         key=str.casefold,
     )
-    return list(dict.fromkeys(p for v in [*offered, *ran] if (p := v.strip())))
+    return list(dict.fromkeys(p for v in [*offered, *ran] if (p := device.program(v))))
 
 
 @command({vol.Required("type"): "coinop/devices/list"})

@@ -131,10 +131,12 @@
           "description": "Optionally pick the entity that reports which program the machine runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
           "data": {
             "entity_id": "Program entity (optional)",
-            "attribute": "Attribute (optional)"
+            "attribute": "Attribute (optional)",
+            "ignored": "Values to ignore (optional)"
           },
           "data_description": {
-            "attribute": "Read this attribute instead of the entity's state."
+            "attribute": "Read this attribute instead of the entity's state.",
+            "ignored": "Values the entity reports while it knows no program, such as a placeholder while it is still detecting. They never become a Run's Program."
           }
         },
         "consumption": {

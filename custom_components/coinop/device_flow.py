@@ -430,15 +430,31 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             entity_id = user_input.get("entity_id")
             attribute = user_input.get("attribute") if entity_id else None
+            ignored = [v for v in user_input.get("ignored", []) if v.strip()]
             self._data["program"] = {
                 "entity_id": entity_id,
                 "attribute": attribute or None,
-            }
+            } | ({"ignored": ignored} if entity_id and ignored else {})
             return await self._section_done("program")
+        stored = self._data.get("program", {})
+        offered = (
+            offered_values(self.hass, entity_id, stored.get("attribute"))
+            if (entity_id := stored.get("entity_id"))
+            else []
+        )
         schema = vol.Schema(
             {
                 vol.Optional("entity_id"): EntitySelector(),
                 vol.Optional("attribute"): TextSelector(),
+                vol.Optional("ignored"): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(
+                            dict.fromkeys(offered + stored.get("ignored", []))
+                        ),
+                        multiple=True,
+                        custom_value=True,
+                    )
+                ),
             }
         )
         return self.async_show_form(

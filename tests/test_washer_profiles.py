@@ -21,6 +21,17 @@ from .test_device_flow import suggested
 from .test_integration_profiles import accepted
 from .test_runs import stored_runs
 from .washers import Washer, add_home_connect, add_miele, add_washdata
+from .websocket import PanelClient
+
+# What WashData's program sensor reports while no program is recognised.
+WASHDATA_PLACEHOLDERS = [
+    "off",
+    "starting",
+    "detecting...",
+    "restored...",
+    "none",
+    "unknown",
+]
 
 ANSWERS = {
     "consumption": {"next_step_id": "energy"},
@@ -89,6 +100,7 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
     assert data["program"] == {
         "entity_id": washer["washer_program"],
         "attribute": None,
+        "ignored": WASHDATA_PLACEHOLDERS,
     }
     # The plug's meter, which the user picked: WashData's own sensors are ignored.
     assert data["consumption"]["entity_id"] == WASHER_ENERGY
@@ -317,3 +329,37 @@ async def test_profiles_only_detect_for_their_device_type(
         )
         assert result["step_id"] == "status"
         assert suggested(result, "entity_id") is None
+
+
+async def test_washdatas_placeholder_programs_never_name_a_run_or_a_row(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], panel: PanelClient
+) -> None:
+    washer = add_washdata(hass)
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    await walk_pre_filled(hass, entry, washer, energy={"entity_id": WASHER_ENERGY})
+
+    async def report(state: str, program: str) -> None:
+        hass.states.async_set(
+            washer["washer_program"], program, {"options": ["Cotton 60", "none"]}
+        )
+        hass.states.async_set(washer["washer_state"], state)
+        await hass.async_block_till_done()
+        await clock.advance(minutes=30)
+
+    await report("starting", "off")
+    await report("running", "detecting...")
+    await report("finished", "detecting...")
+    await report("running", "detecting...")
+    await report("running", "Cotton 60")
+    await report("running", "detecting...")
+    await report("finished", "off")
+    hass.states.async_set(WASHER_ENERGY, "101.2", {"unit_of_measurement": "kWh"})
+    await clock.advance(minutes=10)
+
+    assert [(run.get("program"), run["name"]) for run in stored_runs(hass_storage)] == [
+        (None, None),
+        ("Cotton 60", "Cotton 60"),
+    ]
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert device["known_programs"] == ["Cotton 60"]

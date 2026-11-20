@@ -42,7 +42,7 @@ async def test_the_program_step_follows_the_status_mapping(
     result = await configure(hass, result, WASHER_MAPPING)
 
     assert result["step_id"] == "program"
-    assert fields(result) == ["entity_id", "attribute"]
+    assert fields(result) == ["entity_id", "attribute", "ignored"]
     result = await configure(
         hass, result, {"entity_id": WASHER_PROGRAM, "attribute": "program"}
     )
@@ -132,6 +132,30 @@ async def test_an_unavailable_program_input_keeps_the_last_program(
 
     [run] = stored_runs(hass_storage)
     assert (run["program"], run["name"]) == ("Eco 40-60", "Eco 40-60")
+
+
+async def test_values_the_program_input_ignores_are_like_no_program(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_energy(hass, 100)
+    await set_washer(hass, "off")
+    await set_program(hass, "Standby")
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": WASHER_PROGRAM, "ignored": ["Standby", "Detecting"]},
+    )
+    assert subentry.data["program"]["ignored"] == ["Standby", "Detecting"]
+
+    await set_washer(hass, "running")
+    await set_program(hass, "Wool")
+    await clock.advance(minutes=30)
+    await set_program(hass, "Detecting")
+    await set_washer(hass, "finished")
+    await set_energy(hass, 101)
+
+    [run] = stored_runs(hass_storage)
+    assert (run["program"], run["name"]) == ("Wool", "Wool")
 
 
 async def test_a_renamed_run_keeps_its_name_when_the_program_changes(

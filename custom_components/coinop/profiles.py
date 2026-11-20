@@ -20,6 +20,15 @@ Find = Callable[..., str | None]
 SLOTS = range(1, 5)
 # Sections a profile pre-fills only in Add Device: Detect again leaves them alone.
 METERS = (ELECTRICITY.source_key, WATER.source_key)
+# WashData's program sensor until it recognises a program (its match_rules.py).
+WASHDATA_PLACEHOLDERS = [
+    "off",
+    "starting",
+    "detecting...",
+    "restored...",
+    "none",
+    "unknown",
+]
 
 
 def _found(entity: str | list[str] | None, /, **fields: Any) -> dict[str, Any]:
@@ -132,7 +141,9 @@ def _washdata(find: Find) -> dict[str, Any]:
                 ignored=["off", "idle", "starting", "delay_wait", "unknown"],
             ),
         ),
-        "program": _found(program, entity_id=program, attribute=None),
+        "program": _found(
+            program, entity_id=program, attribute=None, ignored=WASHDATA_PLACEHOLDERS
+        ),
     }
 
 

@@ -439,9 +439,7 @@ class DeviceTracker:
         if (entity_id := self._config.program_entity_id) is None:
             return None
         state = self._hass.states.get(entity_id)
-        return (
-            input_value(state, self._config.program_attribute) or ""
-        ).strip() or None
+        return self._config.program(input_value(state, self._config.program_attribute))
 
     def correct_program(self, run: Run, program: str | None) -> None:
         """The user's Program for the Run, whose defaults follow it even once the

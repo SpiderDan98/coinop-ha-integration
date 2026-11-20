@@ -131,10 +131,12 @@
           "description": "Wähle optional die Entität, die meldet, welches Programm die Maschine ausführt. Ein Lauf speichert sein Programm und wird danach benannt, bis du ihn umbenennst. Das Programm folgt der Eingabe, solange der Lauf offen ist, sodass eine späte oder korrigierte Erkennung übernommen wird; ein Programmwechsel beendet den Lauf nie.",
           "data": {
             "entity_id": "Programm-Entität (optional)",
-            "attribute": "Attribut (optional)"
+            "attribute": "Attribut (optional)",
+            "ignored": "Zu ignorierende Werte (optional)"
           },
           "data_description": {
-            "attribute": "Dieses Attribut statt des Zustands der Entität lesen."
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen.",
+            "ignored": "Werte, die die Entität meldet, solange sie kein Programm kennt, etwa ein Platzhalter während der Erkennung. Sie werden nie zum Programm eines Laufs."
           }
         },
         "consumption": {
