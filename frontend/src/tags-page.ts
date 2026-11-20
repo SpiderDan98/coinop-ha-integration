@@ -1,12 +1,16 @@
-// The Tags tab: each Tag with its Run count and total cost, created, renamed (or merged
-// into another by its name) and deleted here. The catalogue follows by subscription.
+// The Tags tab: each Tag with its Run count and total cost. A Tag is created and renamed
+// (or merged into another by its name) in a dialog, and deleted once confirmed. The
+// catalogue follows by subscription.
 import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createTag, deleteTag, getAggregates, renameTag, type RunSummary } from "./api";
+import { confirmDialog, formDialog } from "./dialog";
+import { field, input } from "./fields";
 import { formatter } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
+import { Pagination, pagerStyles } from "./pagination";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
@@ -18,27 +22,17 @@ export class TagsPage extends LitElement {
   @property({ attribute: false }) runs: RunSummary[] = [];
   @property({ type: Boolean, reflect: true }) narrow = false;
 
-  /** The new Tag's name typed so far while its form is open. */
-  @state() private adding?: string;
-  /** The Tag being renamed and the name typed so far. */
-  @state() private renaming?: { tag: string; name: string };
-  @state() private confirming?: string;
-  @state() private failed = false;
+  /** The dialog's draft: the Tag being renamed, none for a new one, and the name typed so far. */
+  @state() private editing?: { tag?: string; name: string };
+  /** Set while its delete confirmation is open. */
+  @state() private deleting?: string;
+  @state() private saving = false;
+  /** What could not be done: "save" shows in the dialog, "delete" on the page. */
+  @state() private failed?: "save" | "delete";
   /** Each Tag's total cost as the backend sums it; undefined until read. */
   @state() private costs?: Map<string | null | undefined, number>;
   private request = 0;
-  private focusRename = false;
-
-  protected override updated(changed: PropertyValues) {
-    // The form opens at the top, far from the floating button that opened it.
-    if (changed.has("adding") && this.adding !== undefined && changed.get("adding") === undefined)
-      this.renderRoot.querySelector<HTMLInputElement>("form.new input")?.focus();
-    if (!this.focusRename) return;
-    this.focusRename = false;
-    const input = this.renderRoot.querySelector<HTMLInputElement>("input.rename");
-    input?.focus();
-    input?.select();
-  }
+  private readonly pages = new Pagination(this);
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runs")) void this.load();
@@ -55,14 +49,10 @@ export class TagsPage extends LitElement {
     const t = localize(this.hass);
     if (!this.tags) return html`<p class="muted">${t("tags.loading")}</p>`;
     return html`
-      ${
-        this.adding === undefined
-          ? html`<ha-button class="new-tag fab" @click=${() => (this.adding = "")}>
-              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-              ${t("tags.new")}
-            </ha-button>`
-          : this.renderNew(this.adding, t)
-      }
+      <ha-button class="new-tag fab" @click=${() => this.edit()}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+        ${t("tags.new")}
+      </ha-button>
       ${
         this.tags.length
           ? table({
@@ -73,189 +63,123 @@ export class TagsPage extends LitElement {
                 { label: t("sensor.total_cost"), num: true },
                 {},
               ],
-              rows: this.tags.map((tag) => this.renderTag(tag, t)),
+              rows: this.pages.of(this.tags).map((tag) => this.renderTag(tag, t)),
+              pager: this.pages.controls(this.tags.length, t),
             })
           : html`<p class="muted">${t("tags.empty")}</p>`
       }
-      ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+      ${this.failed === "delete" ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+      ${this.editing ? this.renderDialog(this.editing.tag, this.editing.name, t) : nothing}
+      ${this.deleting === undefined ? nothing : this.renderDeleteDialog(this.deleting, t)}
     `;
   }
 
-  private renderNew(name: string, t: Localize) {
-    const typed = name.trim().toLocaleLowerCase();
-    const existing = this.tags?.find((tag) => tag.toLocaleLowerCase() === typed);
-    return html`<form
-      class="card new"
-      @submit=${(event: Event) => {
-        event.preventDefault();
-        void this.create();
-      }}
-    >
-      <div class="row">
-        <input
-          maxlength="40"
-          aria-label=${t("tags.tag")}
-          .value=${name}
-          @input=${(event: Event) => (this.adding = (event.target as HTMLInputElement).value)}
-          @keydown=${(event: KeyboardEvent) => {
-            if (event.key === "Escape") this.adding = undefined;
-          }}
-        />
-        <ha-button type="submit" ?disabled=${!typed || !!existing}>
-          ${t("tags.new_create")}
-        </ha-button>
-        <ha-button appearance="plain" @click=${() => (this.adding = undefined)}>
-          ${t("tags.cancel")}
-        </ha-button>
-      </div>
-      ${
-        existing
-          ? html`<div class="exists-hint muted small">${t("tags.exists", { tag: existing })}</div>`
-          : nothing
-      }
-    </form>`;
+  private runsOf(tag: string) {
+    return this.runs.filter((run) => run.tags.includes(tag)).length;
   }
 
   private renderTag(tag: string, t: Localize) {
-    const format = formatter(this.hass);
-    const runs = this.runs.filter((run) => run.tags.includes(tag));
     const total = this.costs && (this.costs.get(tag) ?? 0);
     return html`<tr class="tag">
-      <td>
-        ${this.renaming?.tag === tag ? this.renderRename(tag, t) : html`<span class="tag-name">${tag}</span>`}
+      <td><span class="tag-name">${tag}</span></td>
+      <td class="num">${this.runsOf(tag)}</td>
+      <td class="num">${total === undefined ? nothing : formatter(this.hass).money(total)}</td>
+      <td class="actions">
+        <ha-icon-button
+          class="rename"
+          .label=${t("tags.rename")}
+          .path=${mdiPencil}
+          @click=${() => this.edit(tag)}
+        ></ha-icon-button>
+        <ha-icon-button
+          class="delete"
+          .label=${t("tags.delete")}
+          .path=${mdiDelete}
+          @click=${() => (this.deleting = tag)}
+        ></ha-icon-button>
       </td>
-      <td class="num">${runs.length}</td>
-      <td class="num">${total === undefined ? nothing : format.money(total)}</td>
-      <td class="actions">${this.renderActions(tag, runs.length, t)}</td>
     </tr>`;
   }
 
-  private renderRename(tag: string, t: Localize) {
-    const name = this.renaming?.name ?? tag;
+  /** `tag` is the Tag being renamed, undefined for a new one. */
+  private renderDialog(tag: string | undefined, name: string, t: Localize) {
     const typed = name.trim().toLocaleLowerCase();
-    const target = this.tags?.find((other) => other !== tag && other.toLocaleLowerCase() === typed);
-    return html`<input
-        class="rename"
-        maxlength="40"
-        aria-label=${t("tags.rename")}
-        .value=${name}
-        @input=${(event: Event) =>
-          (this.renaming = { tag, name: (event.target as HTMLInputElement).value })}
-        @keydown=${(event: KeyboardEvent) => {
-          if (event.key === "Enter") void this.rename();
-          else if (event.key === "Escape") this.renaming = undefined;
-        }}
-      />${
-        target
-          ? html`<div class="merge-hint muted small">${t("tags.merge_hint", { tag: target })}</div>`
-          : nothing
-      }`;
+    const other = this.tags?.find(
+      (existing) => existing !== tag && existing.toLocaleLowerCase() === typed,
+    );
+    const creating = tag === undefined;
+    return formDialog({
+      t,
+      title: creating ? t("tags.new") : t("tags.rename_title", { tag }),
+      name: "tag-dialog",
+      submit: creating ? t("tags.new_create") : undefined,
+      busy: this.saving,
+      disabled: !typed || (creating && !!other),
+      error: this.failed === "save" && t("run.save_failed"),
+      onCancel: () => (this.editing = undefined),
+      onSubmit: () => this.save(tag, name.trim()),
+      content: field(
+        t("tags.tag"),
+        input({
+          name: "name",
+          maxlength: 40,
+          autofocus: true,
+          value: name,
+          onInput: (entered) => (this.editing = { tag, name: entered }),
+        }),
+        { hint: other && t(creating ? "tags.exists" : "tags.merge_hint", { tag: other }) },
+      ),
+    });
   }
 
-  private renderActions(tag: string, runs: number, t: Localize) {
-    if (this.renaming?.tag === tag) {
-      return html`<ha-button
-          class="small"
-          ?disabled=${!this.renaming.name.trim()}
-          @click=${this.rename}
-        >
-          ${t("tags.save")}
-        </ha-button>
-        <ha-button class="small" appearance="plain" @click=${() => (this.renaming = undefined)}>
-          ${t("tags.cancel")}
-        </ha-button>`;
+  private renderDeleteDialog(tag: string, t: Localize) {
+    return confirmDialog({
+      t,
+      title: t("delete.title", { name: tag }),
+      name: "delete-tag-dialog",
+      content: html`<p>${t("tags.delete_hint", { tag, count: this.runsOf(tag) })}</p>`,
+      confirm: t("tags.delete_confirm"),
+      onCancel: () => (this.deleting = undefined),
+      onConfirm: () => this.delete(tag),
+    });
+  }
+
+  private edit(tag?: string) {
+    this.failed = undefined;
+    this.editing = { tag, name: tag ?? "" };
+  }
+
+  private async save(tag: string | undefined, name: string) {
+    if (name === tag) return void (this.editing = undefined);
+    this.saving = true;
+    this.failed = undefined;
+    try {
+      await (tag === undefined ? createTag(this.hass, name) : renameTag(this.hass, tag, name));
+      this.editing = undefined;
+    } catch {
+      this.failed = "save";
+    } finally {
+      this.saving = false;
     }
-    if (this.confirming === tag) {
-      return html`<div class="delete-hint muted small">
-          ${t("tags.delete_hint", { tag, count: runs })}
-        </div>
-        <ha-button class="small" variant="danger" @click=${() => this.delete(tag)}>
-          ${t("tags.delete_confirm")}
-        </ha-button>
-        <ha-button class="small" appearance="plain" @click=${() => (this.confirming = undefined)}>
-          ${t("tags.cancel")}
-        </ha-button>`;
-    }
-    return html`<ha-icon-button
-        class="rename"
-        .label=${t("tags.rename")}
-        .path=${mdiPencil}
-        @click=${() => {
-          this.renaming = { tag, name: tag };
-          this.confirming = undefined;
-          this.focusRename = true;
-        }}
-      ></ha-icon-button>
-      <ha-icon-button
-        class="delete"
-        .label=${t("tags.delete")}
-        .path=${mdiDelete}
-        @click=${() => {
-          this.confirming = tag;
-          this.renaming = undefined;
-        }}
-      ></ha-icon-button>`;
-  }
-
-  private async create() {
-    const name = this.adding?.trim();
-    if (!name || this.tags?.some((tag) => tag.toLocaleLowerCase() === name.toLocaleLowerCase()))
-      return;
-    this.adding = undefined;
-    await this.attempt(createTag(this.hass, name));
-  }
-
-  private async rename() {
-    const renaming = this.renaming;
-    const name = renaming?.name.trim();
-    if (!renaming || !name) return;
-    this.renaming = undefined;
-    await this.attempt(renameTag(this.hass, renaming.tag, name));
   }
 
   private async delete(tag: string) {
-    this.confirming = undefined;
-    await this.attempt(deleteTag(this.hass, tag));
-  }
-
-  private async attempt(request: Promise<unknown>) {
-    this.failed = false;
+    this.deleting = undefined;
+    this.failed = undefined;
     try {
-      await request;
+      await deleteTag(this.hass, tag);
     } catch {
-      this.failed = true;
+      this.failed = "delete";
     }
   }
 
   static override styles = [
     shared,
     tableStyles,
+    pagerStyles,
     css`
       .tags {
         max-width: 900px;
-      }
-      .delete-hint {
-        white-space: normal;
-        margin-bottom: 6px;
-      }
-      input {
-        width: 100%;
-      }
-      form.new {
-        max-width: 900px;
-        margin-bottom: 12px;
-        box-sizing: border-box;
-      }
-      form.new input {
-        flex: 1;
-        width: auto;
-        min-width: 160px;
-      }
-      .exists-hint {
-        margin-top: 6px;
-      }
-      .error {
-        color: var(--error-color, #db4437);
       }
     `,
   ];

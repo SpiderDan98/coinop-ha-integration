@@ -12,8 +12,15 @@ const button = (root: Element, label: string) => {
   return found;
 };
 const press = async (panel: Element, input: HTMLElement, key: string) => {
-  input.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
+  input.dispatchEvent(
+    new KeyboardEvent("keydown", { key, bubbles: true, composed: true, cancelable: true }),
+  );
   await settle(panel);
+};
+
+const editRun = async (panel: Element) => {
+  await click(panel, query(panel, ".facts ha-icon-button.edit"));
+  return query(panel, ".run-dialog");
 };
 
 /** A backend whose `coinop/runs/update` returns the Run with the Tags it was sent. */
@@ -32,10 +39,31 @@ describe("Tags tab", () => {
     if (!found) throw new Error(`no row "${tag}"`);
     return found;
   };
+  const CREATE = "coinop/tags/create";
+  const RENAME = "coinop/tags/rename";
+  const DELETE = "coinop/tags/delete";
   const tagsBackend = () =>
     recordedBackend()
-      .reply("coinop/tags/rename", (msg) => ({ tag: msg.name }))
-      .reply("coinop/tags/delete", () => ({}));
+      .reply(CREATE, (msg) => ({ tag: msg.name }))
+      .reply(RENAME, (msg) => ({ tag: msg.name }))
+      .reply(DELETE, () => ({}));
+  const failingBackend = () => {
+    const refuse = () => {
+      throw new WsError("invalid_format");
+    };
+    return recordedBackend().reply(CREATE, refuse).reply(RENAME, refuse).reply(DELETE, refuse);
+  };
+  const dialogs = (panel: Element) => queryAll(panel, ".tag-dialog");
+  const name = (panel: Element) => query(panel, ".tag-dialog [name=name]") as HTMLInputElement;
+  const save = (panel: Element) => query(panel, ".tag-dialog ha-button.save");
+  const hints = (panel: Element) => queryAll(panel, ".tag-dialog .hint").map(text);
+  const openNew = (panel: Element) => click(panel, query(panel, "ha-button.new-tag.fab"));
+  const openRename = (panel: Element, tag: string) =>
+    click(panel, button(row(panel, tag), "Rename"));
+  const escape = async (panel: Element) => {
+    query(panel, "coinop-dialog dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
+    await settle(panel);
+  };
 
   it("opens from the toolbar between Line Item Templates and Devices", async () => {
     const panel = await mountPanel(recordedBackend());
@@ -56,82 +84,184 @@ describe("Tags tab", () => {
     expect(text(query(panel, ".page-title"))).toBe("Tags");
   });
 
-  it("lists each Tag with its Run count and total cost", async () => {
+  it("lists each Tag with its Run count and total cost, read-only", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/tags" });
 
     expect(rows(panel)).toEqual(["Cosplay helmet 1 €0.30", "Gift 2 €1.16", "Spare parts 0 €0.00"]);
+    expect(queryAll(panel, ".tags input")).toEqual([]);
   });
 
-  it("renames a Tag, saying when the new name merges it into another", async () => {
+  it("renames a Tag in a dialog, saying when the new name merges it into another", async () => {
     const backend = tagsBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
-    await click(panel, button(row(panel, "Gift"), "Rename"));
-    const input = query(panel, "tr.tag input");
 
-    await fill(panel, input, "cosplay HELMET");
-    expect(text(query(panel, ".merge-hint"))).toBe(
+    await openRename(panel, "Gift");
+    expect(text(query(panel, ".tag-dialog"))).toContain("Rename “Gift”");
+    expect(name(panel).value).toBe("Gift");
+    expect(name(panel).getAttribute("maxlength")).toBe("40");
+    expect(queryAll(panel, ".tags input")).toEqual([]);
+
+    await fill(panel, name(panel), "cosplay HELMET");
+    expect(hints(panel)).toEqual([
       "Merges into “Cosplay helmet”: every Run and Device keeps it once.",
-    );
-    await fill(panel, input, " Present ");
-    expect(queryAll(panel, ".merge-hint")).toHaveLength(0);
-    await click(panel, button(panel, "Save"));
-
-    expect(backend.sent("coinop/tags/rename")).toEqual([
-      { type: "coinop/tags/rename", tag: "Gift", name: "Present" },
     ]);
-    expect(queryAll(panel, "tr.tag input")).toHaveLength(0);
+    await fill(panel, name(panel), " Present ");
+    expect(hints(panel)).toEqual([]);
+    expect(backend.sent(RENAME)).toEqual([]);
+    await click(panel, save(panel));
+
+    expect(backend.sent(RENAME)).toEqual([{ type: RENAME, tag: "Gift", name: "Present" }]);
+    expect(dialogs(panel)).toEqual([]);
+  });
+
+  it("merges a Tag into the one whose name it is renamed to", async () => {
+    const backend = tagsBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+    await openRename(panel, "Gift");
+
+    await fill(panel, name(panel), "Spare parts");
+    await click(panel, save(panel));
+
+    expect(backend.sent(RENAME)).toEqual([{ type: RENAME, tag: "Gift", name: "Spare parts" }]);
+  });
+
+  it("does not rename a Tag to a blank name", async () => {
+    const backend = tagsBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+    await openRename(panel, "Gift");
+
+    await fill(panel, name(panel), "  ");
+    expect(save(panel).hasAttribute("disabled")).toBe(true);
+    await click(panel, save(panel));
+    await press(panel, name(panel), "Enter");
+
+    expect(backend.sent(RENAME)).toEqual([]);
+    expect(dialogs(panel)).toHaveLength(1);
   });
 
   it("creates a Tag from the floating button, but not one that already exists", async () => {
-    const backend = recordedBackend().reply("coinop/tags/create", (msg) => ({ tag: msg.name }));
+    const backend = tagsBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
 
-    await click(panel, query(panel, "ha-button.new-tag.fab"));
-    const input = query(panel, "form.new input");
-    expect(queryAll(panel, "ha-button.new-tag")).toHaveLength(0);
+    await openNew(panel);
+    expect(text(query(panel, ".tag-dialog"))).toContain("New Tag");
+    expect(name(panel).value).toBe("");
+    expect(text(save(panel))).toBe("Create");
+    expect(save(panel).hasAttribute("disabled")).toBe(true);
 
-    await fill(panel, input, "gift");
-    expect(text(query(panel, ".exists-hint"))).toBe("“Gift” already exists.");
-    expect(button(panel, "Create").hasAttribute("disabled")).toBe(true);
+    await fill(panel, name(panel), "gift");
+    expect(hints(panel)).toEqual(["“Gift” already exists."]);
+    expect(save(panel).hasAttribute("disabled")).toBe(true);
+    await press(panel, name(panel), "Enter");
+    expect(backend.sent(CREATE)).toEqual([]);
 
-    await fill(panel, input, " Batch 8 ");
-    expect(queryAll(panel, ".exists-hint")).toHaveLength(0);
-    await click(panel, button(panel, "Create"));
+    await fill(panel, name(panel), " Batch 8 ");
+    expect(hints(panel)).toEqual([]);
+    expect(backend.sent(CREATE)).toEqual([]);
+    await click(panel, save(panel));
 
-    expect(backend.sent("coinop/tags/create")).toEqual([
-      { type: "coinop/tags/create", name: "Batch 8" },
-    ]);
-    expect(queryAll(panel, "form.new")).toHaveLength(0);
+    expect(backend.sent(CREATE)).toEqual([{ type: CREATE, name: "Batch 8" }]);
+    expect(dialogs(panel)).toEqual([]);
     expect(queryAll(panel, "ha-button.new-tag.fab")).toHaveLength(1);
   });
 
-  it("closes the new Tag form on Escape without creating one", async () => {
-    const backend = recordedBackend();
+  it("creates a Tag on Enter in the name", async () => {
+    const backend = tagsBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
-    await click(panel, query(panel, "ha-button.new-tag"));
+    await openNew(panel);
 
-    await press(panel, query(panel, "form.new input"), "Escape");
+    await fill(panel, name(panel), "Batch 8");
+    await press(panel, name(panel), "Enter");
 
-    expect(queryAll(panel, "form.new")).toHaveLength(0);
-    expect(backend.sent("coinop/tags/create")).toEqual([]);
+    expect(backend.sent(CREATE)).toEqual([{ type: CREATE, name: "Batch 8" }]);
+    expect(dialogs(panel)).toEqual([]);
   });
 
-  it("deletes a Tag only once confirmed", async () => {
+  it("discards what was typed on Cancel or Escape without sending anything", async () => {
+    const backend = tagsBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+
+    await openNew(panel);
+    await fill(panel, name(panel), "Batch 8");
+    await escape(panel);
+    expect(dialogs(panel)).toEqual([]);
+
+    await openRename(panel, "Gift");
+    await fill(panel, name(panel), "Present");
+    await click(panel, query(panel, ".tag-dialog ha-button.cancel"));
+    expect(dialogs(panel)).toEqual([]);
+
+    expect(backend.calls.filter(({ type }) => type.startsWith("coinop/tags/"))).toEqual([]);
+    expect(rows(panel)).toEqual(["Cosplay helmet 1 €0.30", "Gift 2 €1.16", "Spare parts 0 €0.00"]);
+    await openRename(panel, "Gift");
+    expect(name(panel).value).toBe("Gift");
+    await escape(panel);
+    await openNew(panel);
+    expect(name(panel).value).toBe("");
+  });
+
+  it("keeps the dialog open and says so when a Tag could not be created", async () => {
+    const backend = failingBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+    await openNew(panel);
+    await fill(panel, name(panel), "Batch 8");
+
+    await click(panel, save(panel));
+
+    expect(backend.sent(CREATE)).toHaveLength(1);
+    expect(text(query(panel, ".tag-dialog .error"))).toBe("This change could not be saved.");
+    expect(name(panel).value).toBe("Batch 8");
+    expect(save(panel).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("keeps the dialog open and says so when a Tag could not be renamed", async () => {
+    const backend = failingBackend();
+    const panel = await mountPanel(backend, { path: "/tags" });
+    await openRename(panel, "Gift");
+    await fill(panel, name(panel), "Present");
+
+    await click(panel, save(panel));
+
+    expect(backend.sent(RENAME)).toHaveLength(1);
+    expect(text(query(panel, ".tag-dialog .error"))).toBe("This change could not be saved.");
+    expect(name(panel).value).toBe("Present");
+
+    await escape(panel);
+    await openRename(panel, "Gift");
+    expect(queryAll(panel, ".error")).toEqual([]);
+  });
+
+  it("deletes a Tag only once confirmed in a dialog", async () => {
     const backend = tagsBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
 
     await click(panel, button(row(panel, "Gift"), "Delete"));
-    expect(text(query(panel, ".delete-hint"))).toBe(
+    const dialog = query(panel, ".delete-tag-dialog");
+    expect(text(dialog)).toContain("Delete “Gift”?");
+    expect(text(query(dialog, "p"))).toBe(
       "Removes “Gift” from 2 Runs and from every Device's Tags for new Runs.",
     );
-    await click(panel, button(panel, "Cancel"));
-    expect(backend.sent("coinop/tags/delete")).toEqual([]);
+    await click(panel, query(dialog, "ha-button.cancel"));
+    expect(queryAll(panel, ".delete-tag-dialog")).toEqual([]);
+    expect(backend.sent(DELETE)).toEqual([]);
 
     await click(panel, button(row(panel, "Gift"), "Delete"));
-    await click(panel, button(panel, "Delete for good"));
-    expect(backend.sent("coinop/tags/delete")).toEqual([
-      { type: "coinop/tags/delete", tag: "Gift" },
-    ]);
+    expect(text(query(panel, ".delete-tag-dialog ha-button.confirm"))).toBe("Delete for good");
+    await click(panel, query(panel, ".delete-tag-dialog ha-button.confirm"));
+
+    expect(backend.sent(DELETE)).toEqual([{ type: DELETE, tag: "Gift" }]);
+    expect(queryAll(panel, ".delete-tag-dialog")).toEqual([]);
+    expect(queryAll(panel, ".error")).toEqual([]);
+  });
+
+  it("says when a Tag could not be deleted", async () => {
+    const panel = await mountPanel(failingBackend(), { path: "/tags" });
+    await click(panel, button(row(panel, "Gift"), "Delete"));
+
+    await click(panel, query(panel, ".delete-tag-dialog ha-button.confirm"));
+
+    expect(queryAll(panel, ".delete-tag-dialog")).toEqual([]);
+    expect(text(query(panel, ".error"))).toBe("This change could not be saved.");
   });
 
   it("follows the catalogue as it changes", async () => {
@@ -158,6 +288,9 @@ describe("Tags tab", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/tags" });
 
     expect(rows(panel)[1]).toBe("Gift 2 1,16 €");
+    await click(panel, button(row(panel, "Gift"), "Umbenennen"));
+    expect(text(query(panel, ".tag-dialog"))).toContain("„Gift“ umbenennen");
+    expect(text(save(panel))).toBe("Speichern");
   });
 });
 
@@ -271,29 +404,33 @@ describe("Tags on a Run", () => {
   it("suggests existing Tags while typing and adds the one picked", async () => {
     const backend = taggingBackend();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    const input = query(panel, ".tag-input input");
+    const dialog = await editRun(panel);
+    const input = query(dialog, ".tag-input input");
 
     await fill(panel, input, "s");
 
-    expect(queryAll(panel, ".suggestion").map(text)).toEqual([
+    expect(queryAll(dialog, ".suggestion").map(text)).toEqual([
       "Cosplay helmet",
       "Spare parts",
       "Create “s”",
     ]);
-    await click(panel, button(panel, "Spare parts"));
-    expect(backend.sent("coinop/runs/update").at(-1)).toEqual({
-      type: "coinop/runs/update",
-      run_id: "benchy",
-      tags: ["Gift", "Spare parts"],
-    });
-    expect(chips(panel)).toEqual(["Gift", "Spare parts"]);
+    await click(panel, button(dialog, "Spare parts"));
+    expect(chips(dialog)).toEqual(["Gift", "Spare parts"]);
     expect((input as HTMLInputElement).value).toBe("");
+    expect(backend.sent("coinop/runs/update")).toEqual([]);
+    await click(panel, query(dialog, "ha-button.save"));
+
+    expect(backend.sent("coinop/runs/update")).toEqual([
+      { type: "coinop/runs/update", run_id: "benchy", tags: ["Gift", "Spare parts"] },
+    ]);
+    expect(chips(query(panel, ".facts"))).toEqual(["Gift", "Spare parts"]);
   });
 
   it("creates a Tag by typing its name, reusing an existing one that differs in case", async () => {
     const backend = taggingBackend();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    const input = query(panel, ".tag-input input");
+    const dialog = await editRun(panel);
+    const input = query(dialog, ".tag-input input");
 
     await fill(panel, input, "  Batch 7 ");
     await press(panel, input, "Enter");
@@ -301,9 +438,10 @@ describe("Tags on a Run", () => {
     await press(panel, input, "Enter");
     await fill(panel, input, "gift");
     await press(panel, input, "Enter");
+    expect(backend.sent("coinop/runs/update")).toEqual([]);
+    await click(panel, query(dialog, "ha-button.save"));
 
     expect(backend.sent("coinop/runs/update").map((call) => call.tags)).toEqual([
-      ["Batch 7", "Gift"],
       ["Batch 7", "Gift", "Spare parts"],
     ]);
     expect(input.getAttribute("maxlength")).toBe("40");
@@ -312,8 +450,10 @@ describe("Tags on a Run", () => {
   it("removes a Tag from the Run", async () => {
     const backend = taggingBackend();
     const panel = await mountPanel(backend, { path: "/run/helmet" });
+    const dialog = await editRun(panel);
 
-    await click(panel, iconButton(panel, "Remove Gift"));
+    await click(panel, iconButton(dialog, "Remove Gift"));
+    await click(panel, query(dialog, "ha-button.save"));
 
     expect(backend.sent("coinop/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
     expect(chips(panel)).toEqual(["Cosplay helmet"]);
@@ -321,31 +461,32 @@ describe("Tags on a Run", () => {
 });
 
 describe("The Tag field", () => {
-  it("picks a suggestion with the arrow keys and Enter", async () => {
+  it("picks a suggestion with the arrow keys and Enter, which doesn't save the dialog", async () => {
     const backend = taggingBackend();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    const input = query(panel, ".tag-input input");
+    const dialog = await editRun(panel);
+    const input = query(dialog, ".tag-input input");
 
     await fill(panel, input, "s");
     await press(panel, input, "ArrowDown");
     await press(panel, input, "ArrowDown");
-    expect(text(query(panel, ".suggestion.active"))).toBe("Spare parts");
+    expect(text(query(dialog, ".suggestion.active"))).toBe("Spare parts");
     await press(panel, input, "Enter");
 
-    expect(backend.sent("coinop/runs/update").at(-1)).toMatchObject({
-      tags: ["Gift", "Spare parts"],
-    });
+    expect(chips(dialog)).toEqual(["Gift", "Spare parts"]);
+    expect(backend.sent("coinop/runs/update")).toEqual([]);
   });
 
   it("closes its suggestions when focus leaves it", async () => {
     const panel = await mountPanel(taggingBackend(), { path: "/run/benchy" });
-    const input = query(panel, ".tag-input input");
+    const dialog = await editRun(panel);
+    const input = query(dialog, ".tag-input input");
     await fill(panel, input, "s");
 
     input.dispatchEvent(new FocusEvent("focusout", { bubbles: true, composed: true }));
     await settle(panel);
 
-    expect(queryAll(panel, ".suggestion")).toEqual([]);
+    expect(queryAll(dialog, ".suggestion")).toEqual([]);
   });
 });
 

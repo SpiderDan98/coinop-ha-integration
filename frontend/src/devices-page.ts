@@ -11,7 +11,8 @@ import {
   type LineItemTemplate,
   type Material,
 } from "./api";
-import "./dialog";
+import { formDialog } from "./dialog";
+import { field, input, numberInput, select } from "./fields";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
@@ -222,7 +223,15 @@ export class DevicesPage extends LitElement {
       this.templates.filter((template) => template.id === id).map(({ label }) => label),
     );
     return html`<div class="card device">
-      <h3>${name}</h3>
+      <div class="head">
+        <h3 class="ellipsis">${name}</h3>
+        <ha-icon-button
+          class="edit"
+          .label=${t("device.edit", { device: name })}
+          .path=${mdiPencil}
+          @click=${() => this.edit(device, settings)}
+        ></ha-icon-button>
+      </div>
       <dl>
         <dt>${t("device.status")}</dt>
         <dd>${entity(this.hass, ha.status.entity_id, [ha.status.attribute])}</dd>
@@ -239,45 +248,35 @@ export class DevicesPage extends LitElement {
       <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
         >${t("device.reconfigure")}</a
       >
-      <div class="settings">
-        <dl>
-          ${
-            device.capabilities.includes("material")
-              ? html`<dt>${t("device.default_material")}</dt>
-                  <dd class="default-material">
-                    ${
-                      this.materialName(settings.default_material) ??
-                      html`<span class="muted">${t("device.no_default_material")}</span>`
-                    }
-                  </dd>`
-              : nothing
-          }
-          ${device.capabilities.includes("doses") ? this.renderDoseSummary(settings, t, format) : nothing}
-          ${
-            device.capabilities.includes("doses") && device.capabilities.includes("program")
-              ? html`<dt>${t("device.program_rows")}</dt>
-                  <dd class="program-rows">
-                    ${
-                      Object.keys(settings.program_defaults.programs).join(", ") ||
-                      html`<span class="muted">${t("device.none")}</span>`
-                    }
-                  </dd>`
-              : nothing
-          }
-          <dt>${t("device.tags_for_new_runs")}</dt>
-          <dd class="new-run-tags">
-            ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
-          </dd>
-          <dt>${t("device.automatic_templates")}</dt>
-          <dd class="automatic-templates">${chips(templates, "template", t("device.none"))}</dd>
-        </dl>
-        <ha-icon-button
-          class="edit"
-          .label=${t("device.edit", { device: name })}
-          .path=${mdiPencil}
-          @click=${() => this.edit(device, settings)}
-        ></ha-icon-button>
-      </div>
+      <dl class="settings">
+        ${
+          device.capabilities.includes("material")
+            ? html`<dt>${t("device.default_material")}</dt>
+                <dd class="default-material">
+                  ${
+                    this.materialName(settings.default_material) ??
+                    html`<span class="muted">${t("device.no_default_material")}</span>`
+                  }
+                </dd>`
+            : nothing
+        }
+        ${device.capabilities.includes("doses") ? this.renderDoseSummary(settings, t, format) : nothing}
+        ${
+          device.capabilities.includes("doses") && device.capabilities.includes("program")
+            ? html`<dt>${t("device.program_rows")}</dt>
+                <dd class="program-rows">
+                  ${
+                    Object.keys(settings.program_defaults.programs).join(", ") ||
+                    html`<span class="muted">${t("device.none")}</span>`
+                  }
+                </dd>`
+            : nothing
+        }
+        <dt>${t("device.tags_for_new_runs")}</dt>
+        <dd class="new-run-tags">${chips(settings.tags_for_new_runs, "tag", t("device.none"))}</dd>
+        <dt>${t("device.automatic_templates")}</dt>
+        <dd class="automatic-templates">${chips(templates, "template", t("device.none"))}</dd>
+      </dl>
     </div>`;
   }
 
@@ -293,7 +292,7 @@ export class DevicesPage extends LitElement {
                   const amount = amounts[id];
                   return html`<li>
                     <span class="dose-name">${this.doseName(material_id, t)}</span>
-                    <span class="muted"
+                    <span class="muted amount"
                       >${
                         amount === undefined
                           ? t("device.not_dosed")
@@ -392,50 +391,43 @@ export class DevicesPage extends LitElement {
   private renderDialog(device: Device, draft: Device["settings"], t: Localize) {
     const change = (changes: Partial<Device["settings"]>) =>
       (this.editing = { device, draft: { ...draft, ...changes } });
-    return html`<coinop-dialog
-      class="settings-dialog dialog"
-      .label=${t("device.settings_title", { device: device.name })}
-      .closeLabel=${t("dialog.close")}
-      @cancel=${this.close}
-    >
-      ${
-        device.capabilities.includes("material")
-          ? this.renderDefaultMaterial(device, draft.default_material, change, t)
-          : nothing
-      }
-      <div class="field new-run-tags">
-        <span class="label">${t("device.tags_for_new_runs")}</span>
-        <coinop-tag-input
-          .hass=${this.hass}
-          .tags=${draft.tags_for_new_runs}
-          .catalog=${this.tags}
-          .label=${t("device.tags_for_new_runs")}
-          @tags-change=${(event: CustomEvent<string[]>) =>
-            change({ tags_for_new_runs: event.detail })}
-        ></coinop-tag-input>
-        <p class="muted small">${t("device.tags_hint")}</p>
-      </div>
-      ${device.capabilities.includes("doses") ? this.renderDoses(device, draft, change, t) : nothing}
-      ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
-      <p class="muted small ha-settings">
-        ${t("device.ha_settings")}
-        <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
-      </p>
-      ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
-      <div slot="footer" class="row end">
-        <ha-button class="cancel" appearance="plain" @click=${this.close}>
-          ${t("device.cancel")}
-        </ha-button>
-        <ha-button
-          class="save"
-          ?disabled=${this.saving}
-          .loading=${this.saving}
-          @click=${() => this.save(device, draft)}
-        >
-          ${t("device.save")}
-        </ha-button>
-      </div>
-    </coinop-dialog>`;
+    const dosed = device.capabilities.includes("doses");
+    return formDialog({
+      t,
+      title: t("device.settings_title", { device: device.name }),
+      name: `settings-dialog ${dosed ? "wide" : ""}`,
+      busy: this.saving,
+      error: this.failed && t("run.save_failed"),
+      onCancel: () => this.close(),
+      onSubmit: () => this.save(device, draft),
+      content: html`${
+          device.capabilities.includes("material")
+            ? this.renderDefaultMaterial(device, draft.default_material, change, t)
+            : nothing
+        }
+        ${field(
+          t("device.tags_for_new_runs"),
+          html`<coinop-tag-input
+            .hass=${this.hass}
+            .tags=${draft.tags_for_new_runs}
+            .catalog=${this.tags}
+            .label=${t("device.tags_for_new_runs")}
+            @tags-change=${(event: CustomEvent<string[]>) =>
+              change({ tags_for_new_runs: event.detail })}
+          ></coinop-tag-input>`,
+          { name: "new-run-tags", group: true, hint: t("device.tags_hint") },
+        )}
+        ${dosed ? this.renderDoses(device, draft, change, t) : nothing}
+        ${this.renderAutomatic(
+          draft.automatic_templates,
+          (ids) => change({ automatic_templates: ids }),
+          t,
+        )}
+        <p class="muted small ha-settings">
+          ${t("device.ha_settings")}
+          <a href=${RECONFIGURE} @click=${followLink}>${t("device.reconfigure")}</a>
+        </p>`,
+    });
   }
 
   private renderDefaultMaterial(
@@ -449,37 +441,35 @@ export class DevicesPage extends LitElement {
     const pickable = this.materials.filter(
       (material) => !material.archived || material.id === original,
     );
-    return html`<div class="field default-material">
-      <span class="label">${t("device.default_material")}</span>
-      ${
-        pickable.length
-          ? html`<select
-              aria-label=${t("device.default_material")}
-              autofocus
-              @change=${(event: Event) =>
-                change({ default_material: (event.target as HTMLSelectElement).value || null })}
-            >
-              <option value="" ?selected=${chosen === null}>
-                ${t("device.no_default_material")}
-              </option>
-              ${pickable.map(
-                (material) =>
-                  html`<option value=${material.id} ?selected=${material.id === chosen}>
-                    ${this.materialName(material.id)}
-                  </option>`,
-              )}
-            </select>`
-          : this.noMaterials(t)
-      }
-      <p class="muted small">${t("device.default_material_hint")}</p>
-    </div>`;
+    return field(
+      t("device.default_material"),
+      pickable.length
+        ? select({
+            autofocus: true,
+            value: chosen,
+            options: [
+              ["", t("device.no_default_material")],
+              ...pickable.map(({ id }) => [id, this.materialName(id)] as const),
+            ],
+            onChange: (id) => change({ default_material: id || null }),
+          })
+        : this.noMaterials(t),
+      {
+        name: "default-material",
+        group: !pickable.length,
+        hint: t("device.default_material_hint"),
+      },
+    );
+  }
+
+  private toMaterials(t: Localize) {
+    return html`<a href="${this.basePath}/materials" @click=${followLink}
+      >${t("item.to_materials")}</a
+    >`;
   }
 
   private noMaterials(t: Localize) {
-    return html`<p class="no-materials">
-      ${t("device.no_materials")}
-      <a href="${this.basePath}/materials" @click=${followLink}>${t("item.to_materials")}</a>
-    </p>`;
+    return html`<p class="no-materials">${t("device.no_materials")} ${this.toMaterials(t)}</p>`;
   }
 
   /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
@@ -579,9 +569,8 @@ export class DevicesPage extends LitElement {
       if (!measured) return nothing;
       const value = format.quantity(measured.mean, key === "kwh" ? "kWh" : "L");
       return html`<ha-button
-        class="suggestion"
+        class="suggestion small"
         appearance="plain"
-        size="small"
         title=${t("device.apply_suggestion")}
         @click=${() => setConsumed(program, key, String(measured.mean))}
       >
@@ -596,19 +585,14 @@ export class DevicesPage extends LitElement {
       consumed.map(
         (key) =>
           html`<td class="num">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              aria-label=${
+            ${numberInput({
+              label:
                 program === null
                   ? t(`device.default_${key}`)
-                  : t(`device.program_${key}`, { program })
-              }
-              .value=${String(rowOf(program)?.[key] ?? "")}
-              @change=${(event: Event) =>
-                setConsumed(program, key, (event.target as HTMLInputElement).value)}
-            />
+                  : t(`device.program_${key}`, { program }),
+              value: String(rowOf(program)?.[key] ?? ""),
+              onChange: (value) => setConsumed(program, key, value),
+            })}
             ${suggestion(program, key)}
           </td>`,
       );
@@ -616,15 +600,11 @@ export class DevicesPage extends LitElement {
       doses.map(
         ({ id, material_id }) =>
           html`<td class="num">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              aria-label=${label(this.doseName(material_id, t))}
-              .value=${String(rowOf(program)?.doses[id] ?? "")}
-              @change=${(event: Event) =>
-                setAmount(program, id, (event.target as HTMLInputElement).value)}
-            />
+            ${numberInput({
+              label: label(this.doseName(material_id, t)),
+              value: String(rowOf(program)?.doses[id] ?? ""),
+              onChange: (value) => setAmount(program, id, value),
+            })}
           </td>`,
       );
     const hasPrograms = capabilities.includes("program");
@@ -632,9 +612,9 @@ export class DevicesPage extends LitElement {
       ? [...new Set([...known_programs, ...Object.keys(programs)])]
       : [];
     const addable = this.materials.filter((material) => !material.archived);
-    return html`<div class="field doses">
-        <span class="label">${t("device.doses")}</span>
-        <ol class="dose-list">
+    return html`${field(
+      t("device.doses"),
+      html`<ol class="dose-list">
           ${doses.map((dose, index) => {
             const name = this.doseName(dose.material_id, t);
             const unit = unitOf(this.material(dose.material_id));
@@ -675,88 +655,88 @@ export class DevicesPage extends LitElement {
         </ol>
         ${
           addable.length
-            ? html`<select
-                class="add-dose"
-                aria-label=${t("device.add_dose")}
-                @change=${(event: Event) => {
-                  const select = event.target as HTMLSelectElement;
-                  if (select.value)
-                    setDoses([...doses, { id: newDoseId(), material_id: select.value }]);
-                  select.value = "";
-                }}
-              >
-                <option value="">${t("device.add_dose")}</option>
-                ${addable.map(
-                  (material) => html`<option value=${material.id}>${material.name}</option>`,
-                )}
-              </select>`
-            : this.noMaterials(t)
-        }
-        <p class="muted small">${t("device.doses_hint")}</p>
-      </div>
-      ${
-        doses.length || consumed.length
-          ? html`<div class="field program-defaults">
-              <span class="label">${t("device.program_defaults")}</span>
-              ${table({
-                columns: [
-                  { label: t("device.program") },
-                  ...consumed.map((key) => ({ label: t(`device.${key}_column`), num: true })),
-                  ...doses.map(({ material_id }) => ({
-                    label: `${this.doseName(material_id, t)} (${unitOf(this.material(material_id))})`,
-                    num: true,
-                  })),
+            ? select({
+                label: t("device.add_dose"),
+                options: [
+                  ["", t("device.add_dose")],
+                  ...addable.map(({ id, name }) => [id, name] as const),
                 ],
-                rows: html`<tr>
-                    <td>${t("device.default_row")}</td>
-                    ${consumedCells(null)}
-                    ${amountCells(null, (dose) => t("device.default_amount", { dose }))}
-                  </tr>
-                  ${programNames.map(
-                    (program) =>
-                      html`<tr class="program-row ${programs[program] ? "" : "suggested"}">
-                        <td>
-                          <span class="program-name">${program}</span>
-                          ${
-                            programs[program]
-                              ? html`<ha-icon-button
-                                  class="remove"
-                                  .label=${t("device.remove_program", { program })}
-                                  .path=${mdiClose}
-                                  @click=${() =>
-                                    setPrograms(
-                                      Object.fromEntries(
-                                        Object.entries(programs).filter(([own]) => own !== program),
-                                      ),
-                                    )}
-                                ></ha-icon-button>`
-                              : html`<span class="muted small">${t("device.suggested")}</span>`
-                          }
-                        </td>
-                        ${consumedCells(program)}
-                        ${amountCells(program, (dose) => t("device.program_amount", { dose, program }))}
-                      </tr>`,
-                  )}`,
-              })}
-              ${
-                hasPrograms
-                  ? html`<input
-                      class="add-program"
-                      aria-label=${t("device.add_program")}
-                      placeholder=${t("device.add_program")}
-                      @change=${(event: Event) => {
-                        const input = event.target as HTMLInputElement;
-                        const program = input.value.trim();
-                        input.value = "";
-                        if (program && !programs[program]) setRow(program, { doses: {} });
-                      }}
-                    />`
-                  : nothing
-              }
-              <p class="muted small">${t("device.program_defaults_hint")}</p>
-            </div>`
-          : nothing
-      }`;
+                onChange: (picked, control) => {
+                  if (picked) setDoses([...doses, { id: newDoseId(), material_id: picked }]);
+                  control.value = "";
+                },
+              })
+            : this.noMaterials(t)
+        }`,
+      {
+        name: "doses",
+        group: true,
+        hint: addable.length
+          ? html`${t("device.doses_hint")} ${this.toMaterials(t)}`
+          : t("device.doses_hint"),
+      },
+    )}
+    ${
+      doses.length || consumed.length
+        ? field(
+            t("device.program_defaults"),
+            html`${table({
+              columns: [
+                { label: t("device.program") },
+                ...consumed.map((key) => ({ label: t(`device.${key}_column`), num: true })),
+                ...doses.map(({ material_id }) => ({
+                  label: `${this.doseName(material_id, t)} (${unitOf(this.material(material_id))})`,
+                  num: true,
+                })),
+              ],
+              rows: html`<tr>
+                  <td>${t("device.default_row")}</td>
+                  ${consumedCells(null)}
+                  ${amountCells(null, (dose) => t("device.default_amount", { dose }))}
+                </tr>
+                ${programNames.map(
+                  (program) =>
+                    html`<tr class="program-row ${programs[program] ? "" : "suggested"}">
+                      <td>
+                        <span class="program-name">${program}</span>
+                        ${
+                          programs[program]
+                            ? html`<ha-icon-button
+                                class="remove"
+                                .label=${t("device.remove_program", { program })}
+                                .path=${mdiClose}
+                                @click=${() =>
+                                  setPrograms(
+                                    Object.fromEntries(
+                                      Object.entries(programs).filter(([own]) => own !== program),
+                                    ),
+                                  )}
+                              ></ha-icon-button>`
+                            : html`<span class="muted small">${t("device.suggested")}</span>`
+                        }
+                      </td>
+                      ${consumedCells(program)}
+                      ${amountCells(program, (dose) => t("device.program_amount", { dose, program }))}
+                    </tr>`,
+                )}`,
+            })}
+            ${
+              hasPrograms
+                ? input({
+                    label: t("device.add_program"),
+                    placeholder: t("device.add_program"),
+                    onChange: (value, control) => {
+                      const program = value.trim();
+                      control.value = "";
+                      if (program && !programs[program]) setRow(program, { doses: {} });
+                    },
+                  })
+                : nothing
+            }`,
+            { name: "program-defaults", group: true, hint: t("device.program_defaults_hint") },
+          )
+        : nothing
+    }`;
   }
 
   /** A native select over the mass and volume entities (ADR 0007), an optional attribute and its unit. */
@@ -778,56 +758,42 @@ export class DevicesPage extends LitElement {
     const attributes = Object.entries(states[stock?.entity_id ?? ""]?.attributes ?? {})
       .filter(([name, value]) => name === stock?.attribute || Number.isFinite(value))
       .map(([name]) => name);
-    return html`<div class="stock row">
-      <select
-        aria-label=${t("device.stock_input", { dose })}
-        @change=${(event: Event) => {
-          const entity_id = (event.target as HTMLSelectElement).value;
-          change(entity_id ? { entity_id, attribute: null, unit: null } : undefined);
-        }}
-      >
-        <option value="" ?selected=${!stock}>${t("device.no_stock_input")}</option>
-        ${entities.map(
-          (id) =>
-            html`<option value=${id} ?selected=${id === stock?.entity_id}>
-              ${entityName(this.hass, id)}
-            </option>`,
-        )}
-      </select>
+    return html`<div class="stock field-row">
+      ${select({
+        label: t("device.stock_input", { dose }),
+        value: stock?.entity_id,
+        options: [
+          ["", t("device.no_stock_input")],
+          ...entities.map((id) => [id, entityName(this.hass, id)] as const),
+        ],
+        onChange: (entity_id) =>
+          change(entity_id ? { entity_id, attribute: null, unit: null } : undefined),
+      })}
       ${
         stock
-          ? html`<select
-              aria-label=${t("device.stock_attribute", { dose })}
-              @change=${(event: Event) => {
-                const attribute = (event.target as HTMLSelectElement).value || null;
+          ? select({
+              label: t("device.stock_attribute", { dose }),
+              value: stock.attribute,
+              options: [
+                ["", t("device.stock_state")],
+                ...attributes.map((name) => [name, name] as const),
+              ],
+              onChange: (name) => {
+                const attribute = name || null;
                 const fallback = unit === "ml" ? "mL" : unit;
                 change({ ...stock, attribute, unit: attribute ? (stock.unit ?? fallback) : null });
-              }}
-            >
-              <option value="" ?selected=${!stock.attribute}>${t("device.stock_state")}</option>
-              ${attributes.map(
-                (name) =>
-                  html`<option value=${name} ?selected=${name === stock.attribute}>
-                    ${name}
-                  </option>`,
-              )}
-            </select>`
+              },
+            })
           : nothing
       }
       ${
         stock?.attribute
-          ? html`<select
-              aria-label=${t("device.stock_unit", { dose })}
-              @change=${(event: Event) =>
-                change({ ...stock, unit: (event.target as HTMLSelectElement).value })}
-            >
-              ${ATTRIBUTE_UNITS.map(
-                (option) =>
-                  html`<option value=${option} ?selected=${option === stock.unit}>
-                    ${option}
-                  </option>`,
-              )}
-            </select>`
+          ? select({
+              label: t("device.stock_unit", { dose }),
+              value: stock.unit,
+              options: ATTRIBUTE_UNITS.map((option) => [option, option]),
+              onChange: (option) => change({ ...stock, unit: option }),
+            })
           : nothing
       }
     </div>`;
@@ -836,39 +802,41 @@ export class DevicesPage extends LitElement {
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
     const picked = chosen.flatMap((id) => this.templates.filter((template) => template.id === id));
     const addable = this.templates.filter((template) => !chosen.includes(template.id));
-    return html`<div class="field automatic-templates">
-      <span class="label">${t("device.automatic_templates")}</span>
-      <div class="row">
-        ${picked.map(
-          ({ id, label }) =>
-            html`<span class="template-chip"
-              ><span class="template-name">${label}</span
-              ><ha-icon-button
-                class="remove"
-                .label=${t("device.remove_template", { template: label })}
-                .path=${mdiClose}
-                @click=${() => change(chosen.filter((own) => own !== id))}
-              ></ha-icon-button
-            ></span>`,
-        )}
-        ${
-          addable.length
-            ? html`<select
-                aria-label=${t("device.add_template")}
-                @change=${(event: Event) => {
-                  const select = event.target as HTMLSelectElement;
-                  if (select.value) change([...chosen, select.value]);
-                  select.value = "";
-                }}
-              >
-                <option value="">${t("device.add_template")}</option>
-                ${addable.map(
-                  (template) => html`<option value=${template.id}>${template.label}</option>`,
-                )}
-              </select>`
-            : nothing
-        }
-      </div>
+    return field(
+      t("device.automatic_templates"),
+      html`${
+        picked.length
+          ? html`<div class="row">
+              ${picked.map(
+                ({ id, label }) =>
+                  html`<span class="template-chip"
+                    ><span class="template-name">${label}</span
+                    ><ha-icon-button
+                      class="remove"
+                      .label=${t("device.remove_template", { template: label })}
+                      .path=${mdiClose}
+                      @click=${() => change(chosen.filter((own) => own !== id))}
+                    ></ha-icon-button
+                  ></span>`,
+              )}
+            </div>`
+          : nothing
+      }
+      ${
+        addable.length
+          ? select({
+              label: t("device.add_template"),
+              options: [
+                ["", t("device.add_template")],
+                ...addable.map(({ id, label }) => [id, label] as const),
+              ],
+              onChange: (picked, control) => {
+                if (picked) change([...chosen, picked]);
+                control.value = "";
+              },
+            })
+          : nothing
+      }
       ${
         this.templates.length
           ? nothing
@@ -878,9 +846,9 @@ export class DevicesPage extends LitElement {
                 >${t("device.to_templates")}</a
               >
             </p>`
-      }
-      <p class="muted small">${t("device.templates_hint")}</p>
-    </div>`;
+      }`,
+      { name: "automatic-templates", group: true, hint: t("device.templates_hint") },
+    );
   }
 
   /** Sends only what changed: re-sending an archived default Material would be refused. */
@@ -935,8 +903,8 @@ export class DevicesPage extends LitElement {
       }
       .cards {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 16px;
       }
       :host([narrow]) .cards {
         grid-template-columns: 1fr;
@@ -945,14 +913,31 @@ export class DevicesPage extends LitElement {
         display: flex;
         flex-direction: column;
       }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .head h3 {
+        flex: 1;
+      }
+      .head .edit {
+        margin: -8px -8px -8px 0;
+        --ha-icon-button-size: 40px;
+        --mdc-icon-size: 20px;
+        color: var(--secondary-text-color);
+      }
+      /* One label column for both lists, so their values line up. */
       dl {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
         gap: 6px 12px;
         margin: 12px 0;
       }
       dt {
         color: var(--secondary-text-color);
+        overflow-wrap: break-word;
+        hyphens: auto;
       }
       dd {
         margin: 0;
@@ -970,28 +955,21 @@ export class DevicesPage extends LitElement {
         content: ",\\00a0";
       }
       .settings {
-        display: flex;
-        align-items: flex-start;
-        gap: 4px;
-        margin-top: auto;
-        padding-top: 4px;
+        margin: auto 0 0;
+        padding-top: 12px;
         border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-      }
-      .settings dl {
-        flex: 1;
-        min-width: 0;
       }
       .settings dd {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
       }
-      .settings .edit {
-        margin: 4px -8px 0 0;
-      }
       .reconfigure {
         align-self: flex-start;
         margin-bottom: 12px;
+      }
+      coinop-dialog.wide {
+        --coinop-dialog-width: 800px;
       }
       .settings .doses ul,
       .dose-list {
@@ -1000,22 +978,32 @@ export class DevicesPage extends LitElement {
         list-style: none;
       }
       .settings .doses ul {
+        flex: 1;
         display: flex;
         flex-direction: column;
+        gap: 4px;
+      }
+      .settings .doses .amount {
+        white-space: nowrap;
       }
       .dose-list li {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 6px;
+        padding: 4px 0;
+        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+      }
+      .doses > select {
+        margin-top: 12px;
       }
       .dose-list .stock {
         flex-basis: 100%;
         gap: 6px;
         margin-bottom: 6px;
       }
-      .dose-list .stock select {
-        min-width: 0;
+      .program-defaults .table {
+        margin-bottom: 6px;
       }
       .dose-list .dose-name {
         flex: 1;
@@ -1024,14 +1012,19 @@ export class DevicesPage extends LitElement {
         --ha-icon-button-size: 32px;
         --mdc-icon-size: 18px;
       }
+      .program-defaults th {
+        white-space: normal;
+        vertical-align: bottom;
+      }
       .program-defaults td input {
         width: 6em;
         text-align: right;
       }
+      /* ha-button wraps its label whatever white-space says, so it gets the label's width. */
       .program-defaults .suggestion {
         display: block;
+        width: max-content;
         margin-inline-start: auto;
-        white-space: nowrap;
       }
       .program-row td:first-child {
         white-space: nowrap;
@@ -1043,9 +1036,6 @@ export class DevicesPage extends LitElement {
       }
       .program-row.suggested .program-name {
         color: var(--secondary-text-color);
-      }
-      .add-program {
-        align-self: flex-start;
       }
       .template-chip {
         display: inline-flex;
@@ -1060,23 +1050,8 @@ export class DevicesPage extends LitElement {
         --mdc-icon-size: 16px;
         margin-inline-end: -6px;
       }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-      }
-      .field .label {
-        font-size: 12px;
-        color: var(--secondary-text-color);
-      }
-      .field p {
-        margin: 0;
-      }
       .ha-settings {
         margin: 4px 0 0;
-      }
-      .error {
-        color: var(--error-color, #db4437);
       }
     `,
   ];

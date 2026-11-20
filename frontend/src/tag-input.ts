@@ -149,6 +149,9 @@ export class TagInput extends LitElement {
   static override styles = [
     shared,
     css`
+      :host {
+        display: block;
+      }
       .tag-input {
         position: relative;
       }

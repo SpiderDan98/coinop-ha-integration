@@ -1,5 +1,5 @@
 // The browser remembers the options of the last statement made, all but title and note.
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   STATEMENT_DETAILS,
@@ -9,7 +9,8 @@ import {
 } from "./api";
 import { download, type HomeAssistant } from "./hass";
 import { localize, panelLanguage } from "./localize";
-import "./dialog";
+import { formDialog } from "./dialog";
+import { checkbox, field, input, numberInput, select, textarea, withUnit } from "./fields";
 import { shared } from "./styles";
 
 type Options = Omit<Parameters<typeof createStatement>[2], "title" | "note">;
@@ -98,98 +99,80 @@ export class StatementDialog extends LitElement {
   override render() {
     const t = localize(this.hass);
     const options = this.options;
-    const input = (event: Event) => (event.target as HTMLInputElement).value;
     const set = (changes: Partial<Options>) => {
       if (options) this.options = { ...options, ...changes };
     };
-    const title =
-      this.runIds.length === 1
-        ? t("statement.dialog_title_one")
-        : t("statement.dialog_title", { count: this.runIds.length });
-    return html`<coinop-dialog
-      class="statement-dialog dialog"
-      .label=${title}
-      .closeLabel=${t("dialog.close")}
-      @cancel=${this.close}
-    >
-      <p class="muted small">${t("statement.hint")}</p>
-      <label
-        >${t("statement.title")}<input
-          name="title"
-          .value=${this.titleText}
-          placeholder=${this.defaultTitle}
-          @input=${(event: Event) => (this.titleText = input(event))}
-      /></label>
-      <label
-        >${t("statement.note")}<textarea
-          name="note"
-          rows="3"
-          .value=${this.noteText}
-          @input=${(event: Event) => (this.noteText = input(event))}
-        ></textarea>
-      </label>
-      <div class="row options">
-        <label
-          >${t("statement.detail")}<select
-            name="detail"
-            @change=${(event: Event) => set({ detail: input(event) as Options["detail"] })}
-          >
-            ${STATEMENT_DETAILS.map(
-              (detail) =>
-                html`<option value=${detail} ?selected=${options?.detail === detail}>
-                  ${t(`statement.${detail}`)}
-                </option>`,
-            )}
-          </select></label
-        >
-        <label class="check"
-          ><input
-            name="images"
-            type="checkbox"
-            .checked=${options?.images ?? true}
-            ?disabled=${options?.detail === "compact"}
-            @change=${(event: Event) => set({ images: (event.target as HTMLInputElement).checked })}
-          />${t("statement.images")}</label
-        >
-        <label
-          >${t("statement.language")}<select
-            name="language"
-            @change=${(event: Event) => set({ language: input(event) as Options["language"] })}
-          >
-            ${STATEMENT_LANGUAGES.map(
-              (language) =>
-                html`<option value=${language} ?selected=${options?.language === language}>
-                  ${LANGUAGE_NAMES[language]}
-                </option>`,
-            )}
-          </select></label
-        >
-        <label
-          >${t("statement.markup")}<input
-            name="markup"
-            type="number"
-            min="0"
-            step="any"
-            inputmode="decimal"
-            .value=${this.markup}
-            @input=${(event: Event) => (this.markup = input(event))}
-        /></label>
-      </div>
-      ${this.failed ? html`<p class="error small">${t("statement.failed")}</p>` : nothing}
-      <div slot="footer" class="row end">
-        <ha-button class="cancel" appearance="plain" @click=${this.close}>
-          ${t("statement.cancel")}
-        </ha-button>
-        <ha-button
-          class="download"
-          ?disabled=${!options || this.typedMarkup === undefined || this.busy}
-          .loading=${this.busy}
-          @click=${this.download}
-        >
-          ${t("statement.download")}
-        </ha-button>
-      </div>
-    </coinop-dialog>`;
+    return formDialog({
+      t,
+      title:
+        this.runIds.length === 1
+          ? t("statement.dialog_title_one")
+          : t("statement.dialog_title", { count: this.runIds.length }),
+      name: "statement-dialog",
+      action: "download",
+      submit: t("statement.download"),
+      busy: this.busy,
+      disabled: !options || this.typedMarkup === undefined,
+      error: this.failed && t("statement.failed"),
+      onCancel: () => this.close(),
+      onSubmit: () => this.download(),
+      content: html`<p class="muted small">${t("statement.hint")}</p>
+        ${field(
+          t("statement.title"),
+          input({
+            name: "title",
+            value: this.titleText,
+            placeholder: this.defaultTitle,
+            onInput: (title) => (this.titleText = title),
+          }),
+        )}
+        ${field(
+          t("statement.note"),
+          textarea({
+            name: "note",
+            value: this.noteText,
+            onInput: (note) => (this.noteText = note),
+          }),
+        )}
+        <div class="field-row">
+          ${field(
+            t("statement.detail"),
+            select({
+              name: "detail",
+              value: options?.detail,
+              options: STATEMENT_DETAILS.map((detail) => [detail, t(`statement.${detail}`)]),
+              onChange: (detail) => set({ detail: detail as Options["detail"] }),
+            }),
+          )}
+          ${field(
+            t("statement.language"),
+            select({
+              name: "language",
+              value: options?.language,
+              options: STATEMENT_LANGUAGES.map((language) => [language, LANGUAGE_NAMES[language]]),
+              onChange: (language) => set({ language: language as Options["language"] }),
+            }),
+          )}
+          ${field(
+            t("statement.markup"),
+            withUnit(
+              numberInput({
+                name: "markup",
+                value: this.markup,
+                onInput: (markup) => (this.markup = markup),
+              }),
+              "%",
+            ),
+          )}
+        </div>
+        ${checkbox({
+          name: "images",
+          label: t("statement.images"),
+          checked: options?.images ?? true,
+          disabled: options?.detail === "compact",
+          onChange: (images) => set({ images }),
+        })}`,
+    });
   }
 
   private async download() {
@@ -224,32 +207,6 @@ export class StatementDialog extends LitElement {
     css`
       coinop-dialog {
         --coinop-dialog-width: 520px;
-      }
-      .options {
-        flex-wrap: wrap;
-        align-items: flex-end;
-      }
-      .options > label {
-        flex: 1 1 130px;
-      }
-      .options > label.check {
-        flex: 0 0 auto;
-        flex-direction: row;
-        align-items: center;
-        gap: 6px;
-        font-size: 14px;
-        color: var(--primary-text-color);
-        padding-bottom: 7px;
-      }
-      .error {
-        color: var(--error-color, #db4437);
-      }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        font-size: 12px;
-        color: var(--secondary-text-color);
       }
     `,
   ];

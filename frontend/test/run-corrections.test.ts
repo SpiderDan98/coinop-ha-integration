@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Message } from "../src/hass";
 import { recorded, recordedBackend } from "./fake-hass";
-import { change, click, mountPanel, query, queryAll, text } from "./render";
+import { click, fill, mountPanel, query, queryAll, text } from "./render";
 
 const UPDATE = "coinop/runs/update";
 const SUBSCRIBE = "coinop/runs/subscribe";
 const [started] = recorded.changes;
+
+const edit = async (panel: Element) => {
+  await click(panel, query(panel, ".facts ha-icon-button.edit"));
+  return query(panel, ".run-dialog");
+};
+const field = (dialog: HTMLElement, name: string) =>
+  query(dialog, `[name=${name}]`) as HTMLInputElement;
+const save = (panel: Element) => click(panel, query(panel, ".run-dialog ha-button.save"));
+const facts = (panel: Element) => text(query(panel, ".facts dl"));
 
 /** Answers corrections with the recorded Run plus what was changed. */
 const correcting = (options?: Parameters<typeof recordedBackend>[0]) =>
@@ -54,42 +63,74 @@ describe("Correcting a Run", () => {
     }
   });
 
-  it("saves each field as soon as it changes", async () => {
+  it("saves the fields changed in the dialog, in one correction", async () => {
+    const backend = correcting();
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+    const dialog = await edit(panel);
+    expect(text(query(dialog, "h2"))).toBe("Edit Run");
+
+    await fill(panel, field(dialog, "name"), "Benchy XL");
+    await fill(panel, field(dialog, "note"), "Printed for a friend");
+    await fill(panel, field(dialog, "outcome"), "failed");
+    expect(backend.sent(UPDATE)).toEqual([]);
+    await save(panel);
+
+    expect(backend.sent(UPDATE)).toEqual([
+      {
+        type: UPDATE,
+        run_id: "benchy",
+        name: "Benchy XL",
+        note: "Printed for a friend",
+        outcome: "failed",
+      },
+    ]);
+    expect(queryAll(panel, ".run-dialog")).toHaveLength(0);
+    expect(text(query(panel, ".runbar"))).toMatch(/^Failed/);
+    expect(text(query(panel, ".facts h3"))).toBe("Benchy XL");
+    expect(facts(panel)).toContain("Note Printed for a friend");
+  });
+
+  it("sends nothing when the dialog is cancelled or nothing was changed", async () => {
     const backend = correcting();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
-    await change(panel, query(panel, "input[name=name]"), "Benchy XL");
-    await change(panel, query(panel, "textarea[name=note]"), "Printed for a friend");
-    await change(panel, query(panel, "select[name=outcome]"), "failed");
+    const dialog = await edit(panel);
+    await fill(panel, field(dialog, "name"), "Benchy XL");
+    await click(panel, query(dialog, "ha-button.cancel"));
+    expect(queryAll(panel, ".run-dialog")).toHaveLength(0);
+    expect(field(await edit(panel), "name").value).toBe("Benchy");
+    await save(panel);
 
-    expect(backend.sent(UPDATE)).toEqual([
-      { type: UPDATE, run_id: "benchy", name: "Benchy XL" },
-      { type: UPDATE, run_id: "benchy", note: "Printed for a friend" },
-      { type: UPDATE, run_id: "benchy", outcome: "failed" },
-    ]);
-    expect(text(query(panel, ".runbar"))).toMatch(/^Failed/);
+    expect(backend.sent(UPDATE)).toEqual([]);
+    expect(queryAll(panel, ".run-dialog")).toHaveLength(0);
   });
 
-  it("shows the stored fields and says times never recalculate costs", async () => {
+  it("shows the stored fields, and in the dialog says times never recalculate costs", async () => {
     const panel = await mountPanel(correcting(), { path: "/run/benchy" });
 
-    expect((query(panel, "input[name=name]") as HTMLInputElement).value).toBe("Benchy");
-    expect((query(panel, "textarea[name=note]") as HTMLTextAreaElement).value).toBe(
-      "Four on one plate",
+    expect(text(query(panel, ".facts h3"))).toBe("Benchy");
+    expect(facts(panel)).toBe(
+      "Device Kobra Started Jan 12, 2026, 10:00 AM Ended Jan 12, 2026, 11:15 AM " +
+        "Running time 1 h 15 min Part Count 4 Tags Gift Note Four on one plate",
     );
-    expect((query(panel, "input[name=part_count]") as HTMLInputElement).value).toBe("4");
-    expect((query(panel, "input[name=started]") as HTMLInputElement).value).toBe(
-      "2026-01-12T10:00",
-    );
-    expect(text(query(panel, ".facts"))).toContain("Changing these doesn't recalculate costs.");
+    expect(queryAll(panel, ".facts input, .facts select, .facts textarea")).toHaveLength(0);
+
+    const dialog = await edit(panel);
+    expect(field(dialog, "name").value).toBe("Benchy");
+    expect(field(dialog, "note").value).toBe("Four on one plate");
+    expect(field(dialog, "part_count").value).toBe("4");
+    expect(field(dialog, "started").value).toBe("2026-01-12T10:00");
+    expect(text(query(dialog, ".times-hint"))).toBe("Changing these doesn't recalculate costs.");
   });
 
   it("enters times in Home Assistant's time zone", async () => {
     const backend = correcting({ timeZone: "Europe/Berlin" });
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    expect((query(panel, "input[name=ended]") as HTMLInputElement).value).toBe("2026-01-12T12:15");
+    const dialog = await edit(panel);
+    expect(field(dialog, "ended").value).toBe("2026-01-12T12:15");
 
-    await change(panel, query(panel, "input[name=started]"), "2026-01-12T10:30");
+    await fill(panel, field(dialog, "started"), "2026-01-12T10:30");
+    await save(panel);
 
     expect(backend.sent(UPDATE)).toEqual([
       { type: UPDATE, run_id: "benchy", started: "2026-01-12T09:30:00.000Z" },
@@ -104,7 +145,8 @@ describe("Correcting a Run", () => {
     backend.reply(UPDATE, () => ({
       run: { ...recorded.run("benchy"), part_count: 2, cost_per_part: 0.43 },
     }));
-    await change(panel, query(panel, "input[name=part_count]"), "2");
+    await fill(panel, field(await edit(panel), "part_count"), "2");
+    await save(panel);
 
     expect(backend.sent(UPDATE)).toEqual([{ type: UPDATE, run_id: "benchy", part_count: 2 }]);
     expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (2) €0.43");
@@ -113,13 +155,16 @@ describe("Correcting a Run", () => {
   it("keeps the Part Count a whole number of at least one", async () => {
     const backend = correcting();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
-    const input = query(panel, "input[name=part_count]") as HTMLInputElement;
+    const count = field(await edit(panel), "part_count");
 
-    await change(panel, input, "0");
-    await change(panel, input, "1.5");
+    for (const wrong of ["0", "1.5"]) {
+      await fill(panel, count, wrong);
+      await save(panel);
+      expect(count.getAttribute("aria-invalid")).toBe("true");
+    }
 
     expect(backend.sent(UPDATE)).toEqual([]);
-    expect(input.value).toBe("4");
+    expect(facts(panel)).toContain("Part Count 4");
   });
 
   it("locks times and Outcome of an open Run and offers End Run now", async () => {
@@ -131,10 +176,15 @@ describe("Correcting a Run", () => {
     }));
     const panel = await mountPanel(backend, { path: "/run/print-live" });
 
+    const dialog = await edit(panel);
     for (const name of ["started", "ended", "outcome"]) {
-      expect(query(panel, `[name=${name}]`).hasAttribute("disabled")).toBe(true);
+      expect(field(dialog, name).hasAttribute("disabled")).toBe(true);
     }
-    expect(query(panel, "input[name=name]").hasAttribute("disabled")).toBe(false);
+    expect(field(dialog, "name").hasAttribute("disabled")).toBe(false);
+    expect(text(query(dialog, ".times-hint"))).toBe(
+      "Start, end and Outcome can be changed once the Run is final.",
+    );
+    await click(panel, query(dialog, "ha-button.cancel"));
 
     await click(panel, query(panel, "ha-button.end-run"));
 
@@ -168,37 +218,40 @@ describe("Correcting a Run", () => {
         .reply("coinop/runs/get", () => ({ run: recorded.wash }))
         .reply(UPDATE, (msg) => ({ run: { ...recorded.wash, program: msg.program } }));
 
-    it("shows its Program as a field and saves a correction", async () => {
+    it("shows its Program and saves a correction", async () => {
       const backend = washing();
       const panel = await mountPanel(backend, { path: "/run/wash" });
-      const program = query(panel, "input[name=program]") as HTMLInputElement;
+      expect(text(query(panel, ".facts .program"))).toBe("Cotton 60°");
+      const program = field(await edit(panel), "program");
       expect(program.value).toBe("Cotton 60°");
       expect(text(program.closest("label") as Element)).toBe("Program");
 
-      await change(panel, program, "  Eco 40-60 ");
+      await fill(panel, program, "  Eco 40-60 ");
+      await save(panel);
 
       expect(backend.sent(UPDATE)).toEqual([
         { type: UPDATE, run_id: "wash", program: "Eco 40-60" },
       ]);
-      expect((query(panel, "input[name=program]") as HTMLInputElement).value).toBe("Eco 40-60");
+      expect(text(query(panel, ".facts .program"))).toBe("Eco 40-60");
     });
 
     it("clears the Program when the field is emptied", async () => {
       const backend = washing();
       const panel = await mountPanel(backend, { path: "/run/wash" });
 
-      await change(panel, query(panel, "input[name=program]"), " ");
+      await fill(panel, field(await edit(panel), "program"), " ");
+      await save(panel);
 
       expect(backend.sent(UPDATE)).toEqual([{ type: UPDATE, run_id: "wash", program: null }]);
+      expect(text(query(panel, ".facts .program"))).toBe("None");
     });
 
     it("names the Program in German", async () => {
       const panel = await mountPanel(washing({ language: "de" }), { path: "/run/wash" });
+      const dialog = await edit(panel);
 
-      expect(text(query(panel, "input[name=program]").closest("label") as Element)).toBe(
-        "Programm",
-      );
-      expect(text(query(panel, ".program-hint"))).toBe(
+      expect(text(field(dialog, "program").closest("label") as Element)).toBe("Programm");
+      expect(text(query(dialog, ".program .hint"))).toBe(
         "Ein anderes Programm wendet seine Vorgaben auf die Kosten an, die aus Vorgaben stammen und nicht überschrieben sind.",
       );
     });
@@ -206,26 +259,30 @@ describe("Correcting a Run", () => {
     it("hints that changing the Program re-applies its defaults", async () => {
       const panel = await mountPanel(washing(), { path: "/run/wash" });
 
-      expect(text(query(panel, ".program-hint"))).toBe(
+      expect(text(query(await edit(panel), ".program .hint"))).toBe(
         "Changing the Program re-applies its defaults to the costs that came from defaults and aren't overridden.",
       );
     });
   });
 
-  it("has no Program field for a printer's Run", async () => {
+  it("has no Program for a printer's Run", async () => {
     const panel = await mountPanel(correcting(), { path: "/run/benchy" });
 
-    expect(queryAll(panel, "[name=program]")).toHaveLength(0);
-    expect(queryAll(panel, ".program-hint")).toHaveLength(0);
+    expect(queryAll(panel, ".facts .program")).toHaveLength(0);
+    expect(queryAll(await edit(panel), "[name=program]")).toHaveLength(0);
   });
 
-  it("shows when a correction could not be saved", async () => {
+  it("keeps the dialog open when a correction could not be saved", async () => {
     const backend = correcting().reply(UPDATE, () => Promise.reject(new Error("invalid_format")));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
+    const dialog = await edit(panel);
 
-    await change(panel, query(panel, "input[name=ended]"), "2026-01-01T10:00");
+    await fill(panel, field(dialog, "ended"), "2026-01-01T10:00");
+    await save(panel);
 
-    expect(text(query(panel, ".facts"))).toContain("This change could not be saved.");
+    expect(text(query(panel, ".run-dialog .error"))).toBe("This change could not be saved.");
+    expect(field(dialog, "ended").value).toBe("2026-01-01T10:00");
+    expect(facts(panel)).toContain("Ended Jan 12, 2026, 11:15 AM");
   });
 });
 
@@ -302,16 +359,5 @@ describe("Gallery tiles", () => {
     expect(text(helmet)).not.toContain("per part");
     expect(text(query(helmet, ".tile-flags"))).toBe("⚑ 2");
     expect(queryAll(benchy, ".tile-flags")).toHaveLength(0);
-  });
-});
-
-describe("Saving a correction", () => {
-  it("confirms it for a moment where the page says every change is saved", async () => {
-    const panel = await mountPanel(correcting(), { path: "/run/benchy" });
-    expect(text(query(panel, ".saves"))).toBe("Every change saves at once.");
-
-    await change(panel, query(panel, "input[name=name]"), "Benchy v2");
-
-    expect(text(query(panel, ".saves"))).toBe("Saved.");
   });
 });

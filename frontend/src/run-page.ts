@@ -1,8 +1,11 @@
-// Refetches the Run whenever its summary changes, so it follows live updates.
+// The Run page: the Run's facts and its Line Items by kind, read like a receipt. Both are
+// corrected in dialogs. Refetches the Run whenever its summary changes, so it follows
+// live updates.
 import {
   mdiBookmarkPlusOutline,
   mdiDelete,
   mdiLockOutline,
+  mdiPencil,
   mdiPlus,
   mdiRestore,
   mdiStopCircleOutline,
@@ -33,13 +36,15 @@ import {
   type RunDetail,
   type RunSummary,
 } from "./api";
+import { confirmDialog, formDialog } from "./dialog";
+import { field, input, numberInput, select, textarea, withUnit } from "./fields";
 import { formatter, priceUnit, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import "./run-images";
 import { deleteDialog, deviceName, flagLabel, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
-import "./tag-input";
+import { tagChip } from "./tag-input";
 
 /** How a measured length became grams, so the user can check the conversion. */
 const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: Format) => {
@@ -118,13 +123,32 @@ const correction = (field: Field, value: string, format: Format) => {
     case "started":
     case "ended": {
       const iso = format.fromInput(value);
-      return iso && { [field]: iso };
+      return iso ? { [field]: iso } : undefined;
     }
     case "outcome":
       return { outcome: value as Outcome };
     case "part_count":
       return /^\d+$/.test(value) && Number(value) >= 1 ? { part_count: Number(value) } : undefined;
   }
+};
+
+/** The Run's fields and Tags as its dialog edits them. */
+const runDraft = (run: RunDetail, format: Format) => ({
+  ...fieldValues(run, format),
+  tags: run.tags,
+});
+
+/** What the edited fields change, and which of them hold no valid value. */
+const runChanges = (run: RunDetail, draft: ReturnType<typeof runDraft>, format: Format) => {
+  const shown = fieldValues(run, format);
+  const corrections = (Object.keys(shown) as Field[])
+    .filter((name) => draft[name] !== shown[name])
+    .map((name) => [name, correction(name, draft[name], format)] as const);
+  const changes: Parameters<typeof updateRun>[2] = Object.assign(
+    JSON.stringify(draft.tags) === JSON.stringify(run.tags) ? {} : { tags: draft.tags },
+    ...corrections.map(([, change]) => change),
+  );
+  return { changes, invalid: corrections.filter(([, change]) => !change).map(([name]) => name) };
 };
 
 /** A number input's number: null when emptied, undefined if it is no number. */
@@ -167,7 +191,74 @@ const itemChange = (field: ItemField, value: string) => {
   }
 };
 
+/** A Line Item's fields as its dialog edits them. Of unit price and amount the one
+ * typed last (`entered`) stands and the other follows, as the backend computes it. */
+const itemDraft = (item: LineItem, format: Format) => ({
+  id: item.id,
+  ...itemValues(item, format),
+  entered: undefined as "unit_price" | "amount" | undefined,
+});
+
+/** The unit price and amount fields while editing: the one not typed follows the other. */
+const followed = (item: LineItem, draft: ReturnType<typeof itemDraft>, format: Format) => {
+  const shown = itemValues(item, format);
+  const { factor } = priceUnit(item.unit);
+  const quantity = parseNumber(draft.quantity) ?? 0;
+  if (draft.entered === "amount") {
+    const amount = parseNumber(draft.amount);
+    return {
+      amount: draft.amount,
+      unit_price:
+        quantity && typeof amount === "number"
+          ? format.toNumberInput((amount / quantity) * factor, 4)
+          : shown.unit_price,
+    };
+  }
+  const price = parseNumber(draft.unit_price);
+  const changed = draft.quantity !== shown.quantity || draft.unit_price !== shown.unit_price;
+  return {
+    unit_price: draft.unit_price,
+    amount:
+      changed && typeof price === "number"
+        ? format.toAmountInput((quantity * price) / factor)
+        : shown.amount,
+  };
+};
+
+/** What the edited fields change, and which of them hold no valid value. */
+const itemChanges = (item: LineItem, draft: ReturnType<typeof itemDraft>, format: Format) => {
+  const shown = itemValues(item, format);
+  const edited = (["label", "material_id", "unit", "quantity", draft.entered] as const)
+    .filter((name) => name !== undefined)
+    .filter((name) => draft[name] !== shown[name])
+    .map((name) => [name, itemChange(name, draft[name])] as const);
+  const changes: Parameters<typeof updateLineItem>[3] = Object.assign(
+    {},
+    ...edited.map(([, change]) => change),
+  );
+  if (changes.unit_price !== undefined) changes.unit_price /= priceUnit(item.unit).factor;
+  return { changes, invalid: edited.filter(([, change]) => !change).map(([name]) => name) };
+};
+
+/** A new Line Item as its dialog fills it in; what applies depends on the `kind`. */
+const newItem = (kind: "water" | "material" | "other" | "template") => ({
+  kind,
+  label: "",
+  material_id: "",
+  template_id: "",
+  unit: "",
+  quantity: kind === "other" ? "1" : "",
+  unit_price: "",
+});
+
 const VALUES = ["quantity", "unit_price", "amount"] as const;
+
+/** A price per `unit`, per the unit it is shown in when that is another. */
+const priced = (price: number, unit: string, format: Format) => {
+  const shown = priceUnit(unit);
+  const per = shown.unit === unit ? "" : `/${shown.unit}`;
+  return `${format.unitPrice(price * shown.factor)}${per}`;
+};
 
 /** A Line Item value as the user reads it, e.g. "0.15 kWh" or "€0.30". */
 const shownValue = (
@@ -177,8 +268,7 @@ const shownValue = (
   format: Format,
 ) => {
   if (field === "amount") return format.money(values.amount);
-  if (field === "unit_price")
-    return format.unitPrice(values.unit_price * priceUnit(item.unit).factor);
+  if (field === "unit_price") return priced(values.unit_price, item.unit, format);
   return values.quantity === null ? "—" : format.quantity(values.quantity, item.unit);
 };
 
@@ -201,27 +291,26 @@ export class RunPage extends LitElement {
 
   @state() private run?: RunDetail;
   @state() private missing = false;
-  /** Where the last change that could not be saved was made. */
-  @state() private failed?: "fields" | "items";
+  /** Where the last action that failed was taken. */
+  @state() private failed?: "facts" | "items";
   /** Set while the delete confirmation is open. */
   @state() private drop?: Totals;
-  /** Which form for a new Line Item is open: Water, Material, Other by hand or from a template. */
-  @state() private adding?: "water" | "material" | "other" | "template";
-  /** The template picked in its form; the first one until the user picks. */
-  @state() private templateId?: string;
+  /** The Line Item whose delete confirmation is open. */
+  @state() private deleting?: string;
+  /** Set while the Run's dialog is open. */
+  @state() private editing?: ReturnType<typeof runDraft>;
+  /** Set while a Line Item's dialog is open. */
+  @state() private editingItem?: ReturnType<typeof itemDraft>;
+  /** Set while the dialog for a new Line Item is open. */
+  @state() private adding?: ReturnType<typeof newItem>;
+  /** The open dialog tried to save: it marks what holds no valid value from then on. */
+  @state() private checked = false;
+  @state() private saving = false;
+  /** The backend refused what the open dialog saved. */
+  @state() private refused = false;
   /** The label of the Line Item last saved as a template. */
   @state() private savedTemplate?: string;
-  /** The Material picked in the new Material Line Item form; the first one until then. */
-  @state() private materialPick?: string;
-  /** Shown for a moment after each change saved. */
-  @state() private saved = false;
   private request = 0;
-  private savedTimer?: ReturnType<typeof setTimeout>;
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
-    clearTimeout(this.savedTimer);
-  }
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runId")) {
@@ -229,7 +318,8 @@ export class RunPage extends LitElement {
       this.missing = false;
       this.failed = undefined;
       this.drop = undefined;
-      this.adding = this.savedTemplate = undefined;
+      this.savedTemplate = undefined;
+      this.closeDialog();
     }
     if (changed.has("runId") || changed.has("summary")) void this.load();
   }
@@ -244,82 +334,98 @@ export class RunPage extends LitElement {
     }
   }
 
-  /** Show the Run as a command returned it; `undo` puts the field back on failure. */
-  private async save(
-    result: Promise<RunDetail>,
-    undo = () => {},
-    where: "fields" | "items" = "fields",
-  ) {
+  /** Show the Run as a one-click action returned it. */
+  private async act(result: Promise<RunDetail>, where: "facts" | "items" = "items") {
     this.failed = undefined;
     try {
       ++this.request;
       this.run = await result;
-      this.saved = true;
-      clearTimeout(this.savedTimer);
-      this.savedTimer = setTimeout(() => (this.saved = false), 2000);
-      return true;
     } catch {
       this.failed = where;
-      undo();
-      return false;
     }
   }
 
-  /** Run a Line Item command; its failure is shown with the Line Items. */
-  private saveItems(result: Promise<RunDetail>, undo?: () => void) {
-    return this.save(result, undo, "items");
+  /** Show the Run as the open dialog's command returned it and close the dialog; a
+   * refused one stays open. */
+  private async submit(result: Promise<RunDetail>) {
+    this.saving = true;
+    this.refused = false;
+    try {
+      ++this.request;
+      this.run = await result;
+      this.closeDialog();
+    } catch {
+      this.refused = true;
+    } finally {
+      this.saving = false;
+    }
   }
 
-  private onItemChange(item: LineItem, event: Event) {
-    const input = event.target as HTMLInputElement;
-    const field = input.name as ItemField;
-    const shown = itemValues(item, formatter(this.hass))[field];
-    const undo = () => (input.value = shown);
-    const changes = itemChange(field, input.value);
-    if (!changes) return undo();
-    if ("unit_price" in changes) changes.unit_price /= priceUnit(item.unit).factor;
-    void this.saveItems(updateLineItem(this.hass, this.runId, item.id, changes), undo);
+  private closeDialog() {
+    this.editing = this.editingItem = this.adding = this.deleting = undefined;
+    this.checked = this.refused = false;
   }
 
-  private async onAdd(event: SubmitEvent) {
-    event.preventDefault();
-    const form = event.target as HTMLFormElement;
-    const entered = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    const quantity = parseNumber(entered.quantity ?? "");
-    if (quantity === undefined) return;
-    if (this.adding === "water") {
-      const price = parseNumber(entered.unit_price ?? "");
-      if (price === undefined || price === null) return;
-      const water = {
-        kind: "water" as const,
-        quantity,
-        unit_price: price / priceUnit("L").factor,
-      };
-      if (await this.saveItems(addLineItem(this.hass, this.runId, water))) this.adding = undefined;
-      return;
+  private saveRun(run: RunDetail, draft: ReturnType<typeof runDraft>) {
+    const { changes, invalid } = runChanges(run, draft, formatter(this.hass));
+    this.checked = true;
+    if (invalid.length) return;
+    if (!Object.keys(changes).length) return this.closeDialog();
+    void this.submit(updateRun(this.hass, this.runId, changes));
+  }
+
+  private saveItem(item: LineItem, draft: ReturnType<typeof itemDraft>) {
+    const { changes, invalid } = itemChanges(item, draft, formatter(this.hass));
+    this.checked = true;
+    if (invalid.length) return;
+    if (!Object.keys(changes).length) return this.closeDialog();
+    void this.submit(updateLineItem(this.hass, this.runId, item.id, changes));
+  }
+
+  /** The new Line Item's command, or the fields that hold no valid value. */
+  private added(adding: ReturnType<typeof newItem>) {
+    const quantity = parseNumber(adding.quantity);
+    const price = parseNumber(adding.unit_price);
+    const amount = typeof quantity === "number" && quantity >= 0;
+    const add = (item: Parameters<typeof addLineItem>[2]) => ({
+      command: () => addLineItem(this.hass, this.runId, item),
+    });
+    if (adding.kind === "template") {
+      const template = this.template(adding);
+      return template && (quantity === null || amount)
+        ? {
+            command: () =>
+              addTemplateLineItem(this.hass, this.runId, template.id, quantity ?? undefined),
+          }
+        : { invalid: ["quantity"] };
     }
-    if (this.adding === "material") {
-      if (!entered.material_id) return;
-      const material = {
-        kind: "material" as const,
-        material_id: entered.material_id,
-        quantity,
-        unit: entered.unit,
-      };
-      if (await this.saveItems(addLineItem(this.hass, this.runId, material)))
-        this.adding = undefined;
-      return;
+    if (adding.kind === "material") {
+      const { picked, unit } = this.materialOf(adding);
+      return picked && amount
+        ? add({ kind: "material", material_id: picked.id, quantity, unit: adding.unit || unit })
+        : { invalid: ["quantity"] };
     }
-    const unitPrice = parseNumber(entered.unit_price ?? "");
-    if (unitPrice === undefined || unitPrice === null) return;
-    const item = {
-      kind: "other" as const,
-      label: (entered.label ?? "").trim() || null,
-      quantity,
-      unit: (entered.unit ?? "").trim(),
-      unit_price: unitPrice,
-    };
-    if (await this.saveItems(addLineItem(this.hass, this.runId, item))) this.adding = undefined;
+    const priceless = typeof price !== "number" || (adding.kind === "water" && price < 0);
+    const invalid = [
+      ...((adding.kind === "water" ? !amount : quantity !== null && !amount) ? ["quantity"] : []),
+      ...(priceless ? ["unit_price"] : []),
+    ];
+    if (invalid.length || typeof price !== "number" || quantity === undefined) return { invalid };
+    return adding.kind === "water"
+      ? add({ kind: "water", quantity, unit_price: price / priceUnit("L").factor })
+      : add({
+          kind: "other",
+          label: adding.label.trim() || null,
+          quantity,
+          unit: adding.unit.trim(),
+          unit_price: price,
+        });
+  }
+
+  private saveNew(adding: ReturnType<typeof newItem>) {
+    const added = this.added(adding);
+    this.checked = true;
+    if (added.command) void this.submit(added.command());
   }
 
   /** Materials a Line Item can pick: current ones, plus its own even when archived. */
@@ -327,13 +433,26 @@ export class RunPage extends LitElement {
     return this.materials.filter((material) => !material.archived || material.id === current);
   }
 
-  private async onAddTemplate(event: SubmitEvent, template: LineItemTemplate) {
-    event.preventDefault();
-    const entered = new FormData(event.target as HTMLFormElement).get("quantity");
-    const quantity = parseNumber(typeof entered === "string" ? entered : "");
-    if (quantity === undefined || (quantity !== null && quantity < 0)) return;
-    const added = addTemplateLineItem(this.hass, this.runId, template.id, quantity ?? undefined);
-    if (await this.saveItems(added)) this.adding = undefined;
+  /** The Material a new Line Item is of, the first one until the user picks, and the
+   * units it can count in, led by its usual one. */
+  private materialOf({ material_id }: ReturnType<typeof newItem>) {
+    const materials = this.pickable(null);
+    const picked = materials.find(({ id }) => id === material_id) ?? materials[0];
+    const byVolume =
+      picked?.form === "resin" ||
+      (picked?.price.source === "fixed" && picked.price.pack_unit === "ml");
+    const units = picked && picked.price_per_piece !== null ? ["pcs"] : ["g", "ml"];
+    return {
+      materials,
+      picked,
+      units,
+      unit: units.length === 1 ? units[0] : byVolume ? "ml" : "g",
+    };
+  }
+
+  /** The template a new Line Item copies, the first one until the user picks. */
+  private template({ template_id }: ReturnType<typeof newItem>) {
+    return this.templates.find(({ id }) => id === template_id) ?? this.templates[0];
   }
 
   private async onSaveTemplate(item: LineItem) {
@@ -348,18 +467,6 @@ export class RunPage extends LitElement {
     }
   }
 
-  private onFieldChange(event: Event) {
-    if (!this.run) return;
-    const input = event.target as HTMLInputElement;
-    const field = input.name as Field;
-    const format = formatter(this.hass);
-    const shown = fieldValues(this.run, format)[field];
-    const undo = () => (input.value = shown);
-    const changes = correction(field, input.value, format);
-    if (!changes) return undo();
-    void this.save(updateRun(this.hass, this.runId, changes), undo);
-  }
-
   private onImagesChanged(event: CustomEvent<RunDetail>) {
     ++this.request;
     this.run = event.detail;
@@ -370,7 +477,7 @@ export class RunPage extends LitElement {
     try {
       this.drop = await previewDelete(this.hass, [this.runId]);
     } catch {
-      this.failed = "fields";
+      this.failed = "facts";
     }
   }
 
@@ -379,7 +486,7 @@ export class RunPage extends LitElement {
       await deleteRuns(this.hass, [this.runId]);
       navigate(this.runsPath);
     } catch {
-      this.failed = "fields";
+      this.failed = "facts";
     }
     this.drop = undefined;
   }
@@ -397,20 +504,26 @@ export class RunPage extends LitElement {
     const devices = this.devices?.filter(({ id }) => id === run.device_id);
     const water = devices?.some(({ capabilities }) => capabilities.includes("water"));
     const kinds = shownKinds(devices, run.line_items);
+    const add = (kind: Parameters<typeof newItem>[0], label: string) =>
+      html`<ha-button
+        class="small add-${kind}"
+        appearance="filled"
+        @click=${() => (this.adding = newItem(kind))}
+      >
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+        ${label}
+      </ha-button>`;
     return html`
       <div class="runbar row">
         ${outcomeChip(run, t)}
         <span class="muted">${device} · ${format.dateTime(run.started)}</span>
         <span class="spacer"></span>
-        <span class="muted small saves" aria-live="polite"
-          >${this.saved ? t("run.saved") : t("run.saves")}</span
-        >
         ${
           run.ended === null
             ? html`<ha-button
                 class="end-run"
                 appearance="plain"
-                @click=${() => this.save(endRun(this.hass, this.runId))}
+                @click=${() => this.act(endRun(this.hass, this.runId), "facts")}
               >
                 <ha-svg-icon slot="start" .path=${mdiStopCircleOutline}></ha-svg-icon>
                 ${t("run.end_now")}
@@ -435,13 +548,7 @@ export class RunPage extends LitElement {
             .run=${run}
             @run-changed=${this.onImagesChanged}
           ></coinop-run-images>
-          ${this.renderFields(run, t, format)}
-          <dl>
-            <dt>${t("run.device")}</dt>
-            <dd>${device}</dd>
-            <dt>${t("run.running_time")}</dt>
-            <dd>${format.duration(run.running_seconds)}</dd>
-          </dl>
+          ${this.renderFacts(run, device, t, format)}
         </div>
         <div class="items">
           ${
@@ -454,7 +561,7 @@ export class RunPage extends LitElement {
                         <ha-button
                           class="small"
                           appearance="plain"
-                          @click=${() => this.save(clearFlag(this.hass, this.runId, flag))}
+                          @click=${() => this.act(clearFlag(this.hass, this.runId, flag), "facts")}
                         >
                           ${t("run.mark_checked")}
                         </ha-button>
@@ -473,6 +580,16 @@ export class RunPage extends LitElement {
           }
           ${kinds.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
+            const adds = [
+              ...(kind === "water" && water && !items.length
+                ? [add("water", t("item.add_water"))]
+                : []),
+              ...(kind === "material" ? [add("material", t("item.add_material"))] : []),
+              ...(kind === "other" ? [add("other", t("item.add_other"))] : []),
+              ...(kind === "other" && this.templates.length
+                ? [add("template", t("item.add_template"))]
+                : []),
+            ];
             return html`
               <div class="card kind" style="--kind-color: var(--coinop-${kind})">
                 <div class="row between">
@@ -483,15 +600,14 @@ export class RunPage extends LitElement {
                   items.length
                     ? html`<div class="item-head muted small" aria-hidden="true">
                           <span></span><span>${t("item.quantity")}</span
-                          ><span>${t("item.unit_price")}</span><span>${t("item.amount")}</span>
+                          ><span>${t("item.unit_price")}</span><span>${t("item.amount")}</span
+                          ><span></span>
                         </div>
                         ${items.map((item) => this.renderItem(item, t, format))}`
                     : html`<p class="muted small">${t("run.none")}</p>`
                 }
-                ${kind === "water" && water && !items.length ? this.renderAddWater(t, format) : nothing}
-                ${kind === "other" ? this.renderAdd(run, t, format) : nothing}
                 ${kind === "material" ? splitHint(items, t, format) : nothing}
-                ${kind === "material" ? this.renderAddMaterial(t) : nothing}
+                ${adds.length ? html`<div class="add-item row">${adds}</div>` : nothing}
               </div>
             `;
           })}
@@ -508,14 +624,7 @@ export class RunPage extends LitElement {
           </div>
         </div>
       </div>
-      ${
-        this.drop
-          ? deleteDialog(t("delete.title", { name: runName(run, t) }), this.drop, t, format, {
-              cancel: () => (this.drop = undefined),
-              confirm: () => void this.delete(),
-            })
-          : nothing
-      }
+      ${this.renderDialog(run, t, format)}
     `;
   }
 
@@ -525,118 +634,86 @@ export class RunPage extends LitElement {
     return device ? device.capabilities.includes("program") : run.program !== null;
   }
 
-  private renderFields(run: RunDetail, t: Localize, format: Format) {
-    const values = fieldValues(run, format);
-    const locked = !run.finalised;
-    return html`<div class="fields" @change=${this.onFieldChange}>
-      <label class="wide"
-        >${t("run.name")}<input
-          name="name"
-          .value=${values.name}
-          placeholder=${run.job_name ?? t("run.untitled")}
-      /></label>
-      ${
-        this.hasProgram(run)
-          ? html`<label class="wide"
-                >${t("run.program")}<input name="program" .value=${values.program}
-              /></label>
-              <p class="wide muted small program-hint">${t("run.program_hint")}</p>`
-          : nothing
-      }
-      <label class="wide"
-        >${t("run.started")}<input
-          type="datetime-local"
-          name="started"
-          .value=${values.started}
-          ?disabled=${locked}
-      /></label>
-      <label class="wide"
-        >${t("run.ended")}<input
-          type="datetime-local"
-          name="ended"
-          .value=${values.ended}
-          ?disabled=${locked}
-      /></label>
-      <label
-        >${t("run.outcome")}<select name="outcome" ?disabled=${locked}>
-          ${run.outcome === null ? html`<option value="" selected>—</option>` : nothing}
-          ${OUTCOMES.map(
-            (outcome) =>
-              html`<option value=${outcome} ?selected=${outcome === run.outcome}>
-                ${t(`outcome.${outcome}`)}
-              </option>`,
-          )}
-        </select></label
-      >
-      ${
-        run.part_count === null
-          ? nothing
-          : html`<label
-              >${t("run.part_count")}<input
-                type="number"
-                name="part_count"
-                min="1"
-                step="1"
-                .value=${values.part_count}
-            /></label>`
-      }
-      <label class="wide"
-        >${t("run.note")}<textarea name="note" .value=${values.note}></textarea>
-      </label>
-      <div class="wide label">
-        ${t("run.tags")}
-        <coinop-tag-input
-          .hass=${this.hass}
-          .tags=${run.tags}
-          .catalog=${this.tags}
-          .label=${t("run.tags")}
-          @tags-change=${(event: CustomEvent<string[]>) =>
-            this.save(updateRun(this.hass, this.runId, { tags: event.detail }))}
-        ></coinop-tag-input>
+  private renderFacts(run: RunDetail, device: string, t: Localize, format: Format) {
+    const none = html`<span class="muted">${t("run.none")}</span>`;
+    return html`<div class="head">
+        <h3 class="ellipsis">${runName(run, t)}</h3>
+        <ha-icon-button
+          class="edit"
+          .label=${t("run.edit")}
+          .path=${mdiPencil}
+          @click=${() => {
+            this.failed = undefined;
+            this.editing = runDraft(run, format);
+          }}
+        ></ha-icon-button>
       </div>
-      <p class="wide muted small">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
-      ${this.failed === "fields" ? html`<p class="wide error small">${t("run.save_failed")}</p>` : nothing}
-    </div>`;
+      <dl>
+        <dt>${t("run.device")}</dt>
+        <dd>${device}</dd>
+        ${
+          this.hasProgram(run)
+            ? html`<dt>${t("run.program")}</dt>
+                <dd class="program">${run.program ?? none}</dd>`
+            : nothing
+        }
+        <dt>${t("run.started")}</dt>
+        <dd>${format.dateTime(run.started)}</dd>
+        <dt>${t("run.ended")}</dt>
+        <dd class="ended">${run.ended ? format.dateTime(run.ended) : "—"}</dd>
+        <dt>${t("run.running_time")}</dt>
+        <dd>${format.duration(run.running_seconds)}</dd>
+        ${
+          run.part_count === null
+            ? nothing
+            : html`<dt>${t("run.part_count")}</dt>
+                <dd class="part-count">${run.part_count}</dd>`
+        }
+        <dt>${t("run.tags")}</dt>
+        <dd class="tags row">${run.tags.length ? run.tags.map(tagChip) : none}</dd>
+        ${
+          run.note
+            ? html`<dt>${t("run.note")}</dt>
+                <dd class="note">${run.note}</dd>`
+            : nothing
+        }
+      </dl>
+      ${this.failed === "facts" ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}`;
+  }
+
+  /** A Material Line Item by its Material's current name; the Line Item's copy names it
+   * while the catalogue loads or once the Material is gone. */
+  private materialName(item: LineItem, t: Localize) {
+    const material = this.materials.find(({ id }) => id === item.material_id);
+    if (!material) return item.material?.name ?? t("item.no_material");
+    return material.archived
+      ? t("materials.archived_name", { name: material.name })
+      : material.name;
+  }
+
+  private itemName(item: LineItem, t: Localize) {
+    return item.kind === "material" ? this.materialName(item, t) : item.label;
   }
 
   private renderItem(item: LineItem, t: Localize, format: Format) {
     const why = evidence(item, t, format);
-    const shown = itemValues(item, format);
     const { computed, locked } = item;
-    // Labels and units Coin-op sets stay as they are, rendered in the output language;
-    // a Material Line Item is named by its Material and counts g or ml.
-    const entered = item.kind === "other";
-    // Running hours are hours, whatever the template called them.
-    const unitEntered = entered && item.basis !== "running_hours";
-    const number = (field: (typeof VALUES)[number]) => {
+    const name = this.itemName(item, t);
+    const value = (field: (typeof VALUES)[number]) => {
       const manual = computed !== null && computed[field] !== item[field];
-      return html`<input
-        type="number"
-        step="any"
-        name=${field}
-        class=${manual ? "manual" : ""}
+      return html`<div
+        class="num ${field} ${manual ? "manual" : ""}"
         title=${manual ? t("item.computed", { value: shownValue(item, computed, field, format) }) : ""}
-        aria-label=${t(`item.${field}`)}
-        min=${field === "quantity" || item.kind !== "other" ? "0" : nothing}
-        .value=${shown[field]}
-        ?disabled=${locked}
-      />`;
+      >
+        ${shownValue(item, item, field, format)}
+      </div>`;
     };
     return html`<div
       class="item ${computed ? "manual" : ""} ${locked ? "locked" : ""}"
       data-id=${item.id}
-      @change=${(event: Event) => this.onItemChange(item, event)}
     >
       <div class="label">
-        ${
-          item.kind === "material"
-            ? this.renderMaterialPicker(item, t)
-            : entered
-              ? html`<input name="label" aria-label=${t("item.label")} .value=${shown.label} />`
-              : item.label
-                ? html`<div>${item.label}</div>`
-                : nothing
-        }
+        ${name ? html`<div class="name">${name}</div>` : nothing}
         ${why ? html`<div class="evidence">${why}</div>` : nothing}
         ${item.slots.map(
           (slot) =>
@@ -658,32 +735,14 @@ export class RunPage extends LitElement {
                     html`<li>
                       ${format.timeRange(segment.start, segment.end)} ·
                       ${format.quantity(segment.kwh, item.unit)} ×
-                      ${this.priced(segment.unit_price, item.unit, format)}
+                      ${priced(segment.unit_price, item.unit, format)}
                     </li>`,
                 )}
               </ul>`
             : nothing
         }
       </div>
-      <div class="quantity">
-        ${number("quantity")}
-        ${
-          unitEntered
-            ? html`<input
-                name="unit"
-                class="unit"
-                aria-label=${t("item.unit")}
-                .value=${shown.unit}
-              />`
-            : html`<span class="unit muted small">${item.unit}</span>`
-        }
-      </div>
-      <div class="quantity price">
-        ${number("unit_price")}<span class="unit per muted small"
-          >${`${format.currencySymbol}/${priceUnit(item.unit).unit || "–"}`}</span
-        >
-      </div>
-      ${number("amount")}
+      ${VALUES.map(value)}
       <div class="actions">
         ${
           locked
@@ -692,7 +751,15 @@ export class RunPage extends LitElement {
                 title=${t("item.locked")}
                 .path=${mdiLockOutline}
               ></ha-svg-icon>`
-            : nothing
+            : html`<ha-icon-button
+                class="edit"
+                .label=${t("item.edit")}
+                .path=${mdiPencil}
+                @click=${() => {
+                  this.failed = undefined;
+                  this.editingItem = itemDraft(item, format);
+                }}
+              ></ha-icon-button>`
         }
         ${
           computed
@@ -705,7 +772,7 @@ export class RunPage extends LitElement {
                   ),
                 )}
                 .path=${mdiRestore}
-                @click=${() => this.saveItems(resetLineItem(this.hass, this.runId, item.id))}
+                @click=${() => this.act(resetLineItem(this.hass, this.runId, item.id))}
               ></ha-icon-button>`
             : nothing
         }
@@ -721,7 +788,7 @@ export class RunPage extends LitElement {
                 class="delete"
                 .label=${t("item.delete")}
                 .path=${mdiDelete}
-                @click=${() => this.saveItems(deleteLineItem(this.hass, this.runId, item.id))}
+                @click=${() => (this.deleting = item.id)}
               ></ha-icon-button>`
             : nothing
         }
@@ -729,279 +796,382 @@ export class RunPage extends LitElement {
     </div>`;
   }
 
-  private renderMaterialPicker(item: LineItem, t: Localize) {
-    const options = this.pickable(item.material_id);
-    // The catalogue may still be loading; the Line Item's copy names its Material meanwhile.
-    const own = item.material_id !== null && !options.some(({ id }) => id === item.material_id);
-    return html`<select
-      name="material_id"
-      aria-label=${t("item.material")}
-      ?disabled=${item.locked}
-    >
-      ${
-        item.material_id === null
-          ? html`<option value="" selected>${t("item.no_material")}</option>`
-          : nothing
-      }
-      ${
-        own
-          ? html`<option value=${item.material_id} selected>${item.material?.name}</option>`
-          : nothing
-      }
-      ${options.map(
-        (material) =>
-          html`<option value=${material.id} ?selected=${material.id === item.material_id}>
-            ${material.archived ? t("materials.archived_name", { name: material.name }) : material.name}
-          </option>`,
-      )}
-    </select>`;
+  /** What a unit price counts in, e.g. "€/kWh"; the currency alone without a unit. */
+  private per(unit: string, format: Format) {
+    const shown = priceUnit(unit).unit;
+    return shown ? `${format.currencySymbol}/${shown}` : format.currencySymbol;
   }
 
-  private renderAddMaterial(t: Localize) {
-    const materials = this.pickable(null);
-    const picked = materials.find(({ id }) => id === this.materialPick) ?? materials[0];
-    const byVolume =
-      picked?.form === "resin" ||
-      (picked?.price.source === "fixed" && picked.price.pack_unit === "ml");
-    const units = picked && picked.price_per_piece !== null ? ["pcs"] : ["g", "ml"];
-    const unit = units.length === 1 ? units[0] : byVolume ? "ml" : "g";
-    if (this.adding === "material" && !picked) {
-      return html`<div class="add-item no-materials">
-        <p class="muted small">
-          ${t("item.no_materials")}
-          <a href="${this.basePath}/materials" @click=${followLink}>${t("item.to_materials")}</a>
-        </p>
-        <ha-button class="small" appearance="plain" @click=${() => (this.adding = undefined)}>
-          ${t("item.cancel")}
-        </ha-button>
-      </div>`;
-    }
-    return html`<div class="add-item">
-      ${
-        this.adding === "material"
-          ? html`<form class="material" @submit=${this.onAdd}>
-              <select
-                name="material_id"
-                class="label"
-                required
-                aria-label=${t("item.material")}
-                @change=${(event: Event) =>
-                  (this.materialPick = (event.target as HTMLSelectElement).value)}
-              >
-                ${materials.map(
-                  (material) =>
-                    html`<option value=${material.id} ?selected=${material === picked}>
-                      ${material.name}
-                    </option>`,
-                )}
-              </select>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                name="quantity"
-                required
-                aria-label=${t("item.quantity")}
-              />
-              <select name="unit" aria-label=${t("item.unit")}>
-                ${units.map(
-                  (option) =>
-                    html`<option value=${option} .selected=${option === unit}>${option}</option>`,
-                )}
-              </select>
-              <div class="row">
-                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
-                <ha-button
-                  class="small"
-                  appearance="plain"
-                  @click=${() => (this.adding = undefined)}
-                >
-                  ${t("item.cancel")}
-                </ha-button>
-              </div>
-            </form>`
-          : html`<ha-button
-              class="small add-material"
-              appearance="filled"
-              @click=${() => {
-                this.adding = "material";
-                this.materialPick = undefined;
-              }}
-            >
-              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-              ${t("item.add_material")}
-            </ha-button>`
-      }
-    </div>`;
+  private renderDialog(run: RunDetail, t: Localize, format: Format) {
+    const dialog = { t, busy: this.saving, onCancel: () => this.closeDialog() };
+    const error = this.refused && t("run.save_failed");
+    if (this.editing) return this.renderRunDialog(run, this.editing, { ...dialog, error }, format);
+    const item = run.line_items.find(({ id }) => id === this.editingItem?.id);
+    if (this.editingItem && item)
+      return this.renderItemDialog(item, this.editingItem, { ...dialog, error }, format);
+    if (this.adding) return this.renderNewDialog(run, this.adding, { ...dialog, error }, format);
+    const deleting = run.line_items.find(({ id }) => id === this.deleting);
+    if (deleting)
+      return confirmDialog({
+        t,
+        title: t("delete.title", {
+          name: this.itemName(deleting, t) ?? t(`kind.${deleting.kind}`),
+        }),
+        name: "delete-item-dialog",
+        content: html`<p>${t("item.delete_warning")}</p>`,
+        onCancel: () => this.closeDialog(),
+        onConfirm: () => {
+          this.closeDialog();
+          void this.act(deleteLineItem(this.hass, this.runId, deleting.id));
+        },
+      });
+    if (this.drop)
+      return deleteDialog(t("delete.title", { name: runName(run, t) }), this.drop, t, format, {
+        cancel: () => (this.drop = undefined),
+        confirm: () => void this.delete(),
+      });
+    return nothing;
   }
 
-  /** A price per `unit`, per the unit it is shown in when that is another. */
-  private priced(price: number, unit: string, format: Format) {
-    const shown = priceUnit(unit);
-    const per = shown.unit === unit ? "" : `/${shown.unit}`;
-    return `${format.unitPrice(price * shown.factor)}${per}`;
-  }
-
-  private renderAddWater(t: Localize, format: Format) {
-    return html`<div class="add-item">
-      ${
-        this.adding === "water"
-          ? html`<form class="water" @submit=${this.onAdd}>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                name="quantity"
-                required
-                aria-label=${t("item.quantity")}
-              />
-              <span class="unit muted small">L</span>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                name="unit_price"
-                required
-                aria-label=${t("item.unit_price")}
-              />
-              <span class="unit muted small"
-                >${`${format.currencySymbol}/${priceUnit("L").unit}`}</span
-              >
-              <div class="row">
-                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
-                <ha-button
-                  class="small"
-                  appearance="plain"
-                  @click=${() => (this.adding = undefined)}
-                >
-                  ${t("item.cancel")}
-                </ha-button>
-              </div>
-            </form>`
-          : html`<ha-button
-              class="small add-water"
-              appearance="filled"
-              @click=${() => (this.adding = "water")}
-            >
-              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-              ${t("item.add_water")}
-            </ha-button>`
-      }
-    </div>`;
-  }
-
-  private renderAdd(run: RunDetail, t: Localize, format: Format) {
-    if (this.adding === "template") return this.renderAddTemplate(run, t, format);
-    return html`<div class="add-item">
-      ${
-        this.adding === "other"
-          ? html`<form @submit=${this.onAdd}>
-              <input
-                name="label"
-                class="label"
-                placeholder=${t("item.label")}
-                aria-label=${t("item.label")}
-              />
-              <input
-                type="number"
-                step="any"
-                min="0"
-                name="quantity"
-                value="1"
-                aria-label=${t("item.quantity")}
-              />
-              <input name="unit" placeholder=${t("item.unit")} aria-label=${t("item.unit")} />
-              <input
-                type="number"
-                step="any"
-                name="unit_price"
-                required
-                placeholder=${t("item.unit_price")}
-                aria-label=${t("item.unit_price")}
-              />
-              <p class="muted small">${t("item.negative_hint")}</p>
-              <div class="row">
-                <ha-button class="small" type="submit">${t("item.add")}</ha-button>
-                <ha-button
-                  class="small"
-                  appearance="plain"
-                  @click=${() => (this.adding = undefined)}
-                >
-                  ${t("item.cancel")}
-                </ha-button>
-              </div>
-            </form>`
-          : html`<div class="row">
-              <ha-button
-                class="small add-other"
-                appearance="filled"
-                @click=${() => (this.adding = "other")}
-              >
-                <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-                ${t("item.add_other")}
-              </ha-button>
-              ${
-                this.templates.length
-                  ? html`<ha-button
-                      class="small add-template"
-                      appearance="filled"
-                      @click=${() => (this.adding = "template")}
-                    >
-                      <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-                      ${t("item.add_template")}
-                    </ha-button>`
-                  : nothing
-              }
-            </div>`
-      }
-    </div>`;
-  }
-
-  private renderAddTemplate(run: RunDetail, t: Localize, format: Format) {
-    const template =
-      this.templates.find((candidate) => candidate.id === this.templateId) ?? this.templates[0];
-    if (!template) return nothing;
-    return html`<div class="add-item">
-      <form class="template" @submit=${(event: SubmitEvent) => this.onAddTemplate(event, template)}>
-        <select
-          name="template"
-          class="label"
-          aria-label=${t("item.template")}
-          @change=${(event: Event) => (this.templateId = (event.target as HTMLSelectElement).value)}
-        >
-          ${this.templates.map(
-            (option) =>
-              html`<option value=${option.id} ?selected=${option.id === template.id}>
-                ${`${option.label} · ${format.unitPrice(option.unit_price)}${option.unit ? `/${option.unit}` : ""}`}
-              </option>`,
-          )}
-        </select>
+  private renderRunDialog(
+    run: RunDetail,
+    draft: ReturnType<typeof runDraft>,
+    dialog: Pick<Parameters<typeof formDialog>[0], "t" | "busy" | "error" | "onCancel">,
+    format: Format,
+  ) {
+    const { t } = dialog;
+    const set = (changes: Partial<typeof draft>) => (this.editing = { ...draft, ...changes });
+    const locked = !run.finalised;
+    const wrong = new Set(this.checked ? runChanges(run, draft, format).invalid : []);
+    return formDialog({
+      ...dialog,
+      title: t("run.edit"),
+      name: "run-dialog",
+      onSubmit: () => this.saveRun(run, draft),
+      content: html`${field(
+          t("run.name"),
+          input({
+            name: "name",
+            autofocus: true,
+            value: draft.name,
+            placeholder: run.job_name ?? t("run.untitled"),
+            onInput: (name) => set({ name }),
+          }),
+        )}
         ${
-          template.basis === "running_hours"
+          this.hasProgram(run)
+            ? field(
+                t("run.program"),
+                input({
+                  name: "program",
+                  value: draft.program,
+                  onInput: (program) => set({ program }),
+                }),
+                { name: "program", hint: t("run.program_hint") },
+              )
+            : nothing
+        }
+        <div class="field-row">
+          ${field(
+            t("run.started"),
+            input({
+              type: "datetime-local",
+              name: "started",
+              value: draft.started,
+              disabled: locked,
+              invalid: wrong.has("started"),
+              onInput: (started) => set({ started }),
+            }),
+          )}
+          ${field(
+            t("run.ended"),
+            input({
+              type: "datetime-local",
+              name: "ended",
+              value: draft.ended,
+              disabled: locked,
+              invalid: wrong.has("ended"),
+              onInput: (ended) => set({ ended }),
+            }),
+          )}
+        </div>
+        <p class="muted small times-hint">${t(locked ? "run.locked_hint" : "run.times_hint")}</p>
+        <div class="field-row">
+          ${field(
+            t("run.outcome"),
+            select({
+              name: "outcome",
+              value: draft.outcome,
+              disabled: locked,
+              options: [
+                ...(run.outcome === null ? [["", "—"] as const] : []),
+                ...OUTCOMES.map((outcome) => [outcome, t(`outcome.${outcome}`)] as const),
+              ],
+              onChange: (outcome) => set({ outcome: outcome as Outcome }),
+            }),
+          )}
+          ${
+            run.part_count === null
+              ? nothing
+              : field(
+                  t("run.part_count"),
+                  input({
+                    type: "number",
+                    name: "part_count",
+                    min: "1",
+                    step: "1",
+                    value: draft.part_count,
+                    invalid: wrong.has("part_count"),
+                    onInput: (part_count) => set({ part_count }),
+                  }),
+                )
+          }
+        </div>
+        ${field(
+          t("run.note"),
+          textarea({ name: "note", value: draft.note, onInput: (note) => set({ note }) }),
+        )}
+        ${field(
+          t("run.tags"),
+          html`<coinop-tag-input
+            .hass=${this.hass}
+            .tags=${draft.tags}
+            .catalog=${this.tags}
+            .label=${t("run.tags")}
+            @tags-change=${(event: CustomEvent<string[]>) => set({ tags: event.detail })}
+          ></coinop-tag-input>`,
+          { group: true },
+        )}`,
+    });
+  }
+
+  private renderItemDialog(
+    item: LineItem,
+    draft: ReturnType<typeof itemDraft>,
+    dialog: Pick<Parameters<typeof formDialog>[0], "t" | "busy" | "error" | "onCancel">,
+    format: Format,
+  ) {
+    const { t } = dialog;
+    const set = (changes: Partial<typeof draft>) => (this.editingItem = { ...draft, ...changes });
+    const wrong = new Set<string>(this.checked ? itemChanges(item, draft, format).invalid : []);
+    // Labels and units Coin-op sets stay as they are, rendered in the output language;
+    // a Material Line Item is named by its Material and counts g or ml.
+    const entered = item.kind === "other";
+    // Running hours are hours, whatever the template called them.
+    const unitEntered = entered && item.basis !== "running_hours";
+    const shown = followed(item, draft, format);
+    const materials = this.pickable(item.material_id);
+    const quantity = numberInput({
+      name: "quantity",
+      value: draft.quantity,
+      invalid: wrong.has("quantity"),
+      autofocus: !entered,
+      onInput: (typed) => set({ quantity: typed }),
+    });
+    const price = (name: "unit_price" | "amount") =>
+      numberInput({
+        name,
+        min: entered ? undefined : "0",
+        value: shown[name],
+        invalid: wrong.has(name),
+        onInput: (typed) => set({ [name]: typed, entered: name }),
+      });
+    return formDialog({
+      ...dialog,
+      title: t("item.edit"),
+      name: "item-dialog",
+      onSubmit: () => this.saveItem(item, draft),
+      content: html`${
+          item.kind === "material"
+            ? field(
+                t("item.material"),
+                select({
+                  name: "material_id",
+                  value: draft.material_id,
+                  options: [
+                    ...(item.material_id === null ? [["", t("item.no_material")] as const] : []),
+                    // The catalogue may still be loading; the Line Item's copy names its Material meanwhile.
+                    ...(item.material_id === null ||
+                    materials.some(({ id }) => id === item.material_id)
+                      ? []
+                      : [[item.material_id, item.material?.name] as const]),
+                    ...materials.map(
+                      ({ id, name, archived }) =>
+                        [id, archived ? t("materials.archived_name", { name }) : name] as const,
+                    ),
+                  ],
+                  onChange: (material_id) => set({ material_id }),
+                }),
+              )
+            : nothing
+        }
+        ${
+          entered
+            ? field(
+                t("item.label"),
+                input({
+                  name: "label",
+                  autofocus: true,
+                  value: draft.label,
+                  onInput: (label) => set({ label }),
+                }),
+              )
+            : nothing
+        }
+        <div class="field-row">
+          ${field(t("item.quantity"), unitEntered ? quantity : withUnit(quantity, item.unit))}
+          ${
+            unitEntered
+              ? field(
+                  t("item.unit"),
+                  input({ name: "unit", value: draft.unit, onInput: (unit) => set({ unit }) }),
+                )
+              : nothing
+          }
+        </div>
+        <div class="field-row">
+          ${field(t("item.unit_price"), withUnit(price("unit_price"), this.per(item.unit, format)))}
+          ${field(t("item.amount"), withUnit(price("amount"), format.currencySymbol))}
+        </div>
+        ${entered ? html`<p class="muted small">${t("item.negative_hint")}</p>` : nothing}`,
+    });
+  }
+
+  private renderNewDialog(
+    run: RunDetail,
+    adding: ReturnType<typeof newItem>,
+    dialog: Pick<Parameters<typeof formDialog>[0], "t" | "busy" | "error" | "onCancel">,
+    format: Format,
+  ) {
+    const { t } = dialog;
+    const set = (changes: Partial<typeof adding>) => (this.adding = { ...adding, ...changes });
+    const added = this.added(adding);
+    const wrong = new Set(this.checked ? added.invalid : []);
+    const quantity = (options: Parameters<typeof numberInput>[0] = {}) =>
+      numberInput({
+        name: "quantity",
+        value: adding.quantity,
+        invalid: wrong.has("quantity"),
+        onInput: (typed) => set({ quantity: typed }),
+        ...options,
+      });
+    const price = (unit: string, options: Parameters<typeof numberInput>[0] = {}) =>
+      field(
+        t("item.unit_price"),
+        withUnit(
+          numberInput({
+            name: "unit_price",
+            value: adding.unit_price,
+            invalid: wrong.has("unit_price"),
+            onInput: (unit_price) => set({ unit_price }),
+            ...options,
+          }),
+          unit,
+        ),
+      );
+    const { materials, picked, units, unit } = this.materialOf(adding);
+    const template = this.template(adding);
+    const content = {
+      water: () =>
+        html`<div class="field-row">
+          ${field(t("item.quantity"), withUnit(quantity({ autofocus: true }), "L"))}
+          ${price(this.per("L", format))}
+        </div>`,
+      material: () =>
+        picked
+          ? html`${field(
+                t("item.material"),
+                select({
+                  name: "material_id",
+                  value: picked.id,
+                  autofocus: true,
+                  options: materials.map(({ id, name }) => [id, name] as const),
+                  onChange: (material_id) => set({ material_id, unit: "" }),
+                }),
+              )}
+              <div class="field-row">
+                ${field(t("item.quantity"), quantity())}
+                ${field(
+                  t("item.unit"),
+                  select({
+                    name: "unit",
+                    value: adding.unit || unit,
+                    options: units.map((option) => [option, option] as const),
+                    onChange: (option) => set({ unit: option }),
+                  }),
+                )}
+              </div>`
+          : html`<p class="no-materials">
+              ${t("item.no_materials")}
+              <a href="${this.basePath}/materials" @click=${followLink}
+                >${t("item.to_materials")}</a
+              >
+            </p>`,
+      other: () =>
+        html`${field(
+            t("item.label"),
+            input({
+              name: "label",
+              autofocus: true,
+              value: adding.label,
+              onInput: (label) => set({ label }),
+            }),
+          )}
+          <div class="field-row">
+            ${field(t("item.quantity"), quantity())}
+            ${field(
+              t("item.unit"),
+              input({ name: "unit", value: adding.unit, onInput: (typed) => set({ unit: typed }) }),
+            )}
+          </div>
+          ${price(format.currencySymbol, { min: undefined })}
+          <p class="muted small">${t("item.negative_hint")}</p>`,
+      template: () =>
+        html`${field(
+          t("item.template"),
+          select({
+            name: "template",
+            value: template?.id,
+            autofocus: true,
+            options: this.templates.map(
+              (option) =>
+                [
+                  option.id,
+                  `${option.label} · ${format.unitPrice(option.unit_price)}${option.unit ? `/${option.unit}` : ""}`,
+                ] as const,
+            ),
+            onChange: (template_id) => set({ template_id }),
+          }),
+        )}
+        ${
+          template?.basis === "running_hours"
             ? html`<p class="muted small">
                 ${t("item.running_hours_hint", {
                   hours: format.quantity(run.running_seconds / 3600, "h"),
                 })}
               </p>`
-            : html`<input
-                type="number"
-                step="any"
-                min="0"
-                name="quantity"
-                placeholder=${t("item.default_quantity", {
-                  quantity: format.toNumberInput(template.default_quantity, 4),
-                })}
-                aria-label=${t("item.quantity")}
-              />`
-        }
-        <div class="row">
-          <ha-button class="small" type="submit">${t("item.add")}</ha-button>
-          <ha-button class="small" appearance="plain" @click=${() => (this.adding = undefined)}>
-            ${t("item.cancel")}
-          </ha-button>
-        </div>
-      </form>
-    </div>`;
+            : field(
+                t("item.quantity"),
+                withUnit(
+                  quantity({
+                    placeholder: t("item.default_quantity", {
+                      quantity: format.toNumberInput(template?.default_quantity ?? null, 4),
+                    }),
+                  }),
+                  template?.unit,
+                ),
+              )
+        }`,
+    };
+    return formDialog({
+      ...dialog,
+      title: adding.kind === "template" ? t("item.new_template") : t(`item.add_${adding.kind}`),
+      name: "new-item-dialog",
+      submit: t("item.add"),
+      disabled: adding.kind === "material" && !picked,
+      onSubmit: () => this.saveNew(adding),
+      content: content[adding.kind](),
+    });
   }
 
   static override styles = [
@@ -1009,6 +1179,9 @@ export class RunPage extends LitElement {
     css`
       .runbar {
         margin-bottom: 14px;
+      }
+      coinop-run-images {
+        margin-bottom: 16px;
       }
       .spacer {
         flex: 1;
@@ -1022,51 +1195,38 @@ export class RunPage extends LitElement {
       :host([narrow]) .grid {
         grid-template-columns: 1fr;
       }
-      .fields {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      .fields > * {
-        min-width: 0;
-      }
-      .fields p {
-        margin: 0;
-      }
-      .wide {
-        grid-column: span 2;
-      }
-      label,
-      .label {
+      .head {
         display: flex;
-        flex-direction: column;
-        gap: 3px;
-        font-size: 12px;
+        align-items: center;
+        gap: 8px;
+      }
+      .head h3 {
+        flex: 1;
+      }
+      .head .edit {
+        margin: -8px -8px -8px 0;
+        --ha-icon-button-size: 40px;
+        --mdc-icon-size: 20px;
         color: var(--secondary-text-color);
       }
-      input,
-      select,
-      textarea {
-        width: 100%;
-      }
-      :disabled {
-        opacity: 0.6;
-      }
-      .error {
-        color: var(--error-color, #db4437);
-      }
-      dl {
+      .facts dl {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: auto minmax(0, 1fr);
         gap: 6px 12px;
-        margin: 0;
+        margin: 12px 0 0;
       }
       dt {
         color: var(--secondary-text-color);
       }
-      dd {
+      .facts dd {
         margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .facts .tags {
+        gap: 4px;
+      }
+      .facts .note {
+        white-space: pre-wrap;
       }
       .items {
         display: flex;
@@ -1105,8 +1265,8 @@ export class RunPage extends LitElement {
       .item,
       .item-head {
         display: grid;
-        grid-template-columns: minmax(120px, 1fr) 140px 140px 96px 108px;
-        gap: 6px;
+        grid-template-columns: minmax(120px, 1fr) 96px 96px 88px 136px;
+        gap: 8px;
         align-items: start;
         padding: 6px 4px;
       }
@@ -1116,56 +1276,38 @@ export class RunPage extends LitElement {
       .item > * {
         min-width: 0;
       }
+      .item > .num {
+        padding-top: 6px;
+        white-space: normal;
+      }
       .item.manual {
         box-shadow: inset 3px 0 var(--coinop-manual);
         padding-left: 10px;
       }
-      :host([narrow]) :is(.item, .item-head) {
-        grid-template-columns: 1fr 1fr 1fr 108px;
+      .item .num.manual {
+        color: var(--coinop-manual);
       }
-      :host([narrow]) .item .label {
+      :host([narrow]) :is(.item, .item-head) {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      :host([narrow]) .item :is(.label, .actions) {
         grid-column: 1 / -1;
       }
       .item-head {
         padding-block: 2px 0;
         text-align: right;
       }
-      :host([narrow]) .item-head > :first-child {
+      :host([narrow]) .item-head > :is(:first-child, :last-child) {
         display: none;
       }
-      :host([narrow]) .quantity.price {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0;
-      }
-      :host([narrow]) .quantity.price .unit {
-        flex: none;
-        text-align: right;
-      }
-      .item .label > div:first-child {
+      .item .name {
         padding-top: 6px;
-      }
-      .item input[type="number"] {
-        text-align: right;
-      }
-      .item input.manual {
-        border-bottom-color: var(--coinop-manual);
-        color: var(--coinop-manual);
-      }
-      .quantity {
-        display: flex;
-        gap: 4px;
-        align-items: center;
-      }
-      .quantity .unit {
-        flex: 0 0 44px;
       }
       .actions {
         display: flex;
         gap: 2px;
         align-items: center;
         justify-content: flex-end;
-        padding-top: 4px;
       }
       .actions ha-icon-button {
         --ha-icon-button-size: 32px;
@@ -1177,35 +1319,15 @@ export class RunPage extends LitElement {
       }
       .lock {
         --mdc-icon-size: 18px;
+        margin-inline-end: 7px;
         color: var(--secondary-text-color);
       }
       .add-item {
         margin-top: 8px;
       }
-      .add-item form {
-        display: grid;
-        grid-template-columns: 1fr 72px 72px 110px;
-        gap: 6px;
-      }
-      .add-item form.material {
-        grid-template-columns: 1fr 96px 72px;
-      }
-      .add-item form > :is(p, .row) {
-        grid-column: 1 / -1;
-        margin: 0;
-      }
-      .add-item form.template {
-        grid-template-columns: 1fr 140px;
-      }
-      :host([narrow]) .add-item form {
-        grid-template-columns: 1fr 1fr;
-      }
       .saved {
         color: var(--success-color, #43a047);
         margin: 0;
-      }
-      :host([narrow]) .add-item form .label {
-        grid-column: 1 / -1;
       }
       .evidence {
         font-size: 11px;

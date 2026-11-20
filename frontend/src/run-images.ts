@@ -6,7 +6,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { deleteImage, getRun, setCover, uploadImages, type RunDetail, type RunImage } from "./api";
 import type { HomeAssistant } from "./hass";
 import { isKey, localize } from "./localize";
-import "./dialog";
+import { confirmDialog } from "./dialog";
 import "./run-image";
 import { shared } from "./styles";
 
@@ -132,24 +132,15 @@ export class RunImages extends LitElement {
 
   private renderDeleteDialog(image: RunImage) {
     const t = localize(this.hass);
-    const cancel = () => (this.deleting = undefined);
-    return html`<coinop-dialog
-      class="image-dialog dialog"
-      alert
-      .label=${t("images.delete_title")}
-      @cancel=${cancel}
-    >
-      <coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
-      <p class="muted small">${t("images.delete_warning")}</p>
-      <div slot="footer" class="row end">
-        <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
-          ${t("delete.cancel")}
-        </ha-button>
-        <ha-button class="confirm" variant="danger" @click=${() => this.delete(image)}>
-          ${t("delete.confirm")}
-        </ha-button>
-      </div>
-    </coinop-dialog>`;
+    return confirmDialog({
+      t,
+      title: t("images.delete_title"),
+      name: "image-dialog",
+      content: html`<coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
+        <p class="muted small">${t("images.delete_warning")}</p>`,
+      onCancel: () => (this.deleting = undefined),
+      onConfirm: () => this.delete(image),
+    });
   }
 
   static override styles = [
@@ -198,7 +189,7 @@ export class RunImages extends LitElement {
         color: var(--secondary-text-color);
       }
       p {
-        margin: 6px 0 12px;
+        margin: 8px 0 0;
       }
       .images-error {
         color: var(--error-color, #db4437);

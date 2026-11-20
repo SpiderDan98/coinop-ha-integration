@@ -1,7 +1,8 @@
-// The Line Item Templates tab: the global catalogue as a table edited in place, each
-// field saved as it is changed, with the Devices that add a template automatically.
-import { mdiDelete, mdiPlus } from "@mdi/js";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+// The Line Item Templates tab: the global catalogue as a read-only table, with the
+// Devices that add a template automatically. A template is created, edited and copied in
+// a dialog and deleted once confirmed. The catalogue follows by subscription.
+import { mdiContentCopy, mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   createTemplate,
@@ -11,14 +12,18 @@ import {
   type LineItemTemplate,
   type QuantityBasis,
 } from "./api";
+import { confirmDialog, formDialog } from "./dialog";
+import { field, input, numberInput, select, withUnit } from "./fields";
+import { formatter } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
+import { Pagination, pagerStyles } from "./pagination";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
 const BASES: QuantityBasis[] = ["entered", "running_hours"];
 
-/** What each field shows, as its input's value. */
+/** A template's fields as the dialog's fields hold them. */
 const fieldValues = (template: LineItemTemplate) => ({
   label: template.label,
   unit: template.unit,
@@ -27,30 +32,28 @@ const fieldValues = (template: LineItemTemplate) => ({
   basis: template.basis,
 });
 
-type Field = keyof ReturnType<typeof fieldValues>;
+type Draft = ReturnType<typeof fieldValues>;
+
+const NEW: Draft = { label: "", unit: "", unit_price: "", default_quantity: "1", basis: "entered" };
 
 const number = (value: string) =>
   value.trim() === "" || !Number.isFinite(Number(value)) ? undefined : Number(value);
 
-/** The change a field's new value asks for; undefined if it is no valid value. */
-const fieldChange = (field: Field, value: string) => {
-  switch (field) {
-    case "label":
-      return value.trim() ? { label: value.trim() } : undefined;
-    case "unit":
-      return { unit: value.trim() };
-    case "unit_price": {
-      const price = number(value);
-      return price === undefined ? undefined : { unit_price: price };
-    }
-    case "default_quantity": {
-      const quantity = number(value);
-      return quantity === undefined || quantity < 0 ? undefined : { default_quantity: quantity };
-    }
-    case "basis":
-      return { basis: value as QuantityBasis };
-  }
+/** What a draft asks for; undefined for a field that holds no valid value. */
+const valuesOf = (draft: Draft, kept = 1) => {
+  // A running-hours template has no default quantity field, so its quantity is kept.
+  const quantity = draft.basis === "entered" ? number(draft.default_quantity) : kept;
+  return {
+    label: draft.label.trim() || undefined,
+    unit: draft.unit.trim(),
+    unit_price: number(draft.unit_price),
+    default_quantity: quantity !== undefined && quantity < 0 ? undefined : quantity,
+    basis: draft.basis,
+  };
 };
+
+/** A price, or the currency alone, with the unit it counts in: "€0.15/h", "€/h". */
+const per = (price: string, unit: string) => (unit ? `${price}/${unit}` : price);
 
 @customElement("coinop-templates-page")
 export class TemplatesPage extends LitElement {
@@ -61,35 +64,27 @@ export class TemplatesPage extends LitElement {
   @property({ attribute: false }) devices?: Device[];
   @property({ type: Boolean, reflect: true }) narrow = false;
 
-  /** The new template's basis while its form is open. */
-  @state() private adding?: QuantityBasis;
-  @state() private failed = false;
-  /** The template whose delete confirmation is open. */
-  @state() private confirming?: string;
-
-  protected override updated(changed: PropertyValues) {
-    // The form opens at the top, far from the floating button that opened it.
-    if (changed.has("adding") && this.adding && !changed.get("adding"))
-      this.renderRoot.querySelector<HTMLInputElement>("form.new [name=label]")?.focus();
-  }
+  /** The dialog's draft, for a new template without `template`; `tried` marks invalid fields. */
+  @state() private editing?: { template?: LineItemTemplate; draft: Draft; tried: boolean };
+  /** Set while its delete confirmation is open. */
+  @state() private deleting?: LineItemTemplate;
+  @state() private saving = false;
+  /** What could not be done: "save" shows in the dialog, "delete" on the page. */
+  @state() private failed?: "save" | "delete";
+  private readonly pages = new Pagination(this);
 
   override render() {
     const t = localize(this.hass);
     if (!this.templates) return html`<p class="muted">${t("templates.loading")}</p>`;
     return html`
-      ${
-        this.adding
-          ? nothing
-          : html`<ha-button class="new-template fab" @click=${() => (this.adding = "entered")}>
-              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-              ${t("templates.new")}
-            </ha-button>`
-      }
-      ${this.adding ? this.renderNew(this.adding, t) : nothing}
+      <ha-button class="new-template fab" @click=${() => this.open(NEW)}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+        ${t("templates.new")}
+      </ha-button>
       ${
         this.templates.length
           ? table({
-              name: "templates stacked",
+              name: "templates",
               columns: [
                 { label: t("item.label") },
                 { label: t("item.unit") },
@@ -99,234 +94,222 @@ export class TemplatesPage extends LitElement {
                 { label: t("templates.automatic_for") },
                 {},
               ],
-              rows: this.templates.map((template) => this.renderTemplate(template, t)),
+              rows: this.pages
+                .of(this.templates)
+                .map((template) => this.renderTemplate(template, t)),
+              pager: this.pages.controls(this.templates.length, t),
             })
           : html`<p class="muted">${t("templates.empty")}</p>`
       }
-      ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
+      ${this.failed === "delete" ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
       <p class="muted small">${t("templates.copied")}</p>
+      ${this.editing ? this.renderDialog(this.editing, t) : nothing}
+      ${this.deleting ? this.renderDeleteDialog(this.deleting, t) : nothing}
     `;
   }
 
-  private renderTemplate(template: LineItemTemplate, t: Localize) {
-    const shown = fieldValues(template);
-    const automatic = (this.devices ?? [])
-      .filter((device) => device.settings.automatic_templates.includes(template.id))
+  /** The names of the Devices that add the template to their Runs. */
+  private automaticFor({ id }: LineItemTemplate) {
+    return (this.devices ?? [])
+      .filter((device) => device.settings.automatic_templates.includes(id))
       .map((device) => device.name)
       .join(", ");
-    const confirming = this.confirming === template.id;
-    return html`<tr
-      class="template"
-      data-id=${template.id}
-      @change=${(event: Event) => this.onChange(template, event)}
-    >
-      <td><input name="label" aria-label=${t("item.label")} .value=${shown.label} /></td>
-      <td><input name="unit" class="unit" aria-label=${t("item.unit")} .value=${shown.unit} /></td>
-      <td class="num">
-        <input
-          type="number"
-          step="any"
-          name="unit_price"
-          aria-label=${t("item.unit_price")}
-          .value=${shown.unit_price}
-        />
-      </td>
+  }
+
+  private renderTemplate(template: LineItemTemplate, t: Localize) {
+    const format = formatter(this.hass);
+    const none = html`<span class="muted">–</span>`;
+    return html`<tr class="template" data-id=${template.id}>
+      <td>${template.label}</td>
+      <td>${template.unit || none}</td>
+      <td class="num">${per(format.unitPrice(template.unit_price), template.unit)}</td>
       <td class="num">
         ${
           template.basis === "running_hours"
             ? html`<span class="muted small">${t("templates.from_run")}</span>`
-            : html`<input
-                type="number"
-                step="any"
-                min="0"
-                name="default_quantity"
-                aria-label=${t("templates.default_quantity")}
-                .value=${shown.default_quantity}
-              />`
+            : format.quantity(template.default_quantity, template.unit).trim()
         }
       </td>
-      <td>${this.renderBasis(template.basis, t)}</td>
-      <td class="automatic small">${automatic || html`<span class="muted">–</span>`}</td>
+      <td>${t(`basis.${template.basis}`)}</td>
+      <td class="automatic small">${this.automaticFor(template) || none}</td>
       <td class="actions">
-        ${
-          confirming
-            ? html`<div class="delete-hint muted small">
-                  ${t("templates.delete_hint", { label: template.label })}
-                  ${automatic ? t("templates.delete_automatic", { devices: automatic }) : nothing}
-                </div>
-                <ha-button
-                  class="small confirm-delete"
-                  variant="danger"
-                  @click=${() => this.delete(template)}
-                >
-                  ${t("templates.delete_confirm")}
-                </ha-button>
-                <ha-button
-                  class="small"
-                  appearance="plain"
-                  @click=${() => (this.confirming = undefined)}
-                >
-                  ${t("item.cancel")}
-                </ha-button>`
-            : html`<ha-icon-button
-                class="delete"
-                .label=${t("templates.delete")}
-                .path=${mdiDelete}
-                @click=${() => (this.confirming = template.id)}
-              ></ha-icon-button>`
-        }
+        <ha-icon-button
+          class="edit"
+          .label=${t("templates.edit")}
+          .path=${mdiPencil}
+          @click=${() => this.open(fieldValues(template), template)}
+        ></ha-icon-button>
+        <ha-icon-button
+          class="duplicate"
+          .label=${t("templates.duplicate")}
+          .path=${mdiContentCopy}
+          @click=${() => this.open(fieldValues(template))}
+        ></ha-icon-button>
+        <ha-icon-button
+          class="delete"
+          .label=${t("templates.delete")}
+          .path=${mdiDelete}
+          @click=${() => (this.deleting = template)}
+        ></ha-icon-button>
       </td>
     </tr>`;
   }
 
-  private renderBasis(basis: QuantityBasis, t: Localize) {
-    return html`<select name="basis" aria-label=${t("templates.basis")}>
-      ${BASES.map(
-        (option) =>
-          html`<option value=${option} ?selected=${option === basis}>
-            ${t(`basis.${option}`)}
-          </option>`,
-      )}
-    </select>`;
+  private renderDialog(editing: NonNullable<typeof this.editing>, t: Localize) {
+    const { template, draft, tried } = editing;
+    const change = (changes: Partial<Draft>) =>
+      (this.editing = { ...editing, draft: { ...draft, ...changes } });
+    const values = valuesOf(draft, template?.default_quantity);
+    const invalid = (name: keyof Draft) => tried && values[name] === undefined;
+    const unit = draft.unit.trim();
+    return formDialog({
+      t,
+      title: template ? t("templates.edit_title") : t("templates.new"),
+      name: "template-dialog",
+      busy: this.saving,
+      error: this.failed === "save" && t("run.save_failed"),
+      onCancel: () => (this.editing = undefined),
+      onSubmit: () => this.save(editing),
+      content: html`${field(
+          t("item.label"),
+          input({
+            name: "label",
+            required: true,
+            autofocus: true,
+            value: draft.label,
+            invalid: invalid("label"),
+            onInput: (label) => change({ label }),
+          }),
+        )}
+        <div class="field-row">
+          ${field(
+            t("item.unit_price"),
+            withUnit(
+              numberInput({
+                name: "unit_price",
+                min: undefined,
+                required: true,
+                value: draft.unit_price,
+                invalid: invalid("unit_price"),
+                onInput: (unit_price) => change({ unit_price }),
+              }),
+              per(formatter(this.hass).currencySymbol, unit),
+            ),
+          )}
+          ${field(
+            t("item.unit"),
+            input({
+              name: "unit",
+              value: draft.unit,
+              onInput: (entered) => change({ unit: entered }),
+            }),
+          )}
+        </div>
+        <div class="field-row">
+          ${field(
+            t("templates.basis"),
+            select({
+              name: "basis",
+              value: draft.basis,
+              options: BASES.map((basis) => [basis, t(`basis.${basis}`)]),
+              onChange: (basis) => change({ basis: basis as QuantityBasis }),
+            }),
+          )}
+          ${
+            draft.basis === "entered"
+              ? field(
+                  t("templates.default_quantity"),
+                  withUnit(
+                    numberInput({
+                      name: "default_quantity",
+                      value: draft.default_quantity,
+                      invalid: invalid("default_quantity"),
+                      onInput: (default_quantity) => change({ default_quantity }),
+                    }),
+                    unit,
+                  ),
+                )
+              : nothing
+          }
+        </div>`,
+    });
   }
 
-  private renderNew(basis: QuantityBasis, t: Localize) {
-    return html`<form class="card new" @submit=${this.create}>
-      <label>${t("item.label")}<input name="label" required /></label>
-      <label>${t("templates.unit")}<input name="unit" /></label>
-      <label
-        >${t("item.unit_price")}<input type="number" step="any" name="unit_price" required
-      /></label>
-      <label
-        >${t("templates.basis")}<select
-          name="basis"
-          @change=${(event: Event) =>
-            (this.adding = (event.target as HTMLSelectElement).value as QuantityBasis)}
-        >
-          ${BASES.map(
-            (option) =>
-              html`<option value=${option} ?selected=${option === basis}>
-                ${t(`basis.${option}`)}
-              </option>`,
-          )}
-        </select></label
-      >
-      ${
-        basis === "entered"
-          ? html`<label
-              >${t("templates.default_quantity")}<input
-                type="number"
-                step="any"
-                min="0"
-                name="default_quantity"
-                value="1"
-            /></label>`
-          : nothing
-      }
-      <div class="row">
-        <ha-button type="submit">${t("templates.create")}</ha-button>
-        <ha-button appearance="plain" @click=${() => (this.adding = undefined)}>
-          ${t("item.cancel")}
-        </ha-button>
-      </div>
-    </form>`;
+  private renderDeleteDialog(template: LineItemTemplate, t: Localize) {
+    const devices = this.automaticFor(template);
+    return confirmDialog({
+      t,
+      title: t("delete.title", { name: template.label }),
+      name: "delete-template-dialog",
+      content: html`<p>${t("templates.delete_hint", { label: template.label })}</p>
+        ${devices ? html`<p>${t("templates.delete_automatic", { devices })}</p>` : nothing}`,
+      confirm: t("templates.delete_confirm"),
+      onCancel: () => (this.deleting = undefined),
+      onConfirm: () => this.delete(template),
+    });
+  }
+
+  /** Without `template` the draft becomes a new one, as for a copy. */
+  private open(draft: Draft, template?: LineItemTemplate) {
+    this.failed = undefined;
+    this.editing = { template, draft, tried: false };
+  }
+
+  /** Creates the template, or sends what changed of the one being edited. */
+  private async save(editing: NonNullable<typeof this.editing>) {
+    const { template } = editing;
+    const { label, unit_price, default_quantity, ...rest } = valuesOf(
+      editing.draft,
+      template?.default_quantity,
+    );
+    if (label === undefined || unit_price === undefined || default_quantity === undefined) {
+      this.editing = { ...editing, tried: true };
+      return;
+    }
+    const fields = { ...rest, label, unit_price, default_quantity };
+    const changes = Object.fromEntries(
+      Object.entries(fields).filter(
+        ([name, value]) => value !== template?.[name as keyof typeof fields],
+      ),
+    );
+    if (template && !Object.keys(changes).length) {
+      this.editing = undefined;
+      return;
+    }
+    this.saving = true;
+    this.failed = undefined;
+    try {
+      await (template
+        ? updateTemplate(this.hass, template.id, changes)
+        : createTemplate(this.hass, fields));
+      this.editing = undefined;
+    } catch {
+      this.failed = "save";
+    } finally {
+      this.saving = false;
+    }
   }
 
   private async delete(template: LineItemTemplate) {
-    this.confirming = undefined;
-    await this.attempt(deleteTemplate(this.hass, template.id));
-  }
-
-  private onChange(template: LineItemTemplate, event: Event) {
-    const input = event.target as HTMLInputElement;
-    const field = input.name as Field;
-    const shown = fieldValues(template)[field];
-    const undo = () => (input.value = shown);
-    const changes = fieldChange(field, input.value);
-    if (!changes) return undo();
-    void this.attempt(updateTemplate(this.hass, template.id, changes), undo);
-  }
-
-  private async create(event: SubmitEvent) {
-    event.preventDefault();
-    const entered = Object.fromEntries(new FormData(event.target as HTMLFormElement)) as Record<
-      string,
-      string
-    >;
-    const label = (entered.label ?? "").trim();
-    const unitPrice = number(entered.unit_price ?? "");
-    const quantity = entered.default_quantity === undefined ? 1 : number(entered.default_quantity);
-    if (!label || unitPrice === undefined || quantity === undefined || quantity < 0) return;
-    const template = {
-      label,
-      unit: (entered.unit ?? "").trim(),
-      unit_price: unitPrice,
-      default_quantity: quantity,
-      basis: (entered.basis ?? "entered") as QuantityBasis,
-    };
-    if (await this.attempt(createTemplate(this.hass, template))) this.adding = undefined;
-  }
-
-  private async attempt(request: Promise<unknown>, undo = () => {}) {
-    this.failed = false;
+    this.deleting = undefined;
+    this.failed = undefined;
     try {
-      await request;
-      return true;
+      await deleteTemplate(this.hass, template.id);
     } catch {
-      this.failed = true;
-      undo();
-      return false;
+      this.failed = "delete";
     }
   }
 
   static override styles = [
     shared,
     tableStyles,
+    pagerStyles,
     css`
       .templates {
         max-width: 1100px;
       }
-      input,
-      select {
-        width: 100%;
-      }
-      input[type="number"] {
-        max-width: 110px;
-        text-align: right;
-      }
-      input.unit {
-        max-width: 80px;
-      }
-      .delete-hint {
-        max-width: 260px;
-        margin: 0 0 6px auto;
-        text-align: left;
-      }
-      form.new {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 10px;
-        margin-bottom: 12px;
-        max-width: 1100px;
-        box-sizing: border-box;
-      }
-      form.new label {
-        display: grid;
-        gap: 4px;
-        color: var(--secondary-text-color);
-        font-size: 12px;
-      }
-      form.new .row {
-        grid-column: 1 / -1;
-      }
-      p.small {
+      :host > p.small {
         margin: 10px 0 0;
-      }
-      .error {
-        color: var(--error-color, #db4437);
-      }
-      :host([narrow]) input[type="number"] {
-        max-width: none;
       }
     `,
   ];

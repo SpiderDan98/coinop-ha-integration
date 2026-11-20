@@ -1,10 +1,12 @@
-// The Materials tab: the global catalogue, edited in place. The list itself comes
-// from the panel's catalogue subscription, so every open panel shows each change.
+// The Materials tab: the global catalogue, listed read-only and edited in a dialog. The
+// list itself comes from the panel's catalogue subscription, so every open panel shows
+// each change.
 // Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
 import {
   mdiArchiveArrowUpOutline,
   mdiArchiveOutline,
   mdiClose,
+  mdiContentCopy,
   mdiDelete,
   mdiPencil,
   mdiPlus,
@@ -32,9 +34,12 @@ import {
   type MaterialType,
   type PackUnit,
 } from "./api";
+import { confirmDialog, formDialog } from "./dialog";
+import { checkbox, field, input, numberInput, select, withUnit } from "./fields";
 import { formatter, type Format } from "./format";
 import type { HomeAssistant } from "./hass";
-import { localize, type Localize } from "./localize";
+import { localize, type Key, type Localize } from "./localize";
+import { Pagination, pagerStyles } from "./pagination";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
@@ -85,6 +90,13 @@ const draftOf = ({ price, ...material }: Material): Draft => ({
         pack_unit: price.pack_unit,
       }
     : { pack_unit: usualUnit(material.form), filament_id: String(price.filament_id) }),
+});
+
+/** A copy leaves its type's default and a Spoolman link with the original. */
+const copyOf = (material: Material): Draft => ({
+  ...draftOf(material),
+  default_for_type: false,
+  price_source: "fixed",
 });
 
 /** Spoolman supplies everything else of a linked Material. */
@@ -147,27 +159,24 @@ export class MaterialsPage extends LitElement {
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   @state() private types: MaterialType[] = [];
-  /** The form's values, while creating (no `editing`) or editing a Material. */
+  /** The dialog's values, while creating (no `editing`) or editing a Material. */
   @state() private draft?: Draft;
   @state() private editing?: string;
-  /** The backend refused the last save. */
-  @state() private invalid = false;
-  /** Set once the user tried to save: the form marks what is missing or wrong from then on. */
+  @state() private saving = false;
+  /** Why the last save failed. */
+  @state() private failure?: Key;
+  /** Set once the user tried to save: the dialog marks what is missing or wrong from then on. */
   @state() private checked = false;
-  @state() private confirming?: string;
+  @state() private deleting?: Material;
   @state() private notice?: string;
   /** Undefined until read, or when the backend couldn't answer. */
   @state() private spoolman?: Filaments;
   private typesRequested = false;
-  private focusForm = false;
-
-  protected override updated() {
-    if (!this.focusForm) return;
-    this.focusForm = false;
-    const form = this.renderRoot.querySelector("form.material");
-    form?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    form?.querySelector<HTMLInputElement>("[name=name]")?.focus({ preventScroll: true });
-  }
+  private readonly pages = {
+    active: new Pagination(this),
+    archived: new Pagination(this),
+    filaments: new Pagination(this),
+  };
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("hass") && this.hass && !this.typesRequested) {
@@ -190,29 +199,24 @@ export class MaterialsPage extends LitElement {
     const active = this.materials.filter((material) => !material.archived);
     const archived = this.materials.filter((material) => material.archived);
     return html`
-      ${
-        this.draft
-          ? nothing
-          : html`<ha-button class="new-material fab" @click=${() => this.open()}>
-              <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
-              ${t("materials.new")}
-            </ha-button>`
-      }
+      <ha-button class="new-material fab" @click=${() => this.open()}>
+        <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
+        ${t("materials.new")}
+      </ha-button>
       ${this.notice ? html`<p class="notice">${this.notice}</p>` : nothing}
-      ${this.draft ? this.renderForm(this.draft, t) : nothing}
       ${
         this.materials.length
           ? html`
               ${
                 active.length
-                  ? this.renderTable(active, "active", t, format)
+                  ? this.renderTable(active, "active", this.pages.active, t, format)
                   : html`<p class="muted none-active">${t("materials.all_archived")}</p>`
               }
               ${
                 archived.length
                   ? html`<details class="archived">
                       <summary>${t("materials.archived", { count: archived.length })}</summary>
-                      ${this.renderTable(archived, "", t, format)}
+                      ${this.renderTable(archived, "", this.pages.archived, t, format)}
                     </details>`
                   : nothing
               }
@@ -220,7 +224,8 @@ export class MaterialsPage extends LitElement {
             `
           : html`<p class="muted">${t("materials.empty")}</p>`
       }
-      ${this.renderSpoolman(t, format)}
+      ${this.renderSpoolman(t, format)} ${this.draft ? this.renderDialog(this.draft, t) : nothing}
+      ${this.deleting ? this.renderDeleteDialog(this.deleting, t) : nothing}
     `;
   }
 
@@ -234,7 +239,7 @@ export class MaterialsPage extends LitElement {
           material.price.source === "spoolman" &&
           material.price.filament_id === filament.id,
       );
-    const rows = spoolman.filaments.map((filament) => {
+    const rows = this.pages.filaments.of(spoolman.filaments).map((filament) => {
       const linked = linkedTo(filament);
       return html`<tr class="filament">
         <td class="name">
@@ -280,13 +285,20 @@ export class MaterialsPage extends LitElement {
                   {},
                 ],
                 rows,
+                pager: this.pages.filaments.controls(spoolman.filaments.length, t),
               })
             : html`<p class="muted">${t("spoolman.empty")}</p>`
       }
     </section>`;
   }
 
-  private renderTable(materials: Material[], name: string, t: Localize, format: Format) {
+  private renderTable(
+    materials: Material[],
+    name: string,
+    pages: Pagination,
+    t: Localize,
+    format: Format,
+  ) {
     const number = (value: number) => value.toLocaleString(this.hass.language);
     return table({
       name,
@@ -299,7 +311,8 @@ export class MaterialsPage extends LitElement {
         { label: t("materials.default_for_type"), class: "center" },
         {},
       ],
-      rows: materials.map(
+      pager: pages.controls(materials.length, t),
+      rows: pages.of(materials).map(
         (material) =>
           html`<tr class="material">
             <td class="name">
@@ -338,7 +351,7 @@ export class MaterialsPage extends LitElement {
                   : `${format.money(material.price_per_piece)} / pcs`
               }
             </td>
-            <td>
+            <td class="center">
               ${
                 material.archived
                   ? nothing
@@ -363,14 +376,6 @@ export class MaterialsPage extends LitElement {
   }
 
   private renderActions(material: Material, t: Localize) {
-    if (this.confirming === material.id) {
-      return html`<ha-button class="small" variant="danger" @click=${() => this.delete(material)}>
-          ${t("materials.delete_confirm")}
-        </ha-button>
-        <ha-button class="small" appearance="plain" @click=${() => (this.confirming = undefined)}>
-          ${t("materials.cancel")}
-        </ha-button>`;
-    }
     const action = (name: string, label: string, path: string, run: () => void) =>
       html`<ha-icon-button
         class=${name}
@@ -379,47 +384,36 @@ export class MaterialsPage extends LitElement {
         @click=${run}
       ></ha-icon-button>`;
     const remove = action("delete", t("materials.delete"), mdiDelete, () => {
-      this.confirming = material.id;
+      this.deleting = material;
     });
     return material.archived
       ? html`${action("restore", t("materials.restore"), mdiArchiveArrowUpOutline, () =>
           this.act(() => restoreMaterial(this.hass, material.id)),
         )}${remove}`
-      : html`${action("edit", t("materials.edit"), mdiPencil, () => this.open(material))}${action(
-          "archive",
-          t("materials.archive"),
-          mdiArchiveOutline,
-          () => this.act(() => archiveMaterial(this.hass, material.id)),
+      : html`${action("edit", t("materials.edit"), mdiPencil, () =>
+          this.open(draftOf(material), material.id),
+        )}${action("duplicate", t("materials.duplicate"), mdiContentCopy, () =>
+          this.open(copyOf(material)),
+        )}${action("archive", t("materials.archive"), mdiArchiveOutline, () =>
+          this.act(() => archiveMaterial(this.hass, material.id)),
         )}${remove}`;
   }
 
-  private renderForm(draft: Draft, t: Localize) {
+  private renderDialog(draft: Draft, t: Localize) {
     const set = (changes: Partial<Draft>) => (this.draft = { ...draft, ...changes });
     const wrong = this.checked ? problems(draft) : new Set<string>();
-    const marked = (name: string) => (wrong.has(name) ? "true" : "false");
-    const required = (name: string) => !["vendor", "colour", "diameter"].includes(name);
-    const text = (name: "name" | "vendor", label: string) =>
-      html`<label
-        >${label}<input
-          name=${name}
-          ?required=${required(name)}
-          aria-invalid=${marked(name)}
-          .value=${draft[name]}
-          @input=${(event: Event) => set({ [name]: (event.target as HTMLInputElement).value })}
-      /></label>`;
-    const number = (name: "density" | "diameter" | "pack_price" | "pack_size", label: string) =>
-      html`<label
-        >${label}<input
-          name=${name}
-          type="number"
-          step="any"
-          min="0"
-          ?required=${required(name)}
-          aria-invalid=${marked(name)}
-          .value=${draft[name]}
-          @input=${(event: Event) => set({ [name]: (event.target as HTMLInputElement).value })}
-      /></label>`;
+    const failure = this.failure ?? (wrong.size ? "materials.invalid" : undefined);
+    const number = (name: "density" | "diameter" | "pack_price" | "pack_size", label?: string) =>
+      numberInput({
+        name,
+        label,
+        required: name !== "diameter",
+        invalid: wrong.has(name),
+        value: draft[name],
+        onInput: (value) => set({ [name]: value }),
+      });
     const colour = draft.colour.trim();
+    const setColour = (value: string) => set({ colour: value });
     const known = [
       ...new Set([
         ...this.types.map((entry) => entry.type),
@@ -427,104 +421,127 @@ export class MaterialsPage extends LitElement {
       ]),
     ];
     const linked = draft.price_source === "spoolman";
-    const details = html`<label
-        >${t("materials.form")}<select
-          name="form"
-          @change=${(event: Event) => {
-            const form = (event.target as HTMLSelectElement).value as MaterialForm;
-            set({ form, pack_unit: usualUnit(form) });
-          }}
-        >
-          ${MATERIAL_FORMS.map(
-            (form) =>
-              html`<option value=${form} ?selected=${draft.form === form}>
-                ${t(`form.${form}`)}
-              </option>`,
-          )}
-        </select></label
-      >
-      <label
-        >${t("materials.type")}<input
-          name="type"
-          list="material-types"
-          required
-          aria-invalid=${marked("type")}
-          .value=${draft.type}
-          @input=${(event: Event) => this.setType((event.target as HTMLInputElement).value)}
-        /><datalist id="material-types">
-          ${known.map((type) => html`<option value=${type}></option>`)}
-        </datalist></label
-      >
-      ${byPiece(draft) ? nothing : number("density", t("materials.density"))}
-      ${hasDiameter(draft) ? number("diameter", t("materials.diameter")) : nothing}
-      ${text("vendor", t("materials.vendor"))}
-      <div class="label colour">
-        ${t("materials.colour")}
-        <div class="colour-row">
-          <input
-            type="color"
-            class="colour-picker"
-            aria-label=${t("materials.pick_colour")}
-            .value=${COLOUR.test(colour) ? colour.toLowerCase() : "#000000"}
-            @input=${(event: Event) => set({ colour: (event.target as HTMLInputElement).value })}
-          />
-          <input
-            name="colour"
-            aria-label=${t("materials.colour")}
-            aria-invalid=${marked("colour")}
-            placeholder="#rrggbb"
-            .value=${draft.colour}
-            @input=${(event: Event) => set({ colour: (event.target as HTMLInputElement).value })}
-          />
-          ${
-            colour
-              ? html`<ha-icon-button
-                  class="clear-colour"
-                  .label=${t("materials.clear_colour")}
-                  .path=${mdiClose}
-                  @click=${() => set({ colour: "" })}
-                ></ha-icon-button>`
-              : nothing
-          }
-        </div>
+    const details = html`<div class="field-row">
+        ${field(
+          t("materials.form"),
+          select({
+            name: "form",
+            value: draft.form,
+            options: MATERIAL_FORMS.map((form) => [form, t(`form.${form}`)]),
+            onChange: (picked) => {
+              const form = picked as MaterialForm;
+              set({ form, pack_unit: usualUnit(form) });
+            },
+          }),
+        )}
+        ${field(
+          t("materials.type"),
+          input({
+            name: "type",
+            list: known,
+            required: true,
+            invalid: wrong.has("type"),
+            value: draft.type,
+            onInput: (type) => this.setType(type),
+          }),
+        )}
       </div>
-      ${number("pack_price", t("materials.pack_price"))}
-      <div class="pack">
-        ${number("pack_size", t("materials.pack_size"))}
-        <select
-          name="pack_unit"
-          aria-label=${t("materials.pack_unit")}
-          @change=${(event: Event) =>
-            set({ pack_unit: (event.target as HTMLSelectElement).value as PackUnit })}
-        >
-          ${PACK_UNITS.map(
-            (unit) =>
-              html`<option value=${unit} ?selected=${draft.pack_unit === unit}>${unit}</option>`,
-          )}
-        </select>
+      ${
+        byPiece(draft)
+          ? nothing
+          : html`<div class="field-row">
+              ${field(t("materials.density"), withUnit(number("density"), "g/cm³"))}
+              ${
+                hasDiameter(draft)
+                  ? field(t("materials.diameter"), withUnit(number("diameter"), "mm"))
+                  : nothing
+              }
+            </div>`
+      }
+      <div class="field-row">
+        ${field(
+          t("materials.vendor"),
+          input({ name: "vendor", value: draft.vendor, onInput: (vendor) => set({ vendor }) }),
+        )}
+        ${field(
+          t("materials.colour"),
+          html`<div class="group">
+            ${input({
+              type: "color",
+              label: t("materials.pick_colour"),
+              value: COLOUR.test(colour) ? colour.toLowerCase() : "#000000",
+              onInput: setColour,
+            })}
+            ${input({
+              name: "colour",
+              label: t("materials.colour"),
+              placeholder: "#rrggbb",
+              invalid: wrong.has("colour"),
+              value: draft.colour,
+              onInput: setColour,
+            })}
+            ${
+              colour
+                ? html`<ha-icon-button
+                    class="clear-colour"
+                    .label=${t("materials.clear_colour")}
+                    .path=${mdiClose}
+                    @click=${() => setColour("")}
+                  ></ha-icon-button>`
+                : nothing
+            }
+          </div>`,
+          { name: "colour", group: true },
+        )}
+      </div>
+      <div class="field-row">
+        ${field(
+          t("materials.pack_price"),
+          withUnit(number("pack_price"), formatter(this.hass).currencySymbol),
+        )}
+        ${field(
+          t("materials.pack_size"),
+          html`<div class="group">
+            ${number("pack_size", t("materials.pack_size"))}
+            ${select({
+              name: "pack_unit",
+              label: t("materials.pack_unit"),
+              value: draft.pack_unit,
+              options: PACK_UNITS.map((unit) => [unit, unit]),
+              onChange: (unit) => set({ pack_unit: unit as PackUnit }),
+            })}
+          </div>`,
+          { name: "pack", group: true },
+        )}
       </div>`;
-    return html`<form class="card material" novalidate @submit=${this.save}>
-      <h3>${this.editing ? t("materials.edit_title") : t("materials.new_title")}</h3>
-      <div class="fields">
-        ${text("name", t("materials.name"))} ${this.renderCostSource(draft, set, t)}
-        ${linked ? nothing : details}
-        <label class="check"
-          ><input
-            name="default_for_type"
-            type="checkbox"
-            .checked=${draft.default_for_type}
-            @change=${(event: Event) =>
-              set({ default_for_type: (event.target as HTMLInputElement).checked })}
-          />${t("materials.default_for_type")}</label
-        >
-      </div>
-      ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}
-      ${this.invalid || wrong.size ? html`<p class="error">${t("materials.invalid")}</p>` : nothing}
-      <div class="row">
-        <ha-button type="submit">${t("materials.save")}</ha-button>
-        <ha-button appearance="plain" @click=${this.close}>${t("materials.cancel")}</ha-button>
-      </div>
-    </form>`;
+    return formDialog({
+      t,
+      title: this.editing ? t("materials.edit_title") : t("materials.new_title"),
+      name: "material-dialog",
+      busy: this.saving,
+      error: failure && t(failure),
+      onCancel: () => this.close(),
+      onSubmit: () => this.save(draft),
+      content: html`${field(
+        t("materials.name"),
+        input({
+          name: "name",
+          autofocus: true,
+          required: true,
+          invalid: wrong.has("name"),
+          value: draft.name,
+          onInput: (name) => set({ name }),
+        }),
+      )}
+      ${this.renderCostSource(draft, set, t)} ${linked ? nothing : details}
+      ${checkbox({
+        name: "default_for_type",
+        label: t("materials.default_for_type"),
+        checked: draft.default_for_type,
+        onChange: (default_for_type) => set({ default_for_type }),
+      })}
+      ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}`,
+    });
   }
 
   /** Linking happens on existing Materials; new ones come from the Filament list.
@@ -536,46 +553,54 @@ export class MaterialsPage extends LitElement {
     if (!linked && this.spoolman?.status !== "ok") return nothing;
     const filaments = this.spoolman?.filaments ?? [];
     const known = filaments.some((filament) => String(filament.id) === draft.filament_id);
-    const pick = (event: Event) => (event.target as HTMLSelectElement).value;
-    return html`<label
-        >${t("materials.price_source")}<select
-          name="price_source"
-          @change=${(event: Event) => set({ price_source: pick(event) as Draft["price_source"] })}
-        >
-          <option value="fixed" ?selected=${!linked}>${t("materials.price_fixed")}</option>
-          <option value="spoolman" ?selected=${linked}>${t("materials.price_spoolman")}</option>
-        </select></label
-      >${
+    return html`<div class="field-row">
+      ${field(
+        t("materials.price_source"),
+        select({
+          name: "price_source",
+          value: draft.price_source,
+          options: [
+            ["fixed", t("materials.price_fixed")],
+            ["spoolman", t("materials.price_spoolman")],
+          ],
+          onChange: (source) => set({ price_source: source as Draft["price_source"] }),
+        }),
+      )}
+      ${
         linked
-          ? html`<label
-              >${t("materials.filament")}<select
-                name="filament_id"
-                aria-invalid=${this.checked && !draft.filament_id ? "true" : "false"}
-                @change=${(event: Event) => set({ filament_id: pick(event) })}
-              >
-                <option value="" disabled ?selected=${!draft.filament_id}>
-                  ${t("materials.pick_filament")}
-                </option>
-                ${
-                  draft.filament_id && !known
-                    ? html`<option value=${draft.filament_id} selected>
-                        #${draft.filament_id}
-                      </option>`
-                    : nothing
-                }
-                ${filaments.map(
-                  (filament) =>
-                    html`<option
-                      value=${filament.id}
-                      ?selected=${String(filament.id) === draft.filament_id}
-                    >
-                      ${filamentName(filament)}
-                    </option>`,
-                )}
-              </select></label
-            >`
+          ? field(
+              t("materials.filament"),
+              select({
+                name: "filament_id",
+                value: draft.filament_id,
+                invalid: this.checked && !draft.filament_id,
+                options: [
+                  ["", t("materials.pick_filament"), true],
+                  ...(draft.filament_id && !known
+                    ? [[draft.filament_id, `#${draft.filament_id}`] as const]
+                    : []),
+                  ...filaments.map(
+                    (filament) => [String(filament.id), filamentName(filament)] as const,
+                  ),
+                ],
+                onChange: (filament_id) => set({ filament_id }),
+              }),
+            )
           : nothing
-      }`;
+      }
+    </div>`;
+  }
+
+  private renderDeleteDialog(material: Material, t: Localize) {
+    return confirmDialog({
+      t,
+      title: t("delete.title", { name: material.name }),
+      name: "delete-dialog",
+      content: html`<p class="muted small">${t("materials.delete_warning")}</p>`,
+      confirm: t("materials.delete_confirm"),
+      onCancel: () => (this.deleting = undefined),
+      onConfirm: () => this.delete(material),
+    });
   }
 
   private async createFrom(filament: Filament) {
@@ -583,19 +608,20 @@ export class MaterialsPage extends LitElement {
     try {
       await createMaterialFromSpoolman(this.hass, filament.id);
     } catch (error) {
-      this.spoolmanFailed(error);
+      const failure = this.spoolmanFailure(error);
+      if (failure) this.notice = localize(this.hass)(failure);
     }
   }
 
-  /** Says so when Spoolman went away; otherwise the list was stale, so read it again. */
-  private spoolmanFailed(error: unknown) {
-    if ((error as { code?: string }).code === "spoolman_unreachable") {
-      this.notice = localize(this.hass)("spoolman.unreachable");
-    }
+  /** What to say when Spoolman went away; otherwise the list was stale, so it is read again. */
+  private spoolmanFailure(error: unknown) {
     listFilaments(this.hass).then(
       (spoolman) => (this.spoolman = spoolman),
       () => undefined,
     );
+    return (error as { code?: string }).code === "spoolman_unreachable"
+      ? "spoolman.unreachable"
+      : undefined;
   }
 
   /** A built-in type pre-fills its form, density and pack unit. */
@@ -615,40 +641,40 @@ export class MaterialsPage extends LitElement {
       : { ...this.draft, type };
   }
 
-  private open(material?: Material) {
-    this.draft = material ? draftOf(material) : blankDraft();
-    this.editing = material?.id;
-    this.invalid = this.checked = false;
+  private open(draft = blankDraft(), editing?: string) {
+    this.draft = draft;
+    this.editing = editing;
+    this.failure = undefined;
+    this.checked = false;
     this.notice = undefined;
-    this.focusForm = true;
   }
 
-  private close = () => {
+  private close() {
     this.draft = this.editing = undefined;
-    this.invalid = this.checked = false;
-  };
+  }
 
-  private save = async (event: Event) => {
-    event.preventDefault();
-    if (!this.draft) return;
-    const draft = this.draft;
+  private async save(draft: Draft) {
     const linking = draft.price_source === "spoolman";
     this.checked = true;
-    this.invalid = false;
+    this.failure = undefined;
     if (problems(draft).size) return;
+    this.saving = true;
     try {
       await (this.editing
         ? updateMaterial(this.hass, this.editing, linking ? linkOf(draft) : fieldsOf(draft))
         : createMaterial(this.hass, fieldsOf(draft)));
       this.close();
     } catch (error) {
-      if (linking) this.spoolmanFailed(error);
-      else this.invalid = true;
+      this.failure = linking
+        ? (this.spoolmanFailure(error) ?? "run.save_failed")
+        : "materials.invalid";
+    } finally {
+      this.saving = false;
     }
-  };
+  }
 
   private async delete(material: Material) {
-    this.confirming = undefined;
+    this.deleting = undefined;
     const deleted = await deleteMaterial(this.hass, material.id);
     this.notice = deleted
       ? undefined
@@ -663,6 +689,7 @@ export class MaterialsPage extends LitElement {
   static override styles = [
     shared,
     tableStyles,
+    pagerStyles,
     css`
       .star {
         --ha-icon-button-size: 36px;
@@ -672,28 +699,25 @@ export class MaterialsPage extends LitElement {
       .star[selected] {
         color: var(--warning-color, #ffa600);
       }
-      .colour-row {
+      .group {
         display: flex;
         gap: 6px;
         align-items: center;
       }
-      .colour-row input[name="colour"] {
-        flex: 1;
-      }
-      .colour-picker {
+      .group input[type="color"] {
         flex: none;
-        width: 56px;
-        height: 56px;
+        width: 48px;
         padding: 4px;
         cursor: pointer;
+      }
+      .group select {
+        flex: none;
+        width: auto;
       }
       .clear-colour {
         --ha-icon-button-size: 32px;
         --mdc-icon-size: 18px;
         color: var(--secondary-text-color);
-      }
-      [aria-invalid="true"] {
-        border-color: var(--error-color, #db4437);
       }
       .swatch {
         width: 14px;
@@ -723,48 +747,6 @@ export class MaterialsPage extends LitElement {
         padding: 8px 12px;
         border-radius: 8px;
         background: color-mix(in srgb, var(--warning-color, #ffa600) 16%, transparent);
-      }
-      form.material {
-        margin-bottom: 12px;
-      }
-      .fields {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 10px 14px;
-        margin: 12px 0;
-      }
-      label,
-      .label {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        font-size: 12px;
-        color: var(--secondary-text-color);
-      }
-      label.check {
-        flex-direction: row;
-        align-items: center;
-        align-self: end;
-        font-size: 14px;
-        color: var(--primary-text-color);
-      }
-      .pack {
-        display: flex;
-        gap: 6px;
-        align-items: end;
-      }
-      .pack label {
-        flex: 1;
-        min-width: 0;
-      }
-      .pack select {
-        flex: none;
-      }
-      input {
-        min-width: 0;
-      }
-      .error {
-        color: var(--error-color, #db4437);
       }
     `,
   ];

@@ -5,34 +5,22 @@ import { click, mountPanel, query, queryAll, settle, text } from "./render";
 const SUBSCRIBE = "coinop/runs/subscribe";
 const GET = "coinop/runs/get";
 const [started, updated, ended] = recorded.changes;
-/** A Line Item row as a receipt line: "label evidence quantity unit × unit price = amount". */
-const receiptLine = (item: HTMLElement) => {
-  const shown = (selector: string) => {
-    const element = queryAll(item, selector)[0];
-    if (!element) return undefined;
-    if (element instanceof HTMLSelectElement)
-      return text(query(element, `option[value="${element.value}"]`));
-    return element instanceof HTMLInputElement ? element.value : text(element);
-  };
-  return [
-    shown(".label > :not(.evidence)"),
-    ...queryAll(item, ".evidence").map(text),
-    shown("[name=quantity]"),
-    shown(".unit"),
+/** A Line Item row as a receipt line: "label evidence quantity × unit price = amount". */
+const receiptLine = (item: HTMLElement) =>
+  [
+    ...queryAll(item, ".label > *").map(text),
+    text(query(item, ".quantity")),
     "×",
-    shown("[name=unit_price]"),
+    text(query(item, ".unit_price")),
     "=",
-    shown("[name=amount]"),
-  ]
-    .filter((part) => part !== undefined)
-    .join(" ");
-};
+    text(query(item, ".amount")),
+  ].join(" ");
 const cards = (panel: Element) =>
   queryAll(panel, ".kind").map((card) => [
     text(query(card, ".between")),
     ...queryAll(card, ".item").map(receiptLine),
   ]);
-const endedField = (panel: Element) => query(panel, "input[name=ended]") as HTMLInputElement;
+const facts = (panel: Element) => text(query(panel, ".facts dl"));
 
 describe("Run page", () => {
   it("opens from its gallery tile", async () => {
@@ -52,12 +40,12 @@ describe("Run page", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
     expect(cards(panel)).toEqual([
-      ["Electricity €0.05", "Estimated from average power 0.15 kWh × 0.3 = 0.05"],
+      ["Electricity €0.05", "Estimated from average power 0.15 kWh × €0.30 = €0.05"],
       [
         "Material €0.31",
-        "PLA Basic Black 4,191 mm at 1.75 mm and 1.24 g/cm³ 12.5 g × 0.025 = 0.31",
+        "PLA Basic Black 4,191 mm at 1.75 mm and 1.24 g/cm³ 12.5 g × €0.025 = €0.31",
       ],
-      ["Other €0.50", "Nozzle wear 1 pcs × 0.5 = 0.50"],
+      ["Other €0.50", "Nozzle wear 1 pcs × €0.50 = €0.50"],
     ]);
     expect(text(query(panel, ".totals"))).toBe("Total €0.86 Cost per part (4) €0.22");
   });
@@ -65,10 +53,15 @@ describe("Run page", () => {
   it("shows the Run's facts next to its Line Items", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
-    expect(text(query(panel, ".runbar"))).toBe(
-      "Completed Kobra · Jan 12, 2026, 10:00 AM Every change saves at once. Delete",
+    expect(text(query(panel, ".runbar"))).toBe("Completed Kobra · Jan 12, 2026, 10:00 AM Delete");
+    expect(text(query(panel, ".facts h3"))).toBe("Benchy");
+    expect(facts(panel)).toBe(
+      "Device Kobra Started Jan 12, 2026, 10:00 AM Ended Jan 12, 2026, 11:15 AM " +
+        "Running time 1 h 15 min Part Count 4 Tags Gift Note Four on one plate",
     );
-    expect(text(query(panel, ".facts dl"))).toBe("Device Kobra Running time 1 h 15 min");
+    expect(
+      queryAll(panel, "coinop-run-page input:not([type=file]), coinop-run-page select"),
+    ).toEqual([]);
   });
 
   it("names the price segments of electricity and marks empty kinds", async () => {
@@ -79,11 +72,11 @@ describe("Run page", () => {
         "Electricity €0.30",
         "Estimated from average power · 2 price segments " +
           "10:00 AM – 4:00 PM · 0.6 kWh × €0.30 4:00 – 7:00 PM · 0.48 kWh × €0.25 " +
-          "1.08 kWh × 0.2778 = 0.30",
+          "1.08 kWh × €0.2778 = €0.30",
       ],
       [
         "Material €0.00",
-        "No Material 30,000 mm measured; pick a Material to weigh it  g × 0 = 0.00",
+        "No Material 30,000 mm measured; pick a Material to weigh it — × €0.00 = €0.00",
       ],
       ["Other €0.00"],
     ]);
@@ -115,8 +108,8 @@ describe("Run page", () => {
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });
     expect(text(query(panel, ".runbar"))).toMatch(/^In progress/);
-    expect(endedField(panel).value).toBe("");
-    expect(text(query(panel, ".facts dl"))).toContain("Running time 45 min");
+    expect(text(query(panel, ".facts .ended"))).toBe("—");
+    expect(facts(panel)).toContain("Running time 45 min");
     const live = recorded.run("print-live");
 
     backend.reply(GET, () => ({ run: { ...live, ...ended.run } }));
@@ -125,7 +118,7 @@ describe("Run page", () => {
     await settle(panel);
 
     expect(text(query(panel, ".runbar"))).toMatch(/^Completed/);
-    expect(endedField(panel).value).toBe("2026-01-15T10:45");
+    expect(text(query(panel, ".facts .ended"))).toBe("Jan 15, 2026, 10:45 AM");
   });
 
   it("says so when the Run is deleted while shown", async () => {
@@ -153,7 +146,7 @@ describe("Run page", () => {
 
     expect(cards(panel)[0]).toEqual([
       "Strom 0,05 €",
-      "Aus der Durchschnittsleistung geschätzt 0.15 kWh × 0.3 = 0.05",
+      "Aus der Durchschnittsleistung geschätzt 0,15 kWh × 0,30 € = 0,05 €",
     ]);
     expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
   });
@@ -167,11 +160,13 @@ describe("Run page", () => {
 
     expect(cards(panel)[0]).toEqual([
       "Electricity €0.36",
-      "Measured by an energy meter 1.2 kWh × 0.3 = 0.36",
+      "Measured by an energy meter 1.2 kWh × €0.30 = €0.36",
     ]);
     const material = cards(panel).find(([head]) => head.startsWith("Material"));
     expect(material?.[1]).toContain("From the Default row");
-    expect(queryAll(panel, "[name=part_count]")).toHaveLength(0);
+    expect(facts(panel)).not.toContain("Part Count");
+    await click(panel, query(panel, ".facts ha-icon-button.edit"));
+    expect(queryAll(panel, ".run-dialog [name=part_count]")).toHaveLength(0);
     expect(text(query(panel, ".totals"))).toBe("Total €0.75");
   });
 

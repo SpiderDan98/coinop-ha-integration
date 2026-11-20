@@ -8,6 +8,7 @@ import type { Device, RunSummary } from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
+import { Pagination, pagerStyles } from "./pagination";
 import {
   DEFAULT_SORT,
   NO_FILTER,
@@ -57,6 +58,7 @@ export class RunList extends LitElement {
 
   @state() private view = storedView();
   private readonly total = new RunsTotal(this);
+  private readonly pages = new Pagination(this);
   private all: RunSummary[] = [];
   private shown: RunSummary[] = [];
 
@@ -78,6 +80,7 @@ export class RunList extends LitElement {
   protected override willUpdate(changed: PropertyValues<this>) {
     const inputs = ["runs", "filter", "sort", "devices", "hass"] as const;
     if (!inputs.some((name) => changed.has(name))) return;
+    if (changed.has("filter") || changed.has("sort")) this.pages.reset();
     const t = localize(this.hass);
     const format = formatter(this.hass);
     this.all = sorted(this.runs, this.sort, t, this.devices);
@@ -157,28 +160,29 @@ export class RunList extends LitElement {
           : this.view === "table"
             ? this.renderTable(runs, t, format)
             : html`<div class="gallery">
-                ${repeat(
-                  runs,
-                  (run) => run.id,
-                  (run) =>
-                    runTile(
-                      run,
-                      {
-                        hass: this.hass,
-                        devices: this.devices,
-                        basePath: this.basePath,
-                        t,
-                        format,
-                      },
-                      selectable(run)
-                        ? {
-                            selected: this.selected.has(run.id),
-                            toggle: (on) => this.toggle(run, on),
-                          }
-                        : undefined,
-                    ),
-                )}
-              </div>`
+                  ${repeat(
+                    this.pages.of(runs),
+                    (run) => run.id,
+                    (run) =>
+                      runTile(
+                        run,
+                        {
+                          hass: this.hass,
+                          devices: this.devices,
+                          basePath: this.basePath,
+                          t,
+                          format,
+                        },
+                        selectable(run)
+                          ? {
+                              selected: this.selected.has(run.id),
+                              toggle: (on) => this.toggle(run, on),
+                            }
+                          : undefined,
+                      ),
+                  )}
+                </div>
+                ${this.pages.controls(runs.length, t)}`
       }
     `;
   }
@@ -226,10 +230,11 @@ export class RunList extends LitElement {
       sort: this.sort,
       onSort: (sort) => this.dispatchEvent(new CustomEvent("sort-changed", { detail: sort })),
       rows: repeat(
-        runs,
+        this.pages.of(runs),
         (run) => run.id,
         (run) => this.renderRow(run, t, format),
       ),
+      pager: this.pages.controls(runs.length, t),
     });
   }
 
@@ -460,9 +465,13 @@ export class RunList extends LitElement {
     shared,
     tileStyles,
     tableStyles,
+    pagerStyles,
     css`
       .head {
         margin: 0 0 12px;
+      }
+      .gallery + .pager {
+        margin-top: 8px;
       }
       .view-toggle {
         display: flex;
@@ -539,13 +548,27 @@ export class RunList extends LitElement {
         min-height: 0;
         font: inherit;
         color: inherit;
-        background: var(--card-background-color, #fff);
+        background-color: var(--card-background-color, #fff);
         border: 1px solid var(--outline-color, var(--divider-color, rgba(0, 0, 0, 0.12)));
         border-radius: 10px;
         padding: 0 12px;
         max-width: 100%;
         box-sizing: border-box;
         box-shadow: none;
+      }
+      .filters select {
+        padding-inline-end: 34px;
+      }
+      /* The tag filter opens like the selects beside it. */
+      .tag-filter summary::after {
+        content: "";
+        position: absolute;
+        inset-inline-end: 12px;
+        top: 50%;
+        translate: 0 -25%;
+        border: 5px solid transparent;
+        border-top-color: var(--secondary-text-color, #727272);
+        border-bottom: 0;
       }
       .filters input[type="search"]:focus-visible,
       .filters select:focus-visible,
@@ -585,8 +608,10 @@ export class RunList extends LitElement {
         position: relative;
       }
       .tag-filter summary {
+        position: relative;
         display: block;
         line-height: 38px;
+        padding-inline-end: 34px;
         cursor: pointer;
         max-width: 260px;
         white-space: nowrap;

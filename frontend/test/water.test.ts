@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Group } from "../src/api";
 import { recorded, recordedBackend } from "./fake-hass";
-import { change, click, mountPanel, query, queryAll, text } from "./render";
+import { click, fill, mountPanel, query, queryAll, text } from "./render";
 
 const GET = "coinop/runs/get";
 const ADD = "coinop/line_items/add";
 const UPDATE = "coinop/line_items/update";
 const AGGREGATES = "coinop/aggregates/get";
 
-const field = (row: HTMLElement, name: string) => query(row, `[name=${name}]`) as HTMLInputElement;
+const field = (dialog: HTMLElement, name: string) =>
+  query(dialog, `[name=${name}]`) as HTMLInputElement;
 const values = (row: HTMLElement) =>
-  ["quantity", "unit_price", "amount"].map((name) => field(row, name).value);
+  ["quantity", "unit_price", "amount"].map((name) => text(query(row, `.${name}`)));
+const save = (panel: Element) => click(panel, query(panel, ".dialog ha-button.save"));
 const headings = (panel: Element) => queryAll(panel, ".kind h3").map(text);
 /** Second, after Electricity. */
 const waterCard = (panel: Element) => queryAll(panel, ".kind")[1];
@@ -36,8 +38,7 @@ describe("Water", () => {
       "10:00 – 10:30 AM · 20 L × €4.00/m³",
       "10:30 – 11:00 AM · 30 L × €5.00/m³",
     ]);
-    expect(values(row)).toEqual(["50", "4.6", "0.23"]);
-    expect(text(query(row, ".unit.per"))).toBe("€/m³");
+    expect(values(row)).toEqual(["50 L", "€4.60/m³", "€0.23"]);
     expect(queryAll(row, "ha-icon-button.delete")).toHaveLength(0);
   });
 
@@ -47,24 +48,31 @@ describe("Water", () => {
     expect(text(waterCard(panel))).toContain("None");
 
     await click(panel, query(panel, "ha-button.add-water"));
-    const form = query(waterCard(panel), ".add-item form");
-    expect(text(form)).toContain("L");
-    expect(text(form)).toContain("€/m³");
-    await change(panel, field(form, "quantity"), "60");
-    await change(panel, field(form, "unit_price"), "4.5");
-    await click(panel, query(form, "ha-button[type=submit]"));
+    const dialog = query(panel, ".new-item-dialog");
+    expect(text(query(dialog, "h2"))).toBe("Add water");
+    expect(queryAll(dialog, ".with-unit .unit").map(text)).toEqual(["L", "€/m³"]);
+    await save(panel);
+    expect(backend.sent(ADD)).toEqual([]);
+    await fill(panel, field(dialog, "quantity"), "60");
+    await fill(panel, field(dialog, "unit_price"), "4.5");
+    await save(panel);
 
     expect(backend.sent(ADD)).toEqual([
       { type: ADD, run_id: "wash", kind: "water", quantity: 60, unit_price: 0.0045 },
     ]);
     const row = query(waterCard(panel), ".item");
     expect(text(query(row, ".evidence"))).toBe("Entered by hand");
-    expect(values(row)).toEqual(["60", "4.5", "0.27"]);
+    expect(values(row)).toEqual(["60 L", "€4.50/m³", "€0.27"]);
     expect(queryAll(waterCard(panel), "ha-button.add-water")).toHaveLength(0);
     expect(queryAll(row, "ha-icon-button.delete")).toHaveLength(1);
 
     backend.reply(UPDATE, () => recorded.lineItemsAddWater);
-    await change(panel, field(row, "unit_price"), "5");
+    await click(panel, query(row, "ha-icon-button.edit"));
+    const editing = query(panel, ".item-dialog");
+    expect(field(editing, "unit_price").value).toBe("4.5");
+    await fill(panel, field(editing, "unit_price"), "5");
+    expect(field(editing, "amount").value).toBe("0.30");
+    await save(panel);
     expect(backend.sent(UPDATE)).toEqual([
       {
         type: UPDATE,

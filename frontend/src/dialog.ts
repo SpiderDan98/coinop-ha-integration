@@ -3,6 +3,19 @@
 import { mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
+import type { Localize } from "./localize";
+
+let openDialogs = 0;
+
+/** The page behind an open dialog doesn't scroll; the scrollbar's gutter stays, so nothing shifts. */
+const lockPageScroll = (lock: boolean) => {
+  openDialogs += lock ? 1 : -1;
+  if (openDialogs !== (lock ? 1 : 0)) return;
+  const { documentElement: page } = document;
+  const scrollbar = window.innerWidth - page.clientWidth;
+  page.style.overflow = lock ? "hidden" : "";
+  page.style.scrollbarGutter = lock && scrollbar > 0 ? "stable" : "";
+};
 
 @customElement("coinop-dialog")
 export class Dialog extends LitElement {
@@ -13,6 +26,16 @@ export class Dialog extends LitElement {
   @property() closeLabel = "";
 
   @query("dialog") private dialog!: HTMLDialogElement;
+
+  override connectedCallback() {
+    super.connectedCallback();
+    lockPageScroll(true);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    lockPageScroll(false);
+  }
 
   protected override firstUpdated() {
     this.dialog.showModal();
@@ -81,6 +104,7 @@ export class Dialog extends LitElement {
       flex: 1;
       display: flex;
       flex-direction: column;
+      min-width: 0;
       min-height: 0;
     }
     header {
@@ -115,6 +139,88 @@ export class Dialog extends LitElement {
     }
   `;
 }
+
+/** The dialog everything is edited in: its fields, what went wrong, then Cancel and the
+ * action that saves, which Enter in a field takes too. Nothing is saved before. */
+export const formDialog = ({
+  t,
+  title,
+  name = "",
+  content,
+  error,
+  action = "save",
+  submit = t("dialog.save"),
+  busy = false,
+  disabled = false,
+  onCancel,
+  onSubmit,
+}: {
+  t: Localize;
+  title: string;
+  /** Classes of the dialog, e.g. "wide". */
+  name?: string;
+  content: unknown;
+  error?: unknown;
+  /** The class of the saving button. */
+  action?: string;
+  submit?: string;
+  busy?: boolean;
+  disabled?: boolean;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) =>
+  html`<coinop-dialog
+    class="dialog ${name}"
+    .label=${title}
+    .closeLabel=${t("dialog.close")}
+    @cancel=${onCancel}
+    @keydown=${(event: KeyboardEvent) => {
+      const { key, target } = event;
+      if (key !== "Enter" || event.defaultPrevented || !(target instanceof HTMLInputElement))
+        return;
+      if (target.type === "checkbox" || target.type === "color") return;
+      event.preventDefault();
+      if (!busy && !disabled) onSubmit();
+    }}
+  >
+    ${content} ${error ? html`<p class="error small">${error}</p>` : nothing}
+    <div slot="footer" class="row end">
+      <ha-button class="cancel" appearance="plain" @click=${onCancel}>
+        ${t("dialog.cancel")}
+      </ha-button>
+      <ha-button class=${action} ?disabled=${busy || disabled} .loading=${busy} @click=${onSubmit}>
+        ${submit}
+      </ha-button>
+    </div>
+  </coinop-dialog>`;
+
+/** A confirmation of something that can't be undone; Cancel has the focus. */
+export const confirmDialog = ({
+  t,
+  title,
+  name = "",
+  content,
+  confirm = t("delete.confirm"),
+  onCancel,
+  onConfirm,
+}: {
+  t: Localize;
+  title: string;
+  name?: string;
+  content: unknown;
+  confirm?: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) =>
+  html`<coinop-dialog class="dialog ${name}" alert .label=${title} @cancel=${onCancel}>
+    ${content}
+    <div slot="footer" class="row end">
+      <ha-button class="cancel" appearance="plain" autofocus @click=${onCancel}>
+        ${t("dialog.cancel")}
+      </ha-button>
+      <ha-button class="confirm" variant="danger" @click=${onConfirm}>${confirm}</ha-button>
+    </div>
+  </coinop-dialog>`;
 
 declare global {
   interface HTMLElementTagNameMap {

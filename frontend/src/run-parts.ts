@@ -1,7 +1,7 @@
 // Pieces of a Run shown on both the gallery and the Run page.
 import { html } from "lit";
 import type { Device, Group, RunSummary, Totals } from "./api";
-import "./dialog";
+import { confirmDialog } from "./dialog";
 import type { Format } from "./format";
 import { isKey, type Localize } from "./localize";
 
@@ -48,23 +48,19 @@ export const deleteDialog = (
     [t("runs.title"), String(drop.runs)],
     [t("sensor.flagged_runs"), String(drop.flagged_runs)],
   ];
-  return html`<coinop-dialog class="dialog" alert .label=${title} @cancel=${cancel}>
-    <p>${t("delete.drop")}</p>
-    <dl>
-      ${rows.map(
-        ([label, value]) =>
-          html`<dt>${label}</dt>
-            <dd class="num">${value}</dd>`,
-      )}
-    </dl>
-    <p class="muted small">${t("delete.warning")}</p>
-    <div slot="footer" class="row end">
-      <ha-button class="cancel" appearance="plain" autofocus @click=${cancel}>
-        ${t("delete.cancel")}
-      </ha-button>
-      <ha-button class="confirm" variant="danger" @click=${confirm}>
-        ${t("delete.confirm")}
-      </ha-button>
-    </div>
-  </coinop-dialog>`;
+  return confirmDialog({
+    t,
+    title,
+    content: html`<p>${t("delete.drop")}</p>
+      <dl>
+        ${rows.map(
+          ([label, value]) =>
+            html`<dt>${label}</dt>
+              <dd class="num">${value}</dd>`,
+        )}
+      </dl>
+      <p class="muted small">${t("delete.warning")}</p>`,
+    onCancel: cancel,
+    onConfirm: confirm,
+  });
 };

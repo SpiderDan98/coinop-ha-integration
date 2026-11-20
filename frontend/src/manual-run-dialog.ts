@@ -1,13 +1,14 @@
 // "Manual Run": a Run made by hand for a Run Coin-op did not see. Pre-fills the
 // Device's Tags for new Runs, opens the new Run's page once created and fires `close`.
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { OUTCOMES, createRun, type Device, type Outcome } from "./api";
 import { formatter } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { RECONFIGURE } from "./devices-page";
-import "./dialog";
+import { formDialog } from "./dialog";
+import { field, input, select } from "./fields";
 import { shared } from "./styles";
 import "./tag-input";
 
@@ -58,116 +59,106 @@ export class ManualRunDialog extends LitElement {
     const now = formatter(this.hass).toInput(new Date().toISOString());
     const tags = this.runTags ?? device?.settings.tags_for_new_runs ?? [];
     const program = this.programOf(device);
-    const input = (event: Event) => (event.target as HTMLInputElement).value;
-    return html`<coinop-dialog
-      class="manual-dialog dialog"
-      .label=${t("manual.title")}
-      .closeLabel=${t("dialog.close")}
-      @cancel=${this.close}
-    >
-      <p class="muted small">${t("manual.hint")}</p>
-      ${
-        this.devices.length > 1
-          ? html`<label
-              >${t("run.device")}<select
-                name="device"
-                @change=${(event: Event) => {
-                  this.deviceId = input(event);
-                  this.runTags = undefined;
-                }}
-              >
-                ${this.devices.map(
-                  ({ id, name }) =>
-                    html`<option value=${id} ?selected=${id === device?.id}>${name}</option>`,
-                )}
-              </select></label
-            >`
-          : nothing
-      }
-      <label
-        >${t("run.name")}<input
-          name="name"
-          autofocus
-          .value=${this.name}
-          placeholder=${program ?? t("run.untitled")}
-          @input=${(event: Event) => (this.name = input(event))}
-      /></label>
-      ${
-        device?.capabilities.includes("program")
-          ? html`<label
-              >${t("run.program")}<input
-                name="program"
-                list="known-programs"
-                .value=${this.program}
-                @input=${(event: Event) => (this.program = input(event))}
-              /><datalist id="known-programs">
-                ${device.known_programs.map((known) => html`<option value=${known}></option>`)}
-              </datalist></label
-            >`
-          : nothing
-      }
-      <div class="row times">
-        <label
-          >${t("run.started")}<input
-            type="datetime-local"
-            name="started"
-            max=${now}
-            .value=${this.started}
-            @input=${(event: Event) => (this.started = input(event))}
-        /></label>
-        <label
-          >${t("run.ended")}<input
-            type="datetime-local"
-            name="ended"
-            max=${now}
-            aria-invalid=${times.problem ? "true" : "false"}
-            .value=${this.ended}
-            @input=${(event: Event) => (this.ended = input(event))}
-        /></label>
-      </div>
-      ${
-        times.problem
-          ? html`<p class="error small times-problem">${t(`manual.${times.problem}`)}</p>`
-          : nothing
-      }
-      <label
-        >${t("run.outcome")}<select
-          name="outcome"
-          @change=${(event: Event) => (this.outcome = input(event) as Outcome)}
-        >
-          ${OUTCOMES.map(
-            (outcome) =>
-              html`<option value=${outcome} ?selected=${outcome === this.outcome}>
-                ${t(`outcome.${outcome}`)}
-              </option>`,
+    return formDialog({
+      t,
+      title: t("manual.title"),
+      name: "manual-dialog",
+      action: "create",
+      submit: t("manual.create"),
+      busy: this.saving,
+      disabled: !device || !times.started,
+      error: this.failed && t("manual.failed"),
+      onCancel: () => this.close(),
+      onSubmit: () => this.create(tags),
+      content: html`<p class="muted small">${t("manual.hint")}</p>
+        ${
+          this.devices.length > 1
+            ? field(
+                t("run.device"),
+                select({
+                  name: "device",
+                  value: device?.id,
+                  options: this.devices.map(({ id, name }) => [id, name]),
+                  onChange: (id) => {
+                    this.deviceId = id;
+                    this.runTags = undefined;
+                  },
+                }),
+              )
+            : nothing
+        }
+        ${field(
+          t("run.name"),
+          input({
+            name: "name",
+            autofocus: true,
+            value: this.name,
+            placeholder: program ?? t("run.untitled"),
+            onInput: (name) => (this.name = name),
+          }),
+        )}
+        ${
+          device?.capabilities.includes("program")
+            ? field(
+                t("run.program"),
+                input({
+                  name: "program",
+                  list: device.known_programs,
+                  value: this.program,
+                  onInput: (entered) => (this.program = entered),
+                }),
+              )
+            : nothing
+        }
+        <div class="field-row">
+          ${field(
+            t("run.started"),
+            input({
+              type: "datetime-local",
+              name: "started",
+              max: now,
+              value: this.started,
+              onInput: (started) => (this.started = started),
+            }),
           )}
-        </select></label
-      >
-      <div class="label">
-        ${t("run.tags")}
-        <coinop-tag-input
-          .hass=${this.hass}
-          .tags=${tags}
-          .catalog=${this.tags}
-          .label=${t("run.tags")}
-          @tags-change=${(event: CustomEvent<string[]>) => (this.runTags = event.detail)}
-        ></coinop-tag-input>
-      </div>
-      ${this.failed ? html`<p class="error small">${t("manual.failed")}</p>` : nothing}
-      <div slot="footer" class="row end">
-        <ha-button class="cancel" appearance="plain" @click=${this.close}>
-          ${t("manual.cancel")}
-        </ha-button>
-        <ha-button
-          class="create"
-          ?disabled=${!device || !times.started || this.saving}
-          .loading=${this.saving}
-          @click=${() => this.create(tags)}
-        >
-          ${t("manual.create")}
-        </ha-button>
-      </div>
-    </coinop-dialog>`;
+          ${field(
+            t("run.ended"),
+            input({
+              type: "datetime-local",
+              name: "ended",
+              max: now,
+              invalid: !!times.problem,
+              value: this.ended,
+              onInput: (ended) => (this.ended = ended),
+            }),
+          )}
+        </div>
+        ${
+          times.problem
+            ? html`<p class="error small times-problem">${t(`manual.${times.problem}`)}</p>`
+            : nothing
+        }
+        ${field(
+          t("run.outcome"),
+          select({
+            name: "outcome",
+            value: this.outcome,
+            options: OUTCOMES.map((outcome) => [outcome, t(`outcome.${outcome}`)]),
+            onChange: (outcome) => (this.outcome = outcome as Outcome),
+          }),
+        )}
+        ${field(
+          t("run.tags"),
+          html`<coinop-tag-input
+            .hass=${this.hass}
+            .tags=${tags}
+            .catalog=${this.tags}
+            .label=${t("run.tags")}
+            @tags-change=${(event: CustomEvent<string[]>) => (this.runTags = event.detail)}
+          ></coinop-tag-input>`,
+          { group: true },
+        )}`,
+    });
   }
 
   private renderNoDevices(t: Localize) {
@@ -230,29 +221,7 @@ export class ManualRunDialog extends LitElement {
     this.dispatchEvent(new Event("close"));
   }
 
-  static override styles = [
-    shared,
-    css`
-      .times > label {
-        flex: 1 1 180px;
-      }
-      .error {
-        color: var(--error-color, #db4437);
-      }
-      label,
-      .label {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        font-size: 12px;
-        color: var(--secondary-text-color);
-      }
-      input,
-      select {
-        min-width: 0;
-      }
-    `,
-  ];
+  static override styles = shared;
 }
 
 declare global {

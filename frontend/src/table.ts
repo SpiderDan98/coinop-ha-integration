@@ -1,5 +1,6 @@
 // The panel's one table: a native <table> in a card that scrolls sideways when too wide
-// (ADR 0007). Pages render their own <tr>s; cells with class "num" hold figures.
+// and, where a page limits its height, down under a head that stays (ADR 0007). Pages
+// render their own <tr>s; cells with class "num" hold figures.
 import { mdiArrowDown, mdiArrowUp } from "@mdi/js";
 import { css, html, nothing } from "lit";
 
@@ -10,6 +11,7 @@ export function table<Key extends string>({
   columns,
   rows,
   foot,
+  pager,
   empty,
   sort,
   onSort,
@@ -23,6 +25,8 @@ export function table<Key extends string>({
   rows: unknown;
   /** The <tr>s of a total row. */
   foot?: unknown;
+  /** A paged table's `Pagination` controls, shown in the card below the rows. */
+  pager?: unknown;
   /** Shown as the only row when there are no rows. */
   empty?: string;
   sort?: { by: Key; descending: boolean };
@@ -53,37 +57,40 @@ export function table<Key extends string>({
           : "ascending";
   return html`<div class="table ${name}">
     ${header ?? nothing}
-    <table>
-      <thead>
-        <tr>
-          ${columns.map(
-            (column) =>
-              html`<th
-                class="${column.num ? "num" : ""} ${column.class ?? ""}"
-                aria-sort=${ariaSort(column.sort)}
-              >
-                ${heading(column)}
-              </th>`,
-          )}
-        </tr>
-      </thead>
-      <tbody>
+    <div class="rows">
+      <table>
+        <thead>
+          <tr>
+            ${columns.map(
+              (column) =>
+                html`<th
+                  class="${column.num ? "num" : ""} ${column.class ?? ""}"
+                  aria-sort=${ariaSort(column.sort)}
+                >
+                  ${heading(column)}
+                </th>`,
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            !Array.isArray(rows) || rows.length || empty === undefined
+              ? rows
+              : html`<tr class="empty">
+                  <td colspan=${columns.length} class="muted">${empty}</td>
+                </tr>`
+          }
+        </tbody>
         ${
-          !Array.isArray(rows) || rows.length || empty === undefined
-            ? rows
-            : html`<tr class="empty">
-                <td colspan=${columns.length} class="muted">${empty}</td>
-              </tr>`
+          foot
+            ? html`<tfoot>
+                ${foot}
+              </tfoot>`
+            : nothing
         }
-      </tbody>
-      ${
-        foot
-          ? html`<tfoot>
-              ${foot}
-            </tfoot>`
-          : nothing
-      }
-    </table>
+      </table>
+    </div>
+    ${pager ?? nothing}
   </div>`;
 }
 
@@ -94,14 +101,31 @@ export const tableStyles = css`
   .table {
     box-sizing: border-box;
     max-width: 100%;
-    overflow-x: auto;
+    overflow: hidden;
     background: var(--card-background-color, #fff);
     border: ${divider};
     border-radius: 12px;
   }
+  .table .rows {
+    overflow: auto;
+    max-height: var(--coinop-table-height, none);
+  }
+  /* Separate borders stay with the sticky cells. */
   .table table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--card-background-color, #fff);
+  }
+  .table tfoot td {
+    position: sticky;
+    bottom: 0;
+    background: var(--card-background-color, #fff);
   }
   .table th,
   .table td {
@@ -138,6 +162,9 @@ export const tableStyles = css`
     outline-offset: 2px;
     border-radius: 2px;
   }
+  .table .pager {
+    border-top: ${divider};
+  }
   .table .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -169,6 +196,9 @@ export const tableStyles = css`
   }
   :host([narrow]) .table .actions {
     white-space: normal;
+  }
+  :host([narrow]) .table.stacked .rows {
+    max-height: none;
   }
   :host([narrow]) .table.stacked :is(table, thead, tbody, tr, td) {
     display: block;

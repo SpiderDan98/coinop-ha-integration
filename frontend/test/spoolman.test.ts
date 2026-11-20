@@ -22,14 +22,17 @@ const row = (panel: Element, selector: string, name: string) => {
   if (!found) throw new Error(`no row "${name}"`);
   return found;
 };
-const field = (panel: Element, name: string) => query(panel, `[name=${name}]`);
+const DIALOG = ".material-dialog";
+const UPDATE = "coinop/materials/update";
+const field = (panel: Element, name: string) => query(panel, `${DIALOG} [name=${name}]`);
+const save = (panel: Element) => click(panel, query(panel, `${DIALOG} ha-button.save`));
 
 function spoolmanBackend(filaments = recorded.spoolman.filaments) {
   return recordedBackend()
     .subscription(CATALOG, () => [withLinked])
     .reply(FILAMENTS, () => filaments)
     .reply("coinop/materials/create_from_spoolman", () => recorded.createFromSpoolman)
-    .reply("coinop/materials/update", () => recorded.linkSpoolman);
+    .reply(UPDATE, () => recorded.linkSpoolman);
 }
 
 describe("Spoolman in the Materials tab", () => {
@@ -80,18 +83,67 @@ describe("Spoolman in the Materials tab", () => {
 
     await change(panel, field(panel, "price_source"), "spoolman");
     expect(queryAll(panel, "[name=pack_price], [name=density], [name=type]")).toHaveLength(0);
+    expect(text(query(panel, DIALOG))).toContain(
+      "Type, density, diameter, colour and vendor come from the Spoolman Filament",
+    );
     await change(panel, field(panel, "filament_id"), "7");
-    await click(panel, button(panel, "Save"));
+    expect(backend.sent(UPDATE)).toEqual([]);
+    await save(panel);
 
-    expect(backend.calls.at(-1)).toEqual({
-      type: "coinop/materials/update",
-      material_id: "material-1",
-      material: {
-        name: "eSun PLA+ black",
-        default_for_type: true,
-        price: { source: "spoolman", filament_id: 7 },
+    expect(backend.sent(UPDATE)).toEqual([
+      {
+        type: UPDATE,
+        material_id: "material-1",
+        material: {
+          name: "eSun PLA+ black",
+          default_for_type: true,
+          price: { source: "spoolman", filament_id: 7 },
+        },
       },
+    ]);
+    expect(queryAll(panel, DIALOG)).toEqual([]);
+  });
+
+  it("asks for the Filament before linking", async () => {
+    const backend = spoolmanBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
+    await change(panel, field(panel, "price_source"), "spoolman");
+
+    await save(panel);
+
+    expect(backend.sent(UPDATE)).toEqual([]);
+    expect(field(panel, "filament_id").getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("links nothing when the dialog is cancelled", async () => {
+    const backend = spoolmanBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
+    await change(panel, field(panel, "price_source"), "spoolman");
+    await change(panel, field(panel, "filament_id"), "7");
+
+    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
+
+    expect(queryAll(panel, DIALOG)).toEqual([]);
+    expect(backend.sent(UPDATE)).toEqual([]);
+  });
+
+  it("keeps the dialog open and says so when Spoolman went away while linking", async () => {
+    const backend = spoolmanBackend().reply(UPDATE, () => {
+      throw new WsError("spoolman_unreachable");
     });
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
+    await change(panel, field(panel, "price_source"), "spoolman");
+    await change(panel, field(panel, "filament_id"), "7");
+
+    await save(panel);
+
+    expect(text(query(panel, `${DIALOG} .error`))).toBe(
+      "Spoolman can't be reached right now. Linked Materials keep the last price read.",
+    );
+    expect(backend.sent(FILAMENTS)).toHaveLength(2);
   });
 
   it("edits a linked Material's own fields and can unlink it", async () => {
@@ -103,16 +155,42 @@ describe("Spoolman in the Materials tab", () => {
     await change(panel, field(panel, "price_source"), "fixed");
     expect((field(panel, "type") as HTMLInputElement).value).toBe("PLA");
     await fill(panel, field(panel, "pack_price"), "24");
-    await click(panel, button(panel, "Save"));
+    await save(panel);
 
-    expect(backend.calls.at(-1)).toMatchObject({
-      type: "coinop/materials/update",
-      material_id: "pla-black",
-      material: {
-        type: "PLA",
-        price: { source: "fixed", pack_price: 24, pack_size: 1000, pack_unit: "g" },
+    expect(backend.sent(UPDATE)).toMatchObject([
+      {
+        type: UPDATE,
+        material_id: "pla-black",
+        material: {
+          type: "PLA",
+          price: { source: "fixed", pack_price: 24, pack_size: 1000, pack_unit: "g" },
+        },
       },
-    });
+    ]);
+  });
+
+  it("duplicates a linked Material as one with a pack price of its own", async () => {
+    const CREATE = "coinop/materials/create";
+    const backend = spoolmanBackend().reply(CREATE, () => recorded.linkSpoolman);
+    const panel = await mountPanel(backend, { path: "/materials" });
+
+    await click(panel, button(row(panel, "tr.material", "PLA black"), "Duplicate"));
+    expect(queryAll(panel, `${DIALOG} [name=price_source]`)).toHaveLength(0);
+    expect((field(panel, "type") as HTMLInputElement).value).toBe("PLA");
+    await save(panel);
+    expect(backend.sent(CREATE)).toEqual([]);
+    await fill(panel, field(panel, "pack_price"), "24");
+    await save(panel);
+
+    expect(backend.sent(CREATE)).toMatchObject([
+      {
+        type: CREATE,
+        material: {
+          name: "PLA black",
+          price: { source: "fixed", pack_price: 24, pack_size: 1000, pack_unit: "g" },
+        },
+      },
+    ]);
   });
 
   it("creates linked Materials only from the Filament list", async () => {
@@ -131,7 +209,7 @@ describe("Spoolman in the Materials tab", () => {
 
     await click(panel, button(row(panel, "tr.material", "Liquid detergent"), "Edit"));
     expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
-    await click(panel, button(panel, "Cancel"));
+    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
     await click(panel, button(row(panel, "tr.material", "Colour pods"), "Edit"));
     expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
     await change(panel, field(panel, "pack_unit"), "g");
@@ -143,6 +221,7 @@ describe("Spoolman in the Materials tab", () => {
     const panel = await mountPanel(backend, { path: "/materials" });
     await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
 
+    expect(queryAll(panel, DIALOG)).toHaveLength(1);
     expect(queryAll(panel, ".spoolman, [name=price_source]")).toHaveLength(0);
   });
 

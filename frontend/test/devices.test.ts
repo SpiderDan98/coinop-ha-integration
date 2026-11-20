@@ -363,7 +363,7 @@ describe("Devices tab", () => {
 
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    expect(queryAll(panel, ".device > dl").map(text)).toEqual([
+    expect(queryAll(panel, ".device > dl:not(.settings)").map(text)).toEqual([
       "Status sensor.washer_status " +
         "Program sensor.washer_program " +
         "Consumption source Per Program (kWh in the Program Defaults) " +
@@ -536,7 +536,7 @@ describe("A washing machine's Doses", () => {
     expect(stockInput(dialog, "Liquid detergent", "Stock unit")).toBeNull();
 
     await fill(panel, detergent, "");
-    await fill(panel, query(dialog, "select.add-dose"), "material-whitener");
+    await fill(panel, query(dialog, ".doses > select"), "material-whitener");
     await fill(panel, stockInput(dialog, "Whitener") as HTMLSelectElement, "sensor.softener_tank");
     const attribute = stockInput(dialog, "Whitener", "Stock attribute") as HTMLSelectElement;
     expect(queryAll(attribute, "option").map(text)).toEqual(["State", "level"]);
@@ -569,7 +569,7 @@ describe("A washing machine's Doses", () => {
     await open(panel);
     const dialog = query(panel, ".settings-dialog");
     expect(doses(dialog)).toEqual(["Liquid detergent", "Colour pods"]);
-    const picker = query(dialog, "select.add-dose") as HTMLSelectElement;
+    const picker = query(dialog, ".doses > select") as HTMLSelectElement;
     expect(queryAll(picker, "option").map(text)).toContain("Whitener");
 
     await fill(panel, picker, "material-whitener");
@@ -589,6 +589,15 @@ describe("A washing machine's Doses", () => {
         { id: expect.any(String), material_id: "material-whitener" },
       ],
     });
+  });
+
+  it("are named as Materials, with a way to the Materials tab", async () => {
+    const panel = await mountPanel(washerBackend(), { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+    expect(text(query(dialog, ".doses > select option"))).toBe("+ Add a Material as a Dose");
+    expect(text(query(dialog, ".doses .hint"))).toContain("a Material from the Materials tab");
+    expect(query(dialog, ".doses .hint a").getAttribute("href")).toBe("/coinop/materials");
   });
 
   it("are dosed by the Default row of the Program Defaults", async () => {
@@ -629,7 +638,7 @@ describe("A washing machine's Doses", () => {
     await open(panel);
     const dialog = query(panel, ".settings-dialog");
 
-    await fill(panel, query(dialog, "select.add-dose"), "material-whitener");
+    await fill(panel, query(dialog, ".doses > select"), "material-whitener");
     await fill(panel, amount(dialog, "Whitener"), "20");
     await click(panel, query(dialog, "ha-button.save"));
 
@@ -710,7 +719,7 @@ describe("A washing machine's Program rows", () => {
     const panel = await mountPanel(backend, { path: "/devices" });
     const dialog = await openDialog(panel);
 
-    await fill(panel, query(dialog, "input.add-program"), " Rinse ");
+    await fill(panel, query(dialog, ".program-defaults > input"), " Rinse ");
     await click(panel, iconButton(dialog, "Remove the row of Wool"));
     expect(rows(dialog)).toEqual([
       "Default",
@@ -719,7 +728,7 @@ describe("A washing machine's Program rows", () => {
       "Eco 40-60 Suggested",
       "Rinse",
     ]);
-    expect((query(dialog, "input.add-program") as HTMLInputElement).value).toBe("");
+    expect((query(dialog, ".program-defaults > input") as HTMLInputElement).value).toBe("");
     await click(panel, query(dialog, "ha-button.save"));
 
     const [sent] = backend.sent(SETTINGS);
