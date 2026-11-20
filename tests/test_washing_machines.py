@@ -65,6 +65,8 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
         hass, entry, status=WASHER_STATUS, device_type="washing_machine"
     )
     result = await configure(hass, result, WASHER_MAPPING)
+    assert result["step_id"] == "program"
+    result = await configure(hass, result, {})
     assert result["type"] is FlowResultType.MENU
     assert result["menu_options"] == ["energy", "power"]
     result = await configure(hass, result, {"next_step_id": "power"})
@@ -79,6 +81,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
         "mapping",
         "price",
         "printer_device_id",
+        "program",
         "status",
         "water",
     ]
@@ -113,6 +116,7 @@ async def test_reconfiguring_a_washing_machine_offers_its_sections(
 
     assert result["menu_options"] == [
         "status",
+        "program",
         "consumption",
         "price",
         "water",
@@ -236,13 +240,14 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
     devices = (await panel.call("coinop/devices/list"))["devices"]
 
     assert [(d["type"], d["capabilities"]) for d in devices] == [
-        ("washing_machine", ["water"]),
+        ("washing_machine", ["doses", "program", "water"]),
         ("3d_printer", ["average_power", "images", "job", "material", "part_count"]),
     ]
     assert devices[0]["ha_settings"] == {
         "printer_device_id": None,
         "status": {"entity_id": WASHER_STATUS, "attribute": None},
         "mapping": WASHER_MAPPING | {"ended": [], "fault": []},
+        "program": {"entity_id": None, "attribute": None},
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,

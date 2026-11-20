@@ -187,8 +187,12 @@ class LastRunCostSensor(DeviceSensor):
             if run.part_count is None
             else {"part_count": run.part_count, "cost_per_part": cost / run.part_count}
         )
+        program = (
+            {"program": run.program} if Capability.PROGRAM in self._capabilities else {}
+        )
         return {
             "name": run.name,
+            **program,
             "outcome": run.outcome,
             "start": run.started,
             "end": run.ended,

@@ -29,6 +29,8 @@ class Flag(StrEnum):
     SPOOLMAN_NO_PRICE = "spoolman_no_price"
     ESTIMATED_SPLIT = "estimated_split"
     SLOT_FALLBACK = "slot_fallback"
+    # A Cancelled or Failed Run charged defaults meant for a whole cycle.
+    ENDED_EARLY_DEFAULTS = "ended_early_defaults"
 
 
 class UsageUnit(StrEnum):
@@ -63,6 +65,12 @@ class ConsumptionMethod(StrEnum):
     FROM_HISTORY = "from_history"
     ESTIMATED = "estimated"
     ENTERED = "entered"
+
+
+class DoseSource(StrEnum):
+    """Where a Dose Line Item's amount came from."""
+
+    DEFAULT_ROW = "default_row"
 
 
 @overload
@@ -260,11 +268,12 @@ class LineItem:
     Computed Line Items keep `label` None and are labelled by their kind in the
     output language. Material Line Items reference their Material by
     `material_id`, which keeps it from being deleted, and keep a copy of it in
-    `material`; their unit is g or ml. A `measured` one follows the Material used
+    `material`; their unit is g, ml or pcs. A `measured` one follows the Material used
     input, whose length (mm) it keeps, and the Slots it was attributed through
     (`slots`); split across several Materials, `share` is its estimated share of
-    the measured total. A Line Item copied from a Line Item
-    Template keeps only `template_id` as its origin and the template's `basis`;
+    the measured total. A Dose's Line Item references it by `dose_id` and keeps
+    where its amount came from in `dose_source`. A Line Item copied from a Line
+    Item Template keeps only `template_id` as its origin and the template's `basis`;
     with running hours Coin-op computes its quantity. Quantity, unit price and
     amount are what counts; once the user overrides a computed one, `computed`
     keeps what Coin-op computed.
@@ -285,6 +294,8 @@ class LineItem:
     share: float | None = None
     template_id: str | None = None
     basis: QuantityBasis | None = None
+    dose_id: str | None = None
+    dose_source: DoseSource | None = None
     method: ConsumptionMethod | None = None
     segments: list[PriceSegment] = field(default_factory=list)
     computed: dict[str, float | None] | None = None
@@ -300,7 +311,13 @@ class LineItem:
             )
             or self.measured
             or self.basis is QuantityBasis.RUNNING_HOURS
+            or self.dose_source is not None
         )
+
+    @property
+    def from_defaults(self) -> bool:
+        """Its quantity is a default for a whole cycle, not what was measured."""
+        return self.dose_source is DoseSource.DEFAULT_ROW
 
     @property
     def grams(self) -> float:
@@ -359,6 +376,12 @@ class LineItem:
         self.computed = None
 
     def as_dict(self) -> dict[str, Any]:
+        # Only a Dose's Line Item has the Dose fields, so others keep their shape.
+        dose = (
+            {}
+            if self.dose_id is None
+            else {"dose_id": self.dose_id, "dose_source": self.dose_source}
+        )
         return self.unknown | {
             "id": self.id,
             "kind": self.kind,
@@ -371,6 +394,7 @@ class LineItem:
             "share": self.share,
             "template_id": self.template_id,
             "basis": self.basis,
+            **dose,
             "quantity": self.quantity,
             "unit": self.unit,
             "unit_price": self.unit_price,
@@ -396,6 +420,10 @@ class LineItem:
             share=data.get("share"),
             template_id=data.get("template_id"),
             basis=None if data.get("basis") is None else QuantityBasis(data["basis"]),
+            dose_id=data.get("dose_id"),
+            dose_source=None
+            if data.get("dose_source") is None
+            else DoseSource(data["dose_source"]),
             quantity=data["quantity"],
             unit=data["unit"],
             unit_price=data["unit_price"],
@@ -457,6 +485,7 @@ class Run:
     are still awaited; frozen once finalised. `end_reconstructed` marks an end
     Coin-op only learnt about after the Status input or Coin-op itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
+    `program` the Program it ran, which the name follows until the user renames it;
     `last_seen` is the last time the Status input was seen running during the
     open Run.
     `timelines` are what it follows for each consumed quantity, by its Line Item
@@ -475,6 +504,7 @@ class Run:
     line_items: list[LineItem]
     name: str | None = None
     job_name: str | None = None
+    program: str | None = None
     last_seen: datetime | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
@@ -495,6 +525,11 @@ class Run:
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def follow_program(self, program: str | None) -> None:
+        if self.name in (None, self.program):
+            self.name = program
+        self.program = program
 
     @property
     def paused(self) -> bool:
@@ -551,6 +586,8 @@ class Run:
             "device_name": self.device_name,
             "name": self.name,
             "job_name": self.job_name,
+            # Only Runs of Device Types with Programs have one.
+            **({"program": self.program} if self.program is not None else {}),
             "started": _iso(self.started),
             "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
@@ -585,6 +622,7 @@ class Run:
             device_name=data["device_name"],
             name=data["name"],
             job_name=data.get("job_name"),
+            program=data.get("program"),
             started=_time(data["started"]),
             last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),

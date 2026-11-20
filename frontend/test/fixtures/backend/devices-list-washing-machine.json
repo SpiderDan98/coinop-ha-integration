@@ -5,6 +5,8 @@
       "name": "Washer",
       "type": "washing_machine",
       "capabilities": [
+        "doses",
+        "program",
         "water"
       ],
       "ha_settings": {
@@ -32,6 +34,10 @@
             "off"
           ]
         },
+        "program": {
+          "entity_id": "sensor.washer_program",
+          "attribute": null
+        },
         "consumption": {
           "source": "energy",
           "entity_id": "sensor.washer_plug_energy",
@@ -50,7 +56,24 @@
       "settings": {
         "tags_for_new_runs": [],
         "automatic_templates": [],
-        "default_material": null
+        "default_material": null,
+        "doses": [
+          {
+            "id": "dose-detergent",
+            "material_id": "material-detergent"
+          },
+          {
+            "id": "dose-pods",
+            "material_id": "material-pods"
+          }
+        ],
+        "program_defaults": {
+          "default": {
+            "doses": {
+              "dose-detergent": 75.0
+            }
+          }
+        }
       }
     }
   ]

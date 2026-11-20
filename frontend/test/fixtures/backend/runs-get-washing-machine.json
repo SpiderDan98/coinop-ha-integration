@@ -3,8 +3,9 @@
     "id": "wash",
     "device_id": "device-washer",
     "device_name": "Washer",
-    "name": null,
+    "name": "Cotton 60°",
     "job_name": null,
+    "program": "Cotton 60°",
     "started": "2026-01-15T10:00:00+00:00",
     "last_seen": "2026-01-15T11:30:00+00:00",
     "ended": "2026-01-15T11:30:00+00:00",
@@ -77,12 +78,42 @@
         "computed": null,
         "locked": false,
         "deletable": false
+      },
+      {
+        "id": "wash-detergent",
+        "kind": "material",
+        "label": null,
+        "material_id": "material-detergent",
+        "material": {
+          "name": "Liquid detergent",
+          "type": "Liquid detergent",
+          "density": 1.04,
+          "diameter": null,
+          "price_per_gram": 0.005
+        },
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "dose_id": "dose-detergent",
+        "dose_source": "default_row",
+        "quantity": 75.0,
+        "unit": "ml",
+        "unit_price": 0.005200000000000001,
+        "amount": 0.39,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
       }
     ],
     "images": [],
     "cover_id": null,
     "running_seconds": 5400,
-    "total": 0.36,
+    "total": 0.75,
     "cost_per_part": null,
     "cover": null,
     "uploads": {
@@ -97,7 +128,7 @@
     "subtotals": {
       "electricity": 0.36,
       "water": 0.0,
-      "material": 0.0,
+      "material": 0.39,
       "other": 0.0
     }
   }

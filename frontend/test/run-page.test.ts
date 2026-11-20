@@ -169,8 +169,10 @@ describe("Run page", () => {
       "Electricity €0.36",
       "Measured by an energy meter 1.2 kWh × 0.3 = 0.36",
     ]);
+    const material = cards(panel).find(([head]) => head.startsWith("Material"));
+    expect(material?.[1]).toContain("From the Default row");
     expect(queryAll(panel, "[name=part_count]")).toHaveLength(0);
-    expect(text(query(panel, ".totals"))).toBe("Total €0.36");
+    expect(text(query(panel, ".totals"))).toBe("Total €0.75");
   });
 
   it("collapses to one column on narrow screens", async () => {

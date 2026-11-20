@@ -28,6 +28,8 @@ export interface RunSummary {
   device_id: string;
   device_name: string;
   name: string | null;
+  /** The Program it ran; always null for a Device Type without Programs. */
+  program: string | null;
   started: string;
   ended: string | null;
   outcome: Outcome | null;
@@ -68,6 +70,9 @@ export interface LineItem {
   slots: { number: number; type: string; colour: string | null }[];
   /** Split across several Materials: this Line Item's estimated share of the measured total. */
   share: number | null;
+  /** A Dose's Line Item: its Dose and where its amount came from. */
+  dose_id?: string;
+  dose_source?: "default_row";
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -94,7 +99,9 @@ export interface Device {
   /** The Device Type, which the Devices tab groups by. */
   type: "3d_printer" | "washing_machine";
   /** What its Device Type has; the panel shows a part only for these. */
-  capabilities: ("job" | "images" | "material" | "part_count" | "average_power" | "water")[];
+  capabilities: (
+    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses" | "water"
+  )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
@@ -136,6 +143,10 @@ export interface Device {
     tags_for_new_runs: string[];
     automatic_templates: string[];
     default_material: string | null;
+    /** In order; each Dose becomes a Material Line Item on Runs that dose it. */
+    doses: { id: string; material_id: string }[];
+    /** The amount per Dose id in its Material's unit; a missing one is not dosed. */
+    program_defaults: { default: { doses: Record<string, number> } };
   };
 }
 
@@ -220,7 +231,10 @@ export const updateRun = (
   hass: HomeAssistant,
   runId: string,
   changes: Partial<
-    Pick<RunDetail, "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "tags">
+    Pick<
+      RunDetail,
+      "name" | "note" | "started" | "ended" | "outcome" | "part_count" | "program" | "tags"
+    >
   >,
 ) => runResult(hass, { type: "coinop/runs/update", run_id: runId, ...changes });
 

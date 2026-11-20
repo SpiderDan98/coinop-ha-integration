@@ -24,6 +24,7 @@
             "status": "Status & mapping",
             "job": "Job & Material",
             "images": "Images",
+            "program": "Program",
             "consumption": "Consumption source",
             "price": "Electricity price",
             "water": "Water source",
@@ -123,6 +124,17 @@
           "data_description": {
             "thumbnail": "The image entity of the printer integration that shows the model being printed.",
             "snapshot": "Only with a camera. Up to three attempts; none when the end of a Run is only noticed later, e.g. after an outage."
+          }
+        },
+        "program": {
+          "title": "Program",
+          "description": "Optionally pick the entity that reports which program the machine runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
+          "data": {
+            "entity_id": "Program entity (optional)",
+            "attribute": "Attribute (optional)"
+          },
+          "data_description": {
+            "attribute": "Read this attribute instead of the entity's state."
           }
         },
         "consumption": {

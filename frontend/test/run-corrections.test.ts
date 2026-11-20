@@ -161,6 +161,52 @@ describe("Correcting a Run", () => {
     expect(queryAll(panel, ".flag")).toHaveLength(0);
   });
 
+  describe("of a washing machine", () => {
+    const washing = (options?: Parameters<typeof recordedBackend>[0]) =>
+      recordedBackend(options)
+        .reply("coinop/devices/list", () => ({ devices: [recorded.washer] }))
+        .reply("coinop/runs/get", () => ({ run: recorded.wash }))
+        .reply(UPDATE, (msg) => ({ run: { ...recorded.wash, program: msg.program } }));
+
+    it("shows its Program as a field and saves a correction", async () => {
+      const backend = washing();
+      const panel = await mountPanel(backend, { path: "/run/wash" });
+      const program = query(panel, "input[name=program]") as HTMLInputElement;
+      expect(program.value).toBe("Cotton 60°");
+      expect(text(program.closest("label") as Element)).toBe("Program");
+
+      await change(panel, program, "  Eco 40-60 ");
+
+      expect(backend.sent(UPDATE)).toEqual([
+        { type: UPDATE, run_id: "wash", program: "Eco 40-60" },
+      ]);
+      expect((query(panel, "input[name=program]") as HTMLInputElement).value).toBe("Eco 40-60");
+    });
+
+    it("clears the Program when the field is emptied", async () => {
+      const backend = washing();
+      const panel = await mountPanel(backend, { path: "/run/wash" });
+
+      await change(panel, query(panel, "input[name=program]"), " ");
+
+      expect(backend.sent(UPDATE)).toEqual([{ type: UPDATE, run_id: "wash", program: null }]);
+    });
+
+    it("names the Program in German", async () => {
+      const panel = await mountPanel(washing({ language: "de" }), { path: "/run/wash" });
+
+      expect(text(query(panel, "input[name=program]").closest("label") as Element)).toBe(
+        "Programm",
+      );
+    });
+  });
+
+  it("has no Program field for a printer's Run", async () => {
+    const panel = await mountPanel(correcting(), { path: "/run/benchy" });
+
+    expect(queryAll(panel, "[name=program]")).toHaveLength(0);
+  });
+
   it("shows when a correction could not be saved", async () => {
     const backend = correcting().reply(UPDATE, () => Promise.reject(new Error("invalid_format")));
     const panel = await mountPanel(backend, { path: "/run/benchy" });

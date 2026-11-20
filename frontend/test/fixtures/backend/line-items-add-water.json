@@ -103,6 +103,7 @@
     ],
     "images": [],
     "cover_id": null,
+    "program": null,
     "running_seconds": 3600,
     "total": 0.27,
     "cost_per_part": null,

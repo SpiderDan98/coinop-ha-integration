@@ -104,6 +104,7 @@ async def walk_to_water(hass: HomeAssistant, entry: ConfigEntry) -> Any:
         hass, entry, status="sensor.washer_status", device_type="washing_machine"
     )
     result = await configure(hass, result, WASHER_MAPPING)
+    result = await configure(hass, result, {})
     result = await configure(hass, result, {"next_step_id": "energy"})
     result = await configure(hass, result, {"entity_id": WASHER_ENERGY})
     result = await configure(hass, result, {"next_step_id": "fixed_price"})
@@ -238,6 +239,7 @@ async def test_reconfigure_offers_water_and_asks_a_price_for_a_new_meter(
     result = await start_reconfigure(hass, entry, subentry)
     assert result["menu_options"] == [
         "status",
+        "program",
         "consumption",
         "price",
         "water",
@@ -253,6 +255,7 @@ async def test_reconfigure_offers_water_and_asks_a_price_for_a_new_meter(
 
     assert result["menu_options"] == [
         "status",
+        "program",
         "consumption",
         "price",
         "water",
