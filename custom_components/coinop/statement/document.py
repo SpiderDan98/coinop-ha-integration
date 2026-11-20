@@ -18,7 +18,8 @@ from PIL import Image
 from custom_components.coinop.cost.rounding import round_amount, rounded_sum
 from custom_components.coinop.cost.running_time import running_time
 from custom_components.coinop.images.encode import InvalidImage, jpeg
-from custom_components.coinop.models import LineItem, Outcome, Run
+from custom_components.coinop.models import LineItem, LineItemKind, Outcome, Run
+from custom_components.coinop.quantities import WATER
 
 from .export import Detail, Options
 from .text import Text
@@ -130,6 +131,14 @@ def _label(item: LineItem, text: Text) -> str:
     return text(f"kind.{item.kind}")
 
 
+def _unit_price(item: LineItem, text: Text) -> str:
+    """Water is priced per m³, as the utility bills it."""
+    if item.kind is LineItemKind.WATER and item.unit == WATER.unit:
+        per_m3 = item.unit_price / WATER.per_unit(1.0)
+        return f"{text.unit_price(per_m3)}/{WATER.price_unit}"
+    return text.unit_price(item.unit_price)
+
+
 def _parts(count: int, text: Text) -> str:
     return text("part_one") if count == 1 else text("parts", count=count)
 
@@ -204,7 +213,7 @@ def _section(
                 ""
                 if item.quantity is None
                 else text.quantity(item.quantity, item.unit),
-                text.unit_price(item.unit_price),
+                _unit_price(item, text),
                 text.money(round_amount(item.amount, decimals)),
             )
             for item in run.line_items

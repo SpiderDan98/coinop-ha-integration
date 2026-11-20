@@ -3,9 +3,13 @@
 import type { HomeAssistant, Message } from "./hass";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
-export const KINDS = ["electricity", "material", "other"] as const;
+export const KINDS = ["electricity", "water", "material", "other"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
+/** The kinds to show: Water only where a Device has water or a Line Item counts it. */
+export const shownKinds = (water: boolean) => KINDS.filter((kind) => kind !== "water" || water);
+export const hasWater = (devices: Device[] | undefined) =>
+  devices?.some((device) => device.capabilities.includes("water")) ?? false;
 export type Method = "measured" | "from_history" | "estimated" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";
@@ -96,7 +100,7 @@ export interface Device {
   type: "3d_printer" | "washing_machine";
   /** What its Device Type has; the panel shows a part only for these. */
   capabilities: (
-    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses"
+    "job" | "images" | "material" | "part_count" | "average_power" | "program" | "doses" | "water"
   )[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
@@ -159,22 +163,25 @@ export type RunsEvent = { runs: RunSummary[] } | { change: RunChange; run: RunSu
 export interface Totals {
   cost: number;
   electricity_cost: number;
+  water_cost: number;
   material_cost: number;
   other_cost: number;
   material_grams: number;
   energy_kwh: number;
+  water_litres: number;
   runs: number;
   running_hours: number;
   flagged_runs: number;
 }
 
-export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag";
+export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag" | "program";
 
 /**
  * One group's values along the dimensions asked for, then its totals. Cost, grams and
  * kWh sum the group's Line Items; a Run counts once in every group holding one of its
  * Line Items, so Material and Tag groups overlap. `month` is "YYYY-MM" of the Run's
- * start in HA's time zone; `null` is "none" (no Material, no Tag, Run still open).
+ * start in HA's time zone; `null` is "none" (no Material, no Tag, no Program, Run still
+ * open).
  */
 export type Group = Totals &
   Partial<{
@@ -186,6 +193,7 @@ export type Group = Totals &
     material_name: string | null;
     outcome: Outcome | null;
     tag: string | null;
+    program: string | null;
   }>;
 
 /** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some

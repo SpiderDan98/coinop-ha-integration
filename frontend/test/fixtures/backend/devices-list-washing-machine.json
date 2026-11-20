@@ -6,7 +6,8 @@
       "type": "washing_machine",
       "capabilities": [
         "doses",
-        "program"
+        "program",
+        "water"
       ],
       "ha_settings": {
         "printer_device_id": null,
@@ -47,6 +48,9 @@
         "price": {
           "source": "fixed",
           "value": 0.3
+        },
+        "water": {
+          "source": "none"
         }
       },
       "settings": {

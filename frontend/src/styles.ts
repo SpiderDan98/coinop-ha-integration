@@ -4,6 +4,7 @@ import { css } from "lit";
 export const shared = css`
   :host {
     --coinop-electricity: #f9a825;
+    --coinop-water: #1e88e5;
     --coinop-material: #26a69a;
     --coinop-other: #7e57c2;
     --coinop-manual: #7e57c2;

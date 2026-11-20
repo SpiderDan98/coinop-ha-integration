@@ -28,6 +28,12 @@ class ConsumptionSource(StrEnum):
     ESTIMATE = "estimate"
 
 
+class WaterSource(StrEnum):
+    METER = "meter"
+    FLOW = "flow"
+    NONE = "none"
+
+
 class Capability(StrEnum):
     """What a Device Type has; code branches on these, not on the type."""
 
@@ -44,6 +50,8 @@ class Capability(StrEnum):
     PROGRAM = "program"
     # A Dose list whose Program Defaults become Material Line Items.
     DOSES = "doses"
+    # A water source and price, and a Water Line Item from them.
+    WATER = "water"
 
 
 CAPABILITIES = {
@@ -56,7 +64,9 @@ CAPABILITIES = {
             Capability.AVERAGE_POWER,
         }
     ),
-    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.PROGRAM, Capability.DOSES}),
+    DEVICE_TYPE_WASHING_MACHINE: frozenset(
+        {Capability.PROGRAM, Capability.DOSES, Capability.WATER}
+    ),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

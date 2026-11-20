@@ -30,6 +30,7 @@
   "page": "Page {page} of {pages}",
   "kind": {
     "electricity": "Electricity",
+    "water": "Water",
     "material": "Material",
     "other": "Other"
   },

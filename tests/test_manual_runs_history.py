@@ -12,11 +12,13 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 from pytest_homeassistant_custom_component.typing import RecorderInstanceGenerator
 
 from .clock import CLOCK_START, Clock
-from .devices import ENERGY, POWER, add_device, add_hub
+from .devices import ENERGY, POWER, add_device, add_hub, add_washing_machine
 from .test_dynamic_price import PRICE_ENTITY, segments, set_price
 from .test_manual_runs import at, create
 from .test_measured import add_metered_device, electricity, set_meter
 from .test_runs import NO_MATERIAL
+from .test_washing_machines import set_energy
+from .test_water import set_water, water
 from .websocket import PanelClient
 
 
@@ -155,3 +157,57 @@ async def test_a_print_made_while_home_assistant_was_down_is_estimated(
     assert item["quantity"] == pytest.approx(0.05)
     assert item["unit_price"] == pytest.approx(0.25)
     assert run["flags"] == ["price_gap", *NO_MATERIAL]
+
+
+async def test_a_manual_wash_takes_its_water_from_history(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_water(hass, 1000)
+    await set_energy(hass, 100)
+    entry = await add_hub(hass)
+    washer = await add_washing_machine(hass, entry, water="meter", water_price=4.0)
+    await clock.advance(hours=1)
+    await set_water(hass, 1040)
+    await clock.advance(hours=1)
+    await set_water(hass, 1060)
+    await history_until(hass, clock, 5)
+
+    run = await create(panel, washer.subentry_id, started=at(0.5), ended=at(1.5))
+
+    item = water(run)
+    assert item["method"] == "from_history"
+    # 1020 at 10:30, 1050 at 11:30.
+    assert item["quantity"] == pytest.approx(30)
+    assert item["amount"] == pytest.approx(0.12)
+
+
+async def test_without_water_history_a_manual_wash_gets_water_to_enter(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_water(hass, 1000)
+    await set_energy(hass, 100)
+    entry = await add_hub(hass)
+    washer = await add_washing_machine(hass, entry, water="meter")
+    await history_until(hass, clock, 5)
+
+    run = await create(panel, washer.subentry_id, started=at(-3), ended=at(-2))
+
+    item = water(run)
+    assert (item["method"], item["quantity"], item["deletable"]) == (
+        "entered",
+        None,
+        True,
+    )
+
+
+async def test_a_manual_wash_without_a_water_source_has_no_water(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_energy(hass, 100)
+    entry = await add_hub(hass)
+    washer = await add_washing_machine(hass, entry)
+    await history_until(hass, clock, 5)
+
+    run = await create(panel, washer.subentry_id, started=at(1), ended=at(2))
+
+    assert [item["kind"] for item in run["line_items"]] == ["electricity"]

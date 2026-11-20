@@ -42,6 +42,7 @@ class UsageUnit(StrEnum):
 
 class LineItemKind(StrEnum):
     ELECTRICITY = "electricity"
+    WATER = "water"
     MATERIAL = "material"
     OTHER = "other"
 
@@ -53,8 +54,12 @@ class QuantityBasis(StrEnum):
     RUNNING_HOURS = "running_hours"
 
 
+# Consumed quantities: at most one Line Item each per Run.
+CONSUMED_KINDS = frozenset({LineItemKind.ELECTRICITY, LineItemKind.WATER})
+
+
 class ConsumptionMethod(StrEnum):
-    """Where a consumed quantity's Line Item (electricity) came from."""
+    """Where a consumed quantity's Line Item (electricity, water) came from."""
 
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
@@ -302,7 +307,7 @@ class LineItem:
         """Coin-op computes its values, live while the Run is open."""
         return (
             (
-                self.kind is LineItemKind.ELECTRICITY
+                self.kind in CONSUMED_KINDS
                 and self.method is not ConsumptionMethod.ENTERED
             )
             or self.measured
@@ -540,8 +545,12 @@ class Run:
         return not self.finalised and item.is_computed
 
     def deletable(self, item: LineItem) -> bool:
-        """Every Run keeps its one Electricity Line Item, overridden down to 0 at most."""
-        return item.kind is not LineItemKind.ELECTRICITY and not self.locked(item)
+        """Every Run keeps its one Electricity Line Item and a computed Water one,
+        overridden down to 0 at most."""
+        kept = item.kind is LineItemKind.ELECTRICITY or (
+            item.kind is LineItemKind.WATER and item.is_computed
+        )
+        return not kept and not self.locked(item)
 
     def drop_fixed_flags(self) -> None:
         """Drops the Flags the user's corrections fixed; the others wait for "Mark as checked"."""

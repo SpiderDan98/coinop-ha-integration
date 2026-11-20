@@ -13,10 +13,12 @@ class Totals:
 
     cost: float = 0.0
     electricity_cost: float = 0.0
+    water_cost: float = 0.0
     material_cost: float = 0.0
     other_cost: float = 0.0
     material_grams: float = 0.0
     energy_kwh: float = 0.0
+    water_litres: float = 0.0
     runs: int = 0
     running_hours: float = 0.0
     flagged_runs: int = 0
@@ -41,10 +43,16 @@ def run_totals(run: Run, now: datetime) -> Totals:
     return Totals(
         cost=sum(item.amount for item in run.line_items),
         electricity_cost=_amount(run, LineItemKind.ELECTRICITY),
+        water_cost=_amount(run, LineItemKind.WATER),
         material_cost=_amount(run, LineItemKind.MATERIAL),
         other_cost=_amount(run, LineItemKind.OTHER),
         material_grams=sum(item.grams for item in run.line_items),
         energy_kwh=run.electricity.quantity or 0.0,
+        water_litres=sum(
+            item.quantity or 0.0
+            for item in run.line_items
+            if item.kind is LineItemKind.WATER
+        ),
         runs=1,
         running_hours=running_time(run, now).total_seconds() / 3600,
         flagged_runs=1 if run.flags else 0,

@@ -42,6 +42,9 @@ export const deleteDialog = (
     [t("sensor.total_cost"), format.money(drop.cost)],
     [t("sensor.energy_in_runs"), format.quantity(drop.energy_kwh, "kWh")],
     [t("sensor.material_used"), format.quantity(drop.material_grams, "g")],
+    ...(drop.water_litres
+      ? [[t("sensor.water_in_runs"), format.quantity(drop.water_litres, "L")]]
+      : []),
     [t("runs.title"), String(drop.runs)],
     [t("sensor.flagged_runs"), String(drop.flagged_runs)],
   ];

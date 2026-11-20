@@ -20,7 +20,7 @@ STRINGS: dict[str, dict[str, Any]] = {
     for language in LANGUAGES
 }
 
-QUANTITY_DECIMALS = {"kWh": 3, "g": 1, "ml": 1, "h": 2, "pcs": 0}
+QUANTITY_DECIMALS = {"kWh": 3, "L": 1, "g": 1, "ml": 1, "h": 2, "pcs": 0}
 SYMBOLS = {
     "EUR": "€",
     "USD": "$",

@@ -49,7 +49,10 @@ def add_reading(
         readings[-1] = (at, value)
         return
     readings.insert(index, (at, value))
-    if run.ended is not None and at > run.ended:
+    # A drop reported after the end is no reset within the Run, e.g. a per-cycle
+    # counter going back to 0; it counts nothing (`consumption.counted`).
+    within = run.ended is None or at <= run.ended
+    if run.ended is not None and not within:
         # Only the stretch up to the end belongs to the Run.
         at = run.ended
     previous = next(
@@ -68,7 +71,7 @@ def add_reading(
         and meter["source"] == quantity.total_source
         and previous is not None
         and value < previous[1]
-        and (run.ended is None or previous[0] < run.ended)
+        and within
     ):
         add_flag(run, Flag.METER_RESET)
 
