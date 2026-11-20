@@ -4,7 +4,9 @@
       "id": "device-washer",
       "name": "Washer",
       "type": "washing_machine",
-      "capabilities": [],
+      "capabilities": [
+        "program"
+      ],
       "ha_settings": {
         "printer_device_id": null,
         "status": {
@@ -29,6 +31,10 @@
           "ignored": [
             "off"
           ]
+        },
+        "program": {
+          "entity_id": "sensor.washer_program",
+          "attribute": null
         },
         "consumption": {
           "source": "energy",

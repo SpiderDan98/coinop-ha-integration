@@ -34,6 +34,7 @@
   "run.cost_per_part": "Kosten pro Teil ({count})",
   "run.per_part": "{amount} pro Teil × {count}",
   "run.name": "Name",
+  "run.program": "Programm",
   "run.outcome": "Ausgang",
   "run.part_count": "Teileanzahl",
   "run.note": "Notiz",

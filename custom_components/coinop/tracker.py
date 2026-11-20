@@ -150,6 +150,10 @@ class DeviceTracker:
                     self._hass, usage["entity_id"], self._on_usage
                 ),
             ]
+        if program := self._config.program_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(self._hass, program, self._on_program)
+            )
         if loaded_slot := self._config.loaded_slot_entity_id:
             self._unsubscribe.append(
                 async_track_state_change_event(
@@ -158,6 +162,7 @@ class DeviceTracker:
             )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
+            self._record_program(run)
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
@@ -287,6 +292,30 @@ class DeviceTracker:
         if changed < run.started or late or self._next_started(run, changed):
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
+
+    @callback
+    def _on_program(self, event: Event[EventStateChangedData]) -> None:
+        if (
+            run := self._book.open_run(self._config.device_id)
+        ) and self._record_program(run):
+            self._book.async_update(run)
+
+    def _program(self) -> str | None:
+        """The Program input's value; None while it has none to give."""
+        if (entity_id := self._config.program_entity_id) is None:
+            return None
+        state = self._hass.states.get(entity_id)
+        return (
+            input_value(state, self._config.program_attribute) or ""
+        ).strip() or None
+
+    def _record_program(self, run: Run) -> bool:
+        """Follow a new valid Program; whether the Run changed."""
+        program = self._program()
+        if program is None or program == run.program:
+            return False
+        run.follow_program(program)
+        return True
 
     @callback
     def _on_slot(self, event: Event[EventStateChangedData]) -> None:
@@ -446,6 +475,7 @@ class DeviceTracker:
         self._follow_average_power(run, at)
         self._record_usage(run, self._usage_state())
         self._record_slot(run)
+        self._record_program(run)
         self._refresh(run, at)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at

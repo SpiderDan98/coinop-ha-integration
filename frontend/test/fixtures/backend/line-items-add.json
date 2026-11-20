@@ -116,6 +116,7 @@
       }
     ],
     "cover_id": null,
+    "program": null,
     "running_seconds": 32400,
     "total": -1.7,
     "cost_per_part": -1.7,

@@ -101,10 +101,15 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "status": self.async_step_status,
             "job": self.async_step_job,
             "images": self.async_step_images,
+            "program": self.async_step_program,
             "consumption": self.async_step_consumption,
             "price": self.async_step_price,
         }
-        needs = {"job": Capability.JOB, "images": Capability.IMAGES}
+        needs = {
+            "job": Capability.JOB,
+            "images": Capability.IMAGES,
+            "program": Capability.PROGRAM,
+        }
         return {
             name: step
             for name, step in sections.items()
@@ -392,6 +397,30 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 # Without a camera the toggle was off only for lack of one.
                 stored
                 | {"snapshot": stored["snapshot"] if stored.get("camera") else True},
+            ),
+        )
+
+    async def async_step_program(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            entity_id = user_input.get("entity_id")
+            attribute = user_input.get("attribute") if entity_id else None
+            self._data["program"] = {
+                "entity_id": entity_id,
+                "attribute": attribute or None,
+            }
+            return await self._section_done("program")
+        schema = vol.Schema(
+            {
+                vol.Optional("entity_id"): EntitySelector(),
+                vol.Optional("attribute"): TextSelector(),
+            }
+        )
+        return self.async_show_form(
+            step_id="program",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self._data.get("program")
             ),
         )
 

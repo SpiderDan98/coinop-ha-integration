@@ -126,6 +126,7 @@
       }
     ],
     "cover_id": "benchy-upload",
+    "program": null,
     "running_seconds": 4500,
     "total": 0.86,
     "cost_per_part": 0.22,

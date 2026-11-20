@@ -40,11 +40,21 @@ class Capability(StrEnum):
     PART_COUNT = "part_count"
     # Electricity estimated from average powers when nothing measures it.
     AVERAGE_POWER = "average_power"
+    # The Program input; a Run records its Program.
+    PROGRAM = "program"
 
 
 CAPABILITIES = {
-    DEVICE_TYPE_3D_PRINTER: frozenset(Capability),
-    DEVICE_TYPE_WASHING_MACHINE: frozenset[Capability](),
+    DEVICE_TYPE_3D_PRINTER: frozenset(
+        {
+            Capability.JOB,
+            Capability.IMAGES,
+            Capability.MATERIAL,
+            Capability.PART_COUNT,
+            Capability.AVERAGE_POWER,
+        }
+    ),
+    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.PROGRAM}),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
@@ -61,6 +71,8 @@ class DeviceConfig:
     mapping: Mapping[str, Target]
     job_entity_id: str | None
     job_attribute: str | None
+    program_entity_id: str | None
+    program_attribute: str | None
     # The Material used input: entity_id, attribute and unit.
     material: Mapping[str, Any] | None
     # The Slot entities in Slot order, their colour attribute and the Loaded slot input.
@@ -80,6 +92,7 @@ class DeviceConfig:
         data: Mapping[str, Any] = subentry.data
         job = data.get("job", {})
         images = data.get("images", {})
+        program = data.get("program", {})
         return cls(
             device_id=subentry.subentry_id,
             name=subentry.title,
@@ -94,6 +107,8 @@ class DeviceConfig:
             },
             job_entity_id=job.get("entity_id"),
             job_attribute=job.get("attribute"),
+            program_entity_id=program.get("entity_id"),
+            program_attribute=program.get("attribute"),
             material=job.get("material"),
             slots=tuple(job.get("slots", ())),
             colour_attribute=job.get("colour_attribute"),

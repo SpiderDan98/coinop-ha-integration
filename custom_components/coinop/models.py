@@ -452,6 +452,7 @@ class Run:
     are still awaited; frozen once finalised. `end_reconstructed` marks an end
     Coin-op only learnt about after the Status input or Coin-op itself was away.
     `job_name` is the job the Device reported, kept apart from the editable name;
+    `program` the Program it ran, which the name follows until the user renames it;
     `last_seen` is the last time the Status input was seen running during the
     open Run.
     `timelines` are what it follows for each consumed quantity, by its Line Item
@@ -470,6 +471,7 @@ class Run:
     line_items: list[LineItem]
     name: str | None = None
     job_name: str | None = None
+    program: str | None = None
     last_seen: datetime | None = None
     ended: datetime | None = None
     outcome: Outcome | None = None
@@ -490,6 +492,11 @@ class Run:
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def follow_program(self, program: str | None) -> None:
+        if self.name in (None, self.program):
+            self.name = program
+        self.program = program
 
     @property
     def paused(self) -> bool:
@@ -542,6 +549,8 @@ class Run:
             "device_name": self.device_name,
             "name": self.name,
             "job_name": self.job_name,
+            # Only Runs of Device Types with Programs have one.
+            **({"program": self.program} if self.program is not None else {}),
             "started": _iso(self.started),
             "last_seen": _iso(self.last_seen),
             "ended": _iso(self.ended),
@@ -576,6 +585,7 @@ class Run:
             device_name=data["device_name"],
             name=data["name"],
             job_name=data.get("job_name"),
+            program=data.get("program"),
             started=_time(data["started"]),
             last_seen=_time(data.get("last_seen")),
             ended=_time(data["ended"]),
