@@ -172,6 +172,41 @@ describe("Analysis tab", () => {
   });
 });
 
+describe("Analysis rows", () => {
+  const links = (panel: Element, table: string) =>
+    queryAll(panel, `.${table} tbody a`).map((link) => link.getAttribute("href"));
+
+  it("link to the Runs of their Device, month, Outcome or Tag", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/analysis" });
+
+    expect(links(panel, "by-device")).toEqual([
+      "/wattbill/runs?device=device-kobra",
+      "/wattbill/runs?device=device-mini",
+    ]);
+    expect(links(panel, "by-month")).toEqual(["/wattbill/runs?month=2026-01"]);
+    expect(links(panel, "by-outcome")).toEqual([
+      "/wattbill/runs?outcome=completed",
+      "/wattbill/runs?outcome=cancelled",
+      "/wattbill/runs?outcome=failed",
+    ]);
+    expect(links(panel, "by-tag")).toEqual([
+      "/wattbill/runs?tag=Cosplay+helmet",
+      "/wattbill/runs?tag=Gift",
+      "/wattbill/runs?untagged=1",
+    ]);
+    expect(queryAll(panel, ".by-kind a, .by-material a")).toEqual([]);
+  });
+
+  it("open the Runs tab filtered, a removed Device's too", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/analysis" });
+
+    await click(panel, queryAll(panel, ".by-device tbody a")[1]);
+
+    expect(location.pathname + location.search).toBe("/wattbill/runs?device=device-mini");
+    expect(queryAll(panel, ".tile .strong").map(text)).toEqual(["Untitled Run"]);
+  });
+});
+
 describe("An empty Analysis tab", () => {
   it("says there are no Runs instead of empty tables", async () => {
     const backend = recordedBackend()

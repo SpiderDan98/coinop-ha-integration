@@ -1,12 +1,13 @@
 // The Analysis tab: tables of totals across all Devices from the backend's aggregates,
-// read afresh whenever a Run changes.
+// read afresh whenever a Run changes. Rows with a matching Runs filter link to those Runs.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { KINDS, OUTCOMES, getGroupings, type Device, type Group, type RunSummary } from "./api";
 import { formatter, type Format } from "./format";
-import type { HomeAssistant } from "./hass";
+import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { deviceName } from "./run-parts";
+import { runsPath, type Filter } from "./runs-query";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
@@ -40,9 +41,9 @@ function totals(
     foot,
     hint,
     empty,
-  }: { head: string[]; rows: (string | number)[][]; foot?: string[]; hint?: string; empty: string },
+  }: { head: string[]; rows: unknown[][]; foot?: string[]; hint?: string; empty: string },
 ) {
-  const cells = (row: (string | number)[]) =>
+  const cells = (row: unknown[]) =>
     row.map((value, index) => html`<td class=${index ? "num" : ""}>${value}</td>`);
   return table({
     name,
@@ -72,6 +73,7 @@ export class AnalysisPage extends LitElement {
   /** Replaced, not changed, whenever a Run changes. */
   @property({ attribute: false }) runs: ReadonlyMap<string, RunSummary> = new Map();
   @property({ attribute: false }) devices?: Device[];
+  @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   /** Undefined until loaded, null if loading failed. */
@@ -80,6 +82,10 @@ export class AnalysisPage extends LitElement {
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runs")) void this.load();
+  }
+
+  private link(label: string, filter: Partial<Filter>) {
+    return html`<a href=${runsPath(this.basePath, filter)} @click=${followLink}>${label}</a>`;
   }
 
   private async load() {
@@ -135,7 +141,7 @@ export class AnalysisPage extends LitElement {
         t("analysis.cost"),
       ],
       rows: device.map((group) => [
-        deviceName(group, this.devices, t),
+        this.link(deviceName(group, this.devices, t), { deviceId: group.device_id ?? "" }),
         group.runs,
         format.duration(group.running_hours * 3600),
         format.quantity(group.energy_kwh, "kWh"),
@@ -156,7 +162,7 @@ export class AnalysisPage extends LitElement {
       rows: month
         .toSorted((a, b) => (b.month ?? "").localeCompare(a.month ?? ""))
         .map((group) => [
-          format.monthName(group.month ?? ""),
+          this.link(format.monthName(group.month ?? ""), { month: group.month ?? "" }),
           group.runs,
           ...KINDS.map((kind) => format.money(group[`${kind}_cost`])),
           format.money(group.cost),
@@ -188,7 +194,7 @@ export class AnalysisPage extends LitElement {
       rows: outcome
         .toSorted((a, b) => rank(a) - rank(b))
         .map((group) => [
-          t(`outcome.${group.outcome ?? "open"}`),
+          this.link(t(`outcome.${group.outcome ?? "open"}`), { outcome: group.outcome ?? "open" }),
           group.runs,
           format.money(group.cost),
           share(group.cost, cost, format),
@@ -201,7 +207,9 @@ export class AnalysisPage extends LitElement {
     return totals("by-tag overlapping", t("analysis.by_tag"), {
       head: [t("tags.tag"), t("runs.title"), t("analysis.cost")],
       rows: tag.map((group) => [
-        group.tag ?? t("runs.no_tag"),
+        group.tag
+          ? this.link(group.tag, { tags: [group.tag] })
+          : this.link(t("runs.no_tag"), { untagged: true }),
         group.runs,
         format.money(group.cost),
       ]),
