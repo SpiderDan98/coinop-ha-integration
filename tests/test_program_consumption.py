@@ -18,10 +18,15 @@ from .devices import (
     configure,
     walk_to_mapping,
 )
-from .test_programs import WASHER_PROGRAM, set_program
 from .test_runs import stored_runs
-from .test_washing_machines import set_energy, set_washer
 from .test_water import set_water, set_water_price
+from .washing import (
+    add_washer,
+    set_energy,
+    set_program,
+    set_washer,
+    washed,
+)
 from .websocket import PanelClient
 
 
@@ -83,24 +88,7 @@ async def set_rows(
 async def washer(hass: HomeAssistant, clock: Clock) -> ConfigSubentry:
     """A washing machine with electricity and water per Program and a Program
     input, at 0.30 per kWh and 4.00 per m³."""
-    hass.config.currency = "EUR"
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    return await add_washing_machine(
-        hass,
-        await add_hub(hass),
-        program={"entity_id": WASHER_PROGRAM},
-        source="per_program",
-        water="per_program",
-    )
-
-
-async def run_cycle(
-    hass: HomeAssistant, clock: Clock, outcome: str = "finished"
-) -> None:
-    await set_washer(hass, "running")
-    await clock.advance(minutes=90)
-    await set_washer(hass, outcome)
+    return await add_washer(hass, source="per_program", water="per_program")
 
 
 def consumed(run: dict[str, Any]) -> list[tuple[Any, ...]]:
@@ -149,7 +137,7 @@ async def test_a_run_gets_electricity_and_water_from_its_programs_row(
     await set_rows(panel, washer)
     await set_program(hass, program)
 
-    await run_cycle(hass, clock)
+    await washed(hass, clock)
 
     [run] = stored_runs(hass_storage)
     assert consumed(run) == approx(expected)
@@ -166,7 +154,7 @@ async def test_a_program_row_without_kwh_and_litres_leaves_them_empty_and_flagge
     await set_rows(panel, washer)
     await set_program(hass, "Wool")
 
-    await run_cycle(hass, clock)
+    await washed(hass, clock)
 
     [run] = stored_runs(hass_storage)
     assert consumed(run) == [
@@ -184,7 +172,7 @@ async def test_entering_the_missing_quantities_clears_the_flag(
     hass_storage: dict[str, Any],
 ) -> None:
     await set_program(hass, "Wool")
-    await run_cycle(hass, clock)
+    await washed(hass, clock)
     [run] = stored_runs(hass_storage)
 
     for item in run["line_items"]:
@@ -262,7 +250,7 @@ async def test_a_meter_silent_for_the_whole_run_falls_back_to_the_default(
     await set_energy(hass, STATE_UNAVAILABLE)
     await set_water(hass, STATE_UNAVAILABLE)
 
-    await run_cycle(hass, clock)
+    await washed(hass, clock)
     await clock.advance(minutes=5)
 
     [run] = stored_runs(hass_storage)
@@ -283,7 +271,7 @@ async def test_a_silent_meter_without_a_default_leaves_the_quantity_empty(
     await set_washer(hass, "off")
     await add_washing_machine(hass, await add_hub(hass))
 
-    await run_cycle(hass, clock)
+    await washed(hass, clock)
     await clock.advance(minutes=5)
 
     [run] = stored_runs(hass_storage)
@@ -322,7 +310,7 @@ async def test_a_cancelled_run_is_flagged_for_its_default_water(
 ) -> None:
     await set_rows(panel, washer)
 
-    await run_cycle(hass, clock, "cancelled")
+    await washed(hass, clock, outcome="cancelled")
 
     [run] = stored_runs(hass_storage)
     assert run["flags"] == ["ended_early_defaults"]
@@ -337,7 +325,7 @@ async def test_a_cancelled_run_is_not_flagged_for_default_electricity_alone(
 ) -> None:
     await set_rows(panel, washer, {"default": {"doses": {}, "kwh": 0.8}})
 
-    await run_cycle(hass, clock, "cancelled")
+    await washed(hass, clock, outcome="cancelled")
 
     [run] = stored_runs(hass_storage)
     assert [item[:3] for item in consumed(run)] == [

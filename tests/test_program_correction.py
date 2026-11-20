@@ -8,14 +8,11 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_hub, add_washing_machine
-from .stored import place_materials
-from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, set_scale
+from .test_doses import SCALE, set_scale
 from .test_manual_runs import create
-from .test_programs import WASHER_PROGRAM, set_program
 from .test_runs import stored_runs, value
-from .test_washing_machines import set_washer
 from .test_water import set_water
+from .washing import DOSES, add_washer, set_program, set_washer, washed
 from .websocket import PanelClient
 
 # 0.30 per kWh, 0.004 per L; 0.006 per ml of liquid, 0.004 per g of whitener.
@@ -32,30 +29,14 @@ ROWS = {
 }
 
 
-async def add_washer(
-    hass: HomeAssistant, hass_storage: dict[str, Any], water: str = "per_program"
-) -> ConfigSubentry:
-    """A washing machine with electricity per Program, a Program input and the
-    laundry Materials."""
-    hass.config.currency = "EUR"
-    place_materials(hass_storage, LIQUID, PODS, WHITENER)
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    return await add_washing_machine(
-        hass,
-        await add_hub(hass),
-        program={"entity_id": WASHER_PROGRAM},
-        source="per_program",
-        water=water,
-    )
-
-
 @pytest.fixture
 async def washer(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> ConfigSubentry:
-    """Water per Program too."""
-    return await add_washer(hass, hass_storage)
+    """Electricity and water per Program, with the laundry Materials."""
+    return await add_washer(
+        hass, hass_storage, source="per_program", water="per_program"
+    )
 
 
 async def set_rows(
@@ -66,15 +47,6 @@ async def set_rows(
         device_id=washer.subentry_id,
         settings={"doses": DOSES, "program_defaults": rows},
     )
-
-
-async def washed(
-    hass: HomeAssistant, clock: Clock, program: str, outcome: str = "finished"
-) -> None:
-    await set_program(hass, program)
-    await set_washer(hass, "running")
-    await clock.advance(minutes=90)
-    await set_washer(hass, outcome)
 
 
 async def correct(panel: PanelClient, run_id: str, program: str | None) -> Any:
@@ -123,7 +95,7 @@ async def test_measured_water_and_an_overridden_dose_stay_as_they_were(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     await set_water(hass, 1000)
-    washer = await add_washer(hass, hass_storage, water="meter")
+    washer = await add_washer(hass, hass_storage, source="per_program", water="meter")
     await set_rows(panel, washer)
     await set_program(hass, "Cotton 40°")
     await set_washer(hass, "running")

@@ -7,52 +7,20 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_device, add_hub, add_washing_machine
+from .devices import add_device, add_hub
 from .http import HttpClient
-from .stored import place_materials, stored_material
 from .test_cost_statement import export
 from .test_persistence import restart
 from .test_runs import stored_runs, value
-from .test_washing_machines import set_energy, set_washer, wash, washer_entry
+from .test_washing_machines import washer_entry
+from .washing import (
+    DOSES,
+    add_washer,
+    set_energy,
+    set_washer,
+    washed,
+)
 from .websocket import PanelClient
-
-
-def laundry(material_id: str, pack_unit: str, **fields: Any) -> dict[str, Any]:
-    price = {"source": "fixed", "pack_unit": pack_unit} | fields.pop("price")
-    return stored_material(
-        material_id,
-        **({"form": "detergent", "diameter": None, "price": price} | fields),
-    )
-
-
-# 0.006 per ml, 0.30 per pod, 0.004 per g.
-LIQUID = laundry(
-    "liquid",
-    "ml",
-    type="Liquid detergent",
-    density=1.04,
-    price={"pack_price": 9.0, "pack_size": 1500.0},
-)
-PODS = laundry(
-    "pods",
-    "pcs",
-    type="Detergent pods",
-    density=None,
-    price={"pack_price": 12.0, "pack_size": 40.0},
-)
-WHITENER = laundry(
-    "whitener",
-    "g",
-    form="laundry_additive",
-    type="Whitener",
-    density=0.9,
-    price={"pack_price": 4.0, "pack_size": 1000.0},
-)
-DOSES = [
-    {"id": "dose-liquid", "material_id": "liquid"},
-    {"id": "dose-pods", "material_id": "pods"},
-    {"id": "dose-whitener", "material_id": "whitener"},
-]
 
 
 @pytest.fixture
@@ -60,11 +28,7 @@ async def washer(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> ConfigSubentry:
     """A washing machine on a plug's energy meter, with the laundry Materials."""
-    hass.config.currency = "EUR"
-    place_materials(hass_storage, LIQUID, PODS, WHITENER)
-    await set_energy(hass, 100)
-    await set_washer(hass, "off")
-    return await add_washing_machine(hass, await add_hub(hass), price=0.50)
+    return await add_washer(hass, hass_storage, program=False, price=0.50)
 
 
 async def dose(
@@ -103,7 +67,7 @@ async def test_each_dose_of_the_default_row_is_a_material_line_item(
 ) -> None:
     await dose(panel, washer, {"dose-liquid": 75, "dose-pods": 1})
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     [run] = stored_runs(hass_storage)
     assert doses(run) == [
@@ -121,7 +85,7 @@ async def test_editing_the_default_row_changes_the_open_run_but_no_ended_one(
     hass_storage: dict[str, Any],
 ) -> None:
     await dose(panel, washer, {"dose-liquid": 75})
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     await set_washer(hass, "running")
 
     await dose(panel, washer, {"dose-liquid": 60, "dose-whitener": 20})
@@ -216,7 +180,7 @@ async def test_a_dose_keeps_its_archived_material(
     await panel.call("coinop/materials/archive", material_id="whitener")
 
     settings = await dose(panel, washer, {"dose-whitener": 30})
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     assert settings["doses"] == DOSES
     [run] = stored_runs(hass_storage)
@@ -245,7 +209,7 @@ async def test_doses_count_as_material_costs(
 ) -> None:
     await dose(panel, washer, {"dose-liquid": 75, "dose-pods": 1})
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
 
     assert value(hass, "sensor.washer_material_cost") == pytest.approx(0.75)
     groups = (await panel.call("coinop/aggregates/get", group_by=["material"]))[
@@ -377,7 +341,7 @@ async def test_an_unavailable_stock_input_falls_back_to_the_default_with_a_flag(
     await set_scale(hass, "unavailable")
     await stock(panel, washer, {"entity_id": SCALE}, {"dose-whitener": 20})
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     await clock.advance(minutes=4, seconds=59)
     assert stored_runs(hass_storage) == []
     await clock.advance(seconds=1)
@@ -399,7 +363,7 @@ async def test_a_stock_input_that_lost_nothing_doses_nothing(
     await set_scale(hass, 500)
     await stock(panel, washer, {"entity_id": SCALE}, {"dose-whitener": 20})
 
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     await set_scale(hass, 500)
 
     [run] = stored_runs(hass_storage)

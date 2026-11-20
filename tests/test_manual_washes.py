@@ -7,13 +7,14 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_device, add_hub, add_washing_machine
-from .stored import place_materials
-from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, doses, set_scale
+from .devices import add_device, add_hub
+from .test_doses import SCALE, doses, set_scale
 from .test_manual_runs import at, create
 from .test_program_consumption import approx, consumed
-from .test_programs import WASHER_PROGRAM, set_program
-from .test_washing_machines import set_washer
+from .washing import (
+    DOSES,
+    add_washer,
+)
 from .websocket import PanelClient
 
 ROWS = {
@@ -35,16 +36,8 @@ async def washer(
 ) -> ConfigSubentry:
     """A washing machine with electricity and water per Program, the laundry
     Doses and ROWS, at 0.30 per kWh and 4.00 per m³."""
-    hass.config.currency = "EUR"
-    place_materials(hass_storage, LIQUID, PODS, WHITENER)
-    await set_washer(hass, "off")
-    await set_program(hass, "unknown")
-    washer = await add_washing_machine(
-        hass,
-        await add_hub(hass),
-        program={"entity_id": WASHER_PROGRAM},
-        source="per_program",
-        water="per_program",
+    washer = await add_washer(
+        hass, hass_storage, source="per_program", water="per_program"
     )
     await panel.call(
         "coinop/devices/update_settings",

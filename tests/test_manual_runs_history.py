@@ -19,8 +19,8 @@ from .test_manual_runs import at, create
 from .test_measured import add_metered_device, electricity, set_meter
 from .test_program_consumption import approx, consumed
 from .test_runs import NO_MATERIAL
-from .test_washing_machines import set_energy
 from .test_water import set_water, water
+from .washing import set_energy
 from .websocket import PanelClient
 
 

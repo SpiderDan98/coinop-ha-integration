@@ -28,7 +28,7 @@ from .test_measured import electricity
 from .test_persistence import live_runs
 from .test_run_event import record_events
 from .test_runs import set_status, stored_runs, value
-from .test_washing_machines import set_energy, set_washer, wash
+from .washing import set_energy, set_washer, washed
 from .websocket import PanelClient
 
 
@@ -382,7 +382,7 @@ async def test_a_per_cycle_meter_dropping_to_zero_after_the_end_counts_once(
     await set_energy(hass, 0)
     await clock.advance(minutes=5)
 
-    # The next cycle starts from 0, reported as it starts.
+    # The next load starts from 0, reported as it starts.
     await set_water(hass, 0)
     await set_energy(hass, 0)
     await set_washer(hass, "running")
@@ -439,7 +439,7 @@ async def test_without_a_water_source_water_is_added_by_hand(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
     await add_water_washer(hass, water="none")
-    await wash(hass, clock)
+    await washed(hass, clock, kwh=1.2)
     [summary] = (await panel.call("coinop/runs/list"))["runs"]
     run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
     assert [i["kind"] for i in run["line_items"]] == ["electricity"]
