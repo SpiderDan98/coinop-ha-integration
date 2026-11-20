@@ -112,6 +112,14 @@ async def test_add_device_creates_a_device_subentry(hass: HomeAssistant) -> None
     assert [s.title for s in entry.subentries.values()] == ["Kobra"]
 
 
+async def test_add_device_stores_the_device_type(hass: HomeAssistant) -> None:
+    entry = await add_hub(hass)
+
+    subentry = await add_device(hass, entry)
+
+    assert subentry.data["device_type"] == "3d_printer"
+
+
 async def test_add_device_adds_further_devices(hass: HomeAssistant) -> None:
     entry = await add_hub(hass)
 

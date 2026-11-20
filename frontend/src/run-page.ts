@@ -45,7 +45,7 @@ import "./tag-input";
 const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: Format) => {
   if (length === null) return undefined;
   const measured = format.quantity(length, "mm");
-  return material?.diameter
+  return material?.diameter && material.density
     ? t("evidence.length", {
         length: measured,
         diameter: format.quantity(material.diameter, "mm"),
@@ -712,7 +712,11 @@ export class RunPage extends LitElement {
   private renderAddMaterial(t: Localize) {
     const materials = this.pickable(null);
     const picked = materials.find(({ id }) => id === this.materialPick) ?? materials[0];
-    const unit = picked?.form === "resin" ? "ml" : "g";
+    const byVolume =
+      picked?.form === "resin" ||
+      (picked?.price.source === "fixed" && picked.price.pack_unit === "ml");
+    const units = picked && picked.price_per_piece !== null ? ["pcs"] : ["g", "ml"];
+    const unit = units.length === 1 ? units[0] : byVolume ? "ml" : "g";
     if (this.adding === "material" && !picked) {
       return html`<div class="add-item no-materials">
         <p class="muted small">
@@ -752,8 +756,10 @@ export class RunPage extends LitElement {
                 aria-label=${t("item.quantity")}
               />
               <select name="unit" aria-label=${t("item.unit")}>
-                <option value="g" .selected=${unit === "g"}>g</option>
-                <option value="ml" .selected=${unit === "ml"}>ml</option>
+                ${units.map(
+                  (option) =>
+                    html`<option value=${option} .selected=${option === unit}>${option}</option>`,
+                )}
               </select>
               <div class="row">
                 <ha-button class="small" type="submit">${t("item.add")}</ha-button>

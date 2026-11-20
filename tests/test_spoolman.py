@@ -323,6 +323,7 @@ async def test_a_material_created_from_a_filament_takes_over_its_details(
         "archived": False,
         "price": {"source": "spoolman", "filament_id": 7, "per_gram": 0.02},
         "price_per_gram": 0.02,
+        "price_per_piece": None,
     }
     assert (await panel.call("coinop/materials/list"))["materials"] == [created]
 
@@ -420,6 +421,40 @@ async def test_linking_needs_spoolman_and_the_filament(
     assert unreachable["code"] == "spoolman_unreachable"
     [material] = (await panel.call("coinop/materials/list"))["materials"]
     assert material["price"]["source"] == "fixed"
+
+
+async def test_a_material_priced_per_piece_is_not_linked(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    pods = stored_material(
+        "pods",
+        form="detergent",
+        type="Detergent pods",
+        density=None,
+        diameter=None,
+        price={
+            "source": "fixed",
+            "pack_price": 12,
+            "pack_size": 40,
+            "pack_unit": "pcs",
+        },
+    )
+    place_materials(hass_storage, pods)
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+
+    error = await panel.error(
+        "coinop/materials/update",
+        material_id="pods",
+        material={"price": {"source": "spoolman", "filament_id": 7}},
+    )
+
+    assert error["code"] == "not_allowed"
+    [material] = (await panel.call("coinop/materials/list"))["materials"]
+    assert material["price"] == pods["price"]
 
 
 def linked_material(material_id: str, per_gram: float, **fields: Any) -> dict[str, Any]:

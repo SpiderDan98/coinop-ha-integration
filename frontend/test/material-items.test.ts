@@ -135,6 +135,34 @@ describe("A new Material Line Item", () => {
     expect((query(form, "select[name=unit]") as HTMLSelectElement).value).toBe("ml");
   });
 
+  it("counts pieces of a Material bought by the piece", async () => {
+    const backend = recordedBackend()
+      .subscription("coinop/catalog/subscribe", () => [
+        { ...recorded.catalog.filled, materials: recorded.laundry },
+      ])
+      .reply(ADD, () => recorded.lineItemsAddMaterial);
+    const panel = await mountPanel(backend, { path: "/run/benchy" });
+    await click(panel, query(panel, "ha-button.add-material"));
+    const form = query(panel, ".add-item form");
+    expect((query(form, "select[name=unit]") as HTMLSelectElement).value).toBe("ml");
+
+    await fill(panel, query(form, "select[name=material_id]"), "material-pods");
+    expect(options(query(form, "select[name=unit]"))).toEqual(["pcs"]);
+    await fill(panel, query(form, "[name=quantity]"), "2");
+    await click(panel, query(form, "ha-button[type=submit]"));
+
+    expect(backend.sent(ADD)).toEqual([
+      {
+        type: ADD,
+        run_id: "benchy",
+        kind: "material",
+        material_id: "material-pods",
+        quantity: 2,
+        unit: "pcs",
+      },
+    ]);
+  });
+
   it("points to the Materials tab while there are no Materials", async () => {
     const backend = recordedBackend().subscription("coinop/catalog/subscribe", () => [
       recorded.catalog.empty,

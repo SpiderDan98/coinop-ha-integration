@@ -35,6 +35,7 @@ import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
+import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
@@ -133,6 +134,9 @@ export const recorded = {
   linkSpoolman: materialsLinkSpoolman as { material: Material },
   /** `coinop/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
+  /** `coinop/materials/create` of "material-detergent" (1,500 ml for 7.80) and
+   * "material-pods" (40 pieces for 12.00), each answer's Material. */
+  laundry: materialsCreateLaundry as Material[],
   material: (id: string) =>
     found(
       recorded.catalog.filled.materials.find((material) => material.id === id),

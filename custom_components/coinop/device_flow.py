@@ -22,7 +22,7 @@ from homeassistant.helpers.selector import (
     TextSelector,
 )
 
-from .const import SUBENTRY_DEVICE
+from .const import DEVICE_TYPE_3D_PRINTER, SUBENTRY_DEVICE
 from .device_config import ENDING_TARGETS, ConsumptionSource, Target
 from .device_inputs import (
     entity_unit,
@@ -142,6 +142,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         if user_input is not None:
+            self._data["device_type"] = DEVICE_TYPE_3D_PRINTER
             self._data["printer_device_id"] = user_input.get("device")
             self._data |= detect(self.hass, self._data["printer_device_id"]) or {}
             return await self.async_step_name()

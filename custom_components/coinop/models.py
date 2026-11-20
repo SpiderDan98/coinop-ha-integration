@@ -155,13 +155,16 @@ class Timeline:
 
 @dataclass
 class MaterialCopy:
-    """Evidence on a Material Line Item: its Material as it was when priced."""
+    """Evidence on a Material Line Item: its Material as it was when priced.
+
+    One priced per piece has no density and no price per gram.
+    """
 
     name: str
     type: str
-    density: float
+    density: float | None
     diameter: float | None
-    price_per_gram: float
+    price_per_gram: float | None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def as_dict(self) -> dict[str, Any]:
@@ -296,11 +299,15 @@ class LineItem:
 
     @property
     def grams(self) -> float:
-        """How much Material it counts for; millilitres weigh their density."""
-        if self.kind is not LineItemKind.MATERIAL or not self.quantity:
+        """How much Material it counts for; millilitres weigh their density, pieces nothing."""
+        if (
+            self.kind is not LineItemKind.MATERIAL
+            or not self.quantity
+            or self.unit == "pcs"
+        ):
             return 0.0
         if self.unit == "ml" and self.material is not None:
-            return self.quantity * self.material.density
+            return self.quantity * (self.material.density or 0.0)
         return self.quantity
 
     @property

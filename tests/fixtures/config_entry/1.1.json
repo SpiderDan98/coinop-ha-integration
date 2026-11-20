@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "data": {},
+  "options": {"markup": 10},
+  "subentries": [
+    {
+      "subentry_id": "device-kobra",
+      "subentry_type": "device",
+      "title": "Kobra",
+      "unique_id": null,
+      "data": {
+        "printer_device_id": null,
+        "status": {"entity_id": "sensor.kobra_status", "attribute": null},
+        "mapping": {
+          "running": ["printing"],
+          "paused": ["paused"],
+          "finished": ["finished"],
+          "cancelled": ["cancelled"],
+          "ended": ["idle"],
+          "fault": [],
+          "ignored": []
+        },
+        "job": {
+          "entity_id": "sensor.kobra_job",
+          "attribute": null,
+          "material": {
+            "entity_id": "sensor.kobra_used",
+            "attribute": null,
+            "unit": "g"
+          },
+          "slots": ["sensor.kobra_slot_1", "sensor.kobra_slot_2"],
+          "colour_attribute": "color",
+          "loaded_slot": "sensor.kobra_loaded_slot"
+        },
+        "images": {
+          "thumbnail": "image.kobra_thumbnail",
+          "camera": "camera.kobra",
+          "snapshot": true
+        },
+        "consumption": {
+          "source": "energy",
+          "entity_id": "sensor.kobra_plug_energy",
+          "attribute": null,
+          "unit": "kWh",
+          "factor": null
+        },
+        "price": {
+          "source": "entity",
+          "entity_id": "sensor.electricity_price",
+          "attribute": null,
+          "unit": "EUR/kWh",
+          "factor": null
+        }
+      }
+    },
+    {
+      "subentry_id": "device-mini",
+      "subentry_type": "device",
+      "title": "Mini",
+      "unique_id": null,
+      "data": {
+        "printer_device_id": null,
+        "status": {"entity_id": "sensor.mini_status", "attribute": "state"},
+        "mapping": {
+          "running": ["printing"],
+          "paused": [],
+          "finished": ["finished"],
+          "cancelled": [],
+          "ended": [],
+          "fault": [],
+          "ignored": []
+        },
+        "job": {
+          "entity_id": null,
+          "attribute": null,
+          "material": null,
+          "slots": [],
+          "colour_attribute": null,
+          "loaded_slot": null
+        },
+        "images": {"thumbnail": null, "camera": null, "snapshot": false},
+        "consumption": {
+          "source": "estimate",
+          "running_power": 120,
+          "paused_power": null
+        },
+        "price": {"source": "fixed", "value": 0.3}
+      }
+    }
+  ]
+}

@@ -26,6 +26,8 @@ from .test_runs import NO_MATERIAL, RUNS, set_status, stored_runs, value
 from .websocket import PanelClient
 
 FIXTURES = Path(__file__).parent / "fixtures" / "storage"
+# The hub entry with its Device subentries as each config entry version stored it.
+ENTRIES = Path(__file__).parent / "fixtures" / "config_entry"
 STORES = ("coinop.catalog", "coinop.runs", "coinop.live")
 
 
@@ -68,7 +70,11 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
     assert live_runs(hass_storage) == current["live"]
     listed = (await panel.call("coinop/materials/list"))["materials"]
     assert [
-        {key: value for key, value in m.items() if key != "price_per_gram"}
+        {
+            key: value
+            for key, value in m.items()
+            if key not in ("price_per_gram", "price_per_piece")
+        }
         for m in listed
     ] == current["catalog"]["materials"]
     await panel.subscribe("coinop/catalog/subscribe")
@@ -107,7 +113,7 @@ async def test_fields_added_by_a_newer_minor_version_are_kept(
     assert kept == run
 
 
-def stored(key: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
+def store_file(key: str, runs: list[dict[str, Any]]) -> dict[str, Any]:
     return {"version": 1, "minor_version": 1, "key": key, "data": {"runs": runs}}
 
 
@@ -188,8 +194,8 @@ async def test_an_open_metered_run_of_1_1_resumes_and_finalises_alike(
     )
     await set_status(hass, "printing")
     await stop_coinop(hass, entry)
-    hass_storage["coinop.runs"] = stored("coinop.runs", [])
-    hass_storage["coinop.live"] = stored("coinop.live", [open_metered_run(device)])
+    hass_storage["coinop.runs"] = store_file("coinop.runs", [])
+    hass_storage["coinop.live"] = store_file("coinop.live", [open_metered_run(device)])
 
     await start_coinop(hass, entry)
     await clock.advance(minutes=30)
@@ -205,3 +211,38 @@ async def test_an_open_metered_run_of_1_1_resumes_and_finalises_alike(
         (at(minutes=-15), at(minutes=30), 0.45, 0.4),
     ]
     assert run["flags"] == NO_MATERIAL
+
+
+async def test_devices_stored_before_device_types_become_3d_printers(
+    hass: HomeAssistant, panel: PanelClient
+) -> None:
+    stored = read(ENTRIES / "1.1.json")
+    entry = MockConfigEntry(
+        domain="coinop",
+        title="Coin-op",
+        version=stored["version"],
+        minor_version=stored["minor_version"],
+        data=stored["data"],
+        options=stored["options"],
+        subentries_data=stored["subentries"],
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [
+        (s.subentry_id, s.subentry_type, s.title, s.unique_id, dict(s.data))
+        for s in entry.subentries.values()
+    ] == [
+        (
+            s["subentry_id"],
+            s["subentry_type"],
+            s["title"],
+            s["unique_id"],
+            s["data"] | {"device_type": "3d_printer"},
+        )
+        for s in stored["subentries"]
+    ]
+    assert entry.options == stored["options"]
+    listed = (await panel.call("coinop/devices/list"))["devices"]
+    assert [d["type"] for d in listed] == ["3d_printer", "3d_printer"]
