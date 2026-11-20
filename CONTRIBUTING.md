@@ -6,7 +6,7 @@
 - `tests/`: backend tests, run inside a real Home Assistant test instance.
 - `frontend/`: the sidebar panel (TypeScript + Lit). It builds into `custom_components/wattbill/frontend/wattbill-panel.js`, which is gitignored and built by CI.
 - `scripts/test_ha.py`: runs the tests against the minimum, stable or beta Home Assistant release.
-- `scripts/devenv.py` and `dev/`: a local Home Assistant with test data (see [Dev container](#dev-container)).
+- `scripts/devenv.py` (with `make dev` shortcuts in the `Makefile`) and `dev/`: a local Home Assistant with test data (see [Dev container](#dev-container)).
 - `scripts/release.py`: builds the release asset `wattbill.zip` from a version tag (see [Release](#release)).
 - `GLOSSARY.md`: domain terms; use them in code, tests and docs. Decisions go in `docs/adr/`.
 
@@ -73,6 +73,8 @@ uv run scripts/devenv.py restart          # after a change to the Python code
 uv run scripts/devenv.py scenario long-history
 uv run scripts/devenv.py logs | down
 ```
+
+The `Makefile` has the same as `make dev`, `make dev-build`, `make dev-restart`, `make dev-scenario`, `make dev-logs` and `make dev-down`; `SCENARIO=long-history` picks the Scenario for `dev` and `dev-scenario`.
 
 Then open http://localhost:8124/wattbill. The round flask button at the panel's bottom left (shown only when the `wattbill_dev` integration is loaded) switches Scenarios too.
 
