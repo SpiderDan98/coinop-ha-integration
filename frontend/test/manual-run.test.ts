@@ -119,7 +119,7 @@ describe("A manual Run", () => {
     expect(location.pathname).toBe("/coinop/runs");
   });
 
-  it("asks a washing machine for nothing printer-only", async () => {
+  it("asks a washing machine for its Program and nothing printer-only", async () => {
     const backend = creating().reply("coinop/devices/list", () => ({
       devices: [recorded.washer],
     }));
@@ -129,8 +129,47 @@ describe("A manual Run", () => {
 
     expect(
       queryAll(dialog, "input[name], select[name]").map((field) => field.getAttribute("name")),
-    ).toEqual(["name", "started", "ended", "outcome"]);
+    ).toEqual(["name", "program", "started", "ended", "outcome"]);
+    expect(text(dialog)).toContain("Program");
     expect(text(dialog)).not.toMatch(/print|part/i);
+    const known = query(dialog, `datalist#${field(dialog, "program").getAttribute("list")}`);
+    expect(queryAll(known, "option").map((option) => option.getAttribute("value"))).toEqual([
+      "Cotton 60°",
+      "Wool",
+      "Eco 40-60",
+    ]);
+  });
+
+  it("sends a washing machine's Program, known or typed, which names an unnamed Run", async () => {
+    const backend = creating().reply("coinop/devices/list", () => ({
+      devices: [recorded.washer],
+    }));
+    const panel = await mountPanel(backend, RUNS);
+    const dialog = await open(panel);
+    await fill(panel, field(dialog, "started"), "2026-01-15T04:00");
+    await fill(panel, field(dialog, "ended"), "2026-01-15T06:00");
+
+    await fill(panel, field(dialog, "program"), " Mix 30° ");
+
+    expect(field(dialog, "name").placeholder).toBe("Mix 30°");
+    await click(panel, query(dialog, "ha-button.create"));
+    expect(backend.calls.find((call) => call.type === CREATE)).toMatchObject({
+      device_id: "device-washer",
+      name: null,
+      program: "Mix 30°",
+    });
+  });
+
+  it("sends no Program for a printer", async () => {
+    const backend = creating();
+    const panel = await mountPanel(backend, RUNS);
+    const dialog = await open(panel);
+    expect(queryAll(dialog, "[name=program]")).toEqual([]);
+    await enter(panel, dialog);
+
+    await click(panel, query(dialog, "ha-button.create"));
+
+    expect(backend.calls.find((call) => call.type === CREATE)).not.toHaveProperty("program");
   });
 
   it("is dropped on cancel", async () => {
