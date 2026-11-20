@@ -1,31 +1,22 @@
 // The panel's start page: cost tiles and charts from the backend's aggregates, the Runs
-// running now, the gallery, and a basket of selected final Runs. Tiles and charts set
-// the gallery's filter; the aggregates are read afresh whenever a Run changes.
+// running now and the most recent Runs. Tiles and charts open the Runs tab filtered; the
+// aggregates are read afresh whenever a Run changes.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import {
-  KINDS,
-  deleteRuns,
-  getAggregates,
-  getGroupings,
-  previewDelete,
-  type Device,
-  type RunSummary,
-  type Totals,
-} from "./api";
+import { KINDS, getAggregates, getGroupings, type Device, type RunSummary } from "./api";
 import { barRows, chartStyles, legend, stackedColumns } from "./charts";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import "./run-gallery";
-import "./statement-dialog";
-import { NO_FILTER, selectable, type Filter } from "./run-gallery";
-import { deleteDialog, deviceName, runName } from "./run-parts";
+import { runsPath } from "./run-filter";
+import { deviceName, runCount, runName } from "./run-parts";
+import { runTile, tileStyles } from "./run-tile";
 import { RunsTotal } from "./runs-total";
 import { shared } from "./styles";
 
 const MONTHS_SHOWN = 12;
 const MATERIALS_SHOWN = 6;
+const RECENT_SHOWN = 20;
 
 type Aggregates = Awaited<ReturnType<typeof loadAggregates>>;
 
@@ -48,9 +39,6 @@ async function loadAggregates(hass: HomeAssistant) {
     : undefined;
   return { total: total[0], month, monthKind, materials: materials.slice(0, shown), others };
 }
-
-const runCount = (count: number, t: Localize) =>
-  count === 1 ? t("overview.run_one") : t("overview.runs", { count });
 
 const failedOrCancelled = (run: RunSummary) =>
   run.outcome === "failed" || run.outcome === "cancelled";
@@ -77,23 +65,15 @@ export class Overview extends LitElement {
   @property({ attribute: false }) basePath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
-  @state() private filter = NO_FILTER;
-  @state() private selected: ReadonlySet<string> = new Set();
   /** Undefined until loaded, null if loading failed. */
   @state() private aggregates?: Aggregates | null;
-  /** Set while the delete confirmation is open. */
-  @state() private drop?: Totals;
-  @state() private deleteFailed = false;
-  @state() private exporting = false;
   private request = 0;
   private readonly failedTotal = new RunsTotal(this);
-  private readonly basketTotal = new RunsTotal(this);
 
   protected override willUpdate(changed: PropertyValues<this>) {
     if (changed.has("runs")) void this.load();
-    // Each reads again only when its Runs or their costs changed.
+    // Reads again only when its Runs or their costs changed.
     this.failedTotal.load(this.hass, [...this.runs.values()].filter(failedOrCancelled));
-    this.basketTotal.load(this.hass, this.selectedRuns());
   }
 
   private async load() {
@@ -102,79 +82,28 @@ export class Overview extends LitElement {
     if (request === this.request) this.aggregates = aggregates;
   }
 
-  /** The selected Runs that are still there and final, by start. */
-  selectedRuns() {
-    return [...this.runs.values()]
-      .filter((run) => this.selected.has(run.id) && selectable(run))
-      .sort((a, b) => a.started.localeCompare(b.started));
-  }
-
-  private setFilter(changes: Partial<Filter>) {
-    this.filter = { ...this.filter, ...changes };
-  }
-
-  private async confirmDelete() {
-    this.deleteFailed = false;
-    try {
-      this.drop = await previewDelete(
-        this.hass,
-        this.selectedRuns().map((run) => run.id),
-      );
-    } catch {
-      this.deleteFailed = true;
-    }
-  }
-
-  private async delete() {
-    try {
-      await deleteRuns(
-        this.hass,
-        this.selectedRuns().map((run) => run.id),
-      );
-      this.selected = new Set();
-    } catch {
-      this.deleteFailed = true;
-    }
-    this.drop = undefined;
-  }
-
   override render() {
     const t = localize(this.hass);
     const format = formatter(this.hass);
-    const selected = this.selectedRuns();
+    const recent = [...this.runs.values()]
+      .sort((a, b) => b.started.localeCompare(a.started))
+      .slice(0, RECENT_SHOWN);
+    const context = { hass: this.hass, devices: this.devices, basePath: this.basePath, t, format };
     return html`
       ${this.renderStats(t, format)}
-      <wattbill-run-gallery
-        .hass=${this.hass}
-        .runs=${[...this.runs.values()]}
-        .devices=${this.devices}
-        .tags=${this.tags}
-        .basePath=${this.basePath}
-        .filter=${this.filter}
-        .selected=${new Set(selected.map((run) => run.id))}
-        ?narrow=${this.narrow}
-        @filter-changed=${(event: CustomEvent<Filter>) => (this.filter = event.detail)}
-        @selection-changed=${(event: CustomEvent<Set<string>>) => (this.selected = event.detail)}
-      ></wattbill-run-gallery>
-      ${selected.length ? this.renderBasket(selected, t, format) : nothing}
-      ${
-        this.exporting && selected.length
-          ? html`<wattbill-statement-dialog
-              .hass=${this.hass}
-              .runIds=${selected.map((run) => run.id)}
-              .tag=${this.filter.tags.length === 1 && !this.filter.untagged ? this.filter.tags[0] : undefined}
-              @close=${() => (this.exporting = false)}
-            ></wattbill-statement-dialog>`
-          : nothing
-      }
-      ${
-        this.drop
-          ? deleteDialog(t("delete.title_many", { count: selected.length }), this.drop, t, format, {
-              cancel: () => (this.drop = undefined),
-              confirm: () => void this.delete(),
-            })
-          : nothing
-      }
+      <section class="recent">
+        <div class="row between head">
+          <h2>${t("overview.recent")}</h2>
+          <a class="all-runs" href=${runsPath(this.basePath)} @click=${followLink}
+            >${t("overview.all_runs")}</a
+          >
+        </div>
+        ${
+          recent.length
+            ? html`<div class="gallery">${recent.map((run) => runTile(run, context))}</div>`
+            : html`<p class="muted">${t("runs.empty")}</p>`
+        }
+      </section>
     `;
   }
 
@@ -191,7 +120,6 @@ export class Overview extends LitElement {
     const failed = [...this.runs.values()].filter(failedOrCancelled).length;
     const failedCost = this.failedTotal.cost;
     const flagged = total?.flagged_runs ?? 0;
-    const failedOn = this.filter.outcome === "failed_cancelled";
     return html`
       <div class="stats">
         <div class="stat card this-month">
@@ -204,10 +132,10 @@ export class Overview extends LitElement {
           <div class="value">${money(total?.cost ?? 0)}</div>
           <div class="muted small">${runs(total?.runs)}</div>
         </div>
-        <button
-          class="stat card failed ${failedOn ? "on" : ""}"
-          aria-pressed=${failedOn ? "true" : "false"}
-          @click=${() => this.setFilter({ outcome: failedOn ? "" : "failed_cancelled" })}
+        <a
+          class="stat card failed"
+          href=${runsPath(this.basePath, { outcome: "failed_cancelled" })}
+          @click=${followLink}
         >
           <div class="muted small">${t("overview.failed_cancelled")}</div>
           <div class="value">${failedCost === undefined ? "–" : format.money(failedCost)}</div>
@@ -221,18 +149,16 @@ export class Overview extends LitElement {
                 : runCount(failed, t)
             }
           </div>
-        </button>
-        <button
-          class="stat card flagged ${this.filter.flagged ? "on" : ""} ${flagged ? "warn" : ""}"
-          aria-pressed=${this.filter.flagged ? "true" : "false"}
-          @click=${() => this.setFilter({ flagged: !this.filter.flagged })}
+        </a>
+        <a
+          class="stat card flagged ${flagged ? "warn" : ""}"
+          href=${runsPath(this.basePath, { flagged: true })}
+          @click=${followLink}
         >
           <div class="muted small">${t("sensor.flagged_runs")}</div>
           <div class="value">⚑ ${aggregates ? flagged : "–"}</div>
-          <div class="muted small">
-            ${t(this.filter.flagged ? "overview.filtering" : "overview.click_to_filter")}
-          </div>
-        </button>
+          <div class="muted small">${t("overview.click_to_filter")}</div>
+        </a>
       </div>
       ${
         aggregates
@@ -254,11 +180,10 @@ export class Overview extends LitElement {
     const columns = monthsBetween(first, last)
       .slice(-MONTHS_SHOWN)
       .map((key) => ({
-        key,
         label: format.monthShort(key),
         title: format.monthName(key),
         value: format.money(month.find((group) => group.month === key)?.cost ?? 0),
-        on: this.filter.month === key,
+        href: runsPath(this.basePath, { month: key }),
         segments: KINDS.map((kind) => {
           const amount =
             monthKind.find((group) => group.month === key && group.kind === kind)?.cost ?? 0;
@@ -274,9 +199,7 @@ export class Overview extends LitElement {
         <h3>${t("overview.per_month")}</h3>
         <span class="muted small">${t("overview.per_month_hint")}</span>
       </div>
-      ${stackedColumns(columns, (key) =>
-        this.setFilter({ month: this.filter.month === key ? "" : key }),
-      )}
+      ${stackedColumns(columns)}
       ${legend(KINDS.map((kind) => ({ label: t(`kind.${kind}`), colour: `var(--wattbill-${kind})` })))}
     </div>`;
   }
@@ -323,42 +246,10 @@ export class Overview extends LitElement {
     </div>`;
   }
 
-  private renderBasket(runs: RunSummary[], t: Localize, format: Format) {
-    return html`<aside class="basket card" aria-label=${t("basket.title")}>
-      <div class="summary">
-        <b>${runCount(runs.length, t)}</b>
-        <b class="num"
-          >${this.basketTotal.cost === undefined ? nothing : format.money(this.basketTotal.cost)}</b
-        >
-      </div>
-      <div class="muted small names">${runs.map((run) => runName(run, t)).join(", ")}</div>
-      <div class="row actions">
-        <ha-button class="small statement" @click=${() => (this.exporting = true)}>
-          ${t("basket.statement")}
-        </ha-button>
-        <ha-button
-          class="small clear"
-          appearance="plain"
-          @click=${() => (this.selected = new Set())}
-        >
-          ${t("basket.clear")}
-        </ha-button>
-        <ha-button
-          class="small delete end"
-          appearance="plain"
-          variant="danger"
-          @click=${this.confirmDelete}
-        >
-          ${t("basket.delete")}
-        </ha-button>
-      </div>
-      ${this.deleteFailed ? html`<p class="error small">${t("basket.delete_failed")}</p>` : nothing}
-    </aside>`;
-  }
-
   static override styles = [
     shared,
     chartStyles,
+    tileStyles,
     css`
       .stats {
         display: grid;
@@ -372,12 +263,11 @@ export class Overview extends LitElement {
         text-align: left;
         padding: 14px;
       }
-      button.stat {
-        cursor: pointer;
+      a.stat {
+        display: block;
       }
-      button.stat:hover,
-      button.stat:focus-visible,
-      .stat.on {
+      a.stat:hover,
+      a.stat:focus-visible {
         border-color: var(--primary-color);
       }
       .stat.warn {
@@ -417,43 +307,8 @@ export class Overview extends LitElement {
         margin-top: 6px;
         font-variant-numeric: tabular-nums;
       }
-      /* Sticks to the bottom while the gallery scrolls and rests below its last row. */
-      .basket {
-        position: sticky;
-        bottom: 16px;
-        z-index: 4;
-        margin-top: 16px;
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 4px 16px;
-        border: 2px solid var(--primary-color);
-        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.2);
-      }
-      :host([narrow]) .basket {
-        grid-template-columns: minmax(0, 1fr);
-      }
-      .summary {
-        display: flex;
-        gap: 8px;
-      }
-      .names {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .basket .actions {
-        flex-wrap: nowrap;
-      }
-      .basket .end {
-        margin-inline-start: auto;
-      }
-      .basket .error {
-        grid-column: 1 / -1;
-      }
-      .error {
-        color: var(--error-color, #db4437);
-        margin: 0;
+      .recent .head {
+        margin-bottom: 12px;
       }
     `,
   ];

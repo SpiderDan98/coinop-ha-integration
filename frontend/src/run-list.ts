@@ -1,58 +1,22 @@
-// Filter and selection belong to the Overview, which sets them from its tiles and charts too.
+// The Runs tab's list: filters and the gallery. Filter and selection belong to the Runs
+// tab, which keeps the filter in the URL.
 import { mdiMagnify } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
-import { OUTCOMES, type Device, type RunSummary } from "./api";
+import type { Device, RunSummary } from "./api";
 import { formatter, type Format } from "./format";
-import { followLink, type HomeAssistant } from "./hass";
+import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
-import "./run-image";
+import { NO_FILTER, OUTCOME_FILTERS, matches, selectable, type Filter } from "./run-filter";
+import { deviceName, runCount } from "./run-parts";
+import { runTile, tileStyles } from "./run-tile";
 import { RunsTotal } from "./runs-total";
-import { deviceName, flagLabel, outcomeChip, runName } from "./run-parts";
 import { shared } from "./styles";
-import { sortTags, tagChip } from "./tag-input";
+import { sortTags } from "./tag-input";
 
-const SHOWN_TAGS = 2;
-
-const OUTCOME_FILTERS = ["open", ...OUTCOMES, "failed_cancelled"] as const;
-
-/** Tags match any of `tags`, or no Tag at all with `untagged`. */
-export const NO_FILTER = {
-  name: "",
-  deviceId: "",
-  month: "",
-  outcome: "" as "" | (typeof OUTCOME_FILTERS)[number],
-  flagged: false,
-  tags: [] as string[],
-  untagged: false,
-};
-
-export type Filter = typeof NO_FILTER;
-
-/** Only final Runs go into a Cost Statement or can be deleted. */
-export const selectable = (run: RunSummary) => run.finalised;
-
-export function matches(run: RunSummary, filter: Filter, t: Localize, format: Format) {
-  const outcome = run.ended === null ? "open" : (run.outcome ?? "unknown");
-  const name = filter.name.trim().toLocaleLowerCase();
-  return (
-    (!name || runName(run, t).toLocaleLowerCase().includes(name)) &&
-    (!filter.deviceId || run.device_id === filter.deviceId) &&
-    (!filter.month || format.month(run.started) === filter.month) &&
-    (!filter.outcome ||
-      (filter.outcome === "failed_cancelled"
-        ? outcome === "failed" || outcome === "cancelled"
-        : outcome === filter.outcome)) &&
-    (!filter.flagged || run.flags.length > 0) &&
-    ((!filter.tags.length && !filter.untagged) ||
-      (filter.untagged && !run.tags.length) ||
-      run.tags.some((tag) => filter.tags.includes(tag)))
-  );
-}
-
-@customElement("wattbill-run-gallery")
-export class RunGallery extends LitElement {
+@customElement("wattbill-run-list")
+export class RunList extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) runs: RunSummary[] = [];
   /** Current Devices; Runs of any other Device are shown as removed. */
@@ -142,11 +106,8 @@ export class RunGallery extends LitElement {
     const { all, shown: runs } = this;
     const total = this.total.cost;
     return html`
-      <div class="head">
-        <h2>${t("runs.title")}</h2>
-        <span class="muted"
-          >${runs.length}${total === undefined ? nothing : ` · ${format.money(total)}`}</span
-        >
+      <div class="head muted">
+        ${runCount(runs.length, t)}${total === undefined ? nothing : ` · ${format.money(total)}`}
       </div>
       ${all.length ? this.renderFilters(all, runs, t, format) : ""}
       ${
@@ -155,76 +116,22 @@ export class RunGallery extends LitElement {
               ${repeat(
                 runs,
                 (run) => run.id,
-                (run) => this.renderTile(run, t, format),
+                (run) =>
+                  runTile(
+                    run,
+                    { hass: this.hass, devices: this.devices, basePath: this.basePath, t, format },
+                    selectable(run)
+                      ? {
+                          selected: this.selected.has(run.id),
+                          toggle: (on) => this.toggle(run, on),
+                        }
+                      : undefined,
+                  ),
               )}
             </div>`
           : html`<p class="muted empty">${t(all.length ? "runs.no_match" : "runs.empty")}</p>`
       }
     `;
-  }
-
-  private renderTile(run: RunSummary, t: Localize, format: Format) {
-    const selected = this.selected.has(run.id);
-    return html`<div class="pick-tile ${selected ? "selected" : ""}">
-      <a class="tile" href="${this.basePath}/run/${run.id}" @click=${followLink}>
-        <div class="image">
-          <wattbill-run-image .hass=${this.hass} .src=${run.cover?.tile_url}></wattbill-run-image>
-          ${
-            run.flags.length
-              ? html`<span
-                  class="tile-flags"
-                  title=${run.flags.map((flag) => flagLabel(flag, t)).join("\n")}
-                  >⚑ ${run.flags.length}</span
-                >`
-              : nothing
-          }
-        </div>
-        <div class="body">
-          <div class="strong ellipsis">${runName(run, t)}</div>
-          <div class="muted small">
-            ${deviceName(run, this.devices, t)} · ${format.date(run.started)} ·
-            ${format.duration(run.running_seconds)}
-          </div>
-          <div class="row between">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
-          ${
-            run.part_count > 1
-              ? html`<div class="muted small">
-                  ${t("run.per_part", {
-                    amount: format.money(run.cost_per_part),
-                    count: run.part_count,
-                  })}
-                </div>`
-              : nothing
-          }
-          ${
-            run.tags.length
-              ? html`<div class="tags">
-                  ${run.tags.slice(0, SHOWN_TAGS).map(tagChip)}
-                  ${
-                    run.tags.length > SHOWN_TAGS
-                      ? html`<span class="more-tags muted small"
-                          >${`+${run.tags.length - SHOWN_TAGS}`}</span
-                        >`
-                      : nothing
-                  }
-                </div>`
-              : nothing
-          }
-        </div>
-      </a>
-      ${
-        selectable(run)
-          ? html`<input
-              type="checkbox"
-              class="pick"
-              aria-label=${t("runs.select", { name: runName(run, t) })}
-              .checked=${selected}
-              @change=${(event: Event) =>
-                this.toggle(run, (event.target as HTMLInputElement).checked)}
-            />`
-          : nothing
-      }
-    </div>`;
   }
 
   private renderFilters(runs: RunSummary[], shown: RunSummary[], t: Localize, format: Format) {
@@ -360,12 +267,10 @@ export class RunGallery extends LitElement {
 
   static override styles = [
     shared,
+    tileStyles,
     css`
       .head {
-        display: flex;
-        align-items: baseline;
-        gap: 8px;
-        margin: 8px 0 12px;
+        margin: 0 0 12px;
       }
       .select-all {
         margin-left: auto;
@@ -458,76 +363,12 @@ export class RunGallery extends LitElement {
         align-items: center;
         white-space: nowrap;
       }
-      .tags {
-        display: flex;
-        gap: 4px;
-        align-items: center;
-        min-width: 0;
-        overflow: hidden;
-      }
-      .gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 14px;
-      }
-      :host([narrow]) .gallery {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-      .pick-tile {
-        position: relative;
-        border-radius: 12px;
-      }
-      .pick-tile.selected {
-        outline: 3px solid var(--primary-color);
-      }
-      .pick {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        width: 20px;
-        height: 20px;
-        margin: 0;
-        cursor: pointer;
-        accent-color: var(--primary-color);
-      }
-      .tile {
-        display: block;
-        color: inherit;
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 12px;
-        overflow: hidden;
-      }
-      .tile:hover,
-      .tile:focus-visible {
-        border-color: var(--primary-color);
-      }
-      .image {
-        position: relative;
-      }
-      .tile-flags {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        padding: 1px 7px;
-        border-radius: 10px;
-        font-size: 11px;
-        background: var(--warning-color, #ffa600);
-        color: #000;
-      }
-      .body {
-        padding: 10px 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
     `,
   ];
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-run-gallery": RunGallery;
+    "wattbill-run-list": RunList;
   }
 }

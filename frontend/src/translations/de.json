@@ -242,7 +242,6 @@
   "overview.failed_cancelled": "Fehlgeschlagen + abgebrochen",
   "overview.failed_share": "{runs} · {share} der Kosten",
   "overview.click_to_filter": "Zum Filtern klicken",
-  "overview.filtering": "Nur diese werden gezeigt",
   "overview.per_month": "Kosten pro Monat",
   "overview.per_month_hint": "Zum Filtern einen Monat anklicken",
   "overview.by_material": "Kosten nach Material",
@@ -336,5 +335,9 @@
   "dev.current": "geladen",
   "dev.load": "Laden",
   "dev.loading": "Wird geladen…",
-  "dev.failed": "Das Szenario konnte nicht geladen werden; siehe Home-Assistant-Log."
+  "dev.failed": "Das Szenario konnte nicht geladen werden; siehe Home-Assistant-Log.",
+  "tab.overview": "Übersicht",
+  "tab.runs": "Läufe",
+  "overview.recent": "Neueste Läufe",
+  "overview.all_runs": "Alle Läufe"
 }

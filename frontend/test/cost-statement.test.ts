@@ -36,7 +36,12 @@ afterEach(() => {
 });
 
 async function openDialog(backend = recordedBackend(), { tags = [] as string[] } = {}) {
-  const panel = await mountPanel(backend.reply(CREATE, () => recorded.statementCreate));
+  const panel = await mountPanel(
+    backend.reply(CREATE, () => recorded.statementCreate),
+    {
+      path: "/runs",
+    },
+  );
   for (const tag of tags)
     await fill(panel, query(panel, `.tag-filter input[value="${tag}"]`), "on");
   await fill(panel, pick(panel, "Helmet"), "on");

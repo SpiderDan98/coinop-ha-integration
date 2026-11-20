@@ -44,7 +44,7 @@ describe("Run page", () => {
     await click(panel, benchy);
 
     expect(location.pathname).toBe("/wattbill/run/benchy");
-    expect(text(query(panel, ".title"))).toBe("WattBill › Benchy");
+    expect(text(query(panel, ".title"))).toBe("WattBill › Runs › Benchy");
     expect(backend.calls.at(-1)).toEqual({ type: GET, run_id: "benchy" });
   });
 
@@ -103,9 +103,9 @@ describe("Run page", () => {
   it("leads back to all Runs", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
-    await click(panel, query(panel, ".title a"));
+    await click(panel, query(panel, ".title a.runs-link"));
 
-    expect(location.pathname).toBe("/wattbill");
+    expect(location.pathname).toBe("/wattbill/runs");
     expect(queryAll(panel, ".tile")).toHaveLength(3);
   });
 

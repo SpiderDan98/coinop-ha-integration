@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
+const RUNS = { path: "/runs" };
 const CREATE = "wattbill/runs/create";
 const SUBSCRIBE = "wattbill/runs/subscribe";
 
@@ -36,7 +37,7 @@ const enter = async (panel: HTMLElement, dialog: HTMLElement) => {
 
 describe("A manual Run", () => {
   it("asks for name, start, end and Outcome with the Device's Tags pre-filled", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
 
     const dialog = await open(panel);
 
@@ -54,7 +55,7 @@ describe("A manual Run", () => {
     const [kobra] = recorded.devices;
     const mini = { ...kobra, id: "device-mini", name: "Mini" };
     const backend = creating().reply("wattbill/devices/list", () => ({ devices: [kobra, mini] }));
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
 
     const dialog = await open(panel);
 
@@ -67,7 +68,7 @@ describe("A manual Run", () => {
 
   it("is created with what was entered and opens on its Run page", async () => {
     const backend = creating({ timeZone: "Europe/Berlin" });
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
     const dialog = await open(panel);
     await enter(panel, dialog);
     await fill(panel, field(dialog, "outcome"), "failed");
@@ -92,7 +93,7 @@ describe("A manual Run", () => {
 
   it("needs an end after its start", async () => {
     const backend = creating();
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
     const dialog = await open(panel);
     const create = query(dialog, "ha-button.create") as HTMLButtonElement;
     expect(create.disabled).toBe(true);
@@ -108,19 +109,19 @@ describe("A manual Run", () => {
     const backend = creating().reply(CREATE, () => {
       throw new WsError("invalid_format");
     });
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
     const dialog = await open(panel);
     await enter(panel, dialog);
 
     await click(panel, query(dialog, "ha-button.create"));
 
     expect(text(query(panel, ".manual-dialog"))).toContain("could not be created");
-    expect(location.pathname).toBe("/wattbill");
+    expect(location.pathname).toBe("/wattbill/runs");
   });
 
   it("is dropped on cancel", async () => {
     const backend = creating();
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
     const dialog = await open(panel);
 
     await click(panel, query(dialog, "ha-button.cancel"));
@@ -132,7 +133,7 @@ describe("A manual Run", () => {
 
 describe("The Manual Run dialog", () => {
   it("pre-fills the end with now and points out an end before the start", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
     const dialog = await open(panel);
     expect(field(dialog, "ended").value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     expect(field(dialog, "ended").max).toBe(field(dialog, "ended").value);
@@ -145,7 +146,7 @@ describe("The Manual Run dialog", () => {
   });
 
   it("refuses times in the future", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
     const dialog = await open(panel);
 
     await fill(panel, field(dialog, "started"), "2099-01-15T04:00");
@@ -156,7 +157,7 @@ describe("The Manual Run dialog", () => {
   });
 
   it("is cancelled with Escape or a click on the backdrop", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
     await open(panel);
 
     query(panel, "wattbill-dialog dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
@@ -169,7 +170,7 @@ describe("The Manual Run dialog", () => {
   });
 
   it("is closed with its close button", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
     await open(panel);
 
     await click(panel, iconButton(panel, "Close"));
@@ -184,7 +185,7 @@ describe("The Manual Run dialog", () => {
   });
 
   it("opens as a modal dialog with the name focused", async () => {
-    const panel = await mountPanel(creating());
+    const panel = await mountPanel(creating(), RUNS);
     const dialog = await open(panel);
 
     expect((query(panel, "wattbill-dialog dialog") as HTMLDialogElement).open).toBe(true);
@@ -193,7 +194,7 @@ describe("The Manual Run dialog", () => {
 
   it("explains how to add a Device when there is none", async () => {
     const backend = creating().reply("wattbill/devices/list", () => ({ devices: [] }));
-    const panel = await mountPanel(backend);
+    const panel = await mountPanel(backend, RUNS);
 
     const dialog = await open(panel);
 
@@ -205,7 +206,7 @@ describe("The Manual Run dialog", () => {
   });
 
   it("opens from the floating button on a narrow screen too", async () => {
-    const panel = await mountPanel(creating(), { narrow: true });
+    const panel = await mountPanel(creating(), { ...RUNS, narrow: true });
 
     await click(panel, query(panel, "ha-button.manual-run.fab"));
 

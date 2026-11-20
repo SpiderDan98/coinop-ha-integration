@@ -242,7 +242,6 @@
   "overview.failed_cancelled": "Failed + cancelled",
   "overview.failed_share": "{runs} · {share} of cost",
   "overview.click_to_filter": "Click to filter",
-  "overview.filtering": "Showing only these",
   "overview.per_month": "Cost per month",
   "overview.per_month_hint": "Click a month to filter",
   "overview.by_material": "Cost by Material",
@@ -336,5 +335,9 @@
   "dev.current": "loaded",
   "dev.load": "Load",
   "dev.loading": "Loading…",
-  "dev.failed": "The Scenario could not be loaded; see Home Assistant's log."
+  "dev.failed": "The Scenario could not be loaded; see Home Assistant's log.",
+  "tab.overview": "Overview",
+  "tab.runs": "Runs",
+  "overview.recent": "Recent Runs",
+  "overview.all_runs": "All Runs"
 }

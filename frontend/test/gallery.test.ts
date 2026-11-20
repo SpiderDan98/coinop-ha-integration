@@ -9,14 +9,14 @@ const [started, updated, ended] = recorded.changes;
 
 describe("Run gallery", () => {
   it("shows a tile per Run, newest first", async () => {
-    const panel = await mountPanel(recordedBackend());
+    const panel = await mountPanel(recordedBackend(), { path: "/runs" });
 
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
       "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h Failed €0.30 Cosplay helmet Gift",
       "Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86 €0.22 per part × 4 Gift",
     ]);
-    expect(text(query(panel, ".head"))).toBe("Runs 3 · €1.23");
+    expect(text(query(panel, "wattbill-run-list .head"))).toBe("3 Runs · €1.23");
   });
 
   it("follows Runs as they start, progress, end and are deleted", async () => {
@@ -58,13 +58,8 @@ describe("Run gallery", () => {
         type: "wattbill/aggregates/get",
         group_by,
       })),
-      // Failed + cancelled, then what the gallery shows.
+      // Failed + cancelled.
       { type: "wattbill/aggregates/get", group_by: [], run_ids: ["helmet", "cancelled"] },
-      {
-        type: "wattbill/aggregates/get",
-        group_by: [],
-        run_ids: ["cancelled", "helmet", "benchy"],
-      },
     ]);
   });
 
@@ -108,13 +103,13 @@ describe("Run gallery", () => {
   it("falls back to English for other languages", async () => {
     const panel = await mountPanel(recordedBackend({ language: "fr" }));
 
-    expect(text(query(panel, ".head"))).toMatch(/^Runs 3/);
+    expect(text(query(panel, ".recent .head"))).toBe("Recent Runs All Runs");
   });
 
   it("collapses to one column on narrow screens", async () => {
-    const panel = await mountPanel(recordedBackend(), { narrow: true });
+    const panel = await mountPanel(recordedBackend(), { path: "/runs", narrow: true });
 
-    expect(query(panel, "wattbill-run-gallery").hasAttribute("narrow")).toBe(true);
+    expect(query(panel, "wattbill-run-list").hasAttribute("narrow")).toBe(true);
   });
 
   it("offers HA's sidebar on narrow screens", async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Group } from "../src/api";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
-import { click, fill, mountPanel, query, queryAll, settle, text } from "./render";
+import { click, mountPanel, query, queryAll, settle, text } from "./render";
 
 const AGGREGATES = "wattbill/aggregates/get";
 const SUBSCRIBE = "wattbill/runs/subscribe";
@@ -9,12 +9,6 @@ const [started, updated] = recorded.changes;
 
 const names = (panel: Element) => queryAll(panel, ".tile .strong").map(text);
 const stats = (panel: Element) => queryAll(panel, ".stat").map(text);
-const pick = (panel: Element, name: string) =>
-  query(
-    queryAll(panel, ".pick-tile").find((tile) => text(query(tile, ".strong")) === name) ?? panel,
-    "input.pick",
-  );
-const basket = (panel: Element) => text(query(panel, ".basket"));
 
 /** The recorded groups of `group_by`, as the backend would answer with other Runs. */
 const groups = (key: string) =>
@@ -53,23 +47,41 @@ describe("Overview", () => {
     expect(stats(panel)[0]).toBe("March 2026 €0.00 0 Runs");
   });
 
-  it("filters the gallery by Outcome and Flags from the tiles", async () => {
+  it("opens the Runs tab filtered by Outcome or Flags from the tiles", async () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, ".stat.failed"));
+    expect(location.pathname + location.search).toBe("/wattbill/runs?outcome=failed_cancelled");
     expect(names(panel)).toEqual(["Untitled Run", "Helmet"]);
     expect((query(panel, ".outcome-filter") as HTMLSelectElement).value).toBe("failed_cancelled");
 
+    await click(panel, query(panel, `a.tab[href="/wattbill"]`));
     await click(panel, query(panel, ".stat.flagged"));
+    expect(location.pathname + location.search).toBe("/wattbill/runs?flagged=1");
     expect(names(panel)).toEqual(["Helmet"]);
-    expect(text(query(panel, ".stat.flagged"))).toContain("Showing only these");
-
-    await click(panel, query(panel, ".stat.failed"));
-    await click(panel, query(panel, ".stat.flagged"));
-    expect(names(panel)).toHaveLength(3);
   });
 
-  it("charts the cost per month stacked by kind and filters by the month clicked", async () => {
+  it("shows the most recent Runs without filters or selection, and leads to all of them", async () => {
+    const runs = Array.from({ length: 22 }, (_, day) => ({
+      ...recorded.snapshot.runs[0],
+      id: `run-${day}`,
+      name: `Run ${day + 1}`,
+      started: `2026-01-${String(day + 1).padStart(2, "0")}T10:00:00Z`,
+    }));
+    const backend = recordedBackend().subscription(SUBSCRIBE, () => [{ runs }]);
+    const panel = await mountPanel(backend);
+
+    expect(text(query(panel, ".recent .head"))).toBe("Recent Runs All Runs");
+    expect(names(panel)).toHaveLength(20);
+    expect(names(panel).slice(0, 2)).toEqual(["Run 22", "Run 21"]);
+    expect(queryAll(panel, ".name-filter, input.pick, .basket, .manual-run")).toEqual([]);
+
+    await click(panel, query(panel, "a.all-runs"));
+    expect(location.pathname + location.search).toBe("/wattbill/runs");
+    expect(names(panel)).toHaveLength(22);
+  });
+
+  it("charts the cost per month stacked by kind and opens the Runs of the month clicked", async () => {
     const backend = recordedBackend().reply(AGGREGATES, (msg) => {
       const key = (msg.group_by as string[]).join();
       if (key === "month")
@@ -94,19 +106,13 @@ describe("Overview", () => {
     expect(columns.map((column) => queryAll(column, "rect, path").length)).toEqual([2, 3]);
     expect(text(query(panel, ".per-month .legend"))).toBe("Electricity Material Other");
 
-    await click(panel, columns[1]);
-    await click(panel, queryAll(panel, ".per-month .column")[0]);
+    await click(panel, columns[0]);
+    expect(location.pathname + location.search).toBe("/wattbill/runs?month=2025-12");
     expect(text(panel)).toContain("No Runs match the filters.");
     expect((query(panel, ".month-filter") as HTMLSelectElement).value).toBe("2025-12");
-
-    await click(panel, queryAll(panel, ".per-month .column")[1]);
-    expect(names(panel)).toHaveLength(3);
-    await click(panel, queryAll(panel, ".per-month .column")[1]);
-    // Every Run is from January, so the month filter shows only while it filters.
-    expect(queryAll(panel, ".month-filter")).toHaveLength(0);
   });
 
-  it("labels only the highest month and the one picked once the values would overlap", async () => {
+  it("labels only the highest month once the values would overlap", async () => {
     const months = ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12"];
     const backend = recordedBackend().reply(AGGREGATES, (msg) => {
       const key = (msg.group_by as string[]).join();
@@ -128,10 +134,8 @@ describe("Overview", () => {
     });
     const panel = await mountPanel(backend);
 
-    await click(panel, queryAll(panel, ".per-month .column")[0]);
-
     expect(queryAll(panel, ".per-month .column").map(text)).toEqual([
-      "€1.00 Jul",
+      "Jul",
       "Aug",
       "Sep",
       "Oct",
@@ -216,131 +220,5 @@ describe("Overview", () => {
       "Fehlgeschlagen + abgebrochen 0,37 € 2 Läufe · 30 % der Kosten",
       "Läufe mit Hinweisen ⚑ 1 Zum Filtern klicken",
     ]);
-  });
-});
-
-describe("Gallery filters", () => {
-  it("find Runs by name, Device, month, Outcome and Flags, all at once", async () => {
-    const panel = await mountPanel(recordedBackend());
-
-    await fill(panel, query(panel, ".name-filter"), "hel");
-    expect(names(panel)).toEqual(["Helmet"]);
-    await fill(panel, query(panel, ".name-filter"), "");
-
-    await fill(panel, query(panel, ".outcome-filter"), "completed");
-    expect(names(panel)).toEqual(["Benchy"]);
-    await fill(panel, query(panel, ".device-filter"), "device-mini");
-    expect(text(panel)).toContain("No Runs match the filters.");
-    await fill(panel, query(panel, ".outcome-filter"), "");
-    expect(names(panel)).toEqual(["Untitled Run"]);
-    await fill(panel, query(panel, ".device-filter"), "");
-
-    await fill(panel, query(panel, ".flagged-filter input"), "on");
-    expect(names(panel)).toEqual(["Helmet"]);
-    await fill(panel, query(panel, ".flagged-filter input"), "off");
-
-    // Every Run is from January: a month filter would choose nothing.
-    expect(queryAll(panel, ".month-filter")).toHaveLength(0);
-  });
-
-  it("offers the Runs in progress as an Outcome", async () => {
-    const backend = recordedBackend();
-    const panel = await mountPanel(backend);
-    backend.push(SUBSCRIBE, started);
-    await settle(panel);
-
-    await fill(panel, query(panel, ".outcome-filter"), "open");
-
-    expect(names(panel)).toEqual(["Untitled Run"]);
-  });
-});
-
-describe("Selection basket", () => {
-  it("collects selected final Runs with their names and total", async () => {
-    const backend = recordedBackend();
-    const panel = await mountPanel(backend);
-    backend.push(SUBSCRIBE, started);
-    await settle(panel);
-    expect(queryAll(panel, ".basket")).toHaveLength(0);
-
-    await fill(panel, pick(panel, "Helmet"), "on");
-    await fill(panel, pick(panel, "Benchy"), "on");
-
-    expect(basket(panel)).toBe("2 Runs €1.16 Benchy, Helmet Cost Statement… Clear Delete");
-    expect(queryAll(panel, ".pick-tile.selected")).toHaveLength(2);
-    // The open Run can't be selected.
-    expect(queryAll(panel, "input.pick")).toHaveLength(3);
-
-    await click(panel, query(panel, ".basket .clear"));
-    expect(queryAll(panel, ".basket")).toHaveLength(0);
-  });
-
-  it("selects all ended Runs the filter shows, and clears them again", async () => {
-    const panel = await mountPanel(recordedBackend());
-    await click(panel, query(panel, ".stat.failed"));
-
-    await click(panel, query(panel, ".select-all"));
-    expect(basket(panel)).toMatch(/^2 Runs €0.37 Helmet, Untitled Run/);
-
-    await fill(panel, query(panel, ".outcome-filter"), "");
-    await click(panel, query(panel, ".select-all"));
-    expect(basket(panel)).toMatch(/^3 Runs €1.23 Benchy, Helmet, Untitled Run/);
-
-    await click(panel, query(panel, ".select-all"));
-    expect(queryAll(panel, ".basket")).toHaveLength(0);
-  });
-
-  it("keeps filter and selection while a Run page is open", async () => {
-    const panel = await mountPanel(recordedBackend());
-    await fill(panel, query(panel, ".name-filter"), "e");
-    await fill(panel, pick(panel, "Helmet"), "on");
-
-    await click(panel, query(panel, ".tile[href='/wattbill/run/benchy']"));
-    expect(queryAll(panel, ".basket")).toHaveLength(0);
-    await click(panel, query(panel, ".title a"));
-
-    expect((query(panel, ".name-filter") as HTMLInputElement).value).toBe("e");
-    expect(basket(panel)).toMatch(/^1 Run €0.30 Helmet/);
-  });
-
-  it("deletes the selection after confirming what the sensor totals lose", async () => {
-    const backend = recordedBackend()
-      .reply("wattbill/runs/delete_preview", () => recorded.deletePreview)
-      .reply("wattbill/runs/delete", () => recorded.deletePreview);
-    const panel = await mountPanel(backend);
-    await fill(panel, pick(panel, "Helmet"), "on");
-    await fill(panel, pick(panel, "Benchy"), "on");
-
-    await click(panel, query(panel, ".basket .delete"));
-    expect(backend.sent("wattbill/runs/delete_preview")).toEqual([
-      { type: "wattbill/runs/delete_preview", run_ids: ["benchy", "helmet"] },
-    ]);
-    expect(text(query(panel, ".dialog"))).toBe(
-      "Delete 2 Runs? The sensor totals drop at once by: Total cost €0.30 Energy in Runs 1.08 kWh " +
-        "Material used 0 g Runs 1 Flagged Runs 1 Sensor history is not rewritten. " +
-        "This cannot be undone. Cancel Delete",
-    );
-    await click(panel, query(panel, ".dialog .cancel"));
-    expect(backend.sent("wattbill/runs/delete")).toEqual([]);
-
-    await click(panel, query(panel, ".basket .delete"));
-    await click(panel, query(panel, ".dialog .confirm"));
-
-    expect(backend.sent("wattbill/runs/delete")).toEqual([
-      { type: "wattbill/runs/delete", run_ids: ["benchy", "helmet"] },
-    ]);
-    expect(queryAll(panel, ".dialog, .basket")).toHaveLength(0);
-  });
-
-  it("says when the selection can't be deleted", async () => {
-    const backend = recordedBackend().reply("wattbill/runs/delete_preview", () => {
-      throw new WsError("not_allowed");
-    });
-    const panel = await mountPanel(backend);
-    await fill(panel, pick(panel, "Helmet"), "on");
-
-    await click(panel, query(panel, ".basket .delete"));
-
-    expect(basket(panel)).toContain("The selected Runs could not be deleted.");
   });
 });

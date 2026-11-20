@@ -44,6 +44,7 @@ describe("Tags tab", () => {
 
     expect(location.pathname).toBe("/wattbill/tags");
     expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
+      "Overview",
       "Runs",
       "Analysis",
       "Materials",
@@ -182,7 +183,7 @@ describe("Tags in the gallery", () => {
   });
 
   it("filters by any of the chosen Tags, or Runs without one", async () => {
-    const panel = await mountPanel(recordedBackend());
+    const panel = await mountPanel(recordedBackend(), { path: "/runs" });
     expect(queryAll(panel, ".tag-filter label").map(text)).toEqual([
       "No tag",
       "Cosplay helmet",
@@ -204,14 +205,14 @@ describe("Tags in the gallery", () => {
   });
 
   it("combines the Tag filter with the Device filter", async () => {
-    const panel = await mountPanel(recordedBackend());
+    const panel = await mountPanel(recordedBackend(), { path: "/runs" });
     await tick(panel, "input.no-tag");
     await tick(panel, `input[value="Cosplay helmet"]`);
 
     await fill(panel, query(panel, "select.device-filter"), "device-kobra");
 
     expect(shown(panel)).toEqual(["Helmet"]);
-    expect(text(query(panel, ".head"))).toBe("Runs 1 · €0.30");
+    expect(text(query(panel, "wattbill-run-list .head"))).toBe("1 Run · €0.30");
   });
 });
 
@@ -350,7 +351,7 @@ describe("The Tag field", () => {
 
 describe("The Tag filter", () => {
   it("closes on a click outside it", async () => {
-    const panel = await mountPanel(recordedBackend());
+    const panel = await mountPanel(recordedBackend(), { path: "/runs" });
     const details = query(panel, "details.tag-filter") as HTMLDetailsElement;
     details.open = true;
 

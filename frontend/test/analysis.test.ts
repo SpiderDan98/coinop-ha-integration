@@ -18,6 +18,7 @@ describe("Analysis tab", () => {
 
     expect(location.pathname).toBe("/wattbill/analysis");
     expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
+      "Overview",
       "Runs",
       "Analysis",
       "Materials",
@@ -35,6 +36,7 @@ describe("Analysis tab", () => {
     await click(panel, query(panel, `a.tab[href$="/analysis"]`));
 
     expect(queryAll(panel, "a.tab").map(text)).toEqual([
+      "Runs",
       "Analysis",
       "Materials",
       "Line Item Templates",

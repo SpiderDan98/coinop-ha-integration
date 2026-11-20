@@ -7,6 +7,9 @@ import { isKey, type Localize } from "./localize";
 
 export const runName = (run: RunSummary, t: Localize) => run.name ?? t("run.untitled");
 
+export const runCount = (count: number, t: Localize) =>
+  count === 1 ? t("overview.run_one") : t("overview.runs", { count });
+
 export const flagLabel = (flag: string, t: Localize) => {
   const key = `flag.${flag}`;
   return isKey(key) ? t(key) : flag;

@@ -1,6 +1,7 @@
 // Small charts drawn as inline SVG, so the panel needs neither HA's internal elements
 // nor a chart library. Values below zero (refunds) draw as nothing.
 import { css, html, svg } from "lit";
+import { followLink } from "./hass";
 
 const STACK_HEIGHT = 120;
 const STACK_WIDTH = 28;
@@ -16,25 +17,23 @@ const roundedTop = (y: number, height: number, width: number) => {
 
 type Segment = { amount: number; colour: string; title: string };
 
-/** One clickable column per entry, its segments stacked bottom-up in the given order.
- * Only the highest and the picked column carry their value; every column has it as title. */
+/** One linked column per entry, its segments stacked bottom-up in the given order.
+ * Only the highest column carries its value; every column has it as title. */
 export function stackedColumns(
   columns: {
-    key: string;
     label: string;
     title: string;
     value: string;
-    on: boolean;
+    href: string;
     segments: Segment[];
   }[],
-  pick: (key: string) => void,
 ) {
   const height = (segments: Segment[]) =>
     segments.reduce((sum, segment) => sum + Math.max(segment.amount, 0), 0);
   const max = Math.max(...columns.map((column) => height(column.segments)), 0) || 1;
   // Beyond a few columns their values would overlap, so only the tallest keeps one.
   const valued = (column: (typeof columns)[number]) =>
-    columns.length <= ALL_VALUES_UP_TO || column.on || height(column.segments) === max;
+    columns.length <= ALL_VALUES_UP_TO || height(column.segments) === max;
   return html`<div class="columns">
     ${columns.map((column) => {
       let top = STACK_HEIGHT;
@@ -47,12 +46,12 @@ export function stackedColumns(
           ? svg`<path d=${roundedTop(top, size, STACK_WIDTH)} style="fill:${segment.colour}"></path>`
           : svg`<rect y=${top} width=${STACK_WIDTH} height=${size} style="fill:${segment.colour}"></rect>`;
       });
-      return html`<button
-        class="column ${column.on ? "on" : ""}"
-        aria-pressed=${column.on ? "true" : "false"}
+      return html`<a
+        class="column"
+        href=${column.href}
         aria-label="${column.title}: ${column.value}"
         title=${[column.title, ...column.segments.map((segment) => segment.title)].join("\n")}
-        @click=${() => pick(column.key)}
+        @click=${followLink}
       >
         <span class="value">${valued(column) ? column.value : ""}</span>
         <svg
@@ -64,7 +63,7 @@ export function stackedColumns(
           ${bars}
         </svg>
         <span class="label">${column.label}</span>
-      </button>`;
+      </a>`;
     })}
   </div>`;
 }
@@ -127,9 +126,6 @@ export const chartStyles = css`
   .column:hover,
   .column:focus-visible {
     background: var(--secondary-background-color, #ededed);
-  }
-  .column.on {
-    outline: 2px solid var(--primary-color);
   }
   .column .value {
     min-height: 1.4em;

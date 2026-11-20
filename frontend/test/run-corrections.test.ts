@@ -208,7 +208,7 @@ describe("Deleting a Run", () => {
     expect(backend.sent("wattbill/runs/delete")).toEqual([
       { type: "wattbill/runs/delete", run_ids: ["helmet"] },
     ]);
-    expect(location.pathname).toBe("/wattbill");
+    expect(location.pathname).toBe("/wattbill/runs");
   });
 
   it("is offered only once the Run is final", async () => {

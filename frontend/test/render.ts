@@ -58,21 +58,24 @@ export async function settle(root: Element) {
   }
 }
 
+/** `path` may carry a query, which HA leaves out of `route`. */
 export async function mountPanel(backend: FakeBackend, { path = "", narrow = false } = {}) {
   history.replaceState(null, "", PREFIX + path);
   const panel = document.createElement("wattbill-panel") as WattbillPanel;
   panel.hass = backend.hass;
   panel.narrow = narrow;
-  panel.route = { prefix: PREFIX, path };
+  panel.route = { prefix: PREFIX, path: location.pathname.slice(PREFIX.length) };
   panel.panel = { url_path: "wattbill", config: null };
-  // HA's router: a `location-changed` event becomes a new `route`.
+  // HA's router: a `location-changed` event or the back button becomes a new `route`.
   const followNavigation = () => {
     panel.route = { prefix: PREFIX, path: location.pathname.slice(PREFIX.length) };
   };
   window.addEventListener("location-changed", followNavigation);
+  window.addEventListener("popstate", followNavigation);
   document.body.append(panel);
   cleanups.push(() => {
     window.removeEventListener("location-changed", followNavigation);
+    window.removeEventListener("popstate", followNavigation);
     panel.remove();
   });
   await settle(panel);
@@ -98,5 +101,15 @@ export async function fill(panel: Element, field: HTMLElement, value: string) {
   else control.value = value;
   control.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
   control.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  await settle(panel);
+}
+
+/** The browser's back button. */
+export async function back(panel: Element) {
+  const moved = new Promise((resolve) =>
+    window.addEventListener("popstate", resolve, { once: true }),
+  );
+  history.back();
+  await moved;
   await settle(panel);
 }

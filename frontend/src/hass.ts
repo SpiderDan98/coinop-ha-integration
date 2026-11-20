@@ -25,9 +25,10 @@ export interface PanelInfo {
 }
 
 /** In-app navigation the way HA's own `navigate()` does it. */
-export function navigate(path: string) {
-  history.pushState(null, "", path);
-  window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+export function navigate(path: string, { replace = false } = {}) {
+  if (replace) history.replaceState(null, "", path);
+  else history.pushState(null, "", path);
+  window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace } }));
 }
 
 /**

@@ -186,6 +186,8 @@ export class RunPage extends LitElement {
   @property({ attribute: false }) materials: Material[] = [];
   @property({ attribute: false }) templates: LineItemTemplate[] = [];
   @property({ attribute: false }) basePath = "";
+  /** The Runs tab as the user left it. */
+  @property({ attribute: false }) runsPath = "";
   @property({ type: Boolean, reflect: true }) narrow = false;
 
   @state() private run?: RunDetail;
@@ -354,7 +356,7 @@ export class RunPage extends LitElement {
   private async delete() {
     try {
       await deleteRuns(this.hass, [this.runId]);
-      navigate(this.basePath);
+      navigate(this.runsPath);
     } catch {
       this.failed = "fields";
     }
@@ -365,7 +367,7 @@ export class RunPage extends LitElement {
     const t = localize(this.hass);
     if (this.missing) {
       return html`<p>${t("run.not_found")}</p>
-        <a href=${this.basePath} @click=${followLink}>${t("run.back")}</a>`;
+        <a href=${this.runsPath} @click=${followLink}>${t("run.back")}</a>`;
     }
     if (!this.run) return html`<p class="muted">${t("run.loading")}</p>`;
     const run = this.run;

@@ -2,6 +2,7 @@ import {
   mdiChartBar,
   mdiDevices,
   mdiFlaskOutline,
+  mdiFormatListBulleted,
   mdiMenu,
   mdiPackageVariantClosed,
   mdiPlus,
@@ -29,16 +30,19 @@ import "./devices-page";
 import "./manual-run-dialog";
 import "./materials-page";
 import "./overview";
+import { NO_FILTER, filterOf } from "./run-filter";
 import "./run-page";
+import "./runs-page";
 import "./tags-page";
 import "./templates-page";
 import { runName } from "./run-parts";
 import { shared } from "./styles";
 
-const TABS = ["analysis", "materials", "templates", "tags", "devices"] as const;
+const TABS = ["runs", "analysis", "materials", "templates", "tags", "devices"] as const;
 
 const ICONS = {
   overview: mdiViewDashboard,
+  runs: mdiFormatListBulleted,
   analysis: mdiChartBar,
   materials: mdiPackageVariantClosed,
   templates: mdiTextBoxMultiple,
@@ -68,16 +72,25 @@ export class WattbillPanel extends LitElement {
   @state() private devices?: Device[] | null;
   @state() private manualRun = false;
   @state() private devScenarios = false;
+  /** The URL's query, which HA's `route` leaves out. */
+  @state() private search = location.search;
+  /** The Runs tab's query as last shown, so the way back to it keeps its filter. */
+  private runsSearch = "";
+  private filter = NO_FILTER;
   private unsubscribe?: Promise<() => Promise<void>>[];
   private devicesRequest = 0;
 
   override connectedCallback() {
     super.connectedCallback();
     if (this.hass) this.subscribe();
+    window.addEventListener("location-changed", this.readSearch);
+    window.addEventListener("popstate", this.readSearch);
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
+    window.removeEventListener("location-changed", this.readSearch);
+    window.removeEventListener("popstate", this.readSearch);
     for (const unsubscribe of this.unsubscribe ?? []) void unsubscribe.then((stop) => stop());
     this.unsubscribe = undefined;
   }
@@ -100,7 +113,15 @@ export class WattbillPanel extends LitElement {
     // Devices change in HA's own settings, so the tabs showing them read them afresh.
     else if (changed.get("route") && ["devices", "templates"].includes(page(this.route).name))
       void this.loadDevices();
+    if (page(this.route).name === "runs" && this.search !== this.runsSearch) {
+      this.runsSearch = this.search;
+      this.filter = filterOf(this.search);
+    }
   }
+
+  private readSearch = () => {
+    this.search = location.search;
+  };
 
   private subscribe() {
     this.failed = this.catalogFailed = false;
@@ -163,8 +184,8 @@ export class WattbillPanel extends LitElement {
               ? TABS.map(
                   (tab) =>
                     html`<a
-                      class="tab ${current.name === tab ? "on" : ""}"
-                      href="${this.route.prefix}/${tab}"
+                      class="tab ${this.isOn(tab, current) ? "on" : ""}"
+                      href=${this.tabPath(tab)}
                       @click=${followLink}
                       >${t(`tab.${tab}`)}</a
                     >`,
@@ -173,13 +194,9 @@ export class WattbillPanel extends LitElement {
                 (["overview", ...TABS] as const).map(
                   (tab) =>
                     html`<a
-                      class="tab icon ${
-                        current.name === tab || (tab === "overview" && current.name === "run")
-                          ? "on"
-                          : ""
-                      }"
-                      href=${tab === "overview" ? this.route.prefix : `${this.route.prefix}/${tab}`}
-                      title=${tab === "overview" ? t("runs.title") : t(`tab.${tab}`)}
+                      class="tab icon ${this.isOn(tab, current) ? "on" : ""}"
+                      href=${this.tabPath(tab)}
+                      title=${t(`tab.${tab}`)}
                       @click=${followLink}
                       ><ha-svg-icon .path=${ICONS[tab]}></ha-svg-icon
                     ></a>`,
@@ -198,17 +215,30 @@ export class WattbillPanel extends LitElement {
                 .basePath=${this.route.prefix}
                 ?narrow=${this.narrow}
               ></wattbill-overview>`
-            : // One template for every other page, so only the Overview's filter and
-              // selection are kept while the user looks elsewhere.
-              html`<div>
-                ${
-                  // As HA's view headings; on phones the tab row names the page.
-                  current.name !== "run" && current.name !== "overview" && !this.narrow
-                    ? html`<h1 class="page-title">${t(`tab.${current.name}`)}</h1>`
-                    : nothing
-                }
-                ${this.renderPage(current, run)}
-              </div>`,
+            : current.name === "runs" && this.runs && !this.failed
+              ? html`<div class="runs">
+                  ${this.narrow ? nothing : html`<h1 class="page-title">${t("tab.runs")}</h1>`}
+                  <wattbill-runs-page
+                    .hass=${this.hass}
+                    .runs=${this.runs}
+                    .devices=${this.devices ?? undefined}
+                    .tags=${this.catalog?.tags ?? []}
+                    .basePath=${this.route.prefix}
+                    .filter=${this.filter}
+                    ?narrow=${this.narrow}
+                  ></wattbill-runs-page>
+                </div>`
+              : // One template for every other page, so only the Overview and the Runs tab
+                // (with its selection) are kept while the user looks elsewhere.
+                html`<div>
+                  ${
+                    // As HA's view headings; on phones the tab row names the page.
+                    current.name !== "run" && current.name !== "overview" && !this.narrow
+                      ? html`<h1 class="page-title">${t(`tab.${current.name}`)}</h1>`
+                      : nothing
+                  }
+                  ${this.renderPage(current, run)}
+                </div>`,
         )}
       </main>
       ${
@@ -222,7 +252,7 @@ export class WattbillPanel extends LitElement {
           : nothing
       }
       ${
-        current.name === "overview"
+        current.name === "runs"
           ? html`<ha-button
               class="manual-run fab"
               ?disabled=${!this.devices}
@@ -262,7 +292,18 @@ export class WattbillPanel extends LitElement {
     const home = html`<a href=${this.route.prefix} @click=${followLink}>WattBill</a>`;
     if (current.name !== "run") return home;
     return html`${home}<span class="muted"> › </span
-      ><span class="ellipsis">${run ? runName(run, t) : ""}</span>`;
+      ><a class="runs-link" href=${this.tabPath("runs")} @click=${followLink}>${t("tab.runs")}</a
+      ><span class="muted"> › </span><span class="ellipsis">${run ? runName(run, t) : ""}</span>`;
+  }
+
+  /** A Run's page belongs to the Runs tab. */
+  private isOn(tab: (typeof TABS)[number] | "overview", current: ReturnType<typeof page>) {
+    return current.name === tab || (tab === "runs" && current.name === "run");
+  }
+
+  private tabPath(tab: (typeof TABS)[number] | "overview") {
+    if (tab === "overview") return this.route.prefix;
+    return `${this.route.prefix}/${tab}${tab === "runs" ? this.runsSearch : ""}`;
   }
 
   private renderPage(current: ReturnType<typeof page>, run: RunSummary | undefined) {
@@ -320,6 +361,7 @@ export class WattbillPanel extends LitElement {
     return html`<wattbill-run-page
       .hass=${this.hass}
       .runId=${current.name === "run" ? current.runId : ""}
+      .runsPath=${this.tabPath("runs")}
       .summary=${run}
       .devices=${this.devices ?? undefined}
       .tags=${this.catalog?.tags ?? []}

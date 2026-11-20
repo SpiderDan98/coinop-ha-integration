@@ -23,7 +23,7 @@ describe("Devices tab", () => {
 
     expect(location.pathname).toBe("/wattbill/devices");
     expect(cards(panel)).toHaveLength(1);
-    await click(panel, query(panel, 'a.tab[title="Runs"]'));
+    await click(panel, query(panel, 'a.tab[title="Overview"]'));
     expect(location.pathname).toBe("/wattbill");
   });
 
@@ -331,7 +331,7 @@ describe("Runs of removed Devices", () => {
   });
 
   it("can be filtered by in the gallery, like any Device", async () => {
-    const panel = await mountPanel(recordedBackend());
+    const panel = await mountPanel(recordedBackend(), { path: "/runs" });
     const options = queryAll(panel, "select.device-filter option").map(text);
     expect(options).toEqual(["All Devices", "Kobra", "Mini (removed)"]);
 
@@ -340,7 +340,7 @@ describe("Runs of removed Devices", () => {
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
     ]);
-    expect(text(query(panel, ".head"))).toContain("1 · €0.07");
+    expect(text(query(panel, "wattbill-run-list .head"))).toBe("1 Run · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
       "⚑ 2 Helmet Kobra",
