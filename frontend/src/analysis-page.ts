@@ -8,6 +8,7 @@ import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { deviceName } from "./run-parts";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 
 type Aggregates = Awaited<ReturnType<typeof loadAggregates>>;
 
@@ -30,7 +31,7 @@ async function loadAggregates(hass: HomeAssistant) {
 }
 
 /** A card with a table whose columns after the first hold numbers. */
-function table(
+function totals(
   name: string,
   title: string,
   {
@@ -41,48 +42,28 @@ function table(
     empty,
   }: { head: string[]; rows: (string | number)[][]; foot?: string[]; hint?: string; empty: string },
 ) {
-  const cells = (row: (string | number)[], tag: "th" | "td") =>
-    row.map((value, index) =>
-      tag === "th"
-        ? html`<th class=${index ? "num" : ""}>${value}</th>`
-        : html`<td class=${index ? "num" : ""}>${value}</td>`,
-    );
-  return html`<section class="card ${name}">
-    <header>
+  const cells = (row: (string | number)[]) =>
+    row.map((value, index) => html`<td class=${index ? "num" : ""}>${value}</td>`);
+  return table({
+    name,
+    header: html`<header>
       <h3>${title}</h3>
       ${hint ? html`<p class="small hint">${hint}</p>` : nothing}
-    </header>
-    <table>
-      <thead>
-        <tr>
-          ${cells(head, "th")}
-        </tr>
-      </thead>
-      <tbody>
-        ${
-          rows.length
-            ? rows.map(
-                (row) =>
-                  html`<tr>
-                    ${cells(row, "td")}
-                  </tr>`,
-              )
-            : html`<tr class="empty">
-                <td colspan=${head.length} class="muted">${empty}</td>
-              </tr>`
-        }
-      </tbody>
-      ${
-        foot
-          ? html`<tfoot>
-              <tr>
-                ${cells(foot, "td")}
-              </tr>
-            </tfoot>`
-          : nothing
-      }
-    </table>
-  </section>`;
+    </header>`,
+    columns: head.map((label, index) => ({ label, num: index > 0 })),
+    rows: rows.map(
+      (row) =>
+        html`<tr>
+          ${cells(row)}
+        </tr>`,
+    ),
+    foot: foot
+      ? html`<tr>
+          ${cells(foot)}
+        </tr>`
+      : undefined,
+    empty,
+  });
 }
 
 @customElement("wattbill-analysis-page")
@@ -133,7 +114,7 @@ export class AnalysisPage extends LitElement {
   }
 
   private renderKinds({ cost, kind }: Aggregates, t: Localize, format: Format) {
-    return table("by-kind", t("analysis.by_kind"), {
+    return totals("by-kind", t("analysis.by_kind"), {
       head: [t("analysis.kind"), t("analysis.cost"), t("analysis.share")],
       rows: KINDS.map((key) => {
         const amount = kind.find((group) => group.kind === key)?.cost ?? 0;
@@ -145,7 +126,7 @@ export class AnalysisPage extends LitElement {
   }
 
   private renderDevices({ device }: Aggregates, t: Localize, format: Format) {
-    return table("by-device", t("analysis.by_device"), {
+    return totals("by-device", t("analysis.by_device"), {
       head: [
         t("run.device"),
         t("runs.title"),
@@ -165,7 +146,7 @@ export class AnalysisPage extends LitElement {
   }
 
   private renderMonths({ month }: Aggregates, t: Localize, format: Format) {
-    return table("by-month", t("analysis.by_month"), {
+    return totals("by-month", t("analysis.by_month"), {
       head: [
         t("analysis.month"),
         t("runs.title"),
@@ -185,7 +166,7 @@ export class AnalysisPage extends LitElement {
   }
 
   private renderMaterials({ material }: Aggregates, t: Localize, format: Format) {
-    return table("by-material", t("analysis.by_material"), {
+    return totals("by-material", t("analysis.by_material"), {
       head: [t("item.material"), t("analysis.used"), t("analysis.cost"), t("analysis.per_kg")],
       rows: material
         .toSorted((a, b) => Number(!a.material_id) - Number(!b.material_id) || b.cost - a.cost)
@@ -202,7 +183,7 @@ export class AnalysisPage extends LitElement {
   private renderOutcomes({ cost, outcome }: Aggregates, t: Localize, format: Format) {
     const rank = (group: Group) =>
       group.outcome ? OUTCOMES.indexOf(group.outcome) : OUTCOMES.length;
-    return table("by-outcome", t("analysis.by_outcome"), {
+    return totals("by-outcome", t("analysis.by_outcome"), {
       head: [t("run.outcome"), t("runs.title"), t("analysis.cost"), t("analysis.share")],
       rows: outcome
         .toSorted((a, b) => rank(a) - rank(b))
@@ -217,7 +198,7 @@ export class AnalysisPage extends LitElement {
   }
 
   private renderTags({ tag }: Aggregates, t: Localize, format: Format) {
-    return table("by-tag overlapping", t("analysis.by_tag"), {
+    return totals("by-tag overlapping", t("analysis.by_tag"), {
       head: [t("tags.tag"), t("runs.title"), t("analysis.cost")],
       rows: tag.map((group) => [
         group.tag ?? t("runs.no_tag"),
@@ -231,6 +212,7 @@ export class AnalysisPage extends LitElement {
 
   static override styles = [
     shared,
+    tableStyles,
     css`
       .intro {
         margin: 0 0 12px;
@@ -255,15 +237,8 @@ export class AnalysisPage extends LitElement {
       :host([narrow]) .tables {
         grid-template-columns: minmax(0, 1fr);
       }
-      td:first-child {
-        min-width: 7em;
-      }
-      .card {
-        padding: 0;
-        overflow-x: auto;
-      }
       header {
-        padding: 12px 14px 8px;
+        padding: 12px 12px 8px;
       }
       .hint {
         margin: 4px 0 0;
@@ -271,43 +246,6 @@ export class AnalysisPage extends LitElement {
       }
       .overlapping {
         border-style: dashed;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 7px 14px;
-        text-align: left;
-        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-      }
-      th {
-        font-weight: 500;
-        font-size: 12px;
-        color: var(--secondary-text-color);
-        white-space: nowrap;
-      }
-      th.num,
-      td.num {
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-      }
-      tr.empty td {
-        text-align: left;
-      }
-      tbody tr:last-child td {
-        border-bottom: 0;
-      }
-      tfoot td {
-        font-weight: 500;
-        border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-bottom: 0;
-      }
-      :host([narrow]) th,
-      :host([narrow]) td {
-        padding: 6px 10px;
       }
     `,
   ];

@@ -218,7 +218,7 @@ describe("Materials tab", () => {
 
     const panel = await mountPanel(backend, { path: "/materials" });
 
-    expect(queryAll(panel, ".card.active")).toHaveLength(0);
+    expect(queryAll(panel, ".table.active")).toHaveLength(0);
     expect(text(query(panel, ".none-active"))).toBe(
       "Every Material is archived. Restore one below or create a new one.",
     );

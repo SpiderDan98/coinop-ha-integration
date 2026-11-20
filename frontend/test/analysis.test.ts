@@ -158,7 +158,7 @@ describe("Analysis tab", () => {
   it("is in German when Home Assistant is", async () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }), { path: "/analysis" });
 
-    expect(queryAll(panel, "section h3").map(text)).toEqual([
+    expect(queryAll(panel, ".table h3").map(text)).toEqual([
       "Nach Art",
       "Nach Gerät",
       "Nach Monat",

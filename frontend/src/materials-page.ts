@@ -34,6 +34,7 @@ import { formatter, type Format } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 
 const FORMS: MaterialForm[] = ["filament", "resin"];
 const PACK_UNITS: PackUnit[] = ["g", "ml"];
@@ -194,16 +195,14 @@ export class MaterialsPage extends LitElement {
           ? html`
               ${
                 active.length
-                  ? html`<div class="card flush active">
-                      ${this.renderTable(active, t, format)}
-                    </div>`
+                  ? this.renderTable(active, "active", t, format)
                   : html`<p class="muted none-active">${t("materials.all_archived")}</p>`
               }
               ${
                 archived.length
                   ? html`<details class="archived">
                       <summary>${t("materials.archived", { count: archived.length })}</summary>
-                      <div class="card flush">${this.renderTable(archived, t, format)}</div>
+                      ${this.renderTable(archived, "", t, format)}
                     </details>`
                   : nothing
               }
@@ -263,95 +262,83 @@ export class MaterialsPage extends LitElement {
         spoolman.status === "unreachable"
           ? html`<p class="muted">${t("spoolman.unreachable")}</p>`
           : rows.length
-            ? html`<div class="card flush">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>${t("spoolman.filament")}</th>
-                      <th>${t("materials.type")}</th>
-                      <th class="num">${t("materials.price_per_kg")}</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rows}
-                  </tbody>
-                </table>
-              </div>`
+            ? table({
+                columns: [
+                  { label: t("spoolman.filament") },
+                  { label: t("materials.type") },
+                  { label: t("materials.price_per_kg"), num: true },
+                  {},
+                ],
+                rows,
+              })
             : html`<p class="muted">${t("spoolman.empty")}</p>`
       }
     </section>`;
   }
 
-  private renderTable(materials: Material[], t: Localize, format: Format) {
+  private renderTable(materials: Material[], name: string, t: Localize, format: Format) {
     const number = (value: number) => value.toLocaleString(this.hass.language);
-    return html`<table>
-      <thead>
-        <tr>
-          <th>${t("materials.name")}</th>
-          <th>${t("materials.form_type")}</th>
-          <th>${t("materials.properties")}</th>
-          <th>${t("materials.pack")}</th>
-          <th class="num">${t("materials.price_per_kg")}</th>
-          <th class="star-head">${t("materials.default_for_type")}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${materials.map(
-          (material) =>
-            html`<tr class="material">
-              <td class="name">
-                <div class="row">
-                  <span
-                    class="swatch"
-                    style="background: ${material.colour ?? "transparent"}"
-                  ></span>
-                  <div>
-                    <div class="strong">${material.name}</div>
-                    ${material.vendor ? html`<div class="muted small">${material.vendor}</div>` : nothing}
-                  </div>
+    return table({
+      name,
+      columns: [
+        { label: t("materials.name") },
+        { label: t("materials.form_type") },
+        { label: t("materials.properties") },
+        { label: t("materials.pack") },
+        { label: t("materials.price_per_kg"), num: true },
+        { label: t("materials.default_for_type"), class: "center" },
+        {},
+      ],
+      rows: materials.map(
+        (material) =>
+          html`<tr class="material">
+            <td class="name">
+              <div class="row">
+                <span class="swatch" style="background: ${material.colour ?? "transparent"}"></span>
+                <div>
+                  <div class="strong">${material.name}</div>
+                  ${material.vendor ? html`<div class="muted small">${material.vendor}</div>` : nothing}
                 </div>
-              </td>
-              <td>${t(`form.${material.form}`)} · ${material.type}</td>
-              <td class="small">
-                ${number(material.density)}
-                g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
-              </td>
-              <td class="small">
-                ${
-                  material.price.source === "fixed"
-                    ? `${format.money(material.price.pack_price)} / ${format.quantity(
-                        material.price.pack_size,
-                        material.price.pack_unit,
-                      )}`
-                    : t("materials.from_spoolman")
-                }
-              </td>
-              <td class="num">${format.money(material.price_per_gram * 1000)} / kg</td>
-              <td>
-                ${
-                  material.archived
-                    ? nothing
-                    : html`<ha-icon-button
-                        class="star"
-                        .label=${t("materials.default_for", { type: material.type })}
-                        .path=${material.default_for_type ? mdiStar : mdiStarOutline}
-                        .selected=${material.default_for_type}
-                        @click=${() =>
-                          this.act(() =>
-                            updateMaterial(this.hass, material.id, {
-                              default_for_type: !material.default_for_type,
-                            }),
-                          )}
-                      ></ha-icon-button>`
-                }
-              </td>
-              <td class="actions">${this.renderActions(material, t)}</td>
-            </tr>`,
-        )}
-      </tbody>
-    </table>`;
+              </div>
+            </td>
+            <td>${t(`form.${material.form}`)} · ${material.type}</td>
+            <td class="small">
+              ${number(material.density)}
+              g/cm³${material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`}
+            </td>
+            <td class="small">
+              ${
+                material.price.source === "fixed"
+                  ? `${format.money(material.price.pack_price)} / ${format.quantity(
+                      material.price.pack_size,
+                      material.price.pack_unit,
+                    )}`
+                  : t("materials.from_spoolman")
+              }
+            </td>
+            <td class="num">${format.money(material.price_per_gram * 1000)} / kg</td>
+            <td>
+              ${
+                material.archived
+                  ? nothing
+                  : html`<ha-icon-button
+                      class="star"
+                      .label=${t("materials.default_for", { type: material.type })}
+                      .path=${material.default_for_type ? mdiStar : mdiStarOutline}
+                      .selected=${material.default_for_type}
+                      @click=${() =>
+                        this.act(() =>
+                          updateMaterial(this.hass, material.id, {
+                            default_for_type: !material.default_for_type,
+                          }),
+                        )}
+                    ></ha-icon-button>`
+              }
+            </td>
+            <td class="actions">${this.renderActions(material, t)}</td>
+          </tr>`,
+      ),
+    });
   }
 
   private renderActions(material: Material, t: Localize) {
@@ -651,6 +638,7 @@ export class MaterialsPage extends LitElement {
 
   static override styles = [
     shared,
+    tableStyles,
     css`
       .star {
         --ha-icon-button-size: 36px;
@@ -659,33 +647,6 @@ export class MaterialsPage extends LitElement {
       }
       .star[selected] {
         color: var(--warning-color, #ffa600);
-      }
-      .card.flush {
-        padding: 0;
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 8px 12px;
-        border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-      }
-      th {
-        border-top: 0;
-        text-align: left;
-        font-weight: 500;
-        font-size: 12px;
-        color: var(--secondary-text-color);
-        white-space: nowrap;
-      }
-      th.num {
-        text-align: right;
-      }
-      th.star-head {
-        text-align: center;
       }
       .colour-row {
         display: flex;
@@ -709,15 +670,6 @@ export class MaterialsPage extends LitElement {
       }
       [aria-invalid="true"] {
         border-color: var(--error-color, #db4437);
-      }
-      .actions {
-        white-space: nowrap;
-        text-align: right;
-      }
-      .actions ha-icon-button {
-        --ha-icon-button-size: 36px;
-        --mdc-icon-size: 20px;
-        color: var(--secondary-text-color);
       }
       .swatch {
         width: 14px;

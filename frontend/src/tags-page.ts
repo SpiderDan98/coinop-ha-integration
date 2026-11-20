@@ -8,6 +8,7 @@ import { formatter } from "./format";
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 
 @customElement("wattbill-tags-page")
 export class TagsPage extends LitElement {
@@ -64,19 +65,16 @@ export class TagsPage extends LitElement {
       }
       ${
         this.tags.length
-          ? html`<table>
-              <thead>
-                <tr>
-                  <th>${t("tags.tag")}</th>
-                  <th class="num">${t("runs.title")}</th>
-                  <th class="num">${t("sensor.total_cost")}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${this.tags.map((tag) => this.renderTag(tag, t))}
-              </tbody>
-            </table>`
+          ? table({
+              name: "tags",
+              columns: [
+                { label: t("tags.tag") },
+                { label: t("runs.title"), num: true },
+                { label: t("sensor.total_cost"), num: true },
+                {},
+              ],
+              rows: this.tags.map((tag) => this.renderTag(tag, t)),
+            })
           : html`<p class="muted">${t("tags.empty")}</p>`
       }
       ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
@@ -231,41 +229,10 @@ export class TagsPage extends LitElement {
 
   static override styles = [
     shared,
+    tableStyles,
     css`
-      table {
-        width: 100%;
+      .tags {
         max-width: 900px;
-        border-collapse: collapse;
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 12px;
-      }
-      th,
-      td {
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        vertical-align: middle;
-      }
-      th {
-        font-weight: 500;
-        color: var(--secondary-text-color);
-      }
-      th.num,
-      td.num {
-        text-align: right;
-      }
-      tr:last-child td {
-        border-bottom: 0;
-      }
-      .actions {
-        text-align: right;
-        white-space: nowrap;
-      }
-      .actions ha-icon-button {
-        --ha-icon-button-size: 36px;
-        --mdc-icon-size: 20px;
-        color: var(--secondary-text-color);
       }
       .delete-hint {
         white-space: normal;
@@ -289,13 +256,6 @@ export class TagsPage extends LitElement {
       }
       .error {
         color: var(--error-color, #db4437);
-      }
-      :host([narrow]) th,
-      :host([narrow]) td {
-        padding: 6px 8px;
-      }
-      :host([narrow]) .actions {
-        white-space: normal;
       }
     `,
   ];

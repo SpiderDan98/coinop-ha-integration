@@ -14,6 +14,7 @@ import {
 import type { HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 
 const BASES: QuantityBasis[] = ["entered", "running_hours"];
 
@@ -87,22 +88,19 @@ export class TemplatesPage extends LitElement {
       ${this.adding ? this.renderNew(this.adding, t) : nothing}
       ${
         this.templates.length
-          ? html`<table>
-              <thead>
-                <tr>
-                  <th>${t("item.label")}</th>
-                  <th>${t("item.unit")}</th>
-                  <th class="num">${t("item.unit_price")}</th>
-                  <th class="num">${t("templates.default_quantity")}</th>
-                  <th>${t("templates.basis")}</th>
-                  <th>${t("templates.automatic_for")}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${this.templates.map((template) => this.renderTemplate(template, t))}
-              </tbody>
-            </table>`
+          ? table({
+              name: "templates stacked",
+              columns: [
+                { label: t("item.label") },
+                { label: t("item.unit") },
+                { label: t("item.unit_price"), num: true },
+                { label: t("templates.default_quantity"), num: true },
+                { label: t("templates.basis") },
+                { label: t("templates.automatic_for") },
+                {},
+              ],
+              rows: this.templates.map((template) => this.renderTemplate(template, t)),
+            })
           : html`<p class="muted">${t("templates.empty")}</p>`
       }
       ${this.failed ? html`<p class="error small">${t("run.save_failed")}</p>` : nothing}
@@ -283,32 +281,10 @@ export class TemplatesPage extends LitElement {
 
   static override styles = [
     shared,
+    tableStyles,
     css`
-      table {
-        width: 100%;
+      .templates {
         max-width: 1100px;
-        border-collapse: collapse;
-        background: var(--card-background-color, #fff);
-        border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        border-radius: 12px;
-      }
-      th,
-      td {
-        padding: 6px 10px;
-        text-align: left;
-        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-        vertical-align: middle;
-      }
-      th {
-        font-weight: 500;
-        color: var(--secondary-text-color);
-      }
-      th.num,
-      td.num {
-        text-align: right;
-      }
-      tr:last-child td {
-        border-bottom: 0;
       }
       input,
       select {
@@ -321,18 +297,10 @@ export class TemplatesPage extends LitElement {
       input.unit {
         max-width: 80px;
       }
-      .actions {
-        text-align: right;
-      }
       .delete-hint {
         max-width: 260px;
         margin: 0 0 6px auto;
         text-align: left;
-      }
-      .actions ha-icon-button {
-        --ha-icon-button-size: 36px;
-        --mdc-icon-size: 20px;
-        color: var(--secondary-text-color);
       }
       form.new {
         display: grid;
@@ -356,30 +324,6 @@ export class TemplatesPage extends LitElement {
       }
       .error {
         color: var(--error-color, #db4437);
-      }
-      :host([narrow]) table,
-      :host([narrow]) thead,
-      :host([narrow]) tbody,
-      :host([narrow]) tr,
-      :host([narrow]) td {
-        display: block;
-      }
-      :host([narrow]) thead {
-        display: none;
-      }
-      :host([narrow]) tr {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-        padding: 8px;
-        border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-      }
-      :host([narrow]) td {
-        border: 0;
-        padding: 0;
-      }
-      :host([narrow]) td:first-child {
-        grid-column: 1 / -1;
       }
       :host([narrow]) input[type="number"] {
         max-width: none;
