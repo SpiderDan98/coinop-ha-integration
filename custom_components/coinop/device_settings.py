@@ -12,6 +12,7 @@ from typing import Any
 from homeassistant.core import CALLBACK_TYPE
 
 from .device_inputs import stock_scale
+from .models import DoseSource
 from .schema import vol
 from .store import CoinOpStore
 from .tags import retag, tag_name
@@ -123,6 +124,16 @@ class DeviceSettings:
             name: deepcopy(stored.get(name, default))
             for name, (default, _) in FIELDS.items()
         }
+
+    def program_row(
+        self, device_id: str, program: str | None
+    ) -> tuple[dict[str, Any], DoseSource]:
+        """The Program Defaults' row a Run of `program` uses: its Program's, else
+        the Default row."""
+        defaults = self.get(device_id)[PROGRAM_DEFAULTS]
+        if program in defaults["programs"]:
+            return defaults["programs"][program], DoseSource.PROGRAM_DEFAULT
+        return defaults["default"], DoseSource.DEFAULT_ROW
 
     @staticmethod
     def validate(changes: Mapping[str, Any]) -> dict[str, Any]:

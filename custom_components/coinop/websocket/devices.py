@@ -15,11 +15,11 @@ from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
     DOSES,
-    PROGRAM_DEFAULTS,
     TAGS_FOR_NEW_RUNS,
 )
 from custom_components.coinop.models import (
     ConsumptionMethod,
+    DoseSource,
     LineItemKind,
     Outcome,
     Run,
@@ -193,7 +193,6 @@ def _measured_suggestions(
     device = next((d for d in coinop.devices if d.device_id == device_id), None)
     if found(connection, msg, device, "Device") is None:
         return
-    programs = coinop.settings.get(device_id)[PROGRAM_DEFAULTS]["programs"]
     values: dict[str | None, dict[str, list[float]]] = {}
     for run in coinop.book.runs():
         if (
@@ -203,7 +202,10 @@ def _measured_suggestions(
         ):
             continue
         rows: list[str | None] = [run.program] if run.program else []
-        if run.program not in programs:
+        if (
+            coinop.settings.program_row(device_id, run.program)[1]
+            is DoseSource.DEFAULT_ROW
+        ):
             rows.append(None)
         for quantity in QUANTITIES.values():
             if (measured := _measured(run, quantity.kind)) is not None:

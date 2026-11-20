@@ -53,7 +53,6 @@ from .device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
     DOSES,
-    PROGRAM_DEFAULTS,
     TAGS_FOR_NEW_RUNS,
     DeviceSettings,
 )
@@ -170,11 +169,7 @@ class DeviceTracker:
         return litres, ConsumptionMethod.PROGRAM_DEFAULT
 
     def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
-        """The Program Defaults' row of the Run's Program, else the Default row."""
-        defaults = self._settings.get(self._config.device_id)[PROGRAM_DEFAULTS]
-        if run.program in defaults["programs"]:
-            return defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT
-        return defaults["default"], DoseSource.DEFAULT_ROW
+        return self._settings.program_row(self._config.device_id, run.program)
 
     async def async_start(self) -> None:
         self._unsubscribe = [
