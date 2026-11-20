@@ -26,11 +26,13 @@ class ConsumptionSource(StrEnum):
     ENERGY = "energy"
     POWER = "power"
     ESTIMATE = "estimate"
+    PER_PROGRAM = "per_program"
 
 
 class WaterSource(StrEnum):
     METER = "meter"
     FLOW = "flow"
+    PER_PROGRAM = "per_program"
     NONE = "none"
 
 
@@ -52,6 +54,8 @@ class Capability(StrEnum):
     DOSES = "doses"
     # A water source and price, and a Water Line Item from them.
     WATER = "water"
+    # Electricity and water from the Program Defaults' kWh and litres when not measured.
+    PROGRAM_CONSUMPTION = "program_consumption"
 
 
 CAPABILITIES = {
@@ -65,7 +69,12 @@ CAPABILITIES = {
         }
     ),
     DEVICE_TYPE_WASHING_MACHINE: frozenset(
-        {Capability.PROGRAM, Capability.DOSES, Capability.WATER}
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.WATER,
+            Capability.PROGRAM_CONSUMPTION,
+        }
     ),
 }
 

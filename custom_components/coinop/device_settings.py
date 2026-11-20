@@ -48,10 +48,13 @@ _STOCK = vol.All(
 )
 
 # A row's amount per Dose id, in its Material's unit; a missing one is not dosed.
+# A missing kWh or litres is not set.
 _ROW = {
     vol.Required("doses"): {
         str: vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
-    }
+    },
+    vol.Optional("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0)),
+    vol.Optional("litres"): vol.All(vol.Coerce(float), vol.Range(min=0)),
 }
 
 FIELDS: dict[str, tuple[Any, Any]] = {

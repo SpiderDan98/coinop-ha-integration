@@ -93,3 +93,16 @@ def piecewise(models: Sequence[tuple[datetime, Model]]) -> Model:
         return result
 
     return amount
+
+
+def spread(amount: float, start: datetime, end: datetime) -> Model:
+    """`amount` evenly over [start, end]; all of it while they are the same moment."""
+    span = (end - start).total_seconds()
+
+    def share(low: datetime, high: datetime) -> float:
+        if span <= 0:
+            return amount
+        overlap = (min(high, end) - max(low, start)).total_seconds()
+        return amount * max(overlap, 0.0) / span
+
+    return share

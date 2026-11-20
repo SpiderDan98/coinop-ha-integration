@@ -33,6 +33,8 @@ class Flag(StrEnum):
     ENDED_EARLY_DEFAULTS = "ended_early_defaults"
     # A Dose's stock input reported nothing usable: its default was charged.
     STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
+    # A computed Line Item had neither a measurement nor a default.
+    DEFAULT_MISSING = "default_missing"
 
 
 class UsageUnit(StrEnum):
@@ -66,6 +68,7 @@ class ConsumptionMethod(StrEnum):
     MEASURED = "measured"
     FROM_HISTORY = "from_history"
     ESTIMATED = "estimated"
+    PROGRAM_DEFAULT = "program_default"
     ENTERED = "entered"
 
 
@@ -344,7 +347,10 @@ class LineItem:
     @property
     def from_defaults(self) -> bool:
         """Its quantity is a default for a whole cycle, not what was measured."""
-        return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
+        return (
+            self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
+            or self.method is ConsumptionMethod.PROGRAM_DEFAULT
+        )
 
     @property
     def grams(self) -> float:

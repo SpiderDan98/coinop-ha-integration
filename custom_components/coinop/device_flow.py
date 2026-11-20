@@ -450,6 +450,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         sources = [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
         if Capability.AVERAGE_POWER in self._capabilities():
             sources.append(ConsumptionSource.ESTIMATE)
+        if Capability.PROGRAM_CONSUMPTION in self._capabilities():
+            sources.append(ConsumptionSource.PER_PROGRAM)
         return self.async_show_menu(
             step_id="consumption", menu_options=[s.value for s in sources]
         )
@@ -485,8 +487,14 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_water(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        sources = [
+            source
+            for source in WaterSource
+            if source is not WaterSource.PER_PROGRAM
+            or Capability.PROGRAM_CONSUMPTION in self._capabilities()
+        ]
         return self.async_show_menu(
-            step_id="water", menu_options=[_step(WATER, s) for s in WaterSource]
+            step_id="water", menu_options=[_step(WATER, s) for s in sources]
         )
 
     async def async_step_water_meter(
@@ -513,6 +521,18 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         self._meter = {"source": WaterSource.NONE.value}
+        return await self._meter_done(WATER)
+
+    async def async_step_per_program(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        self._meter = {"source": ConsumptionSource.PER_PROGRAM.value}
+        return await self._meter_done(ELECTRICITY)
+
+    async def async_step_water_per_program(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        self._meter = {"source": WaterSource.PER_PROGRAM.value}
         return await self._meter_done(WATER)
 
     async def _async_meter_step(

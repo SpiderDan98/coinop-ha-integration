@@ -37,7 +37,7 @@ from .cost.material import (
     slot_line_items,
 )
 from .cost.slots import slot_material, slot_shares
-from .device_config import Capability, DeviceConfig, Target
+from .device_config import Capability, DeviceConfig, Target, WaterSource
 from .device_inputs import (
     input_time,
     input_value,
@@ -126,10 +126,8 @@ class DeviceTracker:
             gap_rates=lambda run: [
                 (since, running) for since, running, _ in run.average_powers
             ],
-            fallback=lambda run: (
-                self._estimate(run),
-                ConsumptionMethod.ESTIMATED,
-            ),
+            fallback=self._electricity_fallback,
+            silent_meter_falls_back=self._per_program,
         )
         self._meterings: tuple[Metering, ...] = (self._electricity,)
         if Capability.WATER in config.capabilities:
@@ -139,9 +137,37 @@ class DeviceTracker:
                     WATER,
                     config,
                     gap_rates=lambda run: [(run.started, None)],
-                    fallback=lambda run: None,
+                    fallback=self._water_fallback,
+                    silent_meter_falls_back=self._per_program,
                 ),
             )
+
+    @property
+    def _per_program(self) -> bool:
+        return Capability.PROGRAM_CONSUMPTION in self._config.capabilities
+
+    def _electricity_fallback(
+        self, run: Run
+    ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
+        if self._per_program:
+            kwh = self._program_row(run)[0].get("kwh")
+            return kwh, ConsumptionMethod.PROGRAM_DEFAULT
+        return self._estimate(run), ConsumptionMethod.ESTIMATED
+
+    def _water_fallback(self, run: Run) -> tuple[float | None, ConsumptionMethod] | None:
+        """The Program's litres, unless the Run has no water source."""
+        timeline = run.timelines.get(LineItemKind.WATER)
+        source = (timeline.source if timeline else None) or {}
+        if not self._per_program or source.get("source") in (None, WaterSource.NONE):
+            return None
+        return self._program_row(run)[0].get("litres"), ConsumptionMethod.PROGRAM_DEFAULT
+
+    def _program_row(self, run: Run) -> tuple[dict[str, Any], DoseSource]:
+        """The Program Defaults' row of the Run's Program, else the Default row."""
+        defaults = self._settings.get(self._config.device_id)[PROGRAM_DEFAULTS]
+        if run.program in defaults["programs"]:
+            return defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT
+        return defaults["default"], DoseSource.DEFAULT_ROW
 
     async def async_start(self) -> None:
         self._unsubscribe = [
@@ -901,12 +927,7 @@ class DeviceTracker:
 
         No Program or no row for it means the Default row.
         """
-        defaults = self._settings.get(self._config.device_id)[PROGRAM_DEFAULTS]
-        row, row_source = (
-            (defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT)
-            if run.program in defaults["programs"]
-            else (defaults["default"], DoseSource.DEFAULT_ROW)
-        )
+        row, row_source = self._program_row(run)
         ids = {i.dose_id: i.id for i in run.line_items if i.dose_id}
         items = []
         for dose, material in self._dose_materials():
