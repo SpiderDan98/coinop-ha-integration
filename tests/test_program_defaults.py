@@ -9,7 +9,7 @@ import pytest
 from .clock import Clock
 from .devices import add_hub, add_washing_machine
 from .stored import place_materials
-from .test_doses import DOSES, LIQUID, PODS, WHITENER, doses
+from .test_doses import DOSES, LIQUID, PODS, SCALE, WHITENER, doses, set_scale
 from .test_programs import WASHER_PROGRAM, set_program
 from .test_runs import stored_runs
 from .test_washing_machines import set_energy, set_washer, wash
@@ -195,3 +195,31 @@ async def test_program_rows_are_stored_by_their_trimmed_name(
         },
     )
     assert error["code"] == "invalid_format"
+
+
+async def test_an_unavailable_stock_input_falls_back_to_the_program_s_row(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_scale(hass, "unavailable")
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=washer.subentry_id,
+        settings={
+            "doses": [DOSES[2] | {"stock": {"entity_id": SCALE}}],
+            "program_defaults": ROWS,
+        },
+    )
+    await set_program(hass, "White 60°")
+
+    await wash(hass, clock)
+    await clock.advance(minutes=5)
+
+    [run] = stored_runs(hass_storage)
+    assert doses(run) == [
+        ("dose-whitener", "program_default", "whitener", 20, "g", 0.004, 0.08)
+    ]
+    assert run["flags"] == ["stock_input_unavailable"]

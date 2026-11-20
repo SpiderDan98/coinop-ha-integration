@@ -17,7 +17,11 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
-from homeassistant.util.unit_conversion import DistanceConverter, MassConverter
+from homeassistant.util.unit_conversion import (
+    DistanceConverter,
+    MassConverter,
+    VolumeConverter,
+)
 
 from .models import UsageUnit
 from .quantities import Quantity
@@ -27,6 +31,8 @@ USAGE_UNITS = (
     (DistanceConverter, UsageUnit.MILLIMETRE),
     (MassConverter, UsageUnit.GRAM),
 )
+# A stock input reports a mass, kept in g, or a volume, kept in ml.
+STOCK_UNITS = ((MassConverter, "g", "g"), (VolumeConverter, "mL", "ml"))
 # Price units name the currency by its code or one of these symbols.
 CURRENCY_SYMBOLS = {
     "EUR": {"€"},
@@ -118,6 +124,14 @@ def usage_scale(unit: str | None) -> tuple[float, UsageUnit] | None:
     return None
 
 
+def stock_scale(unit: str | None) -> tuple[float, str] | None:
+    """Factor from `unit` to g or ml; None if it is neither a mass nor a volume."""
+    for converter, canonical, kept in STOCK_UNITS:
+        if unit in converter.VALID_UNITS:
+            return converter.get_unit_ratio(canonical, unit), kept
+    return None
+
+
 def price_scale(quantity: Quantity, unit: str | None, currency: str) -> float | None:
     """Factor from a price in `unit` to `currency` per the quantity's unit; None if not recognised."""
     if unit is None or unit.count("/") != 1:
@@ -194,6 +208,20 @@ def usage_reading(
     scale = usage_scale(_reported_unit(state, usage["attribute"])) or usage_scale(
         usage["unit"]
     )
+    if scale is None:
+        return None
+    factor, unit = scale
+    return number * factor, unit
+
+
+def stock_reading(
+    state: State | None, stock: Mapping[str, Any]
+) -> tuple[float, str] | None:
+    """A Dose's stock input's level in g or ml; None while it has none."""
+    number = _number(state, stock["attribute"])
+    if state is None or number is None:
+        return None
+    scale = stock_scale(_reported_unit(state, stock["attribute"]) or stock["unit"])
     if scale is None:
         return None
     factor, unit = scale

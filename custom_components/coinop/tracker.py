@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timedelta
 from functools import partial
 import re
+from typing import Any
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -31,6 +32,7 @@ from .cost.material import (
     GRAM,
     MILLILITRE,
     dose_line_item,
+    in_pack_unit,
     material_line_item,
     slot_line_items,
 )
@@ -41,6 +43,7 @@ from .device_inputs import (
     input_value,
     slot_colour,
     slot_number,
+    stock_reading,
     usage_reading,
 )
 from .device_settings import (
@@ -65,6 +68,7 @@ from .models import (
     Pause,
     Run,
     SlotReport,
+    Stock,
     Usage,
 )
 from .quantities import ELECTRICITY, WATER
@@ -109,6 +113,7 @@ class DeviceTracker:
         self._catalog = catalog
         self._spoolman = spoolman
         self._unsubscribe: list[CALLBACK_TYPE] = []
+        self._unsubscribe_stocks: list[CALLBACK_TYPE] = []
         # Until Coin-op has seen the Status input, it may have missed the end.
         self._status_lost = True
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
@@ -170,6 +175,7 @@ class DeviceTracker:
                     self._hass, usage["entity_id"], self._on_usage
                 ),
             ]
+        self._follow_stocks()
         if program := self._config.program_entity_id:
             self._unsubscribe.append(
                 async_track_state_change_event(self._hass, program, self._on_program)
@@ -186,6 +192,7 @@ class DeviceTracker:
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
+            self._record_stocks(run)
             await self._async_catch_up(run)
             if run.ended is not None:
                 self._await_final_report(run)
@@ -247,6 +254,8 @@ class DeviceTracker:
     def async_stop(self) -> None:
         while self._unsubscribe:
             self._unsubscribe.pop()()
+        while self._unsubscribe_stocks:
+            self._unsubscribe_stocks.pop()()
         while self._final_waits:
             self._final_waits.popitem()[1]()
         self._images.async_stop()
@@ -312,6 +321,74 @@ class DeviceTracker:
         if changed < run.started or late or self._next_started(run, changed):
             return
         run.usage = Usage(max(changed, state.last_reported), *reading)
+
+    def _stocked_doses(self) -> list[dict[str, Any]]:
+        """The Doses with a stock input."""
+        if Capability.DOSES not in self._config.capabilities:
+            return []
+        doses = self._settings.get(self._config.device_id)[DOSES]
+        return [dose for dose in doses if "stock" in dose]
+
+    def _follow_stocks(self) -> None:
+        """Listen to the stock inputs the Doses have now."""
+        while self._unsubscribe_stocks:
+            self._unsubscribe_stocks.pop()()
+        if entities := {dose["stock"]["entity_id"] for dose in self._stocked_doses()}:
+            self._unsubscribe_stocks = [
+                async_track_state_change_event(self._hass, entities, self._on_stock),
+                async_track_state_report_event(self._hass, entities, self._on_stock),
+            ]
+
+    @callback
+    def _on_stock(
+        self, event: Event[EventStateChangedData] | Event[EventStateReportedData]
+    ) -> None:
+        doses = [
+            dose
+            for dose in self._stocked_doses()
+            if dose["stock"]["entity_id"] == event.data["entity_id"]
+        ]
+        for run in self._unfinalised_runs():
+            if run.ended is not None and run.id not in self._final_waits:
+                # Already being finalised.
+                continue
+            recorded = [
+                self._record_stock(run, dose, event.data["new_state"]) for dose in doses
+            ]
+            if not any(recorded):
+                continue
+            if run.ended is not None and not self._awaits_report(run):
+                self._finish(run)
+                continue
+            self._refresh(run, run.ended or dt_util.utcnow())
+            self._book.async_update(run)
+
+    def _record_stocks(self, run: Run) -> None:
+        for dose in self._stocked_doses():
+            state = self._hass.states.get(dose["stock"]["entity_id"])
+            self._record_stock(run, dose, state)
+
+    def _record_stock(
+        self, run: Run, dose: dict[str, Any], state: State | None
+    ) -> bool:
+        """Add a stock input's valid report of the Run to its usage; whether it was one."""
+        if (reading := stock_reading(state, dose["stock"])) is None:
+            return False
+        assert state is not None
+        changed = input_time(state, dose["stock"]["attribute"])
+        if run.ended is not None and (
+            changed > run.ended + FINAL_REPORT_WAIT or self._next_started(run, changed)
+        ):
+            return False
+        level, unit = reading
+        at = max(changed, state.last_reported)
+        if (stock := run.stocks.get(dose["id"])) is None:
+            run.stocks[dose["id"]] = Stock(at, level, unit)
+        elif stock.unit == unit:
+            # A refill counts nothing.
+            stock.used += max(stock.level - level, 0.0)
+            stock.level, stock.at = level, max(stock.at, at)
+        return True
 
     @callback
     def _on_program(self, event: Event[EventStateChangedData]) -> None:
@@ -402,8 +479,11 @@ class DeviceTracker:
 
     @callback
     def _on_settings(self, device_id: str) -> None:
-        run = self._book.open_run(self._config.device_id)
-        if device_id == self._config.device_id and run:
+        if device_id != self._config.device_id:
+            return
+        self._follow_stocks()
+        if run := self._book.open_run(self._config.device_id):
+            self._record_stocks(run)
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
@@ -504,6 +584,7 @@ class DeviceTracker:
         self._record_usage(run, self._usage_state())
         self._record_slot(run)
         self._record_program(run)
+        self._record_stocks(run)
         self._refresh(run, at)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
@@ -644,9 +725,15 @@ class DeviceTracker:
         return self._await_final_report(run)
 
     def _awaits_report(self, run: Run) -> bool:
-        """Whether the meter or the Material used input may still report the Run's end."""
+        """Whether the meter, the Material used input or a stock input may still
+        report the Run's end."""
         assert run.ended is not None
         if any(metering.awaits_report(run) for metering in self._meterings):
+            return True
+        if any(
+            (stock := run.stocks.get(dose["id"])) is None or stock.at < run.ended
+            for dose in self._stocked_doses()
+        ):
             return True
         return self._config.material is not None and (
             run.usage is None or run.usage.at < run.ended
@@ -688,6 +775,12 @@ class DeviceTracker:
             item.from_defaults for item in run.line_items
         ):
             add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
+        if any(
+            self._stock_used(run, dose, material) is None
+            for dose, material in self._dose_materials()
+            if "stock" in dose
+        ):
+            add_flag(run, Flag.STOCK_INPUT_UNAVAILABLE)
         linked = self._spoolman_prices(run)
         if not read and linked:
             add_flag(run, Flag.SPOOLMAN_UNREACHABLE)
@@ -696,6 +789,7 @@ class DeviceTracker:
         for metering in self._meterings:
             metering.finish(run)
         run.loaded_slots = []
+        run.stocks = {}
         await self._async_finalise(run)
         self._finishing.discard(run.id)
 
@@ -783,34 +877,54 @@ class DeviceTracker:
             item_id,
         )
 
+    def _dose_materials(self) -> list[tuple[dict[str, Any], Material]]:
+        """The Doses whose Material can be charged, with it, in Dose list order."""
+        if Capability.DOSES not in self._config.capabilities:
+            return []
+        return [
+            (dose, material)
+            for dose in self._settings.get(self._config.device_id)[DOSES]
+            if (material := self._catalog.material(dose["material_id"]))
+            and not material.archived
+        ]
+
+    @staticmethod
+    def _stock_used(run: Run, dose: dict[str, Any], material: Material) -> float | None:
+        """What the Dose's stock input lost so far, in the Material's unit; None
+        without a usable report."""
+        if (stock := run.stocks.get(dose["id"])) is None:
+            return None
+        return in_pack_unit(material, stock.used, stock.unit)
+
     def _doses(self, run: Run) -> list[LineItem]:
-        """A Line Item per Dose its Program's row doses, in Dose list order.
+        """A Line Item per Dose its stock input or else its Program's row doses.
 
         No Program or no row for it means the Default row.
         """
-        if Capability.DOSES not in self._config.capabilities:
-            return []
-        settings = self._settings.get(self._config.device_id)
-        defaults = settings[PROGRAM_DEFAULTS]
-        row, source = (
+        defaults = self._settings.get(self._config.device_id)[PROGRAM_DEFAULTS]
+        row, row_source = (
             (defaults["programs"][run.program], DoseSource.PROGRAM_DEFAULT)
             if run.program in defaults["programs"]
             else (defaults["default"], DoseSource.DEFAULT_ROW)
         )
-        amounts = row["doses"]
         ids = {i.dose_id: i.id for i in run.line_items if i.dose_id}
-        return [
-            dose_line_item(
-                ids.get(dose["id"]) or ulid_now(), dose["id"], material, amount, source
-            )
-            for dose in settings[DOSES]
-            if (amount := amounts.get(dose["id"])) is not None
-            and (material := self._catalog.material(dose["material_id"]))
-            and not material.archived
-        ]
+        items = []
+        for dose, material in self._dose_materials():
+            amount, source = row["doses"].get(dose["id"]), row_source
+            if (
+                "stock" in dose
+                and (used := self._stock_used(run, dose, material)) is not None
+            ):
+                amount, source = used, DoseSource.STOCK_INPUT
+            if amount:
+                item_id = ids.get(dose["id"]) or ulid_now()
+                items.append(
+                    dose_line_item(item_id, dose["id"], material, amount, source)
+                )
+        return items
 
     def _refresh(self, run: Run, until: datetime) -> None:
-        """Recompute the Run's live values up to `until`; Doses only while it is open."""
+        """Recompute the Run's live values up to `until`."""
         consumed = [
             item
             for metering in self._meterings
@@ -819,11 +933,7 @@ class DeviceTracker:
         # A quantity without measurement or fallback keeps a Line Item entered by hand.
         kinds = {item.kind for item in consumed}
         materials = self._measured_items(run, until) if self._config.material else []
-        doses = (
-            self._doses(run)
-            if run.ended is None
-            else [i for i in run.line_items if i.dose_id]
-        )
+        doses = self._doses(run)
         run.line_items = [
             *consumed,
             *materials,

@@ -406,6 +406,21 @@ async def test_record_a_washing_machine_and_its_run(
     hass.states.async_set(WASHER_ENERGY, "101.2", {"unit_of_measurement": "kWh"})
     hass.states.async_set(WASHER_STATUS, "finished")
     await hass.async_block_till_done()
+    # Weighed only from the next Run on, so the recorded one keeps its Default row.
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [
+                {
+                    "id": "dose-detergent",
+                    "material_id": "material-detergent",
+                    "stock": {"entity_id": "sensor.detergent_scale"},
+                },
+                {"id": "dose-pods", "material_id": "material-pods"},
+            ]
+        },
+    )
 
     devices = await panel.call("coinop/devices/list")
     [run] = (await panel.call("coinop/runs/list"))["runs"]

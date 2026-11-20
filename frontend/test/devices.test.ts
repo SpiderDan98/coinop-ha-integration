@@ -326,7 +326,7 @@ describe("Devices tab", () => {
         "Consumption source Energy meter sensor.washer_plug_energy " +
         "Electricity price €0.30 per kWh " +
         "Reconfigure in Home Assistant " +
-        "Doses Liquid detergent 75 ml Colour pods Not dosed " +
+        "Doses Liquid detergent 75 ml · measured by sensor.detergent_scale Colour pods Not dosed " +
         "Program rows Wool " +
         "Tags for new Runs None " +
         "Automatic templates None",
@@ -436,8 +436,8 @@ describe("A washing machine's Doses", () => {
     name: "Whitener",
     price: { source: "fixed", pack_price: 4, pack_size: 1000, pack_unit: "g" },
   } as Material;
-  const washerBackend = () =>
-    recordedBackend()
+  const washerBackend = () => {
+    const backend = recordedBackend()
       .reply(LIST, () => ({ devices: [kobra, recorded.washer] }))
       .subscription("coinop/catalog/subscribe", () => [
         {
@@ -448,17 +448,77 @@ describe("A washing machine's Doses", () => {
       .reply(SETTINGS, (msg) => ({
         settings: { ...recorded.washer.settings, ...(msg.settings as object) },
       }));
+    backend.hass.states = {
+      "sensor.washer_power": {
+        attributes: { friendly_name: "Washer power", unit_of_measurement: "W" },
+      },
+      "sensor.softener_tank": {
+        attributes: { friendly_name: "Softener tank", unit_of_measurement: "L", level: 0.4 },
+      },
+      "sensor.detergent_scale": {
+        attributes: { friendly_name: "Detergent scale", unit_of_measurement: "g", model: "X1" },
+      },
+    };
+    return backend;
+  };
   const open = (panel: Element) => click(panel, iconButton(panel, "Edit settings of Washer"));
   const doses = (root: Element) => queryAll(root, ".doses li .dose-name").map(text);
   const amount = (root: Element, dose: string) =>
     query(root, `input[aria-label="Default amount of ${dose}"]`) as HTMLInputElement;
+  const stockInput = (root: Element, dose: string, part = "Stock input") =>
+    root.querySelector<HTMLSelectElement>(`select[aria-label="${part} of ${dose}"]`);
 
-  it("shows the Doses on the card with their Default amounts", async () => {
+  it("shows the Doses on the card with their Default amounts and stock inputs", async () => {
     const panel = await mountPanel(washerBackend(), { path: "/devices" });
 
     const washer = queryAll(panel, ".device")[1] as HTMLElement;
-    expect(text(query(washer, ".doses"))).toBe("Liquid detergent 75 ml Colour pods Not dosed");
+    expect(text(query(washer, ".doses"))).toBe(
+      "Liquid detergent 75 ml · measured by Detergent scale Colour pods Not dosed",
+    );
     expect(queryAll(panel, ".device")[0]?.querySelector(".doses")).toBeNull();
+  });
+
+  it("measure a Dose in g or ml by a stock input with a mass or volume unit", async () => {
+    const backend = washerBackend();
+    const panel = await mountPanel(backend, { path: "/devices" });
+    await open(panel);
+    const dialog = query(panel, ".settings-dialog");
+    const detergent = stockInput(dialog, "Liquid detergent") as HTMLSelectElement;
+    expect(detergent.value).toBe("sensor.detergent_scale");
+    expect(queryAll(detergent, "option").map(text)).toEqual([
+      "No stock input",
+      "Detergent scale",
+      "Softener tank",
+    ]);
+    expect(stockInput(dialog, "Colour pods")).toBeNull();
+    expect(stockInput(dialog, "Liquid detergent", "Stock unit")).toBeNull();
+
+    await fill(panel, detergent, "");
+    await fill(panel, query(dialog, "select.add-dose"), "material-whitener");
+    await fill(panel, stockInput(dialog, "Whitener") as HTMLSelectElement, "sensor.softener_tank");
+    const attribute = stockInput(dialog, "Whitener", "Stock attribute") as HTMLSelectElement;
+    expect(queryAll(attribute, "option").map(text)).toEqual(["State", "level"]);
+    await fill(panel, attribute, "level");
+    const unit = stockInput(dialog, "Whitener", "Stock unit") as HTMLSelectElement;
+    expect(unit.value).toBe("g");
+    await fill(panel, unit, "L");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    const [sent] = backend.sent(SETTINGS);
+    expect(sent?.settings).toEqual({
+      doses: [
+        { id: "dose-detergent", material_id: "material-detergent" },
+        { id: "dose-pods", material_id: "material-pods" },
+        {
+          id: expect.any(String),
+          material_id: "material-whitener",
+          stock: { entity_id: "sensor.softener_tank", attribute: "level", unit: "L" },
+        },
+      ],
+    });
+    expect(text(query(queryAll(panel, ".device")[1] as HTMLElement, ".doses"))).toBe(
+      "Liquid detergent 75 ml Colour pods Not dosed Whitener Not dosed · measured by Softener tank",
+    );
   });
 
   it("are added, reordered and removed in the settings dialog", async () => {
@@ -479,7 +539,11 @@ describe("A washing machine's Doses", () => {
     const [sent] = backend.sent(SETTINGS);
     expect(sent?.settings).toEqual({
       doses: [
-        { id: "dose-detergent", material_id: "material-detergent" },
+        {
+          id: "dose-detergent",
+          material_id: "material-detergent",
+          stock: { entity_id: "sensor.detergent_scale", attribute: null, unit: null },
+        },
         { id: expect.any(String), material_id: "material-whitener" },
       ],
     });
@@ -513,7 +577,7 @@ describe("A washing machine's Doses", () => {
       },
     ]);
     expect(text(query(queryAll(panel, ".device")[1] as HTMLElement, ".doses"))).toBe(
-      "Liquid detergent Not dosed Colour pods 1 pcs",
+      "Liquid detergent Not dosed · measured by Detergent scale Colour pods 1 pcs",
     );
   });
 

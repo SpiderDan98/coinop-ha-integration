@@ -115,6 +115,20 @@ def dose_line_item(
     return item
 
 
+def in_pack_unit(material: Material, quantity: float, unit: str) -> float | None:
+    """`quantity` g or ml in the Material's pack unit; None for one priced per piece."""
+    if material.density is None:
+        return None
+    pack_unit = material.price.pack_unit.value
+    if unit == pack_unit:
+        return quantity
+    return (
+        quantity * material.density
+        if unit == MILLILITRE
+        else quantity / material.density
+    )
+
+
 def slot_line_items(
     usage: Usage | None,
     shares: dict[SlotReport, float],

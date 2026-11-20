@@ -31,6 +31,8 @@ class Flag(StrEnum):
     SLOT_FALLBACK = "slot_fallback"
     # A Cancelled or Failed Run charged defaults meant for a whole cycle.
     ENDED_EARLY_DEFAULTS = "ended_early_defaults"
+    # A Dose's stock input reported nothing usable: its default was charged.
+    STOCK_INPUT_UNAVAILABLE = "stock_input_unavailable"
 
 
 class UsageUnit(StrEnum):
@@ -72,6 +74,7 @@ class DoseSource(StrEnum):
 
     PROGRAM_DEFAULT = "program_default"
     DEFAULT_ROW = "default_row"
+    STOCK_INPUT = "stock_input"
 
 
 @overload
@@ -219,6 +222,29 @@ class Usage:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Usage:
         return cls(_time(data["at"]), data["value"], UsageUnit(data["unit"]))
+
+
+@dataclass
+class Stock:
+    """What a Dose's stock input reported during the Run: its last `level` and
+    when it was last reported, in g or ml, and the decreases summed so far."""
+
+    at: datetime
+    level: float
+    unit: str
+    used: float = 0.0
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "at": _iso(self.at),
+            "level": self.level,
+            "unit": self.unit,
+            "used": self.used,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Stock:
+        return cls(_time(data["at"]), data["level"], data["unit"], data["used"])
 
 
 @dataclass(frozen=True)
@@ -494,7 +520,7 @@ class Run:
     estimate used. `usage` is what
     the Material used input last reported during the Run: its measured total.
     `loaded_slots` is the timeline of the Slot it printed from, kept until
-    finalised.
+    finalised; `stocks` what each Dose's stock input reported, by Dose id, too.
     `cover_id` is the image the user picked as Cover Image.
     """
 
@@ -524,6 +550,7 @@ class Run:
     images: list[RunImage] = field(default_factory=list)
     usage: Usage | None = None
     loaded_slots: list[LoadedSlot] = field(default_factory=list)
+    stocks: dict[str, Stock] = field(default_factory=dict)
     cover_id: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -610,6 +637,11 @@ class Run:
             ],
             "usage": None if self.usage is None else self.usage.as_dict(),
             "loaded_slots": [loaded.as_dict() for loaded in self.loaded_slots],
+            **(
+                {"stocks": {id_: s.as_dict() for id_, s in self.stocks.items()}}
+                if self.stocks
+                else {}
+            ),
             "line_items": [item.as_dict() for item in self.line_items],
             "images": [image.as_dict() for image in self.images],
             "cover_id": self.cover_id,
@@ -649,6 +681,10 @@ class Run:
             loaded_slots=[
                 LoadedSlot.from_dict(loaded) for loaded in data.get("loaded_slots", [])
             ],
+            stocks={
+                id_: Stock.from_dict(stock)
+                for id_, stock in data.get("stocks", {}).items()
+            },
             line_items=[LineItem.from_dict(item) for item in data["line_items"]],
             images=[RunImage.from_dict(image) for image in data.get("images", [])],
             cover_id=data.get("cover_id"),

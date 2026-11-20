@@ -60,7 +60,12 @@
         "doses": [
           {
             "id": "dose-detergent",
-            "material_id": "material-detergent"
+            "material_id": "material-detergent",
+            "stock": {
+              "entity_id": "sensor.detergent_scale",
+              "attribute": null,
+              "unit": null
+            }
           },
           {
             "id": "dose-pods",
