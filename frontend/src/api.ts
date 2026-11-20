@@ -4,6 +4,20 @@ import type { HomeAssistant, Message } from "./hass";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
 export const KINDS = ["electricity", "water", "material", "other"] as const;
+/** What a Device Type has; the panel shows a part only for these. */
+export const CAPABILITIES = [
+  "job",
+  "images",
+  "material",
+  "part_count",
+  "average_power",
+  "program",
+  "doses",
+  "water",
+  "program_consumption",
+  "per_run_meters",
+] as const;
+export const DOSE_SOURCES = ["program_default", "default_row", "stock_input"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
 /** The kinds to show: Water only where one of the Devices has water or something counts it. */
@@ -75,7 +89,7 @@ export interface LineItem {
   share: number | null;
   /** A Dose's Line Item: its Dose and where its amount came from. */
   dose_id?: string;
-  dose_source?: "program_default" | "default_row" | "stock_input";
+  dose_source?: (typeof DOSE_SOURCES)[number];
   /** What Coin-op computed, kept while the user's override counts instead. */
   computed: Pick<LineItem, "quantity" | "unit_price" | "amount"> | null;
   /** Computed values update live until the Run is final. */
@@ -101,19 +115,7 @@ export interface Device {
   name: string;
   /** The Device Type, which the Devices tab groups by. */
   type: "3d_printer" | "washing_machine";
-  /** What its Device Type has; the panel shows a part only for these. */
-  capabilities: (
-    | "job"
-    | "images"
-    | "material"
-    | "part_count"
-    | "average_power"
-    | "program"
-    | "doses"
-    | "water"
-    | "program_consumption"
-    | "per_run_meters"
-  )[];
+  capabilities: (typeof CAPABILITIES)[number][];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
