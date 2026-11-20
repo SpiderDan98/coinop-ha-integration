@@ -153,13 +153,14 @@ export interface Totals {
   flagged_runs: number;
 }
 
-export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag";
+export type Dimension = "kind" | "device" | "month" | "material" | "outcome" | "tag" | "program";
 
 /**
  * One group's values along the dimensions asked for, then its totals. Cost, grams and
  * kWh sum the group's Line Items; a Run counts once in every group holding one of its
  * Line Items, so Material and Tag groups overlap. `month` is "YYYY-MM" of the Run's
- * start in HA's time zone; `null` is "none" (no Material, no Tag, Run still open).
+ * start in HA's time zone; `null` is "none" (no Material, no Tag, no Program, Run still
+ * open).
  */
 export type Group = Totals &
   Partial<{
@@ -171,6 +172,7 @@ export type Group = Totals &
     material_name: string | null;
     outcome: Outcome | null;
     tag: string | null;
+    program: string | null;
   }>;
 
 /** Only combinations that have Line Items; no Runs, no groups. `only` limits them to some

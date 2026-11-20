@@ -1,10 +1,11 @@
-"""Totals across Runs, grouped by any of kind, Device, month, Material, Outcome and Tag.
+"""Totals across Runs, grouped by kind, Device, month, Material, Outcome, Tag or Program.
 
 The facts are Line Items: cost, grams and kWh sum the Line Items in a group;
 Runs, running hours and Flagged Runs count each Run once in every group that
 holds one of its Line Items. So a Run counts in each of its Tags and Materials,
 and those groups overlap. A Run counts in the month it started in, in HA's time
-zone; open Runs count at their provisional values.
+zone; open Runs count at their provisional values. Runs without a Program
+(every printer Run among them) share the Program group None.
 """
 
 from collections.abc import Collection, Iterable, Mapping
@@ -16,7 +17,7 @@ from custom_components.coinop.cost.rounding import rounded_sum
 from custom_components.coinop.cost.running_time import running_time
 from custom_components.coinop.models import LineItem, LineItemKind, Run
 
-DIMENSIONS = ("kind", "device", "month", "material", "outcome", "tag")
+DIMENSIONS = ("kind", "device", "month", "material", "outcome", "tag", "program")
 
 type Fact = tuple[Run, LineItem]
 
@@ -78,6 +79,8 @@ def _keys(
             return [{"material_id": item.material_id, "material_name": name}]
         case "outcome":
             return [{"outcome": run.outcome}]
+        case "program":
+            return [{"program": run.program}]
         case _:
             return [{"tag": tag} for tag in run.tags] or [{"tag": None}]
 

@@ -18,6 +18,7 @@ import type {
   RunImage,
   RunSummary,
 } from "../src/api";
+import aggregatesByProgram from "./fixtures/backend/aggregates-by-program.json";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
@@ -70,6 +71,13 @@ export const recorded = {
    * grouping the Overview and Analysis ask for, then ungrouped for each selection of them
    * (`run_ids`, sorted). */
   aggregates: aggregatesGet as { group_by: Dimension[]; run_ids?: string[]; groups: Group[] }[],
+  /** `coinop/runs/list` of Kobra's "vase" and the "device-washer" Runs "monday" and
+   * "tuesday" (Cotton 60°, 0.07 and 0.57), "eco" (Eco 40-60, 0.07) and "unknown" (no
+   * Program, 0.07), with `coinop/aggregates/get` of those four by Program. */
+  programs: aggregatesByProgram as {
+    runs: RunSummary[];
+    aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
+  },
   /** `coinop/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
@@ -295,7 +303,7 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       const asked = `${String(msg.group_by)} of ${String(runIds)}`;
       return {
         groups: found(
-          recorded.aggregates.find(
+          [...recorded.aggregates, ...recorded.programs.aggregates].find(
             (answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked,
           ),
           `grouping ${asked}`,

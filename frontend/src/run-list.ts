@@ -13,6 +13,7 @@ import {
   NO_FILTER,
   OUTCOME_FILTERS,
   matches,
+  programmed,
   selectable,
   sorted,
   type Filter,
@@ -27,6 +28,8 @@ import { sortTags, tagChip } from "./tag-input";
 
 const VIEWS = ["gallery", "table"] as const;
 const VIEW_KEY = "coinop-runs-view";
+// Programs are trimmed, so a blank value can't be one.
+const NO_PROGRAM = " ";
 
 /** The view this browser last chose; the gallery without one. */
 function storedView() {
@@ -78,7 +81,7 @@ export class RunList extends LitElement {
     const t = localize(this.hass);
     const format = formatter(this.hass);
     this.all = sorted(this.runs, this.sort, t, this.devices);
-    this.shown = this.all.filter((run) => matches(run, this.filter, t, format));
+    this.shown = this.all.filter((run) => matches(run, this.filter, t, format, this.devices));
     this.total.load(this.hass, this.shown);
   }
 
@@ -127,6 +130,7 @@ export class RunList extends LitElement {
       ".device-filter": this.filter.deviceId,
       ".month-filter": this.filter.month,
       ".outcome-filter": this.filter.outcome,
+      ".program-filter": this.filter.noProgram ? NO_PROGRAM : this.filter.program,
     };
     for (const [selector, value] of Object.entries(values)) {
       const select = this.renderRoot.querySelector<HTMLSelectElement>(selector);
@@ -359,7 +363,7 @@ export class RunList extends LitElement {
             </option>`,
         )}
       </select>
-      ${this.renderTagFilter(runs, t)}
+      ${this.renderProgramFilter(runs, t)} ${this.renderTagFilter(runs, t)}
       <label class="flagged-filter">
         <input
           type="checkbox"
@@ -380,6 +384,31 @@ export class RunList extends LitElement {
           : nothing
       }
     </div>`;
+  }
+
+  private renderProgramFilter(runs: RunSummary[], t: Localize) {
+    const { program, noProgram } = this.filter;
+    if (!program && !noProgram && !runs.some((run) => programmed(run, this.devices)))
+      return nothing;
+    const programs = [...new Set([program, ...runs.map((run) => run.program ?? "")])]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    return html`<select
+      class="program-filter"
+      aria-label=${t("runs.filter_program")}
+      @change=${(event: Event) => {
+        const value = (event.target as HTMLSelectElement).value;
+        this.setFilter(
+          value === NO_PROGRAM
+            ? { program: "", noProgram: true }
+            : { program: value, noProgram: false },
+        );
+      }}
+    >
+      <option value="">${t("runs.all_programs")}</option>
+      ${programs.map((name) => html`<option .value=${name}>${name}</option>`)}
+      <option .value=${NO_PROGRAM}>${t("runs.no_program")}</option>
+    </select>`;
   }
 
   private renderTagFilter(runs: RunSummary[], t: Localize) {

@@ -1,0 +1,145 @@
+{
+  "runs": [
+    {
+      "id": "vase",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": "Vase",
+      "program": null,
+      "started": "2026-01-14T10:00:00+00:00",
+      "ended": "2026-01-14T12:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 7200,
+      "total": 0.07,
+      "part_count": 1,
+      "cost_per_part": 0.07,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    },
+    {
+      "id": "monday",
+      "device_id": "device-washer",
+      "device_name": "Washer",
+      "name": "Cotton 60°",
+      "program": "Cotton 60°",
+      "started": "2026-01-14T10:00:00+00:00",
+      "ended": "2026-01-14T12:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 7200,
+      "total": 0.07,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    },
+    {
+      "id": "tuesday",
+      "device_id": "device-washer",
+      "device_name": "Washer",
+      "name": "Cotton 60°",
+      "program": "Cotton 60°",
+      "started": "2026-01-14T13:00:00+00:00",
+      "ended": "2026-01-14T15:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 7200,
+      "total": 0.57,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    },
+    {
+      "id": "eco",
+      "device_id": "device-washer",
+      "device_name": "Washer",
+      "name": "Eco 40-60",
+      "program": "Eco 40-60",
+      "started": "2026-01-14T10:00:00+00:00",
+      "ended": "2026-01-14T12:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 7200,
+      "total": 0.07,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    },
+    {
+      "id": "unknown",
+      "device_id": "device-washer",
+      "device_name": "Washer",
+      "name": null,
+      "program": null,
+      "started": "2026-01-14T10:00:00+00:00",
+      "ended": "2026-01-14T12:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 7200,
+      "total": 0.07,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    }
+  ],
+  "aggregates": [
+    {
+      "group_by": [
+        "program"
+      ],
+      "run_ids": [
+        "eco",
+        "monday",
+        "tuesday",
+        "unknown"
+      ],
+      "groups": [
+        {
+          "program": "Cotton 60°",
+          "cost": 0.64,
+          "electricity_cost": 0.14,
+          "material_cost": 0.0,
+          "other_cost": 0.5,
+          "material_grams": 0.0,
+          "energy_kwh": 0.48,
+          "runs": 2,
+          "running_hours": 4.0,
+          "flagged_runs": 0
+        },
+        {
+          "program": "Eco 40-60",
+          "cost": 0.07,
+          "electricity_cost": 0.07,
+          "material_cost": 0.0,
+          "other_cost": 0.0,
+          "material_grams": 0.0,
+          "energy_kwh": 0.24,
+          "runs": 1,
+          "running_hours": 2.0,
+          "flagged_runs": 0
+        },
+        {
+          "program": null,
+          "cost": 0.07,
+          "electricity_cost": 0.07,
+          "material_cost": 0.0,
+          "other_cost": 0.0,
+          "material_grams": 0.0,
+          "energy_kwh": 0.24,
+          "runs": 1,
+          "running_hours": 2.0,
+          "flagged_runs": 0
+        }
+      ]
+    }
+  ]
+}

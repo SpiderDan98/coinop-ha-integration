@@ -418,6 +418,44 @@ async def test_record_the_aggregates_of_overview_and_analysis(
     assert_recorded("aggregates-get", answers)
 
 
+async def test_record_washing_machine_runs_by_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    washer: dict[str, Any] = {
+        "device_id": "device-washer",
+        "device_name": "Washer",
+        "part_count": None,
+    }
+    started = CLOCK_START - DAY
+    place_runs(
+        hass_storage,
+        stored_run("vase", name="Vase"),
+        stored_run("monday", **washer, name="Cotton 60°", program="Cotton 60°"),
+        stored_run(
+            "tuesday",
+            **washer,
+            name="Cotton 60°",
+            program="Cotton 60°",
+            started=started + timedelta(hours=3),
+            line_items=[
+                electricity(0.24, 0.30, started, started + timedelta(hours=2)),
+                line_item("other", 0.5, id="tuesday-rinse", label="Extra rinse"),
+            ],
+        ),
+        stored_run("eco", **washer, name="Eco 40-60", program="Eco 40-60"),
+        stored_run("unknown", **washer, name=None),
+    )
+    await add_hub(hass)
+
+    runs = await panel.call("coinop/runs/list")
+    run_ids = ["eco", "monday", "tuesday", "unknown"]
+    by_program = {"group_by": ["program"], "run_ids": run_ids} | await panel.call(
+        "coinop/aggregates/get", group_by=["program"], run_ids=run_ids
+    )
+
+    assert_recorded("aggregates-by-program", runs | {"aggregates": [by_program]})
+
+
 async def test_record_what_the_image_commands_answer(
     hass: HomeAssistant,
     clock: Clock,
