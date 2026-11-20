@@ -8,9 +8,11 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
+from custom_components.coinop.device_config import Capability
 from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
+    DOSES,
     TAGS_FOR_NEW_RUNS,
 )
 from custom_components.coinop.runtime import CoinOp
@@ -65,19 +67,36 @@ async def _update_settings(
     """Change the named panel settings; returns all of the Device's panel settings.
 
     Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
-    the default Material must exist and not be archived.
+    the default Material and a new Dose's Material must exist and not be archived,
+    and only a Device Type with Doses has a Dose list.
     """
-    device = msg["device_id"] if msg["device_id"] in coinop.settings else None
+    device_id = msg["device_id"]
+    device = next((d for d in coinop.devices if d.device_id == device_id), None)
     if found(connection, msg, device, "Device") is None:
         return
+    assert device is not None
     try:
         changes = coinop.settings.validate(msg["settings"])
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
-    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None and not pickable(
-        connection, msg, coinop, material_id
-    ):
+    if DOSES in changes and Capability.DOSES not in device.capabilities:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_ALLOWED, "This Device has no Doses"
+        )
+        return
+    kept = {
+        (dose["id"], dose["material_id"])
+        for dose in coinop.settings.get(device_id)[DOSES]
+    }
+    picked = [
+        dose["material_id"]
+        for dose in changes.get(DOSES, [])
+        if (dose["id"], dose["material_id"]) not in kept
+    ]
+    if (material_id := changes.get(DEFAULT_MATERIAL)) is not None:
+        picked.append(material_id)
+    if not all(pickable(connection, msg, coinop, id_) for id_ in picked):
         return
     templates = changes.get(AUTOMATIC_TEMPLATES, [])
     complete = len(coinop.catalog.find_templates(templates)) == len(templates)

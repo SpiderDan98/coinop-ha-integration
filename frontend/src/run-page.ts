@@ -57,6 +57,7 @@ const lengthEvidence = ({ length, material }: LineItem, t: Localize, format: For
 const evidence = (item: LineItem, t: Localize, format: Format) =>
   [
     item.method && t(`method.${item.method}`),
+    item.dose_source && t(`dose_source.${item.dose_source}`),
     item.template_id && t("evidence.template"),
     item.basis === "running_hours" && t("evidence.running_hours"),
     item.segments.length > 1 && t("evidence.segments", { count: item.segments.length }),

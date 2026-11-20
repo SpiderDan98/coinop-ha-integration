@@ -42,6 +42,8 @@ class Capability(StrEnum):
     AVERAGE_POWER = "average_power"
     # The Program input; a Run records its Program.
     PROGRAM = "program"
+    # A Dose list whose Program Defaults become Material Line Items.
+    DOSES = "doses"
 
 
 CAPABILITIES = {
@@ -54,7 +56,7 @@ CAPABILITIES = {
             Capability.AVERAGE_POWER,
         }
     ),
-    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.PROGRAM}),
+    DEVICE_TYPE_WASHING_MACHINE: frozenset({Capability.PROGRAM, Capability.DOSES}),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

@@ -5,6 +5,7 @@
       "name": "Washer",
       "type": "washing_machine",
       "capabilities": [
+        "doses",
         "program"
       ],
       "ha_settings": {
@@ -51,7 +52,24 @@
       "settings": {
         "tags_for_new_runs": [],
         "automatic_templates": [],
-        "default_material": null
+        "default_material": null,
+        "doses": [
+          {
+            "id": "dose-detergent",
+            "material_id": "material-detergent"
+          },
+          {
+            "id": "dose-pods",
+            "material_id": "material-pods"
+          }
+        ],
+        "program_defaults": {
+          "default": {
+            "doses": {
+              "dose-detergent": 75.0
+            }
+          }
+        }
       }
     }
   ]

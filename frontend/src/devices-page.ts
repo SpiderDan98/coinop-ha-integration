@@ -1,7 +1,7 @@
 // The Devices tab: a section per Device Type with a card per Device. A card shows the
 // HA-side settings, which only the Device's reconfigure flow in HA changes, and a summary
 // of Coin-op's own settings, edited in a dialog. Devices are added in HA too.
-import { mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
+import { mdiArrowDown, mdiArrowUp, mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
@@ -10,6 +10,7 @@ import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
+import { table, tableStyles } from "./table";
 import "./tag-input";
 
 export const RECONFIGURE = "/config/integrations/integration/coinop";
@@ -52,6 +53,15 @@ const consumptionDetails = (
   ];
   return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
 };
+
+type Settings = Device["settings"];
+
+/** The unit a Dose of the Material counts in; Spoolman prices by weight. */
+const unitOf = (material?: Material) =>
+  material?.price.source === "fixed" ? material.price.pack_unit : "g";
+
+/** Unique enough per Device; `crypto.randomUUID` needs a secure context HA may not have. */
+const newDoseId = () => `dose-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 const chips = (names: string[], kind: "tag" | "template", none: string) =>
   names.length
@@ -96,6 +106,14 @@ export class DevicesPage extends LitElement {
     return material.archived
       ? t("materials.archived_name", { name: material.name })
       : material.name;
+  }
+
+  private doseName(materialId: string, t: Localize) {
+    return this.materialName(materialId) ?? t("device.material_gone");
+  }
+
+  private material(id: string) {
+    return this.materials.find((material) => material.id === id);
   }
 
   override render() {
@@ -173,6 +191,7 @@ export class DevicesPage extends LitElement {
                   </dd>`
               : nothing
           }
+          ${device.capabilities.includes("doses") ? this.renderDoseSummary(settings, t, format) : nothing}
           <dt>${t("device.tags_for_new_runs")}</dt>
           <dd class="new-run-tags">
             ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
@@ -191,6 +210,33 @@ export class DevicesPage extends LitElement {
         ></ha-icon-button>
       </div>
     </div>`;
+  }
+
+  /** Each Dose with its Default row amount. */
+  private renderDoseSummary({ doses, program_defaults }: Settings, t: Localize, format: Format) {
+    const amounts = program_defaults.default.doses;
+    return html`<dt>${t("device.doses")}</dt>
+      <dd class="doses">
+        ${
+          doses.length
+            ? html`<ul>
+                ${doses.map(({ id, material_id }) => {
+                  const amount = amounts[id];
+                  return html`<li>
+                    <span class="dose-name">${this.doseName(material_id, t)}</span>
+                    <span class="muted"
+                      >${
+                        amount === undefined
+                          ? t("device.not_dosed")
+                          : format.quantity(amount, unitOf(this.material(material_id)))
+                      }</span
+                    >
+                  </li>`;
+                })}
+              </ul>`
+            : html`<span class="muted">${t("device.none")}</span>`
+        }
+      </dd>`;
   }
 
   /** Of the Device Inputs its Device Type offers, the ones it has, then the ones it
@@ -284,6 +330,7 @@ export class DevicesPage extends LitElement {
         ></coinop-tag-input>
         <p class="muted small">${t("device.tags_hint")}</p>
       </div>
+      ${device.capabilities.includes("doses") ? this.renderDoses(draft, change, t) : nothing}
       ${this.renderAutomatic(draft.automatic_templates, (ids) => change({ automatic_templates: ids }), t)}
       <p class="muted small ha-settings">
         ${t("device.ha_settings")}
@@ -346,6 +393,135 @@ export class DevicesPage extends LitElement {
       }
       <p class="muted small">${t("device.default_material_hint")}</p>
     </div>`;
+  }
+
+  /** The Dose list and the Program Defaults' Default row, one column per Dose. */
+  private renderDoses(
+    { doses, program_defaults }: Settings,
+    change: (changes: Partial<Settings>) => void,
+    t: Localize,
+  ) {
+    const amounts = program_defaults.default.doses;
+    const setDoses = (next: Settings["doses"]) => {
+      const kept = new Set(next.map(({ id }) => id));
+      change({
+        doses: next,
+        program_defaults: {
+          default: {
+            doses: Object.fromEntries(Object.entries(amounts).filter(([id]) => kept.has(id))),
+          },
+        },
+      });
+    };
+    const move = (index: number, by: number) => {
+      const next = [...doses];
+      const [dose] = next.splice(index, 1);
+      if (dose) next.splice(index + by, 0, dose);
+      setDoses(next);
+    };
+    const setAmount = (id: string, value: string) => {
+      const others = Object.fromEntries(Object.entries(amounts).filter(([own]) => own !== id));
+      const amount = Number(value);
+      change({
+        program_defaults: {
+          default: { doses: value.trim() && amount > 0 ? { ...others, [id]: amount } : others },
+        },
+      });
+    };
+    const addable = this.materials.filter((material) => !material.archived);
+    return html`<div class="field doses">
+        <span class="label">${t("device.doses")}</span>
+        <ol class="dose-list">
+          ${doses.map(({ material_id }, index) => {
+            const name = this.doseName(material_id, t);
+            return html`<li>
+              <span class="dose-name">${name}</span>
+              <span class="muted small">${unitOf(this.material(material_id))}</span>
+              <ha-icon-button
+                class="up"
+                .label=${t("device.move_dose_up", { dose: name })}
+                .path=${mdiArrowUp}
+                ?disabled=${index === 0}
+                @click=${() => move(index, -1)}
+              ></ha-icon-button>
+              <ha-icon-button
+                class="down"
+                .label=${t("device.move_dose_down", { dose: name })}
+                .path=${mdiArrowDown}
+                ?disabled=${index === doses.length - 1}
+                @click=${() => move(index, 1)}
+              ></ha-icon-button>
+              <ha-icon-button
+                class="remove"
+                .label=${t("device.remove_dose", { dose: name })}
+                .path=${mdiClose}
+                @click=${() => setDoses(doses.filter((_, other) => other !== index))}
+              ></ha-icon-button>
+            </li>`;
+          })}
+        </ol>
+        ${
+          addable.length
+            ? html`<select
+                class="add-dose"
+                aria-label=${t("device.add_dose")}
+                @change=${(event: Event) => {
+                  const select = event.target as HTMLSelectElement;
+                  if (select.value)
+                    setDoses([...doses, { id: newDoseId(), material_id: select.value }]);
+                  select.value = "";
+                }}
+              >
+                <option value="">${t("device.add_dose")}</option>
+                ${addable.map(
+                  (material) => html`<option value=${material.id}>${material.name}</option>`,
+                )}
+              </select>`
+            : html`<p class="no-materials">
+                ${t("device.no_materials")}
+                <a href="${this.basePath}/materials" @click=${followLink}
+                  >${t("item.to_materials")}</a
+                >
+              </p>`
+        }
+        <p class="muted small">${t("device.doses_hint")}</p>
+      </div>
+      ${
+        doses.length
+          ? html`<div class="field program-defaults">
+              <span class="label">${t("device.program_defaults")}</span>
+              ${table({
+                columns: [
+                  { label: t("device.program") },
+                  ...doses.map(({ material_id }) => ({
+                    label: `${this.doseName(material_id, t)} (${unitOf(this.material(material_id))})`,
+                    num: true,
+                  })),
+                ],
+                rows: html`<tr>
+                  <td>${t("device.default_row")}</td>
+                  ${doses.map(
+                    ({ id, material_id }) =>
+                      html`<td class="num">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          aria-label=${t("device.default_amount", {
+                            dose: this.doseName(material_id, t),
+                          })}
+                          .value=${String(amounts[id] ?? "")}
+                          @change=${(event: Event) =>
+                            setAmount(id, (event.target as HTMLInputElement).value)}
+                        />
+                      </td>`,
+                  )}
+                </tr>`,
+              })}
+              <p class="muted small">${t("device.program_defaults_hint")}</p>
+            </div>`
+          : nothing
+      }`;
   }
 
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {
@@ -427,6 +603,7 @@ export class DevicesPage extends LitElement {
 
   static override styles = [
     shared,
+    tableStyles,
     css`
       .device-type + .device-type {
         margin-top: 24px;
@@ -493,6 +670,32 @@ export class DevicesPage extends LitElement {
       .reconfigure {
         align-self: flex-start;
         margin-bottom: 12px;
+      }
+      .settings .doses ul,
+      .dose-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .settings .doses ul {
+        display: flex;
+        flex-direction: column;
+      }
+      .dose-list li {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dose-list .dose-name {
+        flex: 1;
+      }
+      .dose-list ha-icon-button {
+        --ha-icon-button-size: 32px;
+        --mdc-icon-size: 18px;
+      }
+      .program-defaults input {
+        width: 6em;
+        text-align: right;
       }
       .template-chip {
         display: inline-flex;

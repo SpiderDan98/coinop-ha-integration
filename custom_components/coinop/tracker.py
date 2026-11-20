@@ -27,7 +27,13 @@ from . import recorded
 from .catalog import Catalog
 from .cost import consumption
 from .cost.electricity import estimate
-from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
+from .cost.material import (
+    GRAM,
+    MILLILITRE,
+    dose_line_item,
+    material_line_item,
+    slot_line_items,
+)
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
@@ -40,6 +46,8 @@ from .device_inputs import (
 from .device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
+    DOSES,
+    PROGRAM_DEFAULTS,
     TAGS_FOR_NEW_RUNS,
     DeviceSettings,
 )
@@ -125,6 +133,7 @@ class DeviceTracker:
                 self._hass, self._config.status_entity_id, self._on_status
             ),
             async_track_time_interval(self._hass, self._on_tick, LIVE_INTERVAL),
+            self._settings.async_listen(self._on_settings),
         ]
         for metering in self._meterings:
             if price_entity_id := metering.price_entity_id:
@@ -376,6 +385,13 @@ class DeviceTracker:
         run = self._book.open_run(self._config.device_id)
         metering.on_price(event.data["new_state"], run)
         if run:
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
+
+    @callback
+    def _on_settings(self, device_id: str) -> None:
+        run = self._book.open_run(self._config.device_id)
+        if device_id == self._config.device_id and run:
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
@@ -634,6 +650,10 @@ class DeviceTracker:
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)
+        if run.outcome in (Outcome.CANCELLED, Outcome.FAILED) and any(
+            item.from_defaults for item in run.line_items
+        ):
+            add_flag(run, Flag.ENDED_EARLY_DEFAULTS)
         linked = self._spoolman_prices(run)
         if not read and linked:
             add_flag(run, Flag.SPOOLMAN_UNREACHABLE)
@@ -729,14 +749,41 @@ class DeviceTracker:
             item_id,
         )
 
+    def _doses(self, run: Run) -> list[LineItem]:
+        """A Line Item per Dose the Default row doses, in Dose list order."""
+        if Capability.DOSES not in self._config.capabilities:
+            return []
+        settings = self._settings.get(self._config.device_id)
+        amounts = settings[PROGRAM_DEFAULTS]["default"]["doses"]
+        ids = {i.dose_id: i.id for i in run.line_items if i.dose_id}
+        return [
+            dose_line_item(
+                ids.get(dose["id"]) or ulid_now(), dose["id"], material, amount
+            )
+            for dose in settings[DOSES]
+            if (amount := amounts.get(dose["id"])) is not None
+            and (material := self._catalog.material(dose["material_id"]))
+            and not material.archived
+        ]
+
     def _refresh(self, run: Run, until: datetime) -> None:
-        """Recompute the Run's live values up to `until`."""
+        """Recompute the Run's live values up to `until`; Doses only while it is open."""
         consumed = [metering.refresh(run, until) for metering in self._meterings]
         kinds = {metering.quantity.kind for metering in self._meterings}
         materials = self._measured_items(run, until) if self._config.material else []
+        doses = (
+            self._doses(run)
+            if run.ended is None
+            else [i for i in run.line_items if i.dose_id]
+        )
         run.line_items = [
             *consumed,
             *materials,
-            *(i for i in run.line_items if i.kind not in kinds and not i.measured),
+            *doses,
+            *(
+                i
+                for i in run.line_items
+                if i.kind not in kinds and not i.measured and not i.dose_id
+            ),
         ]
         count_running_hours(run.line_items, run, until)

@@ -70,7 +70,13 @@
         "automatic_templates": [
           "template-wear"
         ],
-        "default_material": "pla-black"
+        "default_material": "pla-black",
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          }
+        }
       }
     }
   ]
