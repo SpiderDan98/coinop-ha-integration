@@ -133,7 +133,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Flags on washing machine Runs
 
-- **Ended early with defaults**: a Cancelled or Failed Run was charged defaults for a whole cycle. Lower the water or Doses if it stopped early.
+- **Ended early with defaults**: a Cancelled or Failed Run was charged water or Dose defaults meant for a whole Run. Lower them if it stopped early.
 - **Default missing**: neither a measurement nor a Program Default gave a quantity; enter it on the Run.
 - **Stock input unavailable**: a Dose's stock input reported nothing usable, so its default was charged.
 - A meter that reported nothing during a load (and has no recorder history for it) falls back to the Program's kWh or litres and marks the Run with a consumption gap.

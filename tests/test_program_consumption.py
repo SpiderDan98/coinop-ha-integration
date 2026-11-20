@@ -326,3 +326,22 @@ async def test_a_cancelled_run_is_flagged_for_its_default_water(
 
     [run] = stored_runs(hass_storage)
     assert run["flags"] == ["ended_early_defaults"]
+
+
+async def test_a_cancelled_run_is_not_flagged_for_default_electricity_alone(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await set_rows(panel, washer, {"default": {"doses": {}, "kwh": 0.8}})
+
+    await run_cycle(hass, clock, "cancelled")
+
+    [run] = stored_runs(hass_storage)
+    assert [item[:3] for item in consumed(run)] == [
+        ("electricity", "program_default", 0.8),
+        ("water", "program_default", None),
+    ]
+    assert run["flags"] == ["default_missing"]

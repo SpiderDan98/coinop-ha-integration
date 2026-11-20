@@ -346,9 +346,10 @@ class LineItem:
 
     @property
     def from_defaults(self) -> bool:
-        """Its quantity is a default for a whole cycle, not what was measured."""
+        """Its Water or Dose quantity is a default for a whole Run, not what was
+        measured; Program-default electricity doesn't count."""
         if self.method is ConsumptionMethod.PROGRAM_DEFAULT:
-            return self.quantity is not None
+            return self.kind is LineItemKind.WATER and self.quantity is not None
         return self.dose_source in (DoseSource.PROGRAM_DEFAULT, DoseSource.DEFAULT_ROW)
 
     @property
