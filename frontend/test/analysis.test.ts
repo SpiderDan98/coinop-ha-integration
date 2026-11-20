@@ -26,7 +26,7 @@ describe("Analysis tab", () => {
       "Devices",
     ]);
     expect(query(panel, "a.tab.on").title).toBe("Analysis");
-    expect(text(query(panel, ".title"))).toBe("Analysis");
+    expect(text(query(panel, ".page-title"))).toBe("Analysis");
   });
 
   it("on a phone, names its tabs and leads back through the title", async () => {
