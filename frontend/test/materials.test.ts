@@ -299,3 +299,95 @@ describe("Materials tab", () => {
     );
   });
 });
+
+describe("Laundry Materials", () => {
+  const withLaundry = () =>
+    catalogBackend().subscription(CATALOG, () => [
+      { ...recorded.catalog.filled, materials: recorded.laundry },
+    ]);
+
+  it("are listed with their price per kg, or per piece when bought by the piece", async () => {
+    const panel = await mountPanel(withLaundry(), { path: "/materials" });
+
+    expect(rows(panel)).toEqual([
+      "Liquid detergent Detergent · Liquid detergent 1.04 g/cm³ €7.80 / 1,500 ml €5.00 / kg",
+      "Colour pods Detergent · Detergent pods €12.00 / 40 pcs €0.30 / pcs",
+    ]);
+  });
+
+  it("are created with form, density and pack unit pre-filled from the type", async () => {
+    const backend = catalogBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "name"), "Liquid detergent");
+    await fill(panel, field(panel, "type"), "Liquid detergent");
+    expect((field(panel, "form") as HTMLSelectElement).value).toBe("detergent");
+    expect((field(panel, "density") as HTMLInputElement).value).toBe("1.04");
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe("ml");
+    expect(queryAll(panel, "[name=diameter]")).toHaveLength(0);
+    await fill(panel, field(panel, "pack_price"), "7.80");
+    await fill(panel, field(panel, "pack_size"), "1500");
+    await click(panel, button(panel, "Save"));
+
+    expect(lastCall(backend)).toEqual({
+      type: "coinop/materials/create",
+      material: {
+        name: "Liquid detergent",
+        form: "detergent",
+        type: "Liquid detergent",
+        density: 1.04,
+        vendor: null,
+        colour: null,
+        diameter: null,
+        default_for_type: false,
+        price: { source: "fixed", pack_price: 7.8, pack_size: 1500, pack_unit: "ml" },
+      },
+    });
+  });
+
+  it("are created by the piece without density or diameter", async () => {
+    const backend = catalogBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "name"), "Colour pods");
+    await fill(panel, field(panel, "type"), "Detergent pods");
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe("pcs");
+    expect(queryAll(panel, "[name=density], [name=diameter]")).toHaveLength(0);
+    await fill(panel, field(panel, "pack_price"), "12");
+    await fill(panel, field(panel, "pack_size"), "40");
+    await click(panel, button(panel, "Save"));
+
+    expect(lastCall(backend)).toEqual({
+      type: "coinop/materials/create",
+      material: {
+        name: "Colour pods",
+        form: "detergent",
+        type: "Detergent pods",
+        density: null,
+        vendor: null,
+        colour: null,
+        diameter: null,
+        default_for_type: false,
+        price: { source: "fixed", pack_price: 12, pack_size: 40, pack_unit: "pcs" },
+      },
+    });
+  });
+
+  it("ask for a density again when switched from pieces to millilitres", async () => {
+    const backend = withLaundry();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "Colour pods"), "Edit"));
+
+    await fill(panel, field(panel, "pack_unit"), "ml");
+    await click(panel, button(panel, "Save"));
+
+    expect(backend.sent("coinop/materials/update")).toEqual([]);
+    expect(
+      queryAll(panel, 'form.material [aria-invalid="true"]').map((input) =>
+        input.getAttribute("name"),
+      ),
+    ).toEqual(["density"]);
+  });
+});

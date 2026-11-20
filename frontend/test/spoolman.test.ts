@@ -123,6 +123,21 @@ describe("Spoolman in the Materials tab", () => {
     expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
   });
 
+  it("offers no link for a Material bought by the piece", async () => {
+    const backend = spoolmanBackend().subscription(CATALOG, () => [
+      { ...withLinked, materials: recorded.laundry },
+    ]);
+    const panel = await mountPanel(backend, { path: "/materials" });
+
+    await click(panel, button(row(panel, "tr.material", "Liquid detergent"), "Edit"));
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
+    await click(panel, button(panel, "Cancel"));
+    await click(panel, button(row(panel, "tr.material", "Colour pods"), "Edit"));
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+    await change(panel, field(panel, "pack_unit"), "g");
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+  });
+
   it("shows nothing of Spoolman while it isn't set up", async () => {
     const backend = spoolmanBackend(recorded.spoolman.notConfigured);
     const panel = await mountPanel(backend, { path: "/materials" });
