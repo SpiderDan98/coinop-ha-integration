@@ -7,7 +7,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from . import ha_device, panel, websocket
 from .catalog import Catalog
-from .const import DOMAIN, SUBENTRY_DEVICE
+from .const import DEVICE_TYPE_3D_PRINTER, DOMAIN, SUBENTRY_DEVICE
 from .device_config import DeviceConfig
 from .device_settings import DeviceSettings
 from .images import DeviceImages, ImageLibrary, RunImageView, RunUploadView
@@ -27,6 +27,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.http.register_view(RunImageView())
     hass.http.register_view(RunUploadView())
     hass.http.register_view(CostStatementView())
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: CoinOpConfigEntry) -> bool:
+    if entry.version > 1:
+        return False
+    if entry.minor_version < 2:
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type == SUBENTRY_DEVICE:
+                hass.config_entries.async_update_subentry(
+                    entry,
+                    subentry,
+                    data={**subentry.data, "device_type": DEVICE_TYPE_3D_PRINTER},
+                )
+        hass.config_entries.async_update_entry(entry, minor_version=2)
     return True
 
 

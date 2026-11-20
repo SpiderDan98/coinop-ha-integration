@@ -422,6 +422,7 @@ SCENARIOS = {
 def _device(key: str) -> dict[str, Any]:
     """The Device's subentry data, as Add Device writes it."""
     return {
+        "device_type": "3d_printer",
         "printer_device_id": None,
         "status": {"entity_id": f"input_select.{key}_status", "attribute": None},
         "mapping": {
