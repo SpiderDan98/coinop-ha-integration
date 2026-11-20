@@ -4,7 +4,8 @@ and the user's corrections: fields, Flags, "End Run now" and deletion.
 Summaries carry what a gallery tile shows (with its Cover Image); `get` returns
 the stored Run with amounts rounded to the currency, the derived subtotals and
 total, and every image with the URLs to fetch it from.
-Corrections never recompute a cost (ADR 0002).
+Corrections never recompute a cost, except that a corrected Program re-applies
+its defaults (ADR 0002).
 """
 
 from datetime import datetime
@@ -250,11 +251,10 @@ async def _update(
     run.outcome = msg.get("outcome", run.outcome)
     run.part_count = msg.get("part_count", run.part_count)
     if "program" in msg:
-        program = _text(msg["program"])
-        if run.ended is None:
-            run.follow_program(program)
+        if tracker := _tracker(coinop, run.device_id):
+            tracker.correct_program(run, _text(msg["program"]))
         else:
-            run.program = program
+            run.program = _text(msg["program"])
     if "tags" in msg:
         run.tags = await coinop.catalog.async_add_tags(msg["tags"])
     await coinop.book.async_correct(run)

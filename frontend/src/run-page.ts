@@ -539,8 +539,9 @@ export class RunPage extends LitElement {
       ${
         this.hasProgram(run)
           ? html`<label class="wide"
-              >${t("run.program")}<input name="program" .value=${values.program}
-            /></label>`
+                >${t("run.program")}<input name="program" .value=${values.program}
+              /></label>
+              <p class="wide muted small program-hint">${t("run.program_hint")}</p>`
           : nothing
       }
       <label class="wide"

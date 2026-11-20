@@ -198,6 +198,17 @@ describe("Correcting a Run", () => {
       expect(text(query(panel, "input[name=program]").closest("label") as Element)).toBe(
         "Programm",
       );
+      expect(text(query(panel, ".program-hint"))).toBe(
+        "Ein anderes Programm wendet seine Vorgaben auf die Kosten an, die aus Vorgaben stammen und nicht überschrieben sind.",
+      );
+    });
+
+    it("hints that changing the Program re-applies its defaults", async () => {
+      const panel = await mountPanel(washing(), { path: "/run/wash" });
+
+      expect(text(query(panel, ".program-hint"))).toBe(
+        "Changing the Program re-applies its defaults to the costs that came from defaults and aren't overridden.",
+      );
     });
   });
 
@@ -205,6 +216,7 @@ describe("Correcting a Run", () => {
     const panel = await mountPanel(correcting(), { path: "/run/benchy" });
 
     expect(queryAll(panel, "[name=program]")).toHaveLength(0);
+    expect(queryAll(panel, ".program-hint")).toHaveLength(0);
   });
 
   it("shows when a correction could not be saved", async () => {
