@@ -3,6 +3,7 @@
 Removed Devices are not listed; their Runs keep `device_id` and `device_name`.
 """
 
+from statistics import fmean
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -14,7 +15,14 @@ from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
     DEFAULT_MATERIAL,
     DOSES,
+    PROGRAM_DEFAULTS,
     TAGS_FOR_NEW_RUNS,
+)
+from custom_components.coinop.models import (
+    ConsumptionMethod,
+    LineItemKind,
+    Outcome,
+    Run,
 )
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
@@ -147,4 +155,79 @@ async def _update_settings(
     connection.send_result(msg["id"], {"settings": settings})
 
 
-COMMANDS = (_list, _update_settings)
+# A row's key, the Line Item kind measuring it and the decimals the panel shows.
+_MEASURED = {"kwh": (LineItemKind.ELECTRICITY, 3), "litres": (LineItemKind.WATER, 1)}
+
+
+def _measured(run: Run, kind: LineItemKind) -> float | None:
+    return next(
+        (
+            item.quantity
+            for item in run.line_items
+            if item.kind is kind
+            and item.method
+            in (ConsumptionMethod.MEASURED, ConsumptionMethod.FROM_HISTORY)
+        ),
+        None,
+    )
+
+
+@command(
+    {
+        vol.Required("type"): "coinop/devices/measured_suggestions",
+        vol.Required("device_id"): str,
+    }
+)
+def _measured_suggestions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    coinop: CoinOp,
+) -> None:
+    """The mean measured kWh and litres of the Device's Completed Runs, with their
+    count, per Program and for the Default row (Runs whose Program has no row).
+
+    Only measured and from-history quantities count; a key without Runs is left out.
+    """
+    device_id = msg["device_id"]
+    device = next((d for d in coinop.devices if d.device_id == device_id), None)
+    if found(connection, msg, device, "Device") is None:
+        return
+    programs = coinop.settings.get(device_id)[PROGRAM_DEFAULTS]["programs"]
+    values: dict[str | None, dict[str, list[float]]] = {}
+    for run in coinop.book.runs():
+        if (
+            run.device_id != device_id
+            or run.outcome is not Outcome.COMPLETED
+            or not run.finalised
+        ):
+            continue
+        rows: list[str | None] = [run.program] if run.program else []
+        if run.program not in programs:
+            rows.append(None)
+        for key, (kind, _) in _MEASURED.items():
+            if (quantity := _measured(run, kind)) is not None:
+                for row in rows:
+                    values.setdefault(row, {}).setdefault(key, []).append(quantity)
+
+    def means(row: str | None) -> dict[str, Any]:
+        return {
+            key: {
+                "mean": round(fmean(measured), _MEASURED[key][1]),
+                "runs": len(measured),
+            }
+            for key, measured in values.get(row, {}).items()
+        }
+
+    connection.send_result(
+        msg["id"],
+        {
+            "suggestions": {
+                "default": means(None),
+                "programs": {row: means(row) for row in values if row is not None},
+            }
+        },
+    )
+
+
+COMMANDS = (_list, _update_settings, _measured_suggestions)

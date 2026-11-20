@@ -4,7 +4,13 @@
 import { mdiArrowDown, mdiArrowUp, mdiClose, mdiPencil, mdiPlus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { updateDeviceSettings, type Device, type LineItemTemplate, type Material } from "./api";
+import {
+  getMeasuredSuggestions,
+  updateDeviceSettings,
+  type Device,
+  type LineItemTemplate,
+  type Material,
+} from "./api";
 import "./dialog";
 import { formatter, type Format } from "./format";
 import { followLink, navigate, type HomeAssistant } from "./hass";
@@ -107,6 +113,11 @@ export class DevicesPage extends LitElement {
   @state() private saved = new Map<string, Device["settings"]>();
   /** The Device whose settings the dialog edits, and the settings as edited so far. */
   @state() private editing?: { device: Device; draft: Device["settings"] };
+  /** The measured suggestions for the Device being edited, once they arrive. */
+  @state() private suggestions?: {
+    deviceId: string;
+    rows: Awaited<ReturnType<typeof getMeasuredSuggestions>>;
+  };
   @state() private saving = false;
   @state() private failed = false;
 
@@ -232,10 +243,7 @@ export class DevicesPage extends LitElement {
           class="edit"
           .label=${t("device.edit", { device: name })}
           .path=${mdiPencil}
-          @click=${() => {
-            this.failed = false;
-            this.editing = { device, draft: settings };
-          }}
+          @click=${() => this.edit(device, settings)}
         ></ha-icon-button>
       </div>
     </div>`;
@@ -437,7 +445,7 @@ export class DevicesPage extends LitElement {
   /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
    * column per Dose. Known Programs without a row are suggested; a value stores their row. */
   private renderDoses(
-    { capabilities, known_programs, ha_settings }: Device,
+    { id, capabilities, known_programs, ha_settings }: Device,
     { doses, program_defaults }: Settings,
     change: (changes: Partial<Settings>) => void,
     t: Localize,
@@ -506,6 +514,28 @@ export class DevicesPage extends LitElement {
           ...(next.litres !== undefined && { litres: next.litres }),
         });
     };
+    const suggestions = this.suggestions?.deviceId === id ? this.suggestions.rows : undefined;
+    const format = formatter(this.hass);
+    const suggestion = (program: string | null, key: (typeof consumed)[number]) => {
+      const measured = (program === null ? suggestions?.default : suggestions?.programs[program])?.[
+        key
+      ];
+      if (!measured) return nothing;
+      const value = format.quantity(measured.mean, key === "kwh" ? "kWh" : "L");
+      return html`<ha-button
+        class="suggestion"
+        appearance="plain"
+        size="small"
+        title=${t("device.apply_suggestion")}
+        @click=${() => setConsumed(program, key, String(measured.mean))}
+      >
+        ${
+          measured.runs === 1
+            ? t("device.suggestion_one", { value })
+            : t("device.suggestion", { value, count: measured.runs })
+        }
+      </ha-button>`;
+    };
     const consumedCells = (program: string | null) =>
       consumed.map(
         (key) =>
@@ -523,6 +553,7 @@ export class DevicesPage extends LitElement {
               @change=${(event: Event) =>
                 setConsumed(program, key, (event.target as HTMLInputElement).value)}
             />
+            ${suggestion(program, key)}
           </td>`,
       );
     const amountCells = (program: string | null, label: (dose: string) => string) =>
@@ -824,6 +855,19 @@ export class DevicesPage extends LitElement {
     }
   }
 
+  private async edit(device: Device, settings: Settings) {
+    this.failed = false;
+    this.editing = { device, draft: settings };
+    this.suggestions = undefined;
+    if (!device.capabilities.includes("program_consumption")) return;
+    try {
+      const rows = await getMeasuredSuggestions(this.hass, device.id);
+      if (this.editing?.device.id === device.id) this.suggestions = { deviceId: device.id, rows };
+    } catch {
+      // Without suggestions the table is still complete.
+    }
+  }
+
   private close() {
     this.editing = undefined;
   }
@@ -932,6 +976,11 @@ export class DevicesPage extends LitElement {
       .program-defaults td input {
         width: 6em;
         text-align: right;
+      }
+      .program-defaults .suggestion {
+        display: block;
+        margin-inline-start: auto;
+        white-space: nowrap;
       }
       .program-row td:first-child {
         white-space: nowrap;

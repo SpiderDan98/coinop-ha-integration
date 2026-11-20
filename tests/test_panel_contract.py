@@ -425,6 +425,9 @@ async def test_record_a_washing_machine_and_its_run(
     devices = await panel.call("coinop/devices/list")
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    suggestions = await panel.call(
+        "coinop/devices/measured_suggestions", device_id=subentry.subentry_id
+    )
 
     [electricity, detergent] = detail["run"]["line_items"]
     ids = {
@@ -435,6 +438,7 @@ async def test_record_a_washing_machine_and_its_run(
     }
     assert_recorded("devices-list-washing-machine", stable_ids(devices, ids))
     assert_recorded("runs-get-washing-machine", stable_ids(detail, ids))
+    assert_recorded("devices-measured-suggestions", suggestions)
 
 
 async def test_record_water_on_washing_machine_runs(

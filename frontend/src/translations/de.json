@@ -399,5 +399,8 @@
   "device.default_litres": "Standard-Liter",
   "device.program_kwh": "kWh für {program}",
   "device.program_litres": "Liter für {program}",
+  "device.suggestion": "Ø {value} · {count} Läufe",
+  "device.suggestion_one": "Ø {value} · 1 Lauf",
+  "device.apply_suggestion": "Mittelwert der gemessenen abgeschlossenen Läufe übernehmen",
   "flag.default_missing": "Weder eine Messung noch eine Programmvorgabe gefunden: Menge eintragen"
 }

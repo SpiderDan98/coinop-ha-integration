@@ -1,0 +1,18 @@
+{
+  "suggestions": {
+    "default": {
+      "kwh": {
+        "mean": 1.2,
+        "runs": 1
+      }
+    },
+    "programs": {
+      "Cotton 60°": {
+        "kwh": {
+          "mean": 1.2,
+          "runs": 1
+        }
+      }
+    }
+  }
+}

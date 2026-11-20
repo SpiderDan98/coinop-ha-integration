@@ -399,5 +399,8 @@
   "device.default_litres": "Default litres",
   "device.program_kwh": "kWh for {program}",
   "device.program_litres": "Litres for {program}",
+  "device.suggestion": "Ø {value} · {count} Runs",
+  "device.suggestion_one": "Ø {value} · 1 Run",
+  "device.apply_suggestion": "Use the mean of the measured Completed Runs",
   "flag.default_missing": "Neither a measurement nor a Program default was found: enter the quantity"
 }
