@@ -15,7 +15,14 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from .clock import CLOCK_START, Clock
 from .contract import assert_recorded, stable_ids
-from .devices import STATUS, add_device, add_hub
+from .devices import (
+    STATUS,
+    WASHER_ENERGY,
+    WASHER_STATUS,
+    add_device,
+    add_hub,
+    add_washing_machine,
+)
 from .http import HttpClient
 from .images import picture
 from .stored import (
@@ -330,6 +337,32 @@ async def test_record_a_manual_run(
         subentry.subentry_id: "device-kobra",
     }
     assert_recorded("runs-create", stable_ids(created, ids))
+
+
+async def test_record_a_washing_machine_and_its_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "off")
+    subentry = await add_washing_machine(hass, await add_hub(hass), price=0.30)
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(minutes=90)
+    hass.states.async_set(WASHER_ENERGY, "101.2", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        subentry.subentry_id: "device-washer",
+        run["id"]: "wash",
+        electricity["id"]: "wash-electricity",
+    }
+    assert_recorded("devices-list-washing-machine", stable_ids(devices, ids))
+    assert_recorded("runs-get-washing-machine", stable_ids(detail, ids))
 
 
 async def test_record_what_deleting_a_run_drops(

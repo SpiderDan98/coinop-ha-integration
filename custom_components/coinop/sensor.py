@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .cost.totals import run_totals
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .entity import DeviceEntity
 from .models import Run
 from .run_book import RunBook
@@ -31,6 +31,7 @@ def _cost(key: str, translation_key: str) -> SensorEntityDescription:
     )
 
 
+MATERIAL_USED = "material_grams"
 # Each key names the `Totals` field the sensor shows.
 TOTALS = (
     _cost("cost", "total_cost"),
@@ -38,7 +39,7 @@ TOTALS = (
     _cost("material_cost", "material_cost"),
     _cost("other_cost", "other_cost"),
     SensorEntityDescription(
-        key="material_grams",
+        key=MATERIAL_USED,
         translation_key="material_used",
         device_class=SensorDeviceClass.WEIGHT,
         state_class=SensorStateClass.TOTAL,
@@ -93,6 +94,8 @@ async def async_setup_entry(
                 *(
                     TotalSensor(hass, book, device, description)
                     for description in TOTALS
+                    if description.key != MATERIAL_USED
+                    or Capability.MATERIAL in device.capabilities
                 ),
                 CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
                 LastRunCostSensor(hass, book, device, LAST_RUN_COST),
@@ -163,13 +166,17 @@ class LastRunCostSensor(DeviceSensor):
         if run is None:
             return None
         cost = run_totals(run, dt_util.utcnow()).cost
+        parts = (
+            {}
+            if run.part_count is None
+            else {"part_count": run.part_count, "cost_per_part": cost / run.part_count}
+        )
         return {
             "name": run.name,
             "outcome": run.outcome,
             "start": run.started,
             "end": run.ended,
-            "part_count": run.part_count,
-            "cost_per_part": cost / run.part_count,
+            **parts,
             "has_flags": bool(run.flags),
             "tags": list(run.tags),
         }

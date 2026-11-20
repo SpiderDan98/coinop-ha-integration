@@ -6,7 +6,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .cost.totals import run_totals
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .entity import DeviceEntity
 from .models import Run
 from .run_book import RunBook, RunChange
@@ -36,6 +36,7 @@ class RunEvent(DeviceEntity, EventEntity):
     def __init__(self, book: RunBook, device: DeviceConfig) -> None:
         super().__init__(book, device, RUN_EVENT.key)
         self.entity_description = RUN_EVENT
+        self._material = Capability.MATERIAL in device.capabilities
 
     @callback
     def _on_run_change(self, change: RunChange, run: Run) -> None:
@@ -46,6 +47,15 @@ class RunEvent(DeviceEntity, EventEntity):
             )
         elif change is RunChange.ENDED:
             totals = run_totals(run, dt_util.utcnow())
+            parts = (
+                {}
+                if run.part_count is None
+                else {
+                    "cost_per_part": totals.cost / run.part_count,
+                    "part_count": run.part_count,
+                }
+            )
+            grams = {"material_grams": totals.material_grams} if self._material else {}
             self._trigger_event(
                 change,
                 {
@@ -55,10 +65,9 @@ class RunEvent(DeviceEntity, EventEntity):
                     "end": run.ended,
                     "running_hours": totals.running_hours,
                     "total_cost": totals.cost,
-                    "cost_per_part": totals.cost / run.part_count,
-                    "part_count": run.part_count,
+                    **parts,
                     "energy_kwh": totals.energy_kwh,
-                    "material_grams": totals.material_grams,
+                    **grams,
                     "has_flags": bool(run.flags),
                     "tags": list(run.tags),
                 },

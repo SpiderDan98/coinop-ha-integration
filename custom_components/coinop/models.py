@@ -428,7 +428,8 @@ class Run:
     finalised: bool = False
     pauses: list[Pause] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
-    part_count: int = 1
+    # None for a Device Type without Part Count.
+    part_count: int | None = 1
     note: str | None = None
     tags: list[str] = field(default_factory=list)
     consumption: dict[str, Any] | None = None

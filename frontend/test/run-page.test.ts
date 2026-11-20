@@ -158,6 +158,21 @@ describe("Run page", () => {
     expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
   });
 
+  it("has no Part Count for a washing machine Run", async () => {
+    const backend = recordedBackend()
+      .reply("coinop/devices/list", () => ({ devices: [recorded.washer] }))
+      .reply(GET, () => ({ run: recorded.wash }));
+
+    const panel = await mountPanel(backend, { path: "/run/wash" });
+
+    expect(cards(panel)[0]).toEqual([
+      "Electricity €0.36",
+      "Measured by an energy meter 1.2 kWh × 0.3 = 0.36",
+    ]);
+    expect(queryAll(panel, "[name=part_count]")).toHaveLength(0);
+    expect(text(query(panel, ".totals"))).toBe("Total €0.36");
+  });
+
   it("collapses to one column on narrow screens", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy", narrow: true });
 

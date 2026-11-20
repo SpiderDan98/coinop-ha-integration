@@ -140,7 +140,7 @@ export class DevicesPage extends LitElement {
       <dl>
         <dt>${t("device.status")}</dt>
         <dd>${entity(this.hass, ha.status.entity_id, [ha.status.attribute])}</dd>
-        ${this.renderOptionalInputs(ha, t)}
+        ${this.renderOptionalInputs(device, t)}
         <dt>${t("device.consumption")}</dt>
         <dd class="consumption">
           <div>${t(`consumption.${ha.consumption.source}`)}</div>
@@ -162,13 +162,17 @@ export class DevicesPage extends LitElement {
       >
       <div class="settings">
         <dl>
-          <dt>${t("device.default_material")}</dt>
-          <dd class="default-material">
-            ${
-              this.materialName(settings.default_material) ??
-              html`<span class="muted">${t("device.no_default_material")}</span>`
-            }
-          </dd>
+          ${
+            device.capabilities.includes("material")
+              ? html`<dt>${t("device.default_material")}</dt>
+                  <dd class="default-material">
+                    ${
+                      this.materialName(settings.default_material) ??
+                      html`<span class="muted">${t("device.no_default_material")}</span>`
+                    }
+                  </dd>`
+              : nothing
+          }
           <dt>${t("device.tags_for_new_runs")}</dt>
           <dd class="new-run-tags">
             ${chips(settings.tags_for_new_runs, "tag", t("device.none"))}
@@ -189,9 +193,11 @@ export class DevicesPage extends LitElement {
     </div>`;
   }
 
-  /** The Device Inputs it has, then the ones it doesn't use in one line. */
-  private renderOptionalInputs({ job, images }: Device["ha_settings"], t: Localize) {
+  /** Of the Device Inputs its Device Type offers, the ones it has, then the ones it
+   * doesn't use in one line. */
+  private renderOptionalInputs({ capabilities, ha_settings }: Device, t: Localize) {
     const hass = this.hass;
+    const { job = { entity_id: null, attribute: null }, images } = ha_settings;
     const rows = [
       ["job", t("device.job"), job.entity_id && entity(hass, job.entity_id, [job.attribute])],
       [
@@ -234,8 +240,11 @@ export class DevicesPage extends LitElement {
           ]),
       ],
     ] as const;
-    const unused = rows.filter(([, , shown]) => !shown).map(([, label]) => label);
-    return html`${rows.map(([name, label, shown]) =>
+    const offered = rows.filter(([name]) =>
+      capabilities.includes(name === "thumbnail" || name === "camera" ? "images" : "job"),
+    );
+    const unused = offered.filter(([, , shown]) => !shown).map(([, label]) => label);
+    return html`${offered.map(([name, label, shown]) =>
       shown
         ? html`<dt>${label}</dt>
             <dd class=${name}>${shown}</dd>`
@@ -252,49 +261,17 @@ export class DevicesPage extends LitElement {
   private renderDialog(device: Device, draft: Device["settings"], t: Localize) {
     const change = (changes: Partial<Device["settings"]>) =>
       (this.editing = { device, draft: { ...draft, ...changes } });
-    // The Device's archived default stays pickable; other archived Materials don't.
-    const original = this.settingsOf(device).default_material;
-    const pickable = this.materials.filter(
-      (material) => !material.archived || material.id === original,
-    );
     return html`<coinop-dialog
       class="settings-dialog dialog"
       .label=${t("device.settings_title", { device: device.name })}
       .closeLabel=${t("dialog.close")}
       @cancel=${this.close}
     >
-      <div class="field default-material">
-        <span class="label">${t("device.default_material")}</span>
-        ${
-          pickable.length
-            ? html`<select
-                aria-label=${t("device.default_material")}
-                autofocus
-                @change=${(event: Event) =>
-                  change({ default_material: (event.target as HTMLSelectElement).value || null })}
-              >
-                <option value="" ?selected=${draft.default_material === null}>
-                  ${t("device.no_default_material")}
-                </option>
-                ${pickable.map(
-                  (material) =>
-                    html`<option
-                      value=${material.id}
-                      ?selected=${material.id === draft.default_material}
-                    >
-                      ${this.materialName(material.id)}
-                    </option>`,
-                )}
-              </select>`
-            : html`<p class="no-materials">
-                ${t("device.no_materials")}
-                <a href="${this.basePath}/materials" @click=${followLink}
-                  >${t("item.to_materials")}</a
-                >
-              </p>`
-        }
-        <p class="muted small">${t("device.default_material_hint")}</p>
-      </div>
+      ${
+        device.capabilities.includes("material")
+          ? this.renderDefaultMaterial(device, draft.default_material, change, t)
+          : nothing
+      }
       <div class="field new-run-tags">
         <span class="label">${t("device.tags_for_new_runs")}</span>
         <coinop-tag-input
@@ -327,6 +304,48 @@ export class DevicesPage extends LitElement {
         </ha-button>
       </div>
     </coinop-dialog>`;
+  }
+
+  private renderDefaultMaterial(
+    device: Device,
+    chosen: string | null,
+    change: (changes: Partial<Device["settings"]>) => void,
+    t: Localize,
+  ) {
+    // The Device's archived default stays pickable; other archived Materials don't.
+    const original = this.settingsOf(device).default_material;
+    const pickable = this.materials.filter(
+      (material) => !material.archived || material.id === original,
+    );
+    return html`<div class="field default-material">
+      <span class="label">${t("device.default_material")}</span>
+      ${
+        pickable.length
+          ? html`<select
+              aria-label=${t("device.default_material")}
+              autofocus
+              @change=${(event: Event) =>
+                change({ default_material: (event.target as HTMLSelectElement).value || null })}
+            >
+              <option value="" ?selected=${chosen === null}>
+                ${t("device.no_default_material")}
+              </option>
+              ${pickable.map(
+                (material) =>
+                  html`<option value=${material.id} ?selected=${material.id === chosen}>
+                    ${this.materialName(material.id)}
+                  </option>`,
+              )}
+            </select>`
+          : html`<p class="no-materials">
+              ${t("device.no_materials")}
+              <a href="${this.basePath}/materials" @click=${followLink}
+                >${t("item.to_materials")}</a
+              >
+            </p>`
+      }
+      <p class="muted small">${t("device.default_material_hint")}</p>
+    </div>`;
   }
 
   private renderAutomatic(chosen: string[], change: (ids: string[]) => void, t: Localize) {

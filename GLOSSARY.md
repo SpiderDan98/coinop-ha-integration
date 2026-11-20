@@ -10,7 +10,7 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, …), which determines which computed Line Items, such as electricity and material, its Runs get.
+The kind of Device (3D printer, washing machine, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
 _Avoid_: Category, device class
 _German UI_: Gerätetyp
 
@@ -40,7 +40,7 @@ _Avoid_: Result, status (for the ending)
 _German UI_: Ausgang (Abgeschlossen, Abgebrochen, Fehlgeschlagen, Unbekannt)
 
 **Part Count**:
-The number of usable parts a Run produced, which its total cost is divided by to give the cost per part.
+The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of 3D printers have one.
 _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 

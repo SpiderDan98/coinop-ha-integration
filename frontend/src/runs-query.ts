@@ -59,7 +59,7 @@ export function sorted(runs: RunSummary[], sort: Sort, t: Localize, devices?: De
     start: text((run) => run.started),
     duration: number((run) => run.running_seconds),
     total: number((run) => run.total),
-    per_part: number((run) => run.cost_per_part),
+    per_part: number((run) => run.cost_per_part ?? run.total),
   }[sort.by];
   const newest = text((run) => run.started);
   return runs.toSorted((a, b) => (sort.descending ? compare(b, a) : compare(a, b)) || newest(b, a));

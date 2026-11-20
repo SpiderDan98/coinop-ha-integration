@@ -35,6 +35,7 @@ def _list(
                     "id": device.device_id,
                     "name": device.name,
                     "type": device.device_type,
+                    "capabilities": sorted(device.capabilities),
                     "ha_settings": {
                         key: value
                         for key, value in device.flow_data.items()

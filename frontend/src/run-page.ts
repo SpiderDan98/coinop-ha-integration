@@ -96,7 +96,7 @@ const fieldValues = (run: RunDetail, format: Format) => ({
   started: format.toInput(run.started),
   ended: run.ended ? format.toInput(run.ended) : "",
   outcome: run.outcome ?? "",
-  part_count: String(run.part_count),
+  part_count: String(run.part_count ?? ""),
 });
 
 type Field = keyof ReturnType<typeof fieldValues>;
@@ -473,8 +473,13 @@ export class RunPage extends LitElement {
           <div class="card totals">
             <span class="big">${t("run.total")}</span
             ><span class="big num">${format.money(run.total)}</span>
-            <span class="muted">${t("run.cost_per_part", { count: run.part_count })}</span
-            ><span class="muted num">${format.money(run.cost_per_part)}</span>
+            ${
+              run.part_count === null || run.cost_per_part === null
+                ? nothing
+                : html`<span class="muted"
+                      >${t("run.cost_per_part", { count: run.part_count })}</span
+                    ><span class="muted num">${format.money(run.cost_per_part)}</span>`
+            }
           </div>
         </div>
       </div>
@@ -524,14 +529,18 @@ export class RunPage extends LitElement {
           )}
         </select></label
       >
-      <label
-        >${t("run.part_count")}<input
-          type="number"
-          name="part_count"
-          min="1"
-          step="1"
-          .value=${values.part_count}
-      /></label>
+      ${
+        run.part_count === null
+          ? nothing
+          : html`<label
+              >${t("run.part_count")}<input
+                type="number"
+                name="part_count"
+                min="1"
+                step="1"
+                .value=${values.part_count}
+            /></label>`
+      }
       <label class="wide"
         >${t("run.note")}<textarea name="note" .value=${values.note}></textarea>
       </label>

@@ -32,12 +32,19 @@
         },
         "user": {
           "title": "Gerät hinzufügen",
-          "description": "Füge einen 3D-Drucker hinzu, dessen Läufe Coin-op erfasst. Wähle das Home-Assistant-Gerät des Druckers, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Drucker-Integration, die Coin-op kennt (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "description": "Welche Art von Gerät soll Coin-op erfassen? Der Gerätetyp bestimmt die nächsten Schritte und lässt sich später nicht ändern.",
           "data": {
-            "device": "Home-Assistant-Gerät des Druckers (optional)"
+            "device_type": "Gerätetyp"
+          }
+        },
+        "device": {
+          "title": "Home-Assistant-Gerät",
+          "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op kennt (3D-Drucker: Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "data": {
+            "device": "Home-Assistant-Gerät (optional)"
           },
           "data_description": {
-            "device": "Das eigene Gerät von Coin-op für diesen Drucker wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
+            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
           }
         },
         "name": {
@@ -48,8 +55,8 @@
           }
         },
         "status": {
-          "title": "Druckstatus",
-          "description": "Wähle die Entität, die den Status des Druckers meldet. Sie muss jetzt nicht verfügbar sein.",
+          "title": "Status",
+          "description": "Wähle die Entität, die den Status des Geräts meldet. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Status-Entität",
             "attribute": "Attribut (optional)"
@@ -127,7 +134,7 @@
         },
         "energy": {
           "title": "Energiezähler",
-          "description": "Wähle die Entität, die die Energie des Druckers zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
+          "description": "Wähle die Entität, die die Energie des Geräts zählt, z. B. den Energiesensor einer Messsteckdose. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Energie-Entität",
             "attribute": "Attribut (optional)",
@@ -140,7 +147,7 @@
         },
         "power": {
           "title": "Leistungssensor",
-          "description": "Wähle die Entität, die die Leistungsaufnahme des Druckers meldet. Coin-op integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
+          "description": "Wähle die Entität, die die Leistungsaufnahme des Geräts meldet. Coin-op integriert sie über die Zeit. Sie muss jetzt nicht verfügbar sein.",
           "data": {
             "entity_id": "Leistungs-Entität",
             "attribute": "Attribut (optional)",
@@ -346,6 +353,14 @@
     "data_corrupt": {
       "title": "Die gespeicherten Daten von Coin-op sind beschädigt",
       "description": "Coin-op konnte {store} lesen, aber der Inhalt ist nicht das, was Coin-op schreibt, etwa nach einer Bearbeitung von Hand. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle unter Einstellungen > System > Backups ein Backup von vor der Beschädigung wieder her oder lege eine aufbewahrte Kopie der Datei zurück. Bis dahin bleibt Coin-op gestoppt."
+    }
+  },
+  "selector": {
+    "device_type": {
+      "options": {
+        "3d_printer": "3D-Drucker",
+        "washing_machine": "Waschmaschine"
+      }
     }
   }
 }

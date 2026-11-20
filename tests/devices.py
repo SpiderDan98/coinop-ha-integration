@@ -27,6 +27,16 @@ MAPPING = {
     "ended": ["idle"],
 }
 
+WASHER_STATUS = "sensor.washer_status"
+WASHER_ENERGY = "sensor.washer_plug_energy"
+WASHER_MAPPING = {
+    "running": ["running"],
+    "paused": ["paused"],
+    "finished": ["finished"],
+    "cancelled": ["cancelled"],
+    "ignored": ["off"],
+}
+
 
 async def add_hub(hass: HomeAssistant) -> ConfigEntry:
     MockConfigEntry(domain=DOMAIN, title="Coin-op").add_to_hass(hass)
@@ -48,13 +58,20 @@ def add_printer(hass: HomeAssistant, name: str = "Kobra S1") -> dr.DeviceEntry:
 
 
 async def start_add_device(
-    hass: HomeAssistant, entry: ConfigEntry, *, printer: str | None = None
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    printer: str | None = None,
+    device_type: str = "3d_printer",
 ) -> Any:
-    """Open Add Device and pick the printer's HA device (or none); returns the name form."""
+    """Open Add Device, pick the Device Type and the HA device (or none); returns the
+    name form."""
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
     assert result["step_id"] == "user"
+    result = await configure(hass, result, {"device_type": device_type})
+    assert result["step_id"] == "device", result.get("errors")
     result = await configure(
         hass, result, {} if printer is None else {"device": printer}
     )
@@ -80,9 +97,12 @@ async def walk_to_mapping(
     printer: str | None = None,
     status: str = STATUS,
     attribute: str | None = None,
+    device_type: str = "3d_printer",
 ) -> Any:
     result = await configure(
-        hass, await start_add_device(hass, entry, printer=printer), {"name": name}
+        hass,
+        await start_add_device(hass, entry, printer=printer, device_type=device_type),
+        {"name": name},
     )
     assert result["step_id"] == "status"
     status_input = {"entity_id": status} | (
@@ -182,6 +202,42 @@ async def add_device(
         result = await configure(hass, result, estimate)
     else:
         result = await configure(hass, result, meter)
+    assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, price_choice(price))
+    result = await configure(hass, result, price_input(price))
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await hass.async_block_till_done()
+    subentry = list(entry.subentries.values())[-1]
+    assert subentry.title == name
+    return subentry
+
+
+async def add_washing_machine(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    name: str = "Washer",
+    device: str | None = None,
+    status: str = WASHER_STATUS,
+    mapping: dict[str, list[str]] = WASHER_MAPPING,
+    source: str = "energy",
+    meter: dict[str, Any] | None = None,
+    price: float | dict[str, Any] = 0.30,
+) -> ConfigSubentry:
+    """Walk Add Device for a washing machine to the end; by default with its plug's
+    energy meter."""
+    result = await walk_to_mapping(
+        hass,
+        entry,
+        name=name,
+        printer=device,
+        status=status,
+        device_type="washing_machine",
+    )
+    result = await configure(hass, result, mapping)
+    assert result["type"] is FlowResultType.MENU, result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
     assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, price_choice(price))
     result = await configure(hass, result, price_input(price))

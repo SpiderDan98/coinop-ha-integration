@@ -15,7 +15,9 @@ from .test_runs import set_status
 RUN_EVENT = "event.kobra_run"
 
 
-def record_events(hass: HomeAssistant) -> list[dict[str, Any]]:
+def record_events(
+    hass: HomeAssistant, entity_id: str = RUN_EVENT
+) -> list[dict[str, Any]]:
     """Attributes of each event the Run event entity fires, in order."""
     fired: list[dict[str, Any]] = []
     # The state is the event's timestamp; a restart restores it without firing.
@@ -27,7 +29,7 @@ def record_events(hass: HomeAssistant) -> list[dict[str, Any]]:
             seen.add(new.state)
             fired.append(dict(new.attributes))
 
-    async_track_state_change_event(hass, RUN_EVENT, on_change)
+    async_track_state_change_event(hass, entity_id, on_change)
     return fired
 
 

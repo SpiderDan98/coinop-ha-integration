@@ -290,7 +290,9 @@ export class RunList extends LitElement {
         }
       </td>
       <td class="num">${format.money(run.total)}</td>
-      <td class="num">${run.part_count > 1 ? format.money(run.cost_per_part) : nothing}</td>
+      <td class="num">
+        ${run.part_count !== null && run.cost_per_part !== null && run.part_count > 1 ? format.money(run.cost_per_part) : nothing}
+      </td>
     </tr>`;
   }
 

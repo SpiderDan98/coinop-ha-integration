@@ -31,7 +31,7 @@ from .cost import consumption
 from .cost.electricity import electricity_line_item, price_gap
 from .cost.material import GRAM, MILLILITRE, material_line_item, slot_line_items
 from .cost.slots import slot_material, slot_shares
-from .device_config import DeviceConfig, Target
+from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
@@ -492,6 +492,7 @@ class DeviceTracker:
             consumption=dict(self._config.consumption),
             cost_source=dict(self._config.price),
             tags=settings[TAGS_FOR_NEW_RUNS],
+            part_count=self._part_count(),
         )
         if meter := meter_of(run.consumption):
             self._record(run, self._hass.states.get(meter["entity_id"]))
@@ -532,6 +533,7 @@ class DeviceTracker:
             consumption=dict(self._config.consumption),
             cost_source=dict(self._config.price),
             tags=settings[TAGS_FOR_NEW_RUNS] if tags is None else tags,
+            part_count=self._part_count(),
         )
         covered = await recorded.async_covers(self._hass, started, ended)
         await self._async_past_prices(run, covered)
@@ -543,6 +545,9 @@ class DeviceTracker:
         )
         await self._book.async_add(run)
         return run
+
+    def _part_count(self) -> int | None:
+        return 1 if Capability.PART_COUNT in self._config.capabilities else None
 
     async def _async_past_prices(self, run: Run, covered: bool) -> None:
         """A past Run's price timeline from history, flagged where it has none."""
@@ -722,6 +727,8 @@ class DeviceTracker:
         """Flag missing usage or Material; without a Material used input (or a
         measurement, as on a manual Run), add a Material Line Item to fill in
         unless the user already added one."""
+        if Capability.MATERIAL not in self._config.capabilities:
+            return
         items = [i for i in run.line_items if i.measured]
         if not (measuring and self._config.material) and not any(
             i.kind is LineItemKind.MATERIAL for i in run.line_items

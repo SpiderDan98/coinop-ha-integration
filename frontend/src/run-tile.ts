@@ -43,7 +43,7 @@ export function runTile(
         </div>
         <div class="row between">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
         ${
-          run.part_count > 1
+          run.part_count !== null && run.cost_per_part !== null && run.part_count > 1
             ? html`<div class="muted small">
                 ${t("run.per_part", { amount: format.money(run.cost_per_part), count: run.part_count })}
               </div>`

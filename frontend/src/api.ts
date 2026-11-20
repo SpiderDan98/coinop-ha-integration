@@ -30,8 +30,9 @@ export interface RunSummary {
   finalised: boolean;
   running_seconds: number;
   total: number;
-  part_count: number;
-  cost_per_part: number;
+  /** Null for a Device Type without Part Count. */
+  part_count: number | null;
+  cost_per_part: number | null;
   /** Open Flags; a cleared Flag is gone. */
   flags: string[];
   /** Alphabetical. */
@@ -87,11 +88,14 @@ export interface Device {
   id: string;
   name: string;
   /** The Device Type, which the Devices tab groups by. */
-  type: "3d_printer";
+  type: "3d_printer" | "washing_machine";
+  /** What its Device Type has; the panel shows a part only for these. */
+  capabilities: ("job" | "images" | "material" | "part_count" | "average_power")[];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
     status: { entity_id: string; attribute: string | null };
-    job: {
+    /** Missing for a Device Type without job. */
+    job?: {
       entity_id: string | null;
       attribute: string | null;
       /** Missing for Devices added before Material used existed. */

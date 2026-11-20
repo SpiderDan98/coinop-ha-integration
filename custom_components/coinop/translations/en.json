@@ -32,12 +32,19 @@
         },
         "user": {
           "title": "Add Device",
-          "description": "Add a 3D printer whose Runs Coin-op records. Pick the printer's Home Assistant device to take over its name, or leave it empty. For a printer integration Coin-op knows (Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
+          "description": "What kind of Device should Coin-op record Runs of? The Device Type decides the next steps and can't be changed later.",
           "data": {
-            "device": "Printer's Home Assistant device (optional)"
+            "device_type": "Device Type"
+          }
+        },
+        "device": {
+          "title": "Home Assistant device",
+          "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows (3D printers: Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), the next steps come pre-filled from its entities; check and change them as you like.",
+          "data": {
+            "device": "The Device's Home Assistant device (optional)"
           },
           "data_description": {
-            "device": "Coin-op's own device for this printer is linked to it. Entity pickers in the next steps still offer every entity."
+            "device": "Coin-op's own device for this Device is linked to it. Entity pickers in the next steps still offer every entity."
           }
         },
         "name": {
@@ -48,8 +55,8 @@
           }
         },
         "status": {
-          "title": "Print status",
-          "description": "Pick the entity that reports the printer's status. It does not need to be available now.",
+          "title": "Status",
+          "description": "Pick the entity that reports the Device's status. It does not need to be available now.",
           "data": {
             "entity_id": "Status entity",
             "attribute": "Attribute (optional)"
@@ -127,7 +134,7 @@
         },
         "energy": {
           "title": "Energy meter",
-          "description": "Pick the entity that counts the printer's energy, e.g. the energy sensor of a power-measuring plug. It does not need to be available now.",
+          "description": "Pick the entity that counts the Device's energy, e.g. the energy sensor of a power-measuring plug. It does not need to be available now.",
           "data": {
             "entity_id": "Energy entity",
             "attribute": "Attribute (optional)",
@@ -140,7 +147,7 @@
         },
         "power": {
           "title": "Power sensor",
-          "description": "Pick the entity that reports the printer's power draw. Coin-op integrates it over time. It does not need to be available now.",
+          "description": "Pick the entity that reports the Device's power draw. Coin-op integrates it over time. It does not need to be available now.",
           "data": {
             "entity_id": "Power entity",
             "attribute": "Attribute (optional)",
@@ -346,6 +353,14 @@
     "data_corrupt": {
       "title": "Coin-op's stored data is corrupt",
       "description": "Coin-op could read {store}, but its content is not what Coin-op writes, e.g. after it was edited by hand. Coin-op did not start so it cannot overwrite your history.\n\nRestore a backup made before the damage under Settings > System > Backups, or put back a copy of the file you kept. Until then Coin-op stays stopped."
+    }
+  },
+  "selector": {
+    "device_type": {
+      "options": {
+        "3d_printer": "3D printer",
+        "washing_machine": "Washing machine"
+      }
     }
   }
 }

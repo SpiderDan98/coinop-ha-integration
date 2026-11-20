@@ -4,6 +4,13 @@
       "id": "device-kobra",
       "name": "Kobra",
       "type": "3d_printer",
+      "capabilities": [
+        "average_power",
+        "images",
+        "job",
+        "material",
+        "part_count"
+      ],
       "ha_settings": {
         "printer_device_id": null,
         "status": {

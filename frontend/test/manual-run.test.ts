@@ -119,6 +119,20 @@ describe("A manual Run", () => {
     expect(location.pathname).toBe("/coinop/runs");
   });
 
+  it("asks a washing machine for nothing printer-only", async () => {
+    const backend = creating().reply("coinop/devices/list", () => ({
+      devices: [recorded.washer],
+    }));
+    const panel = await mountPanel(backend, RUNS);
+
+    const dialog = await open(panel);
+
+    expect(
+      queryAll(dialog, "input[name], select[name]").map((field) => field.getAttribute("name")),
+    ).toEqual(["name", "started", "ended", "outcome"]);
+    expect(text(dialog)).not.toMatch(/print|part/i);
+  });
+
   it("is dropped on cancel", async () => {
     const backend = creating();
     const panel = await mountPanel(backend, RUNS);
