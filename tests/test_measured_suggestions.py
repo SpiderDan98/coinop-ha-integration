@@ -129,6 +129,32 @@ async def test_default_sourced_values_are_left_out(
     }
 
 
+async def test_an_overridden_quantity_suggests_what_was_measured(
+    hass: HomeAssistant,
+    clock: Clock,
+    washer: ConfigSubentry,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+) -> None:
+    await cycle(hass, clock, "Eco 40-60", kwh=0.8, litres=40)
+    await cycle(hass, clock, "Eco 40-60", kwh=1.0, litres=50)
+    run = stored_runs(hass_storage)[-1]
+    for item, quantity in zip(run["line_items"], (5, 500), strict=True):
+        await panel.call(
+            "coinop/line_items/update",
+            run_id=run["id"],
+            line_item_id=item["id"],
+            quantity=quantity,
+        )
+
+    assert (await suggestions(panel, washer))["programs"] == {
+        "Eco 40-60": {
+            "kwh": {"mean": 0.9, "runs": 2},
+            "litres": {"mean": 45.0, "runs": 2},
+        }
+    }
+
+
 async def test_the_default_row_suggests_from_runs_without_a_program_row(
     hass: HomeAssistant, clock: Clock, washer: ConfigSubentry, panel: PanelClient
 ) -> None:

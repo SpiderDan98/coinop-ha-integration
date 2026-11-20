@@ -161,9 +161,10 @@ _MEASURED = {"kwh": (LineItemKind.ELECTRICITY, 3), "litres": (LineItemKind.WATER
 
 
 def _measured(run: Run, kind: LineItemKind) -> float | None:
+    """What was measured, also under the user's override."""
     return next(
         (
-            item.quantity
+            item.computed["quantity"] if item.computed else item.quantity
             for item in run.line_items
             if item.kind is kind
             and item.method
@@ -188,7 +189,8 @@ def _measured_suggestions(
     """The mean measured kWh and litres of the Device's Completed Runs, with their
     count, per Program and for the Default row (Runs whose Program has no row).
 
-    Only measured and from-history quantities count; a key without Runs is left out.
+    Only measured and from-history quantities count, as measured even if overridden;
+    a key without Runs is left out.
     """
     device_id = msg["device_id"]
     device = next((d for d in coinop.devices if d.device_id == device_id), None)
