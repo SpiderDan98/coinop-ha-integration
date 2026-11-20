@@ -19,6 +19,8 @@ from .devices import (
     STATUS,
     WASHER_ENERGY,
     WASHER_STATUS,
+    WASHER_WATER,
+    WATER_PRICE,
     add_device,
     add_hub,
     add_washing_machine,
@@ -411,6 +413,67 @@ async def test_record_a_washing_machine_and_its_run(
     }
     assert_recorded("devices-list-washing-machine", stable_ids(devices, ids))
     assert_recorded("runs-get-washing-machine", stable_ids(detail, ids))
+
+
+async def test_record_water_on_washing_machine_runs(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """Measured water across a price change, and water added by hand without a source."""
+    hass.config.currency = "EUR"
+    litres = {"unit_of_measurement": "L"}
+    per_m3 = {"unit_of_measurement": "EUR/m³"}
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_WATER, "1000", litres)
+    hass.states.async_set(WATER_PRICE, "4", per_m3)
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set("sensor.dryer_status", "off")
+    entry = await add_hub(hass)
+    metered = await add_washing_machine(
+        hass, entry, water="meter", water_price={"entity_id": WATER_PRICE}
+    )
+    unmetered = await add_washing_machine(
+        hass, entry, name="Basement", status="sensor.dryer_status"
+    )
+    hass.states.async_set(WASHER_WATER, "1000", litres, force_update=True)
+    hass.states.async_set(WASHER_STATUS, "running")
+    hass.states.async_set("sensor.dryer_status", "running")
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_WATER, "1020", litres)
+    hass.states.async_set(WATER_PRICE, "5", per_m3)
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_WATER, "1050", litres)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    hass.states.async_set("sensor.dryer_status", "finished")
+    await clock.advance(minutes=5)
+
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    [wash] = [run for run in runs if run["device_id"] == metered.subentry_id]
+    [other] = [run for run in runs if run["device_id"] == unmetered.subentry_id]
+    detail = await panel.call("coinop/runs/get", run_id=wash["id"])
+    added = await panel.call(
+        "coinop/line_items/add",
+        run_id=other["id"],
+        kind="water",
+        quantity=60,
+        unit_price=0.0045,
+    )
+
+    ids = {
+        metered.subentry_id: "device-washer",
+        unmetered.subentry_id: "device-basement",
+        wash["id"]: "water-wash",
+        other["id"]: "basement-wash",
+        **{
+            item["id"]: f"water-wash-{item['kind']}"
+            for item in detail["run"]["line_items"]
+        },
+        **{
+            item["id"]: f"basement-wash-{item['kind']}"
+            for item in added["run"]["line_items"]
+        },
+    }
+    assert_recorded("runs-get-water", stable_ids(detail, ids))
+    assert_recorded("line-items-add-water", stable_ids(added, ids))
 
 
 async def test_record_what_deleting_a_run_drops(

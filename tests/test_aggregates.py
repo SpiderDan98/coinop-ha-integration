@@ -72,10 +72,12 @@ async def test_without_grouping_everything_adds_up_to_one_total(
     assert total == {
         "cost": 0.31,
         "electricity_cost": 0.3,
+        "water_cost": 0.0,
         "material_cost": 0.51,
         "other_cost": -0.5,
         "material_grams": pytest.approx(20.2),
         "energy_kwh": pytest.approx(1.2),
+        "water_litres": 0.0,
         "runs": 2,
         "running_hours": pytest.approx(6),
         "flagged_runs": 1,

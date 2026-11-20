@@ -3,10 +3,11 @@
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
-  KINDS,
   OUTCOMES,
   getAggregates,
   getGroupings,
+  hasWater,
+  shownKinds,
   type Device,
   type Group,
   type RunSummary,
@@ -136,10 +137,16 @@ export class AnalysisPage extends LitElement {
     `;
   }
 
-  private renderKinds({ cost, kind }: Aggregates, t: Localize, format: Format) {
+  /** Water only once a Device has it or a Run counts it. */
+  private kinds({ kind }: Aggregates) {
+    return shownKinds(hasWater(this.devices) || kind.some((group) => group.kind === "water"));
+  }
+
+  private renderKinds(aggregates: Aggregates, t: Localize, format: Format) {
+    const { cost, kind } = aggregates;
     return totals("by-kind", t("analysis.by_kind"), {
       head: [t("analysis.kind"), t("analysis.cost"), t("analysis.share")],
-      rows: KINDS.map((key) => {
+      rows: this.kinds(aggregates).map((key) => {
         const amount = kind.find((group) => group.kind === key)?.cost ?? 0;
         return [t(`kind.${key}`), format.money(amount), share(amount, cost, format)];
       }),
@@ -168,20 +175,21 @@ export class AnalysisPage extends LitElement {
     });
   }
 
-  private renderMonths({ month }: Aggregates, t: Localize, format: Format) {
+  private renderMonths(aggregates: Aggregates, t: Localize, format: Format) {
+    const kinds = this.kinds(aggregates);
     return totals("by-month", t("analysis.by_month"), {
       head: [
         t("analysis.month"),
         t("runs.title"),
-        ...KINDS.map((kind) => t(`kind.${kind}`)),
+        ...kinds.map((kind) => t(`kind.${kind}`)),
         t("run.total"),
       ],
-      rows: month
+      rows: aggregates.month
         .toSorted((a, b) => (b.month ?? "").localeCompare(a.month ?? ""))
         .map((group) => [
           this.link(format.monthName(group.month ?? ""), { month: group.month ?? "" }),
           group.runs,
-          ...KINDS.map((kind) => format.money(group[`${kind}_cost`])),
+          ...kinds.map((kind) => format.money(group[`${kind}_cost`])),
           format.money(group.cost),
         ]),
       empty: t("analysis.empty"),

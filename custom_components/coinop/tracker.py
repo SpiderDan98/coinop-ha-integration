@@ -66,7 +66,7 @@ from .models import (
     SlotReport,
     Usage,
 )
-from .quantities import ELECTRICITY
+from .quantities import ELECTRICITY, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
 from .templates import add_templates, count_running_hours
@@ -125,7 +125,17 @@ class DeviceTracker:
                 ConsumptionMethod.ESTIMATED,
             ),
         )
-        self._meterings = (self._electricity,)
+        self._meterings: tuple[Metering, ...] = (self._electricity,)
+        if Capability.WATER in config.capabilities:
+            self._meterings += (
+                Metering(
+                    hass,
+                    WATER,
+                    config,
+                    gap_rates=lambda run: [(run.started, None)],
+                    fallback=lambda run: None,
+                ),
+            )
 
     async def async_start(self) -> None:
         self._unsubscribe = [
@@ -529,6 +539,9 @@ class DeviceTracker:
             metering.pin(run)
         covered = await recorded.async_covers(self._hass, started, ended)
         run.line_items = [await self._async_past_electricity(run, covered)]
+        for metering in self._meterings[1:]:
+            if item := await self._async_past_quantity(metering, run, covered):
+                run.line_items.append(item)
         for metering in self._meterings:
             metering.finish(run)
         self._settle_material(run, measuring=False)
@@ -559,6 +572,25 @@ class DeviceTracker:
                 run.ended,
                 estimate(running, running, []),
                 ConsumptionMethod.ESTIMATED,
+            )
+        item = metering.priced(
+            run, run.ended, lambda _, __: 0.0, ConsumptionMethod.ENTERED
+        )
+        item.quantity, item.segments = None, []
+        return item
+
+    async def _async_past_quantity(
+        self, metering: Metering, run: Run, covered: bool
+    ) -> LineItem | None:
+        """From the meter's history if it covers the Run, else left for the user to
+        enter; None without a meter."""
+        assert run.ended is not None
+        if metering.meter(run) is None:
+            return None
+        await metering.async_past_prices(run, covered)
+        if await metering.async_past_readings(run, covered):
+            return metering.priced(
+                run, run.ended, metering.model(run), ConsumptionMethod.FROM_HISTORY
             )
         item = metering.priced(
             run, run.ended, lambda _, __: 0.0, ConsumptionMethod.ENTERED
@@ -768,8 +800,13 @@ class DeviceTracker:
 
     def _refresh(self, run: Run, until: datetime) -> None:
         """Recompute the Run's live values up to `until`; Doses only while it is open."""
-        consumed = [metering.refresh(run, until) for metering in self._meterings]
-        kinds = {metering.quantity.kind for metering in self._meterings}
+        consumed = [
+            item
+            for metering in self._meterings
+            if (item := metering.refresh(run, until))
+        ]
+        # A quantity without measurement or fallback keeps a Line Item entered by hand.
+        kinds = {item.kind for item in consumed}
         materials = self._measured_items(run, until) if self._config.material else []
         doses = (
             self._doses(run)
