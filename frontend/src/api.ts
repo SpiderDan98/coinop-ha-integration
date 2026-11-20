@@ -6,10 +6,13 @@ export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const
 export const KINDS = ["electricity", "water", "material", "other"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
-/** The kinds to show: Water only where a Device has water or a Line Item counts it. */
-export const shownKinds = (water: boolean) => KINDS.filter((kind) => kind !== "water" || water);
-export const hasWater = (devices: Device[] | undefined) =>
-  devices?.some((device) => device.capabilities.includes("water")) ?? false;
+/** The kinds to show: Water only where one of the Devices has water or something counts it. */
+export const shownKinds = (devices: Device[] | undefined, counted: { kind?: Kind | null }[]) => {
+  const water =
+    devices?.some((device) => device.capabilities.includes("water")) ||
+    counted.some(({ kind }) => kind === "water");
+  return KINDS.filter((kind) => kind !== "water" || water);
+};
 export type Method = "measured" | "from_history" | "estimated" | "program_default" | "entered";
 /** Running hours are the Run's running time without pauses. */
 export type QuantityBasis = "entered" | "running_hours";

@@ -469,15 +469,17 @@ export class DevicesPage extends LitElement {
                   </option>`,
               )}
             </select>`
-          : html`<p class="no-materials">
-              ${t("device.no_materials")}
-              <a href="${this.basePath}/materials" @click=${followLink}
-                >${t("item.to_materials")}</a
-              >
-            </p>`
+          : this.noMaterials(t)
       }
       <p class="muted small">${t("device.default_material_hint")}</p>
     </div>`;
+  }
+
+  private noMaterials(t: Localize) {
+    return html`<p class="no-materials">
+      ${t("device.no_materials")}
+      <a href="${this.basePath}/materials" @click=${followLink}>${t("item.to_materials")}</a>
+    </p>`;
   }
 
   /** The Dose list and the Program Defaults: the Default row, then a row per Program, a
@@ -530,28 +532,44 @@ export class DevicesPage extends LitElement {
       if (dose) next.splice(index + by, 0, dose);
       setDoses(next);
     };
-    const setAmount = (program: string | null, id: string, value: string) => {
+    /** Writes a cell's value, or clears it unless `valid`; a suggested row is stored
+     * only once it gets a valid value. */
+    const setCell = (
+      program: string | null,
+      value: string,
+      valid: (amount: number) => boolean,
+      write: (row: Settings["program_defaults"]["default"], amount?: number) => typeof row,
+    ) => {
       const row = rowOf(program);
-      const others = Object.fromEntries(
-        Object.entries(row?.doses ?? {}).filter(([own]) => own !== id),
+      const amount = value.trim() === "" ? NaN : Number(value);
+      if (row || valid(amount))
+        setRow(program, write(row ?? { doses: {} }, valid(amount) ? amount : undefined));
+    };
+    const setAmount = (program: string | null, id: string, value: string) =>
+      setCell(
+        program,
+        value,
+        (amount) => amount > 0,
+        (row, amount) => {
+          const doses = Object.fromEntries(Object.entries(row.doses).filter(([own]) => own !== id));
+          return { ...row, doses: amount === undefined ? doses : { ...doses, [id]: amount } };
+        },
       );
-      const amount = Number(value);
-      const valid = value.trim() !== "" && amount > 0;
-      if (row || valid)
-        setRow(program, { ...row, doses: valid ? { ...others, [id]: amount } : others });
-    };
-    const setConsumed = (program: string | null, key: (typeof consumed)[number], value: string) => {
-      const { doses: amounts, kwh, litres } = rowOf(program) ?? { doses: {} };
-      const amount = Number(value);
-      const valid = value.trim() !== "" && amount >= 0;
-      const next = { kwh, litres, [key]: valid ? amount : undefined };
-      if (rowOf(program) || valid)
-        setRow(program, {
-          doses: amounts,
-          ...(next.kwh !== undefined && { kwh: next.kwh }),
-          ...(next.litres !== undefined && { litres: next.litres }),
-        });
-    };
+    const setConsumed = (program: string | null, key: (typeof consumed)[number], value: string) =>
+      setCell(
+        program,
+        value,
+        (amount) => amount >= 0,
+        ({ doses, ...row }, amount) => {
+          const { kwh, litres } =
+            key === "kwh" ? { ...row, kwh: amount } : { ...row, litres: amount };
+          return {
+            doses,
+            ...(kwh !== undefined && { kwh }),
+            ...(litres !== undefined && { litres }),
+          };
+        },
+      );
     const suggestions = this.suggestions?.deviceId === id ? this.suggestions.rows : undefined;
     const format = formatter(this.hass);
     const suggestion = (program: string | null, key: (typeof consumed)[number]) => {
@@ -672,12 +690,7 @@ export class DevicesPage extends LitElement {
                   (material) => html`<option value=${material.id}>${material.name}</option>`,
                 )}
               </select>`
-            : html`<p class="no-materials">
-                ${t("device.no_materials")}
-                <a href="${this.basePath}/materials" @click=${followLink}
-                  >${t("item.to_materials")}</a
-                >
-              </p>`
+            : this.noMaterials(t)
         }
         <p class="muted small">${t("device.doses_hint")}</p>
       </div>
