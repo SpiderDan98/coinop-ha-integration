@@ -19,6 +19,8 @@ from .devices import (
     reconfigure,
     walk_to_mapping,
 )
+from .http import HttpClient
+from .test_cost_statement import export
 from .test_device_flow import fields
 from .test_run_event import record_events
 from .test_runs import set_status, stored_runs
@@ -254,3 +256,25 @@ async def test_a_printer_run_has_no_program_to_correct(
 
     assert error["code"] == "not_allowed"
     assert run["program"] is None
+
+
+@pytest.mark.usefixtures("programmed")
+async def test_a_cost_statement_shows_the_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    await set_program(hass, "Cotton 60°")
+    await wash(hass, clock)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], name="Towels")
+
+    detailed = await export(panel, browser, run_ids=[run["id"]])
+    compact = await export(panel, browser, run_ids=[run["id"]], detail="compact")
+
+    assert (
+        "Washer · Jan 15, 2026 · Program Cotton 60° · Running time 1 h 30 min"
+        in detailed.lines
+    )
+    assert compact.lines[3:5] == [
+        "Run Device Program Start Total",
+        "Towels Washer Cotton 60° Jan 15, 2026 €0.60",
+    ]

@@ -44,6 +44,7 @@ SHARED_TERMS = {
 STATEMENT_TERMS = {
     "statement.default_title": "title",
     "run.untitled": "untitled",
+    "run.program": "column.program",
     "duration": "duration",
     "kind.electricity": "kind.electricity",
     "kind.water": "kind.water",
