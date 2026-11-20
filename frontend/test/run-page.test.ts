@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
 import { click, mountPanel, query, queryAll, settle, text } from "./render";
 
-const SUBSCRIBE = "wattbill/runs/subscribe";
-const GET = "wattbill/runs/get";
+const SUBSCRIBE = "coinop/runs/subscribe";
+const GET = "coinop/runs/get";
 const [started, updated, ended] = recorded.changes;
 /** A Line Item row as a receipt line: "label evidence quantity unit × unit price = amount". */
 const receiptLine = (item: HTMLElement) => {
@@ -43,8 +43,8 @@ describe("Run page", () => {
 
     await click(panel, benchy);
 
-    expect(location.pathname).toBe("/wattbill/run/benchy");
-    expect(text(query(panel, ".title"))).toBe("WattBill › Runs › Benchy");
+    expect(location.pathname).toBe("/coinop/run/benchy");
+    expect(text(query(panel, ".title"))).toBe("Coin-op › Runs › Benchy");
     expect(backend.calls.at(-1)).toEqual({ type: GET, run_id: "benchy" });
   });
 
@@ -105,7 +105,7 @@ describe("Run page", () => {
 
     await click(panel, query(panel, ".title a.runs-link"));
 
-    expect(location.pathname).toBe("/wattbill/runs");
+    expect(location.pathname).toBe("/coinop/runs");
     expect(queryAll(panel, ".tile")).toHaveLength(3);
   });
 
@@ -137,7 +137,7 @@ describe("Run page", () => {
     backend.push(SUBSCRIBE, { change: "deleted", run: benchy });
     await settle(panel);
 
-    expect(text(query(panel, "wattbill-run-page"))).toBe(
+    expect(text(query(panel, "coinop-run-page"))).toBe(
       "This Run no longer exists. Back to all Runs",
     );
   });
@@ -145,7 +145,7 @@ describe("Run page", () => {
   it("says so for a link to a Run that doesn't exist", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/nope" });
 
-    expect(text(query(panel, "wattbill-run-page"))).toContain("This Run no longer exists.");
+    expect(text(query(panel, "coinop-run-page"))).toContain("This Run no longer exists.");
   });
 
   it("is in German when Home Assistant is", async () => {
@@ -161,6 +161,6 @@ describe("Run page", () => {
   it("collapses to one column on narrow screens", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy", narrow: true });
 
-    expect(query(panel, "wattbill-run-page").hasAttribute("narrow")).toBe(true);
+    expect(query(panel, "coinop-run-page").hasAttribute("narrow")).toBe(true);
   });
 });

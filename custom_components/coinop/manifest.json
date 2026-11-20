@@ -1,0 +1,16 @@
+{
+  "domain": "coinop",
+  "name": "Coin-op",
+  "after_dependencies": ["camera", "frontend", "image", "panel_custom", "recorder"],
+  "categories": ["energy.meters_monitoring", "computers_network.printers"],
+  "codeowners": ["@SpiderDan98"],
+  "config_flow": true,
+  "dependencies": ["http", "websocket_api"],
+  "documentation": "https://github.com/SpiderDan98/coinop-ha-integration",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/SpiderDan98/coinop-ha-integration/issues",
+  "requirements": ["fpdf2==2.9.0"],
+  "single_config_entry": true,
+  "version": "0.0.0"
+}

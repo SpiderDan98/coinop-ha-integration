@@ -180,7 +180,7 @@ async def test_record_the_runs_the_panel_shows(
     hass.states.async_set(STATUS, "idle")
     used = {"unit_of_measurement": "mm"}
     hass.states.async_set(FILAMENT, "0", used)
-    await panel.subscribe("wattbill/runs/subscribe")
+    await panel.subscribe("coinop/runs/subscribe")
     events = [await panel.event()]
     subentry = await add_device(
         hass,
@@ -191,9 +191,9 @@ async def test_record_the_runs_the_panel_shows(
         paused_power=8,
         price=0.30,
     )
-    wear = await panel.call("wattbill/templates/create", template=WEAR)
+    wear = await panel.call("coinop/templates/create", template=WEAR)
     await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=subentry.subentry_id,
         settings={
             "tags_for_new_runs": ["Batch 7"],
@@ -216,7 +216,7 @@ async def test_record_the_runs_the_panel_shows(
         wear["template"]["id"]: "template-wear",
     }
     runs = [run["id"] for run in events[0]["runs"]] + [live_id]
-    details = [await panel.call("wattbill/runs/get", run_id=run) for run in runs]
+    details = [await panel.call("coinop/runs/get", run_id=run) for run in runs]
     [live_item, live_material, live_wear] = details[-1]["run"]["line_items"]
     ids[live_item["id"]] = "print-live-electricity"
     ids[live_material["id"]] = "print-live-material"
@@ -237,7 +237,7 @@ async def test_record_the_runs_the_panel_shows(
     assert_recorded("runs-subscribe", stable_ids(events, ids))
     assert_recorded("runs-get", stable_ids(details, ids))
     # Mini's Runs stay in the history after it was removed.
-    devices = await panel.call("wattbill/devices/list")
+    devices = await panel.call("coinop/devices/list")
     assert_recorded("devices-list", stable_ids(devices, ids))
 
 
@@ -249,13 +249,13 @@ async def test_record_line_item_corrections(
     await add_hub(hass)
 
     overridden = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id="benchy",
         line_item_id="electricity",
         amount=0.1,
     )
     added = await panel.call(
-        "wattbill/line_items/add",
+        "coinop/line_items/add",
         run_id="helmet",
         kind="other",
         label="Refund for the failed print",
@@ -264,24 +264,24 @@ async def test_record_line_item_corrections(
     )
 
     template = await panel.call(
-        "wattbill/line_items/save_as_template",
+        "coinop/line_items/save_as_template",
         run_id="benchy",
         line_item_id="benchy-wear",
     )
     from_template = await panel.call(
-        "wattbill/line_items/add_template",
+        "coinop/line_items/add_template",
         run_id="benchy",
         template_id=template["template"]["id"],
         quantity=2,
     )
     picked = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id="helmet",
         line_item_id="helmet-filament",
         material_id="petg-white",
     )
     added_material = await panel.call(
-        "wattbill/line_items/add",
+        "coinop/line_items/add",
         run_id="benchy",
         kind="material",
         material_id="petg-white",
@@ -313,7 +313,7 @@ async def test_record_a_manual_run(
     subentry = await add_device(hass, entry, running_power=120, price=0.30)
 
     created = await panel.call(
-        "wattbill/runs/create",
+        "coinop/runs/create",
         device_id=subentry.subentry_id,
         name="Bracket",
         started=(CLOCK_START - DAY / 4).isoformat(),
@@ -338,7 +338,7 @@ async def test_record_what_deleting_a_run_drops(
     place_runs(hass_storage, *history())
     await add_hub(hass)
 
-    preview = await panel.call("wattbill/runs/delete_preview", run_ids=["helmet"])
+    preview = await panel.call("coinop/runs/delete_preview", run_ids=["helmet"])
 
     assert_recorded("runs-delete-preview", preview)
 
@@ -364,14 +364,14 @@ async def test_record_the_aggregates_of_overview_and_analysis(
 
     answers = [
         {"group_by": group_by}
-        | await panel.call("wattbill/aggregates/get", group_by=group_by)
+        | await panel.call("coinop/aggregates/get", group_by=group_by)
         for group_by in PANEL_GROUPINGS
     ]
     # The totals of each selection of Runs: gallery, basket, failed + cancelled.
     ids = sorted(run["id"] for run in history())
     answers += [
         {"group_by": [], "run_ids": list(run_ids)}
-        | await panel.call("wattbill/aggregates/get", run_ids=list(run_ids))
+        | await panel.call("coinop/aggregates/get", run_ids=list(run_ids))
         for count in range(1, len(ids) + 1)
         for run_ids in combinations(ids, count)
     ]
@@ -389,16 +389,16 @@ async def test_record_what_the_image_commands_answer(
 ) -> None:
     place_runs(hass_storage, *history())
     await add_hub(hass)
-    path = "/api/wattbill/runs/benchy/images"
+    path = "/api/coinop/runs/benchy/images"
 
     status, uploaded = await http.upload(path, picture("green"))
     refused = await http.upload(path, *[picture()] * 10)
     [upload] = uploaded["images"]
     cover = await panel.call(
-        "wattbill/images/set_cover", run_id="benchy", image_id=upload["id"]
+        "coinop/images/set_cover", run_id="benchy", image_id=upload["id"]
     )
     deleted = await panel.call(
-        "wattbill/images/delete", run_id="benchy", image_id=upload["id"]
+        "coinop/images/delete", run_id="benchy", image_id=upload["id"]
     )
 
     assert (status, refused[0]) == (HTTPStatus.OK, HTTPStatus.CONFLICT)
@@ -419,8 +419,8 @@ async def test_record_the_catalogue_the_panel_shows(
 ) -> None:
     place_runs(hass_storage, stored_run("vase"))
     await add_hub(hass)
-    types = await panel.call("wattbill/materials/types")
-    await panel.subscribe("wattbill/catalog/subscribe")
+    types = await panel.call("coinop/materials/types")
+    await panel.subscribe("coinop/catalog/subscribe")
     events = [await panel.event()]
     fixed = {"source": "fixed", "pack_price": 19.99, "pack_size": 1000}
     created = []
@@ -451,26 +451,26 @@ async def test_record_the_catalogue_the_panel_shows(
             "price": fixed | {"pack_price": 15.99},
         },
     ):
-        result = await panel.call("wattbill/materials/create", material=material)
+        result = await panel.call("coinop/materials/create", material=material)
         created.append(result["material"]["id"])
         await panel.event()
-    await panel.call("wattbill/materials/archive", material_id=created[-1])
+    await panel.call("coinop/materials/archive", material_id=created[-1])
     tags = ["Cosplay helmet", "Gift", "Spare"]
-    await panel.call("wattbill/runs/update", run_id="vase", tags=tags)
-    rename = await panel.call("wattbill/tags/rename", tag="Spare", name="Spare parts")
+    await panel.call("coinop/runs/update", run_id="vase", tags=tags)
+    rename = await panel.call("coinop/tags/rename", tag="Spare", name="Spare parts")
     templates = []
     for fields in TEMPLATES:
-        result = await panel.call("wattbill/templates/create", template=fields)
+        result = await panel.call("coinop/templates/create", template=fields)
         templates.append(result["template"])
         await panel.event()
     updated = await panel.call(
-        "wattbill/templates/update",
+        "coinop/templates/update",
         template_id=templates[2]["id"],
         template={"unit_price": 0.6},
     )
     # A panel opened now gets the whole catalogue at once.
     later = connect_panel(hass_admin_user)
-    await later.subscribe("wattbill/catalog/subscribe")
+    await later.subscribe("coinop/catalog/subscribe")
     events.append(await later.event())
     ids = {material: f"material-{n}" for n, material in enumerate(created, 1)}
     ids |= {
@@ -508,7 +508,7 @@ async def test_record_a_run_split_across_slots(
         loaded_slot="sensor.ace_loaded_slot",
     )
     await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=subentry.subentry_id,
         settings={"default_material": "pla-black"},
     )
@@ -519,12 +519,12 @@ async def test_record_a_run_split_across_slots(
     hass.states.async_set(FILAMENT, "4000", used)
     hass.states.async_set(STATUS, "finished")
     await hass.async_block_till_done()
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    detail = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     electricity_item, pla_item, petg_item = detail["line_items"]
 
     corrected = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=petg_item["id"],
         quantity=4,
@@ -568,17 +568,17 @@ async def test_record_what_spoolman_answers(
         spools=[spool(1, petg, price=29.99, initial_weight=1000.0)],
     )
 
-    listed = await panel.call("wattbill/spoolman/filaments")
-    created = await panel.call("wattbill/materials/create_from_spoolman", filament_id=8)
+    listed = await panel.call("coinop/spoolman/filaments")
+    created = await panel.call("coinop/materials/create_from_spoolman", filament_id=8)
     linked = await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id="pla-black",
         material={"price": {"source": "spoolman", "filament_id": 7}},
     )
     spoolman_down(aioclient_mock)
-    unreachable = await panel.call("wattbill/spoolman/filaments")
+    unreachable = await panel.call("coinop/spoolman/filaments")
     await set_options(hass, entry)
-    not_configured = await panel.call("wattbill/spoolman/filaments")
+    not_configured = await panel.call("coinop/spoolman/filaments")
 
     assert_recorded("spoolman-filaments", listed)
     assert_recorded("spoolman-filaments-unavailable", [not_configured, unreachable])
@@ -594,9 +594,9 @@ async def test_record_the_cost_statement_export(
     entry = await add_hub(hass)
     await set_options(hass, entry, markup=10)
 
-    defaults = await panel.call("wattbill/cost_statement/defaults")
+    defaults = await panel.call("coinop/cost_statement/defaults")
     created = await panel.call(
-        "wattbill/cost_statement/create",
+        "coinop/cost_statement/create",
         run_ids=["benchy", "helmet"],
         detail="compact",
         language="en",

@@ -76,7 +76,7 @@ def main(target: str, pytest_args: list[str]) -> int:
             f"usage: uv run scripts/test_ha.py <{'|'.join(TARGETS)}> [pytest args]"
         )
     manifest = json.loads(
-        (ROOT / "custom_components" / "wattbill" / "manifest.json").read_text()
+        (ROOT / "custom_components" / "coinop" / "manifest.json").read_text()
     )
     version = harness_version(target)
     tested = pinned_homeassistant(version)

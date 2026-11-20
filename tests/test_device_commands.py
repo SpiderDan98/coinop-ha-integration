@@ -13,7 +13,7 @@ from .test_device_management import remove
 from .test_persistence import restart
 from .websocket import PanelClient
 
-SETTINGS = "wattbill.device_settings"
+SETTINGS = "coinop.device_settings"
 NO_SETTINGS: dict[str, Any] = {
     "tags_for_new_runs": [],
     "automatic_templates": [],
@@ -36,7 +36,7 @@ async def test_each_device_lists_its_ha_side_settings(
     )
     mini = await add_device(hass, entry, name="Mini", status="sensor.mini_status")
 
-    result = await panel.call("wattbill/devices/list")
+    result = await panel.call("coinop/devices/list")
 
     assert result["devices"] == [
         {
@@ -91,18 +91,18 @@ async def test_a_panel_setting_is_kept_across_restarts(
 ) -> None:
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
-    [listed] = (await panel.call("wattbill/devices/list"))["devices"]
+    [listed] = (await panel.call("coinop/devices/list"))["devices"]
     assert listed["settings"] == NO_SETTINGS
 
     result = await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"tags_for_new_runs": ["Workshop"]},
     )
     await restart(hass, entry)
 
     assert result == {"settings": NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}}
-    [listed] = (await panel.call("wattbill/devices/list"))["devices"]
+    [listed] = (await panel.call("coinop/devices/list"))["devices"]
     assert listed["settings"] == NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}
 
 
@@ -112,13 +112,13 @@ async def test_an_update_leaves_settings_it_does_not_name_alone(
     entry = await add_hub(hass)
     kobra = await add_device(hass, entry)
     await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"tags_for_new_runs": ["Workshop"]},
     )
 
     result = await panel.call(
-        "wattbill/devices/update_settings", device_id=kobra.subentry_id, settings={}
+        "coinop/devices/update_settings", device_id=kobra.subentry_id, settings={}
     )
 
     assert result == {"settings": NO_SETTINGS | {"tags_for_new_runs": ["Workshop"]}}
@@ -131,12 +131,12 @@ async def test_an_unknown_setting_or_value_is_rejected(
     kobra = await add_device(hass, entry)
 
     unknown = await panel.error(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"colour": "red"},
     )
     wrong = await panel.error(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"tags_for_new_runs": "Workshop"},
     )
@@ -152,13 +152,13 @@ async def test_a_removed_device_has_no_settings_to_update(
     await remove(hass, entry, kobra)
 
     error = await panel.error(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"tags_for_new_runs": ["Workshop"]},
     )
 
     assert error["code"] == "not_found"
-    assert (await panel.call("wattbill/devices/list")) == {"devices": []}
+    assert (await panel.call("coinop/devices/list")) == {"devices": []}
 
 
 async def test_a_removed_devices_settings_are_dropped(
@@ -171,7 +171,7 @@ async def test_a_removed_devices_settings_are_dropped(
     mini = await add_device(hass, entry, name="Mini", status="sensor.mini_status")
     for device in (kobra, mini):
         await panel.call(
-            "wattbill/devices/update_settings",
+            "coinop/devices/update_settings",
             device_id=device.subentry_id,
             settings={"tags_for_new_runs": [device.title]},
         )
@@ -195,7 +195,7 @@ async def test_settings_written_by_a_newer_version_are_kept(
     await restart(hass, entry)
 
     await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"tags_for_new_runs": ["Workshop"]},
     )
@@ -216,23 +216,23 @@ async def test_the_default_material_is_a_current_material_or_none(
     kobra = await add_device(hass, entry)
 
     result = await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"default_material": "pla"},
     )
     assert result["settings"]["default_material"] == "pla"
     for material, code in (("nope", "not_found"), ("old", "not_allowed")):
         error = await panel.error(
-            "wattbill/devices/update_settings",
+            "coinop/devices/update_settings",
             device_id=kobra.subentry_id,
             settings={"default_material": material},
         )
         assert error["code"] == code, material
-    [listed] = (await panel.call("wattbill/devices/list"))["devices"]
+    [listed] = (await panel.call("coinop/devices/list"))["devices"]
     assert listed["settings"]["default_material"] == "pla"
 
     cleared = await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=kobra.subentry_id,
         settings={"default_material": None},
     )
@@ -242,9 +242,9 @@ async def test_the_default_material_is_a_current_material_or_none(
 @pytest.mark.parametrize(
     ("command", "data"),
     [
-        ("wattbill/devices/list", {}),
+        ("coinop/devices/list", {}),
         (
-            "wattbill/devices/update_settings",
+            "coinop/devices/update_settings",
             {"device_id": "a", "settings": {}},
         ),
     ],

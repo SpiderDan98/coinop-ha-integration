@@ -162,25 +162,25 @@ The problem reduces to knowing consumption at arbitrary times: Run start, Run en
 How well each input lets you determine E(t) at a boundary:
 - **Energy meter:** you get readings at times t_k. For a boundary between two readings you can interpolate linearly, or use the power in that interval if a power sensor exists. The error is at most one reporting interval's ΔE times the price difference.
 - **Power sensor:** HA states behave as steps (each value holds until the next one). The left rule with a split exactly at the boundary is consistent with HA. Remaining errors come from sample density, the gap until the first sample after start, and `unavailable` periods.
-- **Estimated** (nominal wattage, standby): WattBill knows the power curve itself. It is a step function, e.g. driven by device state, so integrating it over the segments is **analytically exact** relative to the model. All the uncertainty sits in the model, not in the accounting.
+- **Estimated** (nominal wattage, standby): Coin-op knows the power curve itself. It is a step function, e.g. driven by device state, so integrating it over the segments is **analytically exact** relative to the model. All the uncertainty sits in the model, not in the accounting.
 
 ### 3.2 Options compared
 
 **A. Compute live (event-driven) and settle at price boundaries.** This is the PowerCalc / dynamic_energy_cost pattern, extended with interpolation.
 - **Accuracy:** very good with splitting at boundaries. Without interpolation, the meter-lag gap from 2.1 remains.
-- **Restarts:** WattBill must persist the Run state. Core's lesson applies here: restore state is saved every 15 minutes and on stop, so after a crash the snapshot is stale ([energy/sensor.py L742-L757](https://github.com/home-assistant/core/blob/310914243c1bdbd6149f8466ca2c8eb0cdb36d50/homeassistant/components/energy/sensor.py#L742-L757)). Persist **absolute data points** (time, meter reading, price) per segment rather than a **running total**. Then the computation is idempotent and never counts twice **[Inference]**.
+- **Restarts:** Coin-op must persist the Run state. Core's lesson applies here: restore state is saved every 15 minutes and on stop, so after a crash the snapshot is stale ([energy/sensor.py L742-L757](https://github.com/home-assistant/core/blob/310914243c1bdbd6149f8466ca2c8eb0cdb36d50/homeassistant/components/energy/sensor.py#L742-L757)). Persist **absolute data points** (time, meter reading, price) per segment rather than a **running total**. Then the computation is idempotent and never counts twice **[Inference]**.
 - **Downtime:** with a hardware meter the energy is known, but not how it splits across price segments, short of assuming it was linear in time. With a power sensor or an estimate, the downtime consumption is unknown or can only be modelled.
 - **Effort:** medium. Two listeners (price and consumption), a timer or the `state_reported` event for constant power (see the Riemann helper, 2.2), and persistence.
 
 **B. Compute after the Run ends from the recorder *state* history.**
 - **Accuracy:** as good as A. Price states give the exact switch times, and energy or power states give the data points. The computation is deterministic and easy to test.
-- **Restarts:** robust against restarts of WattBill itself. HA downtime is missing from the history just as in A. B is well suited to filling gaps after a restart.
+- **Restarts:** robust against restarts of Coin-op itself. HA downtime is missing from the history just as in A. B is well suited to filling gaps after a restart.
 - **Limitations:**
   - The recorder must be enabled and neither entity excluded ([long-term-statistics.markdown](https://github.com/home-assistant/home-assistant.io/blob/current/source/_docs/configuration/long-term-statistics.markdown): *"If you exclude an entity from the recorder…"*).
   - States are purged after `purge_keep_days`, default 10 days ([recorder.markdown](https://github.com/home-assistant/home-assistant.io/blob/current/source/_integrations/recorder.markdown)). That is enough for Runs.
-  - The recorder commits with a delay, so WattBill has to wait for a flush before reading **[Inference]**.
+  - The recorder commits with a delay, so Coin-op has to wait for a flush before reading **[Inference]**.
   - Long Runs with dense power samples put load on the database **[Inference]**.
-  - Estimated consumption has no history unless WattBill exposes its own power entity.
+  - Estimated consumption has no history unless Coin-op exposes its own power entity.
 - **Effort:** medium. A history query in the executor, plus the same calculation function as A.
 
 **C. Short-term or long-term statistics (5 min / 1 h) after the Run ends.**
@@ -216,7 +216,7 @@ How well each input lets you determine E(t) at a boundary:
   - For estimated consumption, it depends on whether the device state across the downtime is known **[Inference]**.
 - **Prices during downtime** can sometimes be reconstructed. The recorder has no states for that period, but some price integrations offer queries for past prices, e.g. `nordpool.get_prices_for_date` ([nordpool.markdown](https://github.com/home-assistant/home-assistant.io/blob/current/source/_integrations/nordpool.markdown)). There is no generic way to do this for "any price entity" **[Uncertainty]**.
 
-### 3.4 Recommendation for WattBill
+### 3.4 Recommendation for Coin-op
 
 1. **A pure core function** `cost(price_timeline, consumption_samples, t_start, t_end)`. It segments by the price timeline, splits consumption at the boundaries and sums the segments. Energy is interpolated linearly in time, power uses the left rule, and estimates are integrated analytically. It can be tested without HA.
 2. **Feed it live (option A).** Listen for price `state_changed` and for consumption `state_changed`/`state_reported`, and add a timer for constant power. Persist data points, not totals. This also keeps the live cost of a running Run correct.

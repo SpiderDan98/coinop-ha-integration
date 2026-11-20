@@ -34,13 +34,13 @@ def run_using(run_id: str, material_id: str, **fields: Any) -> dict[str, Any]:
 
 
 async def create(panel: PanelClient, **material: Any) -> dict[str, Any]:
-    result = await panel.call("wattbill/materials/create", material=material)
+    result = await panel.call("coinop/materials/create", material=material)
     created: dict[str, Any] = result["material"]
     return created
 
 
 async def materials(panel: PanelClient) -> list[dict[str, Any]]:
-    result = await panel.call("wattbill/materials/list")
+    result = await panel.call("coinop/materials/list")
     listed: list[dict[str, Any]] = result["materials"]
     return listed
 
@@ -132,7 +132,7 @@ async def test_built_in_types_give_the_density_to_pre_fill(
 ) -> None:
     await add_hub(hass)
 
-    result = await panel.call("wattbill/materials/types")
+    result = await panel.call("coinop/materials/types")
 
     types = {entry["type"]: entry for entry in result["types"]}
     assert types["PLA"] == {"type": "PLA", "form": "filament", "density": 1.24}
@@ -167,7 +167,7 @@ async def test_invalid_materials_are_rejected(
 ) -> None:
     await add_hub(hass)
 
-    error = await panel.error("wattbill/materials/create", material=PLA | invalid)
+    error = await panel.error("coinop/materials/create", material=PLA | invalid)
 
     assert error["code"] == "invalid_format"
     assert await materials(panel) == []
@@ -203,7 +203,7 @@ async def test_editing_changes_only_the_given_fields(
     created = await create(panel, **PLA, vendor="eSun", colour="#1a1a1a")
 
     result = await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id=created["id"],
         material={
             "name": "eSun PLA+ black 2 kg",
@@ -235,7 +235,7 @@ async def test_marking_an_edited_material_default_unmarks_the_old_default(
     new = await create(panel, **PLA)
 
     await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id=new["id"],
         material={"default_for_type": True},
     )
@@ -251,7 +251,7 @@ async def test_a_material_switched_to_resin_drops_its_diameter(
     created = await create(panel, **PLA)
 
     result = await panel.call(
-        "wattbill/materials/update",
+        "coinop/materials/update",
         material_id=created["id"],
         material={"form": "resin", "type": "Standard resin", "density": 1.1},
     )
@@ -265,8 +265,8 @@ async def test_archiving_takes_a_material_out_of_use_until_restored(
     await add_hub(hass)
     created = await create(panel, **PLA, default_for_type=True)
 
-    archived = await panel.call("wattbill/materials/archive", material_id=created["id"])
-    restored = await panel.call("wattbill/materials/restore", material_id=created["id"])
+    archived = await panel.call("coinop/materials/archive", material_id=created["id"])
+    restored = await panel.call("coinop/materials/restore", material_id=created["id"])
 
     assert archived["material"]["archived"] is True
     # An archived Material leaves Slot matching, so it is no longer its type's default.
@@ -282,7 +282,7 @@ async def test_deleting_an_unused_material_removes_it(
     kept = await create(panel, **PLA)
     unused = await create(panel, **PLA | {"name": "PLA red"})
 
-    result = await panel.call("wattbill/materials/delete", material_id=unused["id"])
+    result = await panel.call("coinop/materials/delete", material_id=unused["id"])
 
     assert result == {"deleted": True}
     assert await materials(panel) == [kept]
@@ -303,12 +303,12 @@ async def test_deleting_a_material_a_run_uses_archives_it_instead(
     )
     await add_hub(hass)
 
-    result = await panel.call("wattbill/materials/delete", material_id="pla")
+    result = await panel.call("coinop/materials/delete", material_id="pla")
 
     assert result == {"deleted": False}
     [material] = await materials(panel)
     assert material["archived"] is True
-    run = (await panel.call("wattbill/runs/get", run_id="benchy"))["run"]
+    run = (await panel.call("coinop/runs/get", run_id="benchy"))["run"]
     assert run["line_items"][1]["material_id"] == "pla"
 
 
@@ -322,7 +322,7 @@ async def test_a_used_material_that_is_already_archived_stays_archived(
     )
     await add_hub(hass)
 
-    result = await panel.call("wattbill/materials/delete", material_id="pla")
+    result = await panel.call("coinop/materials/delete", material_id="pla")
 
     assert result == {"deleted": False}
     assert [m["id"] for m in await materials(panel)] == ["pla"]
@@ -334,7 +334,7 @@ async def test_the_catalogue_survives_a_restart(
     entry = await add_hub(hass)
     kept = await create(panel, **PLA, vendor="eSun")
     archived = await create(panel, **PLA | {"name": "PLA red"})
-    await panel.call("wattbill/materials/archive", material_id=archived["id"])
+    await panel.call("coinop/materials/archive", material_id=archived["id"])
     before = await materials(panel)
 
     assert await hass.config_entries.async_reload(entry.entry_id)
@@ -362,9 +362,7 @@ async def test_an_unknown_material_is_not_found(
 ) -> None:
     await add_hub(hass)
 
-    error = await panel.error(
-        f"wattbill/materials/{command}", material_id="nope", **data
-    )
+    error = await panel.error(f"coinop/materials/{command}", material_id="nope", **data)
 
     assert error["code"] == "not_found"
 
@@ -378,17 +376,17 @@ async def test_every_open_panel_sees_catalogue_changes(
 ) -> None:
     entry = await add_hub(hass)
     other = connect_panel(hass_admin_user)
-    await other.subscribe("wattbill/catalog/subscribe")
+    await other.subscribe("coinop/catalog/subscribe")
     assert await other.event() == {"materials": [], "tags": [], "templates": []}
 
     created = await create(panel, **PLA)
     assert await other.event() == {"materials": [created]}
-    archived = await panel.call("wattbill/materials/archive", material_id=created["id"])
+    archived = await panel.call("coinop/materials/archive", material_id=created["id"])
     assert await other.event() == {"materials": [archived["material"]]}
     # Subscriptions outlive a reload of the hub entry.
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    await panel.call("wattbill/materials/delete", material_id=created["id"])
+    await panel.call("coinop/materials/delete", material_id=created["id"])
     assert await other.event() == {"materials": []}
 
 
@@ -398,7 +396,7 @@ async def test_a_new_subscriber_first_gets_the_whole_catalogue(
     place_materials(hass_storage, stored_material("pla"), stored_material("petg"))
     await add_hub(hass)
 
-    await panel.subscribe("wattbill/catalog/subscribe")
+    await panel.subscribe("coinop/catalog/subscribe")
 
     first = await panel.event()
     assert [m["id"] for m in first["materials"]] == ["pla", "petg"]
@@ -408,14 +406,14 @@ async def test_a_new_subscriber_first_gets_the_whole_catalogue(
 @pytest.mark.parametrize(
     ("command", "data"),
     [
-        ("wattbill/catalog/subscribe", {}),
-        ("wattbill/materials/list", {}),
-        ("wattbill/materials/types", {}),
-        ("wattbill/materials/create", {"material": PLA}),
-        ("wattbill/materials/update", {"material_id": "pla", "material": {}}),
-        ("wattbill/materials/archive", {"material_id": "pla"}),
-        ("wattbill/materials/restore", {"material_id": "pla"}),
-        ("wattbill/materials/delete", {"material_id": "pla"}),
+        ("coinop/catalog/subscribe", {}),
+        ("coinop/materials/list", {}),
+        ("coinop/materials/types", {}),
+        ("coinop/materials/create", {"material": PLA}),
+        ("coinop/materials/update", {"material_id": "pla", "material": {}}),
+        ("coinop/materials/archive", {"material_id": "pla"}),
+        ("coinop/materials/restore", {"material_id": "pla"}),
+        ("coinop/materials/delete", {"material_id": "pla"}),
     ],
 )
 async def test_only_admins_use_the_catalogue(

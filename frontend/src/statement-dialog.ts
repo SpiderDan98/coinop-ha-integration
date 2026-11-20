@@ -14,7 +14,7 @@ import { shared } from "./styles";
 
 type Options = Omit<Parameters<typeof createStatement>[2], "title" | "note">;
 
-const REMEMBERED = "wattbill-statement-options";
+const REMEMBERED = "coinop-statement-options";
 
 const FITS = {
   detail: (value: unknown) => STATEMENT_DETAILS.some((detail) => detail === value),
@@ -51,7 +51,7 @@ const LANGUAGE_NAMES = { en: "English", de: "Deutsch" } satisfies Record<
   string
 >;
 
-@customElement("wattbill-statement-dialog")
+@customElement("coinop-statement-dialog")
 export class StatementDialog extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** The selected final Runs, by start. */
@@ -106,7 +106,7 @@ export class StatementDialog extends LitElement {
       this.runIds.length === 1
         ? t("statement.dialog_title_one")
         : t("statement.dialog_title", { count: this.runIds.length });
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="statement-dialog dialog"
       .label=${title}
       .closeLabel=${t("dialog.close")}
@@ -189,7 +189,7 @@ export class StatementDialog extends LitElement {
           ${t("statement.download")}
         </ha-button>
       </div>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   private async download() {
@@ -222,8 +222,8 @@ export class StatementDialog extends LitElement {
   static override styles = [
     shared,
     css`
-      wattbill-dialog {
-        --wattbill-dialog-width: 520px;
+      coinop-dialog {
+        --coinop-dialog-width: 520px;
       }
       .options {
         flex-wrap: wrap;
@@ -257,6 +257,6 @@ export class StatementDialog extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-statement-dialog": StatementDialog;
+    "coinop-statement-dialog": StatementDialog;
   }
 }

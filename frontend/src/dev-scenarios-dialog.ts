@@ -1,4 +1,4 @@
-// Dev container only (the `wattbill_dev` integration): switches WattBill's data to a
+// Dev container only (the `coinop_dev` integration): switches Coin-op's data to a
 // Scenario of test data. Loading replaces the hub entry, so the page loads afresh after.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -7,7 +7,7 @@ import { localize } from "./localize";
 import "./dialog";
 import { shared } from "./styles";
 
-export const DEV_INTEGRATION = "wattbill_dev";
+export const DEV_INTEGRATION = "coinop_dev";
 
 const listScenarios = (hass: HomeAssistant) =>
   hass.callWS<{
@@ -15,7 +15,7 @@ const listScenarios = (hass: HomeAssistant) =>
     current: string | null;
   }>({ type: `${DEV_INTEGRATION}/scenarios` });
 
-@customElement("wattbill-dev-scenarios-dialog")
+@customElement("coinop-dev-scenarios-dialog")
 export class DevScenariosDialog extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) basePath = "";
@@ -34,7 +34,7 @@ export class DevScenariosDialog extends LitElement {
 
   override render() {
     const t = localize(this.hass);
-    return html`<wattbill-dialog
+    return html`<coinop-dialog
       class="dialog"
       .label=${t("dev.title")}
       .closeLabel=${t("dialog.close")}
@@ -65,7 +65,7 @@ export class DevScenariosDialog extends LitElement {
             </li>`,
         )}
       </ul>
-    </wattbill-dialog>`;
+    </coinop-dialog>`;
   }
 
   private async load(scenario: string) {
@@ -111,6 +111,6 @@ export class DevScenariosDialog extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-dev-scenarios-dialog": DevScenariosDialog;
+    "coinop-dev-scenarios-dialog": DevScenariosDialog;
   }
 }

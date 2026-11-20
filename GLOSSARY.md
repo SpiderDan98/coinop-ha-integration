@@ -1,4 +1,4 @@
-# WattBill
+# Coin-op
 
 Tracks what individual household devices cost to run, one Run at a time, inside Home Assistant.
 

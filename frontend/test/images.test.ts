@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FakeBackend, recorded, recordedBackend } from "./fake-hass";
 import { mountPanel, query, queryAll, settle, text } from "./render";
 
-const SUBSCRIBE = "wattbill/runs/subscribe";
+const SUBSCRIBE = "coinop/runs/subscribe";
 const tiles = (panel: Element) => queryAll(panel, ".tile");
 const shown = (root: Element) => queryAll(root, "img").map((img) => img.getAttribute("src"));
 const cover = (id: string) => {
@@ -46,19 +46,19 @@ describe("Run images", () => {
   });
 
   it("follow a tile's new Cover Image", async () => {
-    const backend = recordedBackend().file("/api/wattbill/runs/cancelled/images/new/tile");
+    const backend = recordedBackend().file("/api/coinop/runs/cancelled/images/new/tile");
     const panel = await mountPanel(backend);
 
     backend.push(SUBSCRIBE, {
       change: "updated",
       run: {
         ...recorded.summary("cancelled"),
-        cover: { ...cover("helmet"), tile_url: "/api/wattbill/runs/cancelled/images/new/tile" },
+        cover: { ...cover("helmet"), tile_url: "/api/coinop/runs/cancelled/images/new/tile" },
       },
     });
     await settle(panel);
 
-    expect(backend.fetches.at(-1)).toBe("/api/wattbill/runs/cancelled/images/new/tile");
+    expect(backend.fetches.at(-1)).toBe("/api/coinop/runs/cancelled/images/new/tile");
     expect(shown(tiles(panel)[0])).toEqual([expect.stringMatching(/^blob:/)]);
   });
 

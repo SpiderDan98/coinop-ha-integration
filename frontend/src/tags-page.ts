@@ -10,7 +10,7 @@ import { localize, type Localize } from "./localize";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
-@customElement("wattbill-tags-page")
+@customElement("coinop-tags-page")
 export class TagsPage extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   /** Undefined until the catalogue arrives. */
@@ -263,6 +263,6 @@ export class TagsPage extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-tags-page": TagsPage;
+    "coinop-tags-page": TagsPage;
   }
 }

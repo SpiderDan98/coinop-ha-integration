@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { FakeBackend, WsError, recorded, recordedBackend } from "./fake-hass";
 import { mountPanel, query, queryAll, settle, text } from "./render";
 
-const SUBSCRIBE = "wattbill/runs/subscribe";
-const CATALOG = "wattbill/catalog/subscribe";
+const SUBSCRIBE = "coinop/runs/subscribe";
+const CATALOG = "coinop/catalog/subscribe";
 const tiles = (panel: Element) => queryAll(panel, ".tile").map(text);
 const [started, updated, ended] = recorded.changes;
 
@@ -16,7 +16,7 @@ describe("Run gallery", () => {
       "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h Failed €0.30 Cosplay helmet Gift",
       "Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86 €0.22 per part × 4 Gift",
     ]);
-    expect(text(query(panel, "wattbill-run-list .head"))).toBe("3 Runs · €1.23");
+    expect(text(query(panel, "coinop-run-list .head"))).toBe("3 Runs · €1.23");
   });
 
   it("follows Runs as they start, progress, end and are deleted", async () => {
@@ -53,13 +53,13 @@ describe("Run gallery", () => {
     expect(backend.calls).toEqual([
       { type: SUBSCRIBE },
       { type: CATALOG },
-      { type: "wattbill/devices/list" },
+      { type: "coinop/devices/list" },
       ...[[], ["month"], ["month", "kind"], ["kind", "material"]].map((group_by) => ({
-        type: "wattbill/aggregates/get",
+        type: "coinop/aggregates/get",
         group_by,
       })),
       // Failed + cancelled.
-      { type: "wattbill/aggregates/get", group_by: [], run_ids: ["helmet", "cancelled"] },
+      { type: "coinop/aggregates/get", group_by: [], run_ids: ["helmet", "cancelled"] },
     ]);
   });
 
@@ -82,14 +82,14 @@ describe("Run gallery", () => {
     expect(text(panel)).toContain("No Runs yet.");
   });
 
-  it("says when WattBill can't be reached", async () => {
+  it("says when Coin-op can't be reached", async () => {
     const backend = new FakeBackend().subscription(SUBSCRIBE, () => {
       throw new WsError("not_loaded");
     });
 
     const panel = await mountPanel(backend);
 
-    expect(text(panel)).toContain("WattBill could not load its Runs.");
+    expect(text(panel)).toContain("Coin-op could not load its Runs.");
   });
 
   it("is in German when Home Assistant is", async () => {
@@ -109,7 +109,7 @@ describe("Run gallery", () => {
   it("collapses to one column on narrow screens", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/runs", narrow: true });
 
-    expect(query(panel, "wattbill-run-list").hasAttribute("narrow")).toBe(true);
+    expect(query(panel, "coinop-run-list").hasAttribute("narrow")).toBe(true);
   });
 
   it("offers HA's sidebar on narrow screens", async () => {

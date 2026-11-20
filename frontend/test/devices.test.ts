@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
 
-const SUBSCRIBE = "wattbill/runs/subscribe";
-const LIST = "wattbill/devices/list";
+const SUBSCRIBE = "coinop/runs/subscribe";
+const LIST = "coinop/devices/list";
 const [started] = recorded.changes;
 const cards = (panel: Element) => queryAll(panel, ".device").map(text);
 const tiles = (panel: Element) => queryAll(panel, ".tile").map(text);
@@ -21,10 +21,10 @@ describe("Devices tab", () => {
 
     await click(panel, query(panel, `a.tab[href$="/devices"]`));
 
-    expect(location.pathname).toBe("/wattbill/devices");
+    expect(location.pathname).toBe("/coinop/devices");
     expect(cards(panel)).toHaveLength(1);
     await click(panel, query(panel, 'a.tab[title="Overview"]'));
-    expect(location.pathname).toBe("/wattbill");
+    expect(location.pathname).toBe("/coinop");
   });
 
   it("shows each Device's HA-side settings and its own settings read-only", async () => {
@@ -45,7 +45,7 @@ describe("Devices tab", () => {
     ]);
     expect(queryAll(panel, ".device input, .device select")).toHaveLength(0);
     expect(query(panel, ".device a").getAttribute("href")).toBe(
-      "/config/integrations/integration/wattbill",
+      "/config/integrations/integration/coinop",
     );
   });
 
@@ -292,7 +292,7 @@ describe("Devices tab", () => {
 
     await click(panel, query(panel, "ha-button.new-device.fab"));
 
-    expect(location.pathname).toBe("/config/integrations/integration/wattbill");
+    expect(location.pathname).toBe("/config/integrations/integration/coinop");
   });
 
   it("says when the Devices can't be loaded", async () => {
@@ -302,7 +302,7 @@ describe("Devices tab", () => {
 
     const panel = await mountPanel(backend, { path: "/devices" });
 
-    expect(text(panel)).toContain("WattBill could not load its Devices.");
+    expect(text(panel)).toContain("Coin-op could not load its Devices.");
   });
 
   it("is in German when Home Assistant is", async () => {
@@ -340,7 +340,7 @@ describe("Runs of removed Devices", () => {
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
     ]);
-    expect(text(query(panel, "wattbill-run-list .head"))).toBe("1 Run · €0.07");
+    expect(text(query(panel, "coinop-run-list .head"))).toBe("1 Run · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
       "⚑ 2 Helmet Kobra",
@@ -363,7 +363,7 @@ describe("Runs of removed Devices", () => {
 });
 
 describe("A Device's settings dialog", () => {
-  const SETTINGS = "wattbill/devices/update_settings";
+  const SETTINGS = "coinop/devices/update_settings";
   const open = (panel: Element) => click(panel, iconButton(panel, "Edit settings of Kobra"));
 
   it("is titled after the Device and points to HA for its other settings", async () => {
@@ -397,7 +397,7 @@ describe("A Device's settings dialog", () => {
 
 describe("Device settings without a catalogue", () => {
   it("link to the Materials and Line Item Templates tabs instead of empty selects", async () => {
-    const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/catalog/subscribe", () => [
       recorded.catalog.empty,
     ]);
 
@@ -405,8 +405,8 @@ describe("Device settings without a catalogue", () => {
     await click(panel, iconButton(panel, "Edit settings of Kobra"));
 
     expect(queryAll(panel, ".default-material select")).toEqual([]);
-    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/wattbill/materials");
+    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/coinop/materials");
     expect(queryAll(panel, ".automatic-templates select")).toEqual([]);
-    expect(query(panel, ".no-templates a").getAttribute("href")).toBe("/wattbill/templates");
+    expect(query(panel, ".no-templates a").getAttribute("href")).toBe("/coinop/templates");
   });
 });

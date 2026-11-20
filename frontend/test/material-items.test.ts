@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
 import { change, click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
 
-const UPDATE = "wattbill/line_items/update";
-const ADD = "wattbill/line_items/add";
-const SETTINGS = "wattbill/devices/update_settings";
+const UPDATE = "coinop/line_items/update";
+const ADD = "coinop/line_items/add";
+const SETTINGS = "coinop/devices/update_settings";
 const [started] = recorded.changes;
 
 const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
@@ -53,7 +53,7 @@ describe("Material Line Items", () => {
   });
 
   it("stay locked while the Run is open", async () => {
-    const backend = recordedBackend().subscription("wattbill/runs/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/runs/subscribe", () => [
       { runs: [...recorded.snapshot.runs, started.run] },
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });
@@ -136,7 +136,7 @@ describe("A new Material Line Item", () => {
   });
 
   it("points to the Materials tab while there are no Materials", async () => {
-    const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/catalog/subscribe", () => [
       recorded.catalog.empty,
     ]);
     const panel = await mountPanel(backend, { path: "/run/benchy" });
@@ -147,6 +147,6 @@ describe("A new Material Line Item", () => {
     expect(text(query(panel, ".no-materials"))).toContain(
       "A Material Line Item needs a Material from the catalogue.",
     );
-    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/wattbill/materials");
+    expect(query(panel, ".no-materials a").getAttribute("href")).toBe("/coinop/materials");
   });
 });

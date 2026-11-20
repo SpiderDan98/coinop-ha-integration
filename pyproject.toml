@@ -1,7 +1,7 @@
 [project]
-name = "wattbill-ha-integration"
+name = "coinop-ha-integration"
 version = "0.0.0"
-description = "Development environment for the WattBill Home Assistant integration"
+description = "Development environment for the Coin-op Home Assistant integration"
 requires-python = ">=3.14.2"
 
 [dependency-groups]
@@ -42,7 +42,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
-known-first-party = ["custom_components.wattbill"]
+known-first-party = ["custom_components.coinop"]
 combine-as-imports = true
 
 [tool.mypy]

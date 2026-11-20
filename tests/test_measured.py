@@ -17,7 +17,7 @@ from .devices import (
     configure,
     walk_to_consumption,
 )
-from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_persistence import live_runs, restart
 from .test_runs import NO_MATERIAL, set_status, stored_runs
 
@@ -371,9 +371,9 @@ async def test_an_outage_during_a_run_is_a_consumption_gap(
     await set_status(hass, "printing")
     await clock.advance(minutes=10)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(minutes=30)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
     await set_meter(hass, 10.4)
     await set_status(hass, "finished")
 
@@ -390,9 +390,9 @@ async def test_an_outage_holds_the_average_power(
     await set_status(hass, "printing")
     await clock.advance(minutes=30)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(minutes=30)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
     await set_power(hass, 150)
     await clock.advance(minutes=30)
     await set_status(hass, "finished")

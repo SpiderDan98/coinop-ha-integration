@@ -12,7 +12,7 @@ Primary sources: the integrations' repos (README, source code, releases, issues)
   - **Caveat:** turning LAN Mode on from the touchscreen removes the printer from the Anycubic account (confirmed on S1 FW 2.7.2.7).
   - Cloud and LAN are mutually exclusive on the printer.
 - **Run start/end:** both protocols (cloud and LAN) report a job state with `printing`, `paused`, `finished`/`complete`, `stopped`/`cancelled`, plus preparation phases such as `preheating` and `levelling`. **There is no dedicated "error" state.** An error shows up as a pause or stop that carries a reason code.
-  - `chrisfore` has the cleanest signal for WattBill: `event.<printer>_print_event` fires `started`, `paused`, `resumed`, `finished`, `stopped` and `error` (`error` means an unrequested pause or stop). Each event carries `filename`, `progress` and, where relevant, `reason_code`.
+  - `chrisfore` has the cleanest signal for Coin-op: `event.<printer>_print_event` fires `started`, `paused`, `resumed`, `finished`, `stopped` and `error` (`error` means an unrequested pause or stop). Each event carries `filename`, `progress` and, where relevant, `reason_code`.
   - `Nino6689` has `sensor.*_job_state` plus the binary_sensors `job_in_progress`, `job_complete`, `job_failed` and `job_is_paused`. It fires **no** HA events for the job lifecycle.
   - In LAN Mode, Nino6689 2.x moves `job_state` straight to `idle` when a print ends. `finished`/`cancelled` only persist from the 3.0 beta on.
 - **Material usage:** the printer reports exactly **one** number per job, `supplies_usage`, in **mm**. It is the filament actually extruded, purge included.
@@ -27,7 +27,7 @@ Primary sources: the integrations' repos (README, source code, releases, issues)
   - job state comes from patched mapping, because GoKlipper reports `standby` first at print end and Rinkhals rewrites that;
   - the Moonraker HA integration has a history of breaking with Kobra printers;
   - whether GoKlipper fills `print_stats.filament_used` is **unconfirmed**.
-- **Relevant to WattBill's scope:** `Nino6689/hass-anycubic` **already computes electricity and filament cost per job**. It offers `job_energy`, `job_electricity_cost` and `last_job_total_cost`, reads a smart plug's energy sensor and supports dynamic tariffs. For the S1 this overlaps directly with WattBill.
+- **Relevant to Coin-op's scope:** `Nino6689/hass-anycubic` **already computes electricity and filament cost per job**. It offers `job_energy`, `job_electricity_cost` and `last_job_total_cost`, reads a smart plug's energy sensor and supports dynamic tariffs. For the S1 this overlaps directly with Coin-op.
 
 ---
 
@@ -81,7 +81,7 @@ Metadata from the GitHub API (`gh api repos/<repo>` and `/releases`), queried 20
 ### Entities (verified in code)
 The entity descriptions are in [sensor.py](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/sensor.py), [binary_sensor.py](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/binary_sensor.py) and [image.py](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/image.py). Values are mapped in [coordinator.py L515–L578](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/coordinator.py#L515-L578).
 
-| WattBill need | Entity | Source / unit |
+| Coin-op need | Entity | Source / unit |
 |---|---|---|
 | Print state | `sensor.*_job_state` | `latest_project_print_status`, otherwise `"idle"` while the printer is online |
 | | `binary_sensor.*_job_in_progress`, `*_job_complete`, `*_job_failed`, `*_job_is_paused` | from the project status |
@@ -109,7 +109,7 @@ The entity descriptions are in [sensor.py](https://github.com/Nino6689/hass-anyc
 
 Every payload carries a `taskid`. These raw signals are what Run detection ultimately rests on.
 
-**Events.** The code fires exactly one HA event: `anycubic_cloud` with `type: print_cloud_start`. It only fires when a print is started through the integration's own upload services ([services.py L507–L521](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/services.py#L507-L521)). There are **no** events for start, finish or cancel, so WattBill would have to watch state changes.
+**Events.** The code fires exactly one HA event: `anycubic_cloud` with `type: print_cloud_start`. It only fires when a print is started through the integration's own upload services ([services.py L507–L521](https://github.com/Nino6689/hass-anycubic/blob/826065adf4a12145a017856d91630a6deb4dde3a/custom_components/anycubic_cloud/services.py#L507-L521)). There are **no** events for start, finish or cancel, so Coin-op would have to watch state changes.
 
 **Known LAN Mode gap** ([#35](https://github.com/Nino6689/hass-anycubic/issues/35), maintainer comments).
 - Since 2.9.1, `job_state` shows `idle` instead of `unavailable` when nothing is printing.
@@ -143,7 +143,7 @@ Every payload carries a `taskid`. These raw signals are what Run detection ultim
 ### Entities (verified in code)
 Overview in the [README "Entities"](https://github.com/chrisfore/anycubic_ha_local/blob/8ef65afd2493c148bf70ee40c6168a2b8efe9b41/README.md#entities), checked against the code:
 
-| WattBill need | Entity | Code |
+| Coin-op need | Entity | Code |
 |---|---|---|
 | Print state | sensor *Status* (derived from `info.state` + `project.state`), binary_sensors *Printing*, *Paused* | [models.py `parse_info` L177–L213](https://github.com/chrisfore/anycubic_ha_local/blob/8ef65afd2493c148bf70ee40c6168a2b8efe9b41/custom_components/anycubic/anycubic_local/models.py#L177-L213) |
 | **Lifecycle events** | `event.*_print_event`; `event_types`: `started`, `paused`, `resumed`, `finished`, `stopped`, `error` (+ `clear_ready`/`clear_done`/`clear_failed` for bed cool-down); attributes `filename`, `progress`, plus `reason_code`/`reason` on pause/stop/error | [event.py](https://github.com/chrisfore/anycubic_ha_local/blob/8ef65afd2493c148bf70ee40c6168a2b8efe9b41/custom_components/anycubic/event.py), [coordinator.py `_fire`/`_track_status` L442–L473](https://github.com/chrisfore/anycubic_ha_local/blob/8ef65afd2493c148bf70ee40c6168a2b8efe9b41/custom_components/anycubic/coordinator.py#L442-L473) |
@@ -219,16 +219,16 @@ Overview in the [README "Entities"](https://github.com/chrisfore/anycubic_ha_loc
 
 ---
 
-## 7. Implications for WattBill (assessment, not a sourced claim)
+## 7. Implications for Coin-op (assessment, not a sourced claim)
 
 1. **Run detection.** The most robust approach is to depend on a generic signal: "printing / not printing" plus an end state. Concretely, that is `event.*_print_event` (chrisfore) **or** state changes of `binary_sensor.*_job_in_progress` / `sensor.*_job_state` (Nino6689).
    - Success vs. cancel is only unambiguous with chrisfore (`finished` vs. `stopped`).
    - With Nino6689 it is unambiguous via the cloud or in 3.0 (`finished` vs. `failed`), but not in 2.x LAN Mode.
 2. **Material.** The only measured value is total length in mm per job. Grams and the per-slot split are always derived (density, slicer ratios).
-   - If WattBill reads `job_filament_used` (mm) or `length_mm`, it stays independent of each integration's density heuristic.
-   - WattBill must capture the last value before the job ends, because job entities may reset or go unavailable afterwards.
+   - If Coin-op reads `job_filament_used` (mm) or `length_mm`, it stays independent of each integration's density heuristic.
+   - Coin-op must capture the last value before the job ends, because job entities may reset or go unavailable afterwards.
 3. **Images.** Only chrisfore provides the thumbnail locally; Nino6689 provides it via the cloud only. Both provide a local camera.
-4. **Overlap.** Nino6689 already offers per-job electricity cost. WattBill should decide whether to:
+4. **Overlap.** Nino6689 already offers per-job electricity cost. Coin-op should decide whether to:
    - use it as a data source,
    - compete with it, or
    - deliberately differentiate, for example with cross-printer accounting or a Run history with images.

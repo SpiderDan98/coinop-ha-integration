@@ -13,9 +13,9 @@ from .test_runs import RUNS, TOTAL_COST, set_status, stored_runs, value
 
 
 def live_runs(hass_storage: dict[str, Any]) -> list[dict[str, Any]]:
-    if "wattbill.live" not in hass_storage:
+    if "coinop.live" not in hass_storage:
         return []
-    runs: list[dict[str, Any]] = hass_storage["wattbill.live"]["data"]["runs"]
+    runs: list[dict[str, Any]] = hass_storage["coinop.live"]["data"]["runs"]
     return runs
 
 
@@ -111,12 +111,12 @@ async def test_a_run_found_in_both_stores_is_taken_from_runs(
     await add_device(hass, entry, running_power=100, price=1)
     await set_status(hass, "printing")
     await clock.advance(hours=1)
-    live_before_end = deepcopy(hass_storage["wattbill.live"])
+    live_before_end = deepcopy(hass_storage["coinop.live"])
     await set_status(hass, "finished")
     assert await hass.config_entries.async_unload(entry.entry_id)
 
     # As if HA stopped after writing runs but before writing live.
-    hass_storage["wattbill.live"] = live_before_end
+    hass_storage["coinop.live"] = live_before_end
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     await clock.advance(hours=1)

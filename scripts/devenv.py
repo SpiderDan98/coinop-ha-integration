@@ -1,11 +1,11 @@
-"""A local Home Assistant with WattBill and test data, already logged in.
+"""A local Home Assistant with Coin-op and test data, already logged in.
 
 Usage: uv run scripts/devenv.py <command>
 
   up [scenario]     build the panel, (re)start the container, load a Scenario and
                     show Home Assistant's log until Ctrl+C stops it (--detach: keep
                     it running in the background instead)
-  build             build the panel and reload WattBill
+  build             build the panel and reload Coin-op
   restart           restart Home Assistant, e.g. after a change to the Python code
   scenario <name>   load a Scenario (also in the panel: the flask button at the bottom left)
   logs              follow Home Assistant's log
@@ -33,7 +33,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".dev" / "config"
 AUTH = ROOT / ".dev" / "auth.json"
-CONTAINER = "wattbill-dev"
+CONTAINER = "coinop-dev"
 URL = "http://127.0.0.1:8124"
 CLIENT_ID = f"{URL}/"
 DEFAULT_SCENARIO = "few-runs"
@@ -61,7 +61,7 @@ def main() -> None:
                 attached(lambda: prepare(args.scenario, quiet=True))
         case "build":
             build_panel()
-            reload_wattbill()
+            reload_coinop()
         case "restart":
             run("docker", "restart", CONTAINER)
             wait_until_up()
@@ -90,10 +90,8 @@ def start() -> None:
     mounts = {
         CONFIG: "/config",
         ROOT / "dev" / "configuration.yaml": "/config/configuration.yaml:ro",
-        ROOT
-        / "custom_components"
-        / "wattbill": "/config/custom_components/wattbill:ro",
-        ROOT / "dev" / "wattbill_dev": "/config/custom_components/wattbill_dev:ro",
+        ROOT / "custom_components" / "coinop": "/config/custom_components/coinop:ro",
+        ROOT / "dev" / "coinop_dev": "/config/custom_components/coinop_dev:ro",
     }
     run(
         "docker",
@@ -118,7 +116,7 @@ def prepare(scenario: str, *, quiet: bool = False) -> None:
     wait_until_up(quiet=quiet)
     onboard()
     load(scenario)
-    print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/wattbill", flush=True)
+    print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/coinop", flush=True)
 
 
 def attached(setup: Callable[[], None]) -> None:
@@ -165,7 +163,7 @@ def comes_back() -> bool:
 
 
 def stop() -> None:
-    """Stop Home Assistant gracefully, so WattBill saves what it holds, then remove it."""
+    """Stop Home Assistant gracefully, so Coin-op saves what it holds, then remove it."""
     # A second Ctrl+C must not cut the shutdown short.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if subprocess.run(["docker", "inspect", CONTAINER], capture_output=True).returncode:
@@ -225,8 +223,8 @@ def onboard() -> None:
             {"client_id": CLIENT_ID, "redirect_uri": f"{URL}/?auth_callback=1"},
             access,
         )
-    # Home Assistant's own setup integrations, then wattbill_dev itself.
-    wait_for_service("wattbill_dev", access)
+    # Home Assistant's own setup integrations, then coinop_dev itself.
+    wait_for_service("coinop_dev", access)
 
 
 def wait_for_service(domain: str, access: str) -> None:
@@ -243,16 +241,16 @@ def load(scenario: str) -> None:
     print(f"Loading the Scenario {scenario}", flush=True)
     request(
         "POST",
-        "/api/services/wattbill_dev/load",
+        "/api/services/coinop_dev/load",
         {"scenario": scenario},
         access_token(),
     )
 
 
-def reload_wattbill() -> None:
+def reload_coinop() -> None:
     access = access_token()
     for entry in request(
-        "GET", "/api/config/config_entries/entry?domain=wattbill", None, access
+        "GET", "/api/config/config_entries/entry?domain=coinop", None, access
     ):
         request(
             "POST",
@@ -260,7 +258,7 @@ def reload_wattbill() -> None:
             {},
             access,
         )
-    print("Reloaded WattBill; reload the browser tab.")
+    print("Reloaded Coin-op; reload the browser tab.")
 
 
 def access_token() -> str:

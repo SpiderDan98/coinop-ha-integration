@@ -22,8 +22,8 @@
           "id": "benchy-thumbnail",
           "kind": "thumbnail",
           "created": "2026-01-12T10:00:00+00:00",
-          "url": "/api/wattbill/runs/benchy/images/benchy-thumbnail",
-          "tile_url": "/api/wattbill/runs/benchy/images/benchy-thumbnail/tile"
+          "url": "/api/coinop/runs/benchy/images/benchy-thumbnail",
+          "tile_url": "/api/coinop/runs/benchy/images/benchy-thumbnail/tile"
         }
       },
       {
@@ -51,8 +51,8 @@
           "id": "helmet-snapshot",
           "kind": "snapshot",
           "created": "2026-01-13T19:00:00+00:00",
-          "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
-          "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+          "url": "/api/coinop/runs/helmet/images/helmet-snapshot",
+          "tile_url": "/api/coinop/runs/helmet/images/helmet-snapshot/tile"
         }
       },
       {

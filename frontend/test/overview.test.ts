@@ -3,8 +3,8 @@ import type { Group } from "../src/api";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, mountPanel, query, queryAll, settle, text } from "./render";
 
-const AGGREGATES = "wattbill/aggregates/get";
-const SUBSCRIBE = "wattbill/runs/subscribe";
+const AGGREGATES = "coinop/aggregates/get";
+const SUBSCRIBE = "coinop/runs/subscribe";
 const [started, updated] = recorded.changes;
 
 const names = (panel: Element) => queryAll(panel, ".tile .strong").map(text);
@@ -51,13 +51,13 @@ describe("Overview", () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, ".stat.failed"));
-    expect(location.pathname + location.search).toBe("/wattbill/runs?outcome=failed_cancelled");
+    expect(location.pathname + location.search).toBe("/coinop/runs?outcome=failed_cancelled");
     expect(names(panel)).toEqual(["Untitled Run", "Helmet"]);
     expect((query(panel, ".outcome-filter") as HTMLSelectElement).value).toBe("failed_cancelled");
 
-    await click(panel, query(panel, `a.tab[href="/wattbill"]`));
+    await click(panel, query(panel, `a.tab[href="/coinop"]`));
     await click(panel, query(panel, ".stat.flagged"));
-    expect(location.pathname + location.search).toBe("/wattbill/runs?flagged=1");
+    expect(location.pathname + location.search).toBe("/coinop/runs?flagged=1");
     expect(names(panel)).toEqual(["Helmet"]);
   });
 
@@ -77,7 +77,7 @@ describe("Overview", () => {
     expect(queryAll(panel, ".name-filter, input.pick, .basket, .manual-run")).toEqual([]);
 
     await click(panel, query(panel, "a.all-runs"));
-    expect(location.pathname + location.search).toBe("/wattbill/runs");
+    expect(location.pathname + location.search).toBe("/coinop/runs");
     expect(names(panel)).toHaveLength(22);
   });
 
@@ -107,7 +107,7 @@ describe("Overview", () => {
     expect(text(query(panel, ".per-month .legend"))).toBe("Electricity Material Other");
 
     await click(panel, columns[0]);
-    expect(location.pathname + location.search).toBe("/wattbill/runs?month=2025-12");
+    expect(location.pathname + location.search).toBe("/coinop/runs?month=2025-12");
     expect(text(panel)).toContain("No Runs match the filters.");
     expect((query(panel, ".month-filter") as HTMLSelectElement).value).toBe("2025-12");
   });
@@ -196,7 +196,7 @@ describe("Overview", () => {
     expect(text(query(panel, ".running"))).toBe(
       "Running now Untitled Run Kobra · 45 min €0.25 Provisional, updates live",
     );
-    expect(query(panel, ".running a").getAttribute("href")).toBe("/wattbill/run/print-live");
+    expect(query(panel, ".running a").getAttribute("href")).toBe("/coinop/run/print-live");
     expect(backend.sent(AGGREGATES).length).toBeGreaterThan(loaded);
   });
 
@@ -207,7 +207,7 @@ describe("Overview", () => {
 
     const panel = await mountPanel(backend);
 
-    expect(text(panel)).toContain("WattBill could not load its totals.");
+    expect(text(panel)).toContain("Coin-op could not load its totals.");
     expect(names(panel)).toHaveLength(3);
   });
 

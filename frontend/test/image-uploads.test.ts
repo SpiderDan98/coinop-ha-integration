@@ -3,9 +3,9 @@ import type { RunDetail } from "../src/api";
 import { recorded, recordedBackend } from "./fake-hass";
 import { click, mountPanel, query, queryAll, settle, text } from "./render";
 
-const UPLOADS = "/api/wattbill/runs/benchy/images";
-const SET_COVER = "wattbill/images/set_cover";
-const DELETE = "wattbill/images/delete";
+const UPLOADS = "/api/coinop/runs/benchy/images";
+const SET_COVER = "coinop/images/set_cover";
+const DELETE = "coinop/images/delete";
 const benchy = () => recorded.run("benchy");
 const [upload] = recorded.upload.images;
 const withUpload: RunDetail = { ...benchy(), images: [...benchy().images, upload] };
@@ -34,7 +34,7 @@ describe("Run images on the Run page", () => {
         stored = withUpload;
         return [200, recorded.upload];
       })
-      .reply("wattbill/runs/get", () => ({ run: stored }));
+      .reply("coinop/runs/get", () => ({ run: stored }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
     const files = [photo("front.jpg"), photo("back.jpg")];
 
@@ -86,7 +86,7 @@ describe("Run images on the Run page", () => {
       images: Array.from({ length: 10 }, (_, n) => ({ ...upload, id: `upload-${n}` })),
     };
     const panel = await mountPanel(
-      recordedBackend().reply("wattbill/runs/get", () => ({ run: full })),
+      recordedBackend().reply("coinop/runs/get", () => ({ run: full })),
       { path: "/run/benchy" },
     );
 
@@ -96,7 +96,7 @@ describe("Run images on the Run page", () => {
 
   it("mark the Cover Image and pick another with “Set as cover”", async () => {
     const backend = recordedBackend()
-      .reply("wattbill/runs/get", () => ({ run: withUpload }))
+      .reply("coinop/runs/get", () => ({ run: withUpload }))
       .reply(SET_COVER, () => ({ run: recorded.setCover }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
     expect(text(figure(panel, "Thumbnail"))).toContain("Cover Image");
@@ -115,7 +115,7 @@ describe("Run images on the Run page", () => {
 
   it("delete an image only after confirmation", async () => {
     const backend = recordedBackend()
-      .reply("wattbill/runs/get", () => ({ run: withUpload }))
+      .reply("coinop/runs/get", () => ({ run: withUpload }))
       .reply(DELETE, () => ({ run: recorded.deleteImage }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
@@ -136,7 +136,7 @@ describe("Run images on the Run page", () => {
   });
 
   it("are offered in German when Home Assistant is", async () => {
-    const backend = recordedBackend({ language: "de" }).reply("wattbill/runs/get", () => ({
+    const backend = recordedBackend({ language: "de" }).reply("coinop/runs/get", () => ({
       run: withUpload,
     }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });

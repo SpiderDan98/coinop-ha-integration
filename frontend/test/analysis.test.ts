@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, mountPanel, query, queryAll, settle, text } from "./render";
 
-const AGGREGATES = "wattbill/aggregates/get";
+const AGGREGATES = "coinop/aggregates/get";
 
 /** The recorded groups of `group_by`, as the backend would answer with other Runs. */
 const groups = (key: string) =>
@@ -16,7 +16,7 @@ describe("Analysis tab", () => {
 
     await click(panel, query(panel, `a.tab[href$="/analysis"]`));
 
-    expect(location.pathname).toBe("/wattbill/analysis");
+    expect(location.pathname).toBe("/coinop/analysis");
     expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
       "Overview",
       "Runs",
@@ -45,7 +45,7 @@ describe("Analysis tab", () => {
     ]);
     expect(text(query(panel, "a.tab.on"))).toBe("Analysis");
     await click(panel, query(panel, ".title a"));
-    expect(location.pathname).toBe("/wattbill");
+    expect(location.pathname).toBe("/coinop");
   });
 
   it("totals the cost by kind with each kind's share", async () => {
@@ -141,7 +141,7 @@ describe("Analysis tab", () => {
     expect(rows(panel, "by-kind").at(-1)).toBe("Total €1.23");
 
     extra = 1;
-    backend.push("wattbill/runs/subscribe", recorded.changes[0]);
+    backend.push("coinop/runs/subscribe", recorded.changes[0]);
     await settle(panel);
 
     expect(rows(panel, "by-kind").at(-1)).toBe("Total €2.23");
@@ -154,7 +154,7 @@ describe("Analysis tab", () => {
 
     const panel = await mountPanel(backend, { path: "/analysis" });
 
-    expect(text(panel)).toContain("WattBill could not load its totals.");
+    expect(text(panel)).toContain("Coin-op could not load its totals.");
   });
 
   it("is in German when Home Assistant is", async () => {
@@ -180,19 +180,19 @@ describe("Analysis rows", () => {
     const panel = await mountPanel(recordedBackend(), { path: "/analysis" });
 
     expect(links(panel, "by-device")).toEqual([
-      "/wattbill/runs?device=device-kobra",
-      "/wattbill/runs?device=device-mini",
+      "/coinop/runs?device=device-kobra",
+      "/coinop/runs?device=device-mini",
     ]);
-    expect(links(panel, "by-month")).toEqual(["/wattbill/runs?month=2026-01"]);
+    expect(links(panel, "by-month")).toEqual(["/coinop/runs?month=2026-01"]);
     expect(links(panel, "by-outcome")).toEqual([
-      "/wattbill/runs?outcome=completed",
-      "/wattbill/runs?outcome=cancelled",
-      "/wattbill/runs?outcome=failed",
+      "/coinop/runs?outcome=completed",
+      "/coinop/runs?outcome=cancelled",
+      "/coinop/runs?outcome=failed",
     ]);
     expect(links(panel, "by-tag")).toEqual([
-      "/wattbill/runs?tag=Cosplay+helmet",
-      "/wattbill/runs?tag=Gift",
-      "/wattbill/runs?untagged=1",
+      "/coinop/runs?tag=Cosplay+helmet",
+      "/coinop/runs?tag=Gift",
+      "/coinop/runs?untagged=1",
     ]);
     expect(queryAll(panel, ".by-kind a, .by-material a")).toEqual([]);
   });
@@ -202,7 +202,7 @@ describe("Analysis rows", () => {
 
     await click(panel, queryAll(panel, ".by-device tbody a")[1]);
 
-    expect(location.pathname + location.search).toBe("/wattbill/runs?device=device-mini");
+    expect(location.pathname + location.search).toBe("/coinop/runs?device=device-mini");
     expect(queryAll(panel, ".tile .strong").map(text)).toEqual(["Untitled Run"]);
   });
 });
@@ -210,7 +210,7 @@ describe("Analysis rows", () => {
 describe("An empty Analysis tab", () => {
   it("says there are no Runs instead of empty tables", async () => {
     const backend = recordedBackend()
-      .subscription("wattbill/runs/subscribe", () => [{ runs: [] }])
+      .subscription("coinop/runs/subscribe", () => [{ runs: [] }])
       .reply(AGGREGATES, () => ({ groups: [] }));
 
     const panel = await mountPanel(backend, { path: "/analysis" });

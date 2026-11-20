@@ -114,8 +114,8 @@
         "id": "helmet-snapshot",
         "kind": "snapshot",
         "created": "2026-01-13T19:00:00+00:00",
-        "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
-        "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+        "url": "/api/coinop/runs/helmet/images/helmet-snapshot",
+        "tile_url": "/api/coinop/runs/helmet/images/helmet-snapshot/tile"
       }
     ],
     "cover_id": null,
@@ -126,8 +126,8 @@
       "id": "helmet-snapshot",
       "kind": "snapshot",
       "created": "2026-01-13T19:00:00+00:00",
-      "url": "/api/wattbill/runs/helmet/images/helmet-snapshot",
-      "tile_url": "/api/wattbill/runs/helmet/images/helmet-snapshot/tile"
+      "url": "/api/coinop/runs/helmet/images/helmet-snapshot",
+      "tile_url": "/api/coinop/runs/helmet/images/helmet-snapshot/tile"
     },
     "uploads": {
       "limit": 10,

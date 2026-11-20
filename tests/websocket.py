@@ -1,4 +1,4 @@
-"""Talk to WattBill's websocket commands the way the panel does."""
+"""Talk to Coin-op's websocket commands the way the panel does."""
 
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
@@ -13,10 +13,10 @@ from pytest_homeassistant_custom_component.typing import (
 
 
 class PanelClient:
-    """One websocket connection; `call` / `error` / `subscribe` a `wattbill/...` command.
+    """One websocket connection; `call` / `error` / `subscribe` a `coinop/...` command.
 
     Connects on first use: starting the test HTTP server freezes its routes, so
-    WattBill must be set up before, and the access token must not have expired
+    Coin-op must be set up before, and the access token must not have expired
     on the test clock.
     """
 

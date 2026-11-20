@@ -19,7 +19,7 @@ export const sortTags = (tags: string[]) =>
 export const tagChip = (tag: string) =>
   html`<span class="tag-chip"><span class="tag-name">${tag}</span></span>`;
 
-@customElement("wattbill-tag-input")
+@customElement("coinop-tag-input")
 export class TagInput extends LitElement {
   @property({ attribute: false }) hass!: HomeAssistant;
   @property({ attribute: false }) tags: string[] = [];
@@ -218,6 +218,6 @@ export class TagInput extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-tag-input": TagInput;
+    "coinop-tag-input": TagInput;
   }
 }

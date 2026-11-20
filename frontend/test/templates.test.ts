@@ -16,23 +16,23 @@ import {
 const row = (panel: Element, id: string) => query(panel, `tr.template[data-id="${id}"]`);
 const field = (root: HTMLElement, name: string) =>
   query(root, `[name=${name}]`) as HTMLInputElement;
-const UPDATE = "wattbill/templates/update";
+const UPDATE = "coinop/templates/update";
 
 describe("Line Item Templates tab", () => {
   const templatesBackend = () =>
     recordedBackend()
       .reply(UPDATE, () => recorded.templateUpdate)
-      .reply("wattbill/templates/create", (msg) => ({
+      .reply("coinop/templates/create", (msg) => ({
         template: { id: "template-new", ...(msg.template as object) },
       }))
-      .reply("wattbill/templates/delete", () => ({}));
+      .reply("coinop/templates/delete", () => ({}));
 
   it("opens from the toolbar between Materials and Tags", async () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, `a.tab[href$="/templates"]`));
 
-    expect(location.pathname).toBe("/wattbill/templates");
+    expect(location.pathname).toBe("/coinop/templates");
     expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
       "Overview",
       "Runs",
@@ -105,9 +105,9 @@ describe("Line Item Templates tab", () => {
     await fill(panel, field(form, "default_quantity"), "0.5");
     await click(panel, query(form, "ha-button[type=submit]"));
 
-    expect(backend.sent("wattbill/templates/create")).toEqual([
+    expect(backend.sent("coinop/templates/create")).toEqual([
       {
-        type: "wattbill/templates/create",
+        type: "coinop/templates/create",
         template: {
           label: "Labour",
           unit: "h",
@@ -127,14 +127,14 @@ describe("Line Item Templates tab", () => {
     const remove = query(row(panel, "template-wear"), "ha-icon-button.delete");
     expect(label(remove)).toBe("Delete (past Runs keep their copies)");
     await click(panel, remove);
-    expect(backend.sent("wattbill/templates/delete")).toEqual([]);
+    expect(backend.sent("coinop/templates/delete")).toEqual([]);
     expect(text(query(row(panel, "template-wear"), ".delete-hint"))).toContain(
       "No longer added automatically for: Kobra.",
     );
     await click(panel, query(row(panel, "template-wear"), "ha-button.confirm-delete"));
 
-    expect(backend.sent("wattbill/templates/delete")).toEqual([
-      { type: "wattbill/templates/delete", template_id: "template-wear" },
+    expect(backend.sent("coinop/templates/delete")).toEqual([
+      { type: "coinop/templates/delete", template_id: "template-wear" },
     ]);
   });
 
@@ -142,7 +142,7 @@ describe("Line Item Templates tab", () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend, { path: "/templates" });
 
-    backend.push("wattbill/catalog/subscribe", { templates: [] });
+    backend.push("coinop/catalog/subscribe", { templates: [] });
     await settle(panel);
 
     expect(queryAll(panel, "tr.template")).toHaveLength(0);
@@ -158,8 +158,8 @@ describe("Line Item Templates tab", () => {
 });
 
 describe("Line Item Templates on a Run", () => {
-  const SAVE = "wattbill/line_items/save_as_template";
-  const ADD = "wattbill/line_items/add_template";
+  const SAVE = "coinop/line_items/save_as_template";
+  const ADD = "coinop/line_items/add_template";
   const item = (panel: Element, id: string) => query(panel, `.item[data-id="${id}"]`);
 
   it("saves any Line Item as a template, a computed one under its kind's name", async () => {
@@ -209,7 +209,7 @@ describe("Line Item Templates on a Run", () => {
   });
 
   it("shows a running-hours template live and locked while the Run is open", async () => {
-    const backend = recordedBackend().subscription("wattbill/runs/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/runs/subscribe", () => [
       { runs: [...recorded.snapshot.runs, recorded.changes[1].run] },
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });
@@ -224,7 +224,7 @@ describe("Line Item Templates on a Run", () => {
 });
 
 describe("Automatic templates", () => {
-  const SETTINGS = "wattbill/devices/update_settings";
+  const SETTINGS = "coinop/devices/update_settings";
   const settingsBackend = () =>
     recordedBackend().reply(SETTINGS, (msg) => ({
       settings: { ...recorded.devices[0]?.settings, ...(msg.settings as object) },

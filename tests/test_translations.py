@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.translation import async_get_translations
 import pytest
 
-from custom_components.wattbill.const import DOMAIN
+from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
 from .devices import add_device, add_hub

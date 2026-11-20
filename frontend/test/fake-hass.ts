@@ -53,61 +53,61 @@ const found = <T>(value: T | undefined, what: string) => {
 };
 
 export const recorded = {
-  /** First event of `wattbill/runs/subscribe`: the Runs "benchy", "helmet", "cancelled". */
+  /** First event of `coinop/runs/subscribe`: the Runs "benchy", "helmet", "cancelled". */
   snapshot: { runs: (snapshot as { runs: RunSummary[] }).runs },
   /** Then the Run "print-live" is started, updated (45 min in) and ended. */
   changes: changes as { change: RunChange; run: RunSummary }[],
-  /** `wattbill/runs/get` for every recorded Run; "print-live" while still open, with its
+  /** `coinop/runs/get` for every recorded Run; "print-live" while still open, with its
    * measured Material ("print-live-material") locked and its automatic template
    * "print-live-wear" counting running hours. "benchy" has a Thumbnail and a Snapshot and
    * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
-  /** `wattbill/aggregates/get` over the snapshot's Runs (all in January 2026), for each
+  /** `coinop/aggregates/get` over the snapshot's Runs (all in January 2026), for each
    * grouping the Overview and Analysis ask for, then ungrouped for each selection of them
    * (`run_ids`, sorted). */
   aggregates: aggregatesGet as { group_by: Dimension[]; run_ids?: string[]; groups: Group[] }[],
-  /** `wattbill/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
+  /** `coinop/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
-  /** `wattbill/cost_statement/defaults` with the hub's default Markup at 10 %. */
+  /** `coinop/cost_statement/defaults` with the hub's default Markup at 10 %. */
   statementDefaults: costStatementDefaults,
-  /** `wattbill/cost_statement/create`: the signed path to download it from. */
+  /** `coinop/cost_statement/create`: the signed path to download it from. */
   statementCreate: costStatementCreate,
-  /** `wattbill/runs/delete_preview` for "helmet". */
+  /** `coinop/runs/delete_preview` for "helmet". */
   deletePreview: runsDeletePreview as { drop: Totals },
   /** The upload of one photo to "benchy", and of ten more, refused. */
   upload: imagesUpload as { images: RunImage[] },
   uploadTooMany: imagesUploadTooMany,
-  /** `wattbill/images/set_cover`: "benchy" with that upload picked as Cover Image. */
+  /** `coinop/images/set_cover`: "benchy" with that upload picked as Cover Image. */
   setCover: imagesSetCover.run as RunDetail,
-  /** `wattbill/images/delete` of that upload: "benchy" without it again. */
+  /** `coinop/images/delete` of that upload: "benchy" without it again. */
   deleteImage: imagesDelete.run as RunDetail,
-  /** `wattbill/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
+  /** `coinop/line_items/update`: Benchy's electricity overridden to an amount of 0.10. */
   lineItemsUpdate: lineItemsUpdate as { run: RunDetail },
-  /** `wattbill/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
+  /** `coinop/line_items/add`: a refund of -2.00 ("helmet-refund") added to Helmet. */
   lineItemsAdd: lineItemsAdd as { run: RunDetail },
-  /** `wattbill/line_items/update`: PETG White picked for Helmet's measured 30 m
+  /** `coinop/line_items/update`: PETG White picked for Helmet's measured 30 m
    * ("helmet-filament"), which had no Material. */
   lineItemsMaterial: lineItemsMaterial as { run: RunDetail },
-  /** `wattbill/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
+  /** `coinop/line_items/add`: 3 g of PETG White ("benchy-petg") added to Benchy. */
   lineItemsAddMaterial: lineItemsAddMaterial as { run: RunDetail },
-  /** `wattbill/line_items/update` of a Run ("keychain") split across two Slots: 75% to
+  /** `coinop/line_items/update` of a Run ("keychain") split across two Slots: 75% to
    * PLA Basic Black ("keychain-pla"), 25% to PETG White ("keychain-petg"), whose quantity
    * was corrected to 4 g. */
   splitRun: lineItemsSplit.run as RunDetail,
-  /** `wattbill/line_items/save_as_template`: Benchy's "Nozzle wear" as "template-nozzle". */
+  /** `coinop/line_items/save_as_template`: Benchy's "Nozzle wear" as "template-nozzle". */
   saveAsTemplate: lineItemsSaveAsTemplate as { template: LineItemTemplate },
-  /** `wattbill/line_items/add_template`: 2 × "template-nozzle" added to Benchy ("benchy-nozzle"). */
+  /** `coinop/line_items/add_template`: 2 × "template-nozzle" added to Benchy ("benchy-nozzle"). */
   lineItemsAddTemplate: lineItemsAddTemplate as { run: RunDetail },
-  /** `wattbill/templates/update`: "template-packaging" repriced to 0.60. */
+  /** `coinop/templates/update`: "template-packaging" repriced to 0.60. */
   templateUpdate: templatesUpdate as { template: LineItemTemplate },
-  /** `wattbill/devices/list`: only "device-kobra" (automatic template "template-wear",
+  /** `coinop/devices/list`: only "device-kobra" (automatic template "template-wear",
    * Material used input in mm, default Material "pla-black"); "device-mini" (Runs only)
    * was removed. */
   devices: devicesList.devices as Device[],
   /**
-   * `wattbill/catalog/subscribe`: first empty, then the whole catalogue a panel opened
+   * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
    * Resin grey), "material-3" (PLA red, archived), the Tags "Cosplay helmet", "Gift"
    * and "Spare parts" and the templates "template-wear" (running hours),
@@ -117,9 +117,9 @@ export const recorded = {
     empty: catalogSubscribe[0] as Catalog,
     filled: catalogSubscribe[1] as Catalog,
   },
-  /** `wattbill/tags/rename` of "Spare" to "Spare parts". */
+  /** `coinop/tags/rename` of "Spare" to "Spare parts". */
   tagRename: tagsRename,
-  /** `wattbill/spoolman/filaments`: 7 eSun PLA+ black (0.02 / g), 8 Prusament PETG Galaxy
+  /** `coinop/spoolman/filaments`: 7 eSun PLA+ black (0.02 / g), 8 Prusament PETG Galaxy
    * Black (priced from its spool), 9 eSun TPU clear (no price); then with Spoolman not set
    * up and unreachable. */
   spoolman: {
@@ -127,11 +127,11 @@ export const recorded = {
     notConfigured: spoolmanFilamentsUnavailable[0] as Filaments,
     unreachable: spoolmanFilamentsUnavailable[1] as Filaments,
   },
-  /** `wattbill/materials/create_from_spoolman` of Filament 8 ("material-petg"). */
+  /** `coinop/materials/create_from_spoolman` of Filament 8 ("material-petg"). */
   createFromSpoolman: materialsCreateFromSpoolman as { material: Material },
-  /** `wattbill/materials/update`: "pla-black" linked to Filament 7. */
+  /** `coinop/materials/update`: "pla-black" linked to Filament 7. */
   linkSpoolman: materialsLinkSpoolman as { material: Material },
-  /** `wattbill/materials/types`: the built-in types for pre-filling. */
+  /** `coinop/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
   material: (id: string) =>
     found(
@@ -176,7 +176,7 @@ export class FakeBackend {
   constructor({ language = "en", currency = "EUR", timeZone = "UTC" } = {}) {
     this.hass = {
       language,
-      config: { currency, time_zone: timeZone, components: ["wattbill"] },
+      config: { currency, time_zone: timeZone, components: ["coinop"] },
       states: {},
       callWS: async <T>(msg: Message) => {
         this.calls.push(msg);
@@ -270,17 +270,17 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
   const backend = new FakeBackend(options);
   for (const path of recordedImages) backend.file(path);
   return backend
-    .subscription("wattbill/runs/subscribe", () => [recorded.snapshot])
-    .subscription("wattbill/catalog/subscribe", () => [recorded.catalog.filled])
-    .reply("wattbill/materials/types", () => recorded.materialTypes)
-    .reply("wattbill/runs/get", (msg) => {
+    .subscription("coinop/runs/subscribe", () => [recorded.snapshot])
+    .subscription("coinop/catalog/subscribe", () => [recorded.catalog.filled])
+    .reply("coinop/materials/types", () => recorded.materialTypes)
+    .reply("coinop/runs/get", (msg) => {
       const run = recorded.runs.find((candidate) => candidate.id === msg.run_id);
       if (!run) throw new WsError("not_found");
       return { run };
     })
-    .reply("wattbill/devices/list", () => ({ devices: recorded.devices }))
-    .reply("wattbill/cost_statement/defaults", () => recorded.statementDefaults)
-    .reply("wattbill/aggregates/get", (msg) => {
+    .reply("coinop/devices/list", () => ({ devices: recorded.devices }))
+    .reply("coinop/cost_statement/defaults", () => recorded.statementDefaults)
+    .reply("coinop/aggregates/get", (msg) => {
       const runIds = (msg.run_ids as string[] | undefined)?.toSorted();
       const asked = `${String(msg.group_by)} of ${String(runIds)}`;
       return {

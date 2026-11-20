@@ -8,7 +8,7 @@ SCENARIO ?= few-runs
 dev:
 	uv run scripts/devenv.py up $(SCENARIO)
 
-# Rebuild the panel and reload WattBill.
+# Rebuild the panel and reload Coin-op.
 dev-build:
 	uv run scripts/devenv.py build
 

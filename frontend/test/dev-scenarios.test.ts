@@ -11,14 +11,14 @@ const SCENARIOS = {
 };
 
 const devBackend = () => {
-  const backend = recordedBackend().reply("wattbill_dev/scenarios", () => SCENARIOS);
-  backend.hass.config.components.push("wattbill_dev");
+  const backend = recordedBackend().reply("coinop_dev/scenarios", () => SCENARIOS);
+  backend.hass.config.components.push("coinop_dev");
   return backend;
 };
 
 const open = async (panel: HTMLElement) => {
   await click(panel, iconButton(panel, "Test data"));
-  return query(panel, "wattbill-dev-scenarios-dialog");
+  return query(panel, "coinop-dev-scenarios-dialog");
 };
 
 afterEach(() => vi.restoreAllMocks());
@@ -51,11 +51,11 @@ describe("Test data", () => {
 
     expect(backend.calls.at(-1)).toMatchObject({
       type: "call_service",
-      domain: "wattbill_dev",
+      domain: "coinop_dev",
       service: "load",
       service_data: { scenario: "empty" },
     });
-    expect(assign).toHaveBeenCalledWith("/wattbill");
+    expect(assign).toHaveBeenCalledWith("/coinop");
   });
 
   it("says so when loading fails", async () => {

@@ -28,7 +28,7 @@ def receipt(
 
 
 async def groups(panel: PanelClient, *group_by: str) -> Any:
-    result = await panel.call("wattbill/aggregates/get", group_by=list(group_by))
+    result = await panel.call("coinop/aggregates/get", group_by=list(group_by))
     return result["groups"]
 
 
@@ -257,8 +257,8 @@ async def test_only_known_dimensions_group(
 ) -> None:
     await add_hub(hass)
 
-    unknown = await panel.error("wattbill/aggregates/get", group_by=["colour"])
-    twice = await panel.error("wattbill/aggregates/get", group_by=["tag", "tag"])
+    unknown = await panel.error("coinop/aggregates/get", group_by=["colour"])
+    twice = await panel.error("coinop/aggregates/get", group_by=["tag", "tag"])
 
     assert (unknown["code"], twice["code"]) == ("invalid_format", "invalid_format")
 
@@ -276,9 +276,9 @@ async def test_totals_of_only_some_runs(
     await add_hub(hass)
 
     result = await panel.call(
-        "wattbill/aggregates/get", run_ids=["helmet", "hook", "gone"]
+        "coinop/aggregates/get", run_ids=["helmet", "hook", "gone"]
     )
-    none = await panel.call("wattbill/aggregates/get", run_ids=[])
+    none = await panel.call("coinop/aggregates/get", run_ids=[])
 
     assert pick(result["groups"], "cost", "runs") == [{"cost": 0.14, "runs": 2}]
     assert none["groups"] == []
@@ -307,7 +307,7 @@ async def test_totals_of_only_some_materials(
     await add_hub(hass)
 
     result = await panel.call(
-        "wattbill/aggregates/get", group_by=["kind"], material_ids=["petg", None]
+        "coinop/aggregates/get", group_by=["kind"], material_ids=["petg", None]
     )
 
     assert pick(result["groups"], "kind", "cost", "material_grams") == [

@@ -24,7 +24,7 @@ export function runTile(
   return html`<div class="pick-tile ${pick?.selected ? "selected" : ""}">
     <a class="tile" href="${basePath}/run/${run.id}" @click=${followLink}>
       <div class="image">
-        <wattbill-run-image .hass=${hass} .src=${run.cover?.tile_url}></wattbill-run-image>
+        <coinop-run-image .hass=${hass} .src=${run.cover?.tile_url}></coinop-run-image>
         ${
           run.flags.length
             ? html`<span

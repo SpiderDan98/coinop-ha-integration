@@ -1,8 +1,8 @@
-# WattBill
+# Coin-op
 
 A Home Assistant custom integration that records what each print of your 3D printers costs: electricity, material and anything else you add, kept as an editable history of Runs.
 
-WattBill is in early development. Releases before 1.0 are pre-releases for testing.
+Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
 
 Requires Home Assistant 2026.5 or newer. Licensed under the [MIT licence](LICENSE).
 
@@ -10,25 +10,25 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What it does
 
-- Each 3D printer you add becomes a **Device**. WattBill reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the two Anycubic integrations that support the Kobra S1, the entities are filled in automatically.
+- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the two Anycubic integrations that support the Kobra S1, the entities are filled in automatically.
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
 
 ## Installation
 
-WattBill is installed through HACS (Home Assistant 2026.10 and older) or the built-in Marketplace (Home Assistant 2026.11 and newer). Until it is in the default catalog, add it as a custom repository:
+Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the built-in Marketplace (Home Assistant 2026.11 and newer). Until it is in the default catalog, add it as a custom repository:
 
-[![Open your Home Assistant instance and open this repository in HACS or the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SpiderDan98&repository=wattbill-ha-integration&category=integration)
+[![Open your Home Assistant instance and open this repository in HACS or the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SpiderDan98&repository=coinop-ha-integration&category=integration)
 
-1. Select the badge above, or add `https://github.com/SpiderDan98/wattbill-ha-integration` as a custom repository of type **Integration**. On the Marketplace this needs a GitHub connection.
+1. Select the badge above, or add `https://github.com/SpiderDan98/coinop-ha-integration` as a custom repository of type **Integration**. On the Marketplace this needs a GitHub connection.
 2. Releases before 1.0 are pre-releases: turn on pre-releases for the repository to be offered them.
-3. Download WattBill. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
-4. Go to **Settings > Devices & services > Add integration**, pick **WattBill** and add your first Device.
+3. Download Coin-op. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
+4. Go to **Settings > Devices & services > Add integration**, pick **Coin-op** and add your first Device.
 
 ## Estimating electricity without a meter
 
-Without an energy meter or power sensor, WattBill estimates electricity from the Device's average power while it runs. A desktop FDM printer with a heated bed typically averages 80–150 W over a whole print. Don't enter the rated power from the label or power supply: it is far higher than what the printer really draws on average. If you can, measure one print with a power-measuring plug and use that.
+Without an energy meter or power sensor, CoinOp estimates electricity from the Device's average power while it runs. A desktop FDM printer with a heated bed typically averages 80–150 W over a whole print. Don't enter the rated power from the label or power supply: it is far higher than what the printer really draws on average. If you can, measure one print with a power-measuring plug and use that.
 
 ## Monthly costs on a dashboard
 
@@ -61,7 +61,7 @@ Corrections and deleted Runs change the totals at the moment you make them, so t
 
 ## Anycubic printers
 
-When you add a Device and pick a printer's Home Assistant device from one of these integrations, every setup step comes pre-filled. Check each step and change what you like; WattBill stores the entities themselves, not a link to the integration.
+When you add a Device and pick a printer's Home Assistant device from one of these integrations, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration.
 
 | Integration | Status | Material used | Thumbnail | Slots |
 |---|---|---|---|---|
@@ -74,11 +74,11 @@ If an update of the integration renames or replaces its entities, open the Devic
 
 ## Using it with hass-anycubic
 
-The hass-anycubic integration has cost sensors of its own (such as job energy, job electricity cost and last job total cost). WattBill ignores them and computes every cost itself. Turn off one of the two cost features, for example by disabling hass-anycubic's cost entities, so your dashboards don't count the same print twice.
+The hass-anycubic integration has cost sensors of its own (such as job energy, job electricity cost and last job total cost). Coin-op ignores them and computes every cost itself. Turn off one of the two cost features, for example by disabling hass-anycubic's cost entities, so your dashboards don't count the same print twice.
 
 ## Spoolman
 
-You can set a Spoolman URL in WattBill's integration options. Materials can then be linked to a Spoolman Filament, so their price per gram comes from Spoolman, or be created from your Spoolman Filaments. When Spoolman can't be reached, the last price read is used and the Run gets a Flag.
+You can set a Spoolman URL in Coin-op's integration options. Materials can then be linked to a Spoolman Filament, so their price per gram comes from Spoolman, or be created from your Spoolman Filaments. When Spoolman can't be reached, the last price read is used and the Run gets a Flag.
 
 ## Cost Statement
 
@@ -90,10 +90,10 @@ Cost sensors use the currency configured in Home Assistant. If you change that c
 
 ## Your data
 
-WattBill keeps everything inside Home Assistant: its data files in `.storage/wattbill.*` and its images in the `wattbill` folder of the configuration directory. Both are part of Home Assistant backups, and restoring a backup brings all of WattBill back to that moment. Sensor totals are rebuilt from the stored Runs at every start.
+Coin-op keeps everything inside Home Assistant: its data files in `.storage/coinop.*` and its images in the `coinop` folder of the configuration directory. Both are part of Home Assistant backups, and restoring a backup brings all of Coin-op back to that moment. Sensor totals are rebuilt from the stored Runs at every start.
 
-If the recorder database and WattBill's data are restored from different points in time, the total sensors jump once in long-term statistics. WattBill does not correct this.
+If the recorder database and Coin-op's data are restored from different points in time, the total sensors jump once in long-term statistics. Coin-op does not correct this.
 
-If a data file can't be read (for example a corrupt file after a crash), WattBill does not start, so it can't overwrite your history; a repair issue lets you restore a backup or deliberately start fresh.
+If a data file can't be read (for example a corrupt file after a crash), Coin-op does not start, so it can't overwrite your history; a repair issue lets you restore a backup or deliberately start fresh.
 
-Removing the WattBill integration deletes all of its data: every data file, the `.bak` copies kept from before upgrades, and the `wattbill` folder. Make a backup first if you may want it back.
+Removing the Coin-op integration deletes all of its data: every data file, the `.bak` copies kept from before upgrades, and the `coinop` folder. Make a backup first if you may want it back.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
 import { change, click, label, mountPanel, query, queryAll, text } from "./render";
 
-const UPDATE = "wattbill/line_items/update";
+const UPDATE = "coinop/line_items/update";
 const [started] = recorded.changes;
 const overridden = recorded.lineItemsUpdate.run;
 
@@ -51,14 +51,14 @@ describe("Line Items", () => {
 
   it("reset to the computed value", async () => {
     const backend = recordedBackend()
-      .reply("wattbill/runs/get", () => ({ run: overridden }))
-      .reply("wattbill/line_items/reset", () => ({ run: recorded.run("benchy") }));
+      .reply("coinop/runs/get", () => ({ run: overridden }))
+      .reply("coinop/line_items/reset", () => ({ run: recorded.run("benchy") }));
     const panel = await mountPanel(backend, { path: "/run/benchy" });
 
     await click(panel, query(item(panel, "electricity"), "ha-icon-button.reset"));
 
-    expect(backend.sent("wattbill/line_items/reset")).toEqual([
-      { type: "wattbill/line_items/reset", run_id: "benchy", line_item_id: "electricity" },
+    expect(backend.sent("coinop/line_items/reset")).toEqual([
+      { type: "coinop/line_items/reset", run_id: "benchy", line_item_id: "electricity" },
     ]);
     expect(item(panel, "electricity").classList.contains("manual")).toBe(false);
     expect(values(item(panel, "electricity"))).toEqual(["0.15", "0.3", "0.05"]);
@@ -105,7 +105,7 @@ describe("Line Items", () => {
   });
 
   it("can be deleted, except Electricity", async () => {
-    const backend = recordedBackend().reply("wattbill/line_items/delete", () => ({
+    const backend = recordedBackend().reply("coinop/line_items/delete", () => ({
       run: {
         ...recorded.run("benchy"),
         line_items: recorded.run("benchy").line_items.slice(0, 2),
@@ -116,14 +116,14 @@ describe("Line Items", () => {
 
     await click(panel, query(item(panel, "benchy-wear"), "ha-icon-button.delete"));
 
-    expect(backend.sent("wattbill/line_items/delete")).toEqual([
-      { type: "wattbill/line_items/delete", run_id: "benchy", line_item_id: "benchy-wear" },
+    expect(backend.sent("coinop/line_items/delete")).toEqual([
+      { type: "coinop/line_items/delete", run_id: "benchy", line_item_id: "benchy-wear" },
     ]);
     expect(queryAll(panel, ".item")).toHaveLength(2);
   });
 
   it("add Other items by hand, a refund too", async () => {
-    const backend = recordedBackend().reply("wattbill/line_items/add", () => recorded.lineItemsAdd);
+    const backend = recordedBackend().reply("coinop/line_items/add", () => recorded.lineItemsAdd);
     const panel = await mountPanel(backend, { path: "/run/helmet" });
     expect(queryAll(panel, ".add-item")).toHaveLength(2);
 
@@ -134,9 +134,9 @@ describe("Line Items", () => {
     await change(panel, field(form, "unit_price"), "-2");
     await click(panel, query(form, "ha-button[type=submit]"));
 
-    expect(backend.sent("wattbill/line_items/add")).toEqual([
+    expect(backend.sent("coinop/line_items/add")).toEqual([
       {
-        type: "wattbill/line_items/add",
+        type: "coinop/line_items/add",
         run_id: "helmet",
         kind: "other",
         label: "Refund for the failed print",
@@ -151,7 +151,7 @@ describe("Line Items", () => {
   });
 
   it("lock live values while the Run is open, but take Other items", async () => {
-    const backend = recordedBackend().subscription("wattbill/runs/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/runs/subscribe", () => [
       { runs: [...recorded.snapshot.runs, started.run] },
     ]);
     const panel = await mountPanel(backend, { path: "/run/print-live" });

@@ -9,17 +9,17 @@ import zipfile
 import pytest
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "release.py"
-MANIFEST = {"domain": "wattbill", "name": "WattBill", "version": "0.0.0"}
+MANIFEST = {"domain": "coinop", "name": "Coin-op", "version": "0.0.0"}
 
 
 @pytest.fixture
 def integration(tmp_path: Path) -> Path:
     """An integration folder as the workflow sees it after building the panel."""
-    folder = tmp_path / "custom_components" / "wattbill"
+    folder = tmp_path / "custom_components" / "coinop"
     (folder / "frontend").mkdir(parents=True)
     (folder / "manifest.json").write_text(json.dumps(MANIFEST, indent=2) + "\n")
-    (folder / "__init__.py").write_text('"""WattBill."""\n')
-    (folder / "frontend" / "wattbill-panel.js").write_text("export {};\n")
+    (folder / "__init__.py").write_text('"""Coin-op."""\n')
+    (folder / "frontend" / "coinop-panel.js").write_text("export {};\n")
     return folder
 
 
@@ -33,7 +33,7 @@ def release(tag: str, integration: Path) -> subprocess.CompletedProcess[str]:
 
 
 def zipped(integration: Path) -> zipfile.ZipFile:
-    return zipfile.ZipFile(integration.parents[1] / "dist" / "wattbill.zip")
+    return zipfile.ZipFile(integration.parents[1] / "dist" / "coinop.zip")
 
 
 def test_a_version_tag_zips_the_integration_with_the_tag_as_version(
@@ -46,12 +46,12 @@ def test_a_version_tag_zips_the_integration_with_the_tag_as_version(
     with zipped(integration) as archive:
         assert sorted(archive.namelist()) == [
             "__init__.py",
-            "frontend/wattbill-panel.js",
+            "frontend/coinop-panel.js",
             "manifest.json",
         ]
         assert json.loads(archive.read("manifest.json")) == {
-            "domain": "wattbill",
-            "name": "WattBill",
+            "domain": "coinop",
+            "name": "Coin-op",
             "version": "1.2.0",
         }
     assert json.loads((integration / "manifest.json").read_text()) == MANIFEST
@@ -93,17 +93,17 @@ def test_a_tag_that_is_no_release_version_fails_without_an_asset(
 
     assert result.returncode != 0
     assert tag in result.stderr
-    assert not (integration.parents[1] / "dist" / "wattbill.zip").exists()
+    assert not (integration.parents[1] / "dist" / "coinop.zip").exists()
 
 
 def test_without_the_built_panel_there_is_no_asset(integration: Path) -> None:
-    (integration / "frontend" / "wattbill-panel.js").unlink()
+    (integration / "frontend" / "coinop-panel.js").unlink()
 
     result = release("1.2.0", integration)
 
     assert result.returncode != 0
-    assert "wattbill-panel.js" in result.stderr
-    assert not (integration.parents[1] / "dist" / "wattbill.zip").exists()
+    assert "coinop-panel.js" in result.stderr
+    assert not (integration.parents[1] / "dist" / "coinop.zip").exists()
 
 
 def test_bytecode_caches_stay_out_of_the_asset(integration: Path) -> None:

@@ -6,8 +6,8 @@
 
 Usage: uv run scripts/release.py <tag> <integration folder> <output folder>
 
-Writes <output folder>/wattbill.zip with the integration's files at its root
-(HACS unpacks it into custom_components/wattbill/) and the tag as the
+Writes <output folder>/coinop.zip with the integration's files at its root
+(HACS unpacks it into custom_components/coinop/) and the tag as the
 manifest's version, and prints `prerelease=<true|false>` for $GITHUB_OUTPUT.
 """
 
@@ -22,7 +22,7 @@ import zipfile
 VERSION = re.compile(
     r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?P<pre>(b|rc)(0|[1-9]\d*))?"
 )
-PANEL_BUNDLE = "frontend/wattbill-panel.js"
+PANEL_BUNDLE = "frontend/coinop-panel.js"
 
 
 def main(tag: str, integration: Path, output: Path) -> None:
@@ -34,7 +34,7 @@ def main(tag: str, integration: Path, output: Path) -> None:
         )
     output.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((integration / "manifest.json").read_text())
-    with zipfile.ZipFile(output / "wattbill.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(output / "coinop.zip", "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(integration.rglob("*")):
             name = path.relative_to(integration).as_posix()
             if (

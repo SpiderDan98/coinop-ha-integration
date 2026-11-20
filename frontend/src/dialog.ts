@@ -4,7 +4,7 @@ import { mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 
-@customElement("wattbill-dialog")
+@customElement("coinop-dialog")
 export class Dialog extends LitElement {
   /** A confirmation that needs an answer: an `alertdialog` without a close button. */
   @property({ type: Boolean }) alert = false;
@@ -57,7 +57,7 @@ export class Dialog extends LitElement {
 
   static override styles = css`
     dialog {
-      width: min(var(--wattbill-dialog-width, 480px), calc(100% - 32px));
+      width: min(var(--coinop-dialog-width, 480px), calc(100% - 32px));
       max-height: calc(100% - 32px);
       box-sizing: border-box;
       padding: 0;
@@ -118,6 +118,6 @@ export class Dialog extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "wattbill-dialog": Dialog;
+    "coinop-dialog": Dialog;
   }
 }

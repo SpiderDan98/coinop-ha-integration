@@ -37,7 +37,7 @@ def at(hours: float) -> str:
 async def create(panel: PanelClient, device_id: str, **fields: Any) -> dict[str, Any]:
     """A manual Run from 10:00 to 12:00 unless `fields` say otherwise."""
     result = await panel.call(
-        "wattbill/runs/create",
+        "coinop/runs/create",
         **{
             "device_id": device_id,
             "name": "Bracket",
@@ -100,7 +100,7 @@ async def test_a_manual_run_ends_after_it_starts_and_before_now(
 
     for started, ended in ((at(2), at(2)), (at(3), at(1)), (at(4), at(6))):
         error = await panel.error(
-            "wattbill/runs/create",
+            "coinop/runs/create",
             device_id=device.subentry_id,
             started=started,
             ended=ended,
@@ -108,14 +108,14 @@ async def test_a_manual_run_ends_after_it_starts_and_before_now(
         )
         assert error["code"] == "invalid_format"
     error = await panel.error(
-        "wattbill/runs/create",
+        "coinop/runs/create",
         device_id="gone",
         started=at(0),
         ended=at(1),
         outcome="completed",
     )
     assert error["code"] == "not_found"
-    assert (await panel.call("wattbill/runs/list"))["runs"] == []
+    assert (await panel.call("coinop/runs/list"))["runs"] == []
 
 
 async def test_without_history_or_average_power_the_user_enters_the_electricity(
@@ -132,7 +132,7 @@ async def test_without_history_or_average_power_the_user_enters_the_electricity(
     assert (item["method"], item["quantity"], item["amount"]) == ("entered", None, 0)
     assert item["unit_price"] == pytest.approx(0.30)
     entered = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         quantity=0.5,
@@ -145,7 +145,7 @@ async def test_without_history_or_average_power_the_user_enters_the_electricity(
     )
     assert item["amount"] == pytest.approx(0.15)
     error = await panel.error(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         unit="Wh",
@@ -226,7 +226,7 @@ async def test_tags_for_new_runs_apply_unless_the_dialog_sends_its_own(
     entry = await add_hub(hass)
     device = await add_device(hass, entry)
     await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=device.subentry_id,
         settings={"tags_for_new_runs": ["Batch 7"]},
     )
@@ -277,7 +277,7 @@ async def test_a_manual_run_without_a_default_material_flags_it_missing(
 async def fix(panel: PanelClient, run: dict[str, Any], **values: Any) -> list[str]:
     [item] = material_items(run)
     result = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=item["id"],
         **values,
@@ -309,7 +309,7 @@ async def test_deleting_the_material_line_item_clears_its_flags(
     [item] = material_items(run)
 
     result = await panel.call(
-        "wattbill/line_items/delete", run_id=run["id"], line_item_id=item["id"]
+        "coinop/line_items/delete", run_id=run["id"], line_item_id=item["id"]
     )
 
     assert result["run"]["flags"] == []
@@ -326,7 +326,7 @@ async def test_only_admins_create_manual_runs(
     await clock.advance(hours=5)
 
     error = await connect_panel(hass_read_only_user).error(
-        "wattbill/runs/create",
+        "coinop/runs/create",
         device_id=device.subentry_id,
         started=at(0),
         ended=at(2),

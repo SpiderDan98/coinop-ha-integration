@@ -21,11 +21,11 @@ jobs:
         working-directory: frontend
       - uses: astral-sh/setup-uv@v10.3.3
       - id: asset
-        run: uv run scripts/release.py "$GITHUB_REF_NAME" custom_components/wattbill dist >> "$GITHUB_OUTPUT"
+        run: uv run scripts/release.py "$GITHUB_REF_NAME" custom_components/coinop dist >> "$GITHUB_OUTPUT"
       # A draft, so the release is only published (and offered to users) after
       # its notes are edited, and never without its asset.
       - run: >-
-          gh release create "$GITHUB_REF_NAME" dist/wattbill.zip
+          gh release create "$GITHUB_REF_NAME" dist/coinop.zip
           --draft --generate-notes --verify-tag --title "$GITHUB_REF_NAME"
           ${{ steps.asset.outputs.prerelease == 'true' && '--prerelease' || '' }}
         env:

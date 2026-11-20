@@ -35,7 +35,7 @@ INSERTS = {
 
 
 def catalogue(hass_storage: dict[str, Any]) -> list[dict[str, Any]]:
-    templates: list[dict[str, Any]] = hass_storage["wattbill.catalog"]["data"][
+    templates: list[dict[str, Any]] = hass_storage["coinop.catalog"]["data"][
         "templates"
     ]
     return templates
@@ -43,7 +43,7 @@ def catalogue(hass_storage: dict[str, Any]) -> list[dict[str, Any]]:
 
 async def create(panel: PanelClient, **fields: Any) -> dict[str, Any]:
     template: dict[str, Any] = (
-        await panel.call("wattbill/templates/create", template=fields)
+        await panel.call("coinop/templates/create", template=fields)
     )["template"]
     return template
 
@@ -52,7 +52,7 @@ async def test_templates_are_created_edited_and_deleted_in_the_catalogue(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    await panel.subscribe("wattbill/catalog/subscribe")
+    await panel.subscribe("coinop/catalog/subscribe")
     assert (await panel.event())["templates"] == []
 
     inserts = await create(panel, **INSERTS | {"label": " Threaded inserts "})
@@ -62,13 +62,13 @@ async def test_templates_are_created_edited_and_deleted_in_the_catalogue(
     assert (await panel.event()) == {"templates": [inserts]}
     assert (await panel.event()) == {"templates": [inserts, wear]}
     updated = await panel.call(
-        "wattbill/templates/update",
+        "coinop/templates/update",
         template_id=inserts["id"],
         template={"unit_price": 0.1, "default_quantity": 4},
     )
     assert updated["template"] == inserts | {"unit_price": 0.1, "default_quantity": 4}
     await panel.event()
-    await panel.call("wattbill/templates/delete", template_id=wear["id"])
+    await panel.call("coinop/templates/delete", template_id=wear["id"])
     assert (await panel.event()) == {"templates": [updated["template"]]}
 
     await restart(hass, entry)
@@ -81,12 +81,12 @@ async def test_a_template_needs_a_label_and_a_known_basis(
     await add_hub(hass)
 
     errors = [
-        await panel.error("wattbill/templates/create", template=INSERTS | fields)
+        await panel.error("coinop/templates/create", template=INSERTS | fields)
         for fields in ({"label": "  "}, {"basis": "per_part"}, {"default_quantity": -1})
     ]
     missing = [
-        await panel.error("wattbill/templates/update", template_id="nope", template={}),
-        await panel.error("wattbill/templates/delete", template_id="nope"),
+        await panel.error("coinop/templates/update", template_id="nope", template={}),
+        await panel.error("coinop/templates/delete", template_id="nope"),
     ]
 
     assert [error["code"] for error in errors] == ["invalid_format"] * 3
@@ -98,7 +98,7 @@ async def add_template(
 ) -> dict[str, Any]:
     """Add the template to the Run; the Line Item added, as the Run now lists it."""
     result = await panel.call(
-        "wattbill/line_items/add_template",
+        "coinop/line_items/add_template",
         run_id=run_id,
         template_id=template["id"],
         **fields,
@@ -136,12 +136,12 @@ async def test_adding_a_template_copies_its_values_into_an_other_line_item(
     assert value(hass, OTHER_COST) == pytest.approx(0.88)
 
     await panel.call(
-        "wattbill/templates/update",
+        "coinop/templates/update",
         template_id=inserts["id"],
         template={"label": "M4 inserts", "unit_price": 1},
     )
-    await panel.call("wattbill/templates/delete", template_id=inserts["id"])
-    after = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    await panel.call("coinop/templates/delete", template_id=inserts["id"])
+    after = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     assert after["line_items"][2:] == [default, entered]
     assert value(hass, OTHER_COST) == pytest.approx(0.88)
 
@@ -173,17 +173,17 @@ async def test_running_hours_are_the_runs_running_time_without_pauses(
     }
     assert (item["locked"], item["deletable"]) == (False, True)
     result = await panel.call(
-        "wattbill/line_items/update", run_id="vase", line_item_id=item["id"], quantity=3
+        "coinop/line_items/update", run_id="vase", line_item_id=item["id"], quantity=3
     )
     assert result["run"]["line_items"][-1]["computed"]["quantity"] == 2.5
     result = await panel.call(
-        "wattbill/line_items/reset", run_id="vase", line_item_id=item["id"]
+        "coinop/line_items/reset", run_id="vase", line_item_id=item["id"]
     )
     assert result["run"]["line_items"][-1] == item
 
 
 async def wear_of(panel: PanelClient, run_id: str) -> Any:
-    run = (await panel.call("wattbill/runs/get", run_id=run_id))["run"]
+    run = (await panel.call("coinop/runs/get", run_id=run_id))["run"]
     [item] = [i for i in run["line_items"] if i["basis"] == "running_hours"]
     return item
 
@@ -203,7 +203,7 @@ async def test_running_hours_update_live_and_freeze_at_run_end(
     await clock.advance(minutes=30)
     assert (await wear_of(panel, run["id"]))["quantity"] == pytest.approx(1)
     error = await panel.error(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=added["id"],
         quantity=3,
@@ -223,7 +223,7 @@ async def test_running_hours_update_live_and_freeze_at_run_end(
 
 async def save(panel: PanelClient, run: Any, item: Any, **fields: Any) -> Any:
     result = await panel.call(
-        "wattbill/line_items/save_as_template",
+        "coinop/line_items/save_as_template",
         run_id=run["id"],
         line_item_id=item["id"],
         **fields,
@@ -240,7 +240,7 @@ async def test_any_line_item_is_saved_as_a_template_with_its_current_values(
         panel, run, label="Labour", quantity=0.5, unit="h", unit_price=15
     )
     await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id=run["id"],
         line_item_id=labour["id"],
         quantity=0.75,
@@ -290,7 +290,7 @@ async def test_a_line_item_without_a_label_needs_one_to_be_saved(
 
     errors = [
         await panel.error(
-            "wattbill/line_items/save_as_template",
+            "coinop/line_items/save_as_template",
             run_id=run["id"],
             line_item_id=electricity["id"],
             **fields,
@@ -298,7 +298,7 @@ async def test_a_line_item_without_a_label_needs_one_to_be_saved(
         for fields in ({}, {"label": " "})
     ]
     missing = await panel.error(
-        "wattbill/line_items/save_as_template", run_id=run["id"], line_item_id="nope"
+        "coinop/line_items/save_as_template", run_id=run["id"], line_item_id="nope"
     )
 
     assert [error["code"] for error in errors] == ["invalid_format"] * 2
@@ -309,7 +309,7 @@ async def set_automatic(
     panel: PanelClient, device: ConfigSubentry, *templates: dict[str, Any]
 ) -> Any:
     result = await panel.call(
-        "wattbill/devices/update_settings",
+        "coinop/devices/update_settings",
         device_id=device.subentry_id,
         settings={"automatic_templates": [t["id"] for t in templates]},
     )
@@ -341,8 +341,8 @@ async def test_automatic_templates_are_added_at_run_start_and_count_live(
     ]
 
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
-    started = (await panel.call("wattbill/runs/get", run_id=run["id"]))["run"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    started = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     assert [
         (i["label"], i["quantity"], i["locked"], i["template_id"])
         for i in started["line_items"][1:]
@@ -370,7 +370,7 @@ async def test_running_hours_keep_counting_after_a_restart(
     kobra = await add_device(hass, entry, running_power=100, price=1)
     await set_automatic(panel, kobra, await create(panel, **WEAR))
     await set_status(hass, "printing")
-    [run] = (await panel.call("wattbill/runs/list"))["runs"]
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
     await clock.advance(minutes=30)
 
     await restart(hass, entry)
@@ -393,7 +393,7 @@ async def test_changing_automatic_templates_affects_only_future_runs(
 
     await set_automatic(panel, kobra, inserts)
     await panel.call(
-        "wattbill/templates/update",
+        "coinop/templates/update",
         template_id=wear["id"],
         template={"label": "Nozzle", "unit_price": 1},
     )
@@ -417,9 +417,9 @@ async def test_a_deleted_template_leaves_every_devices_automatic_templates(
     await set_automatic(panel, kobra, wear, inserts)
     await set_automatic(panel, mini, wear)
 
-    await panel.call("wattbill/templates/delete", template_id=wear["id"])
+    await panel.call("coinop/templates/delete", template_id=wear["id"])
 
-    devices = (await panel.call("wattbill/devices/list"))["devices"]
+    devices = (await panel.call("coinop/devices/list"))["devices"]
     assert [d["settings"]["automatic_templates"] for d in devices] == [
         [inserts["id"]],
         [],
@@ -435,7 +435,7 @@ async def test_automatic_templates_must_exist(
 
     errors = [
         await panel.error(
-            "wattbill/devices/update_settings",
+            "coinop/devices/update_settings",
             device_id=kobra.subentry_id,
             settings={"automatic_templates": ids},
         )
@@ -458,7 +458,7 @@ async def test_a_template_is_added_only_to_runs_and_from_templates_that_exist(
 
     errors = [
         await panel.error(
-            "wattbill/line_items/add_template", run_id=run_id, template_id=template_id
+            "coinop/line_items/add_template", run_id=run_id, template_id=template_id
         )
         for run_id, template_id in (("nope", inserts["id"]), ("vase", "nope"))
     ]
@@ -469,12 +469,12 @@ async def test_a_template_is_added_only_to_runs_and_from_templates_that_exist(
 @pytest.mark.parametrize(
     ("command", "data"),
     [
-        ("wattbill/templates/create", {"template": INSERTS}),
-        ("wattbill/templates/update", {"template_id": "t", "template": {}}),
-        ("wattbill/templates/delete", {"template_id": "t"}),
-        ("wattbill/line_items/add_template", {"run_id": "vase", "template_id": "t"}),
+        ("coinop/templates/create", {"template": INSERTS}),
+        ("coinop/templates/update", {"template_id": "t", "template": {}}),
+        ("coinop/templates/delete", {"template_id": "t"}),
+        ("coinop/line_items/add_template", {"run_id": "vase", "template_id": "t"}),
         (
-            "wattbill/line_items/save_as_template",
+            "coinop/line_items/save_as_template",
             {"run_id": "vase", "line_item_id": "electricity", "label": "Power"},
         ),
     ],

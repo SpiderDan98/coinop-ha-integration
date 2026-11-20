@@ -22,7 +22,7 @@ from .test_runs import RUNS, set_status, stored_runs, value
 from .websocket import PanelClient
 
 FIXTURES = Path(__file__).parent / "fixtures" / "storage"
-STORES = ("wattbill.catalog", "wattbill.runs", "wattbill.live")
+STORES = ("coinop.catalog", "coinop.runs", "coinop.live")
 
 
 def read(path: Path) -> Any:
@@ -43,13 +43,13 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
     files = {key: read(fixture / key) for key in STORES if (fixture / key).exists()}
     hass_storage.update(files)
     entry = MockConfigEntry(
-        domain="wattbill", title="WattBill", data=read(fixture / "entry.json")
+        domain="coinop", title="Coin-op", data=read(fixture / "entry.json")
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    # A new Run makes WattBill write both Stores in the current version.
+    # A new Run makes Coin-op write both Stores in the current version.
     await add_device(hass, entry)
     await set_status(hass, "printing")
     await clock.advance(minutes=5)
@@ -62,12 +62,12 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
         "runs"
     ]
     assert live_runs(hass_storage) == current["live"]
-    listed = (await panel.call("wattbill/materials/list"))["materials"]
+    listed = (await panel.call("coinop/materials/list"))["materials"]
     assert [
         {key: value for key, value in m.items() if key != "price_per_gram"}
         for m in listed
     ] == current["catalog"]["materials"]
-    await panel.subscribe("wattbill/catalog/subscribe")
+    await panel.subscribe("coinop/catalog/subscribe")
     catalog = await panel.event()
     assert catalog["tags"] == current["catalog"]["tags"]
     assert catalog["templates"] == current["catalog"]["templates"]
@@ -82,16 +82,14 @@ async def test_stored_data_of_a_released_version_migrates_to_current(
 async def test_fields_added_by_a_newer_minor_version_are_kept(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
-    newer = read(FIXTURES / "1.1" / "wattbill.runs")
+    newer = read(FIXTURES / "1.1" / "coinop.runs")
     newer["minor_version"] = 99
     [run, _] = newer["data"]["runs"]
     run["customer"] = "Lena"
     run["line_items"][0]["override"] = {"amount": 0.1}
     run["line_items"][0]["segments"][0]["source"] = "sensor.price"
-    hass_storage["wattbill.runs"] = newer
-    entry = MockConfigEntry(
-        domain="wattbill", title="WattBill", data={"stores": ["runs"]}
-    )
+    hass_storage["coinop.runs"] = newer
+    entry = MockConfigEntry(domain="coinop", title="Coin-op", data={"stores": ["runs"]})
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

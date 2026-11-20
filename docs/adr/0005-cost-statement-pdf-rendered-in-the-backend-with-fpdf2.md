@@ -1,6 +1,6 @@
 # The Cost Statement PDF is rendered in the backend with fpdf2
 
-The Cost Statement is laid out in Python with fpdf2 (`requirements: ["fpdf2==2.9.0"]`), in Noto Sans, which ships in the package with its OFL licence. Rendering runs in the executor on copies of the Runs. The panel never builds the PDF. It asks `wattbill/cost_statement/create` for an export and gets a short-lived signed path back. The browser downloads that path with a plain link from an admin-only view, which renders the PDF from the Runs' current values. The PDF is never stored.
+The Cost Statement is laid out in Python with fpdf2 (`requirements: ["fpdf2==2.9.0"]`), in Noto Sans, which ships in the package with its OFL licence. Rendering runs in the executor on copies of the Runs. The panel never builds the PDF. It asks `coinop/cost_statement/create` for an export and gets a short-lived signed path back. The browser downloads that path with a plain link from an admin-only view, which renders the PDF from the Runs' current values. The PDF is never stored.
 
 ## Why
 

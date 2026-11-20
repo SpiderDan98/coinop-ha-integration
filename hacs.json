@@ -1,7 +1,7 @@
 {
-  "name": "WattBill",
+  "name": "Coin-op",
   "homeassistant": "2026.5.0",
   "zip_release": true,
-  "filename": "wattbill.zip",
+  "filename": "coinop.zip",
   "hide_default_branch": true
 }

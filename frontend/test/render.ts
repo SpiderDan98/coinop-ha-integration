@@ -1,10 +1,10 @@
 // Mounts the panel the way Home Assistant does and reads what it renders.
 import { afterEach } from "vitest";
-import "../src/wattbill-panel";
-import type { WattbillPanel } from "../src/wattbill-panel";
+import "../src/coinop-panel";
+import type { CoinOpPanel } from "../src/coinop-panel";
 import type { FakeBackend } from "./fake-hass";
 
-const PREFIX = "/wattbill";
+const PREFIX = "/coinop";
 const cleanups: (() => void)[] = [];
 
 afterEach(() => {
@@ -53,7 +53,7 @@ export function text(node: Node): string {
 export async function settle(root: Element) {
   for (let round = 0; round < 5; round++) {
     await new Promise((resolve) => setTimeout(resolve));
-    const elements = [root, ...queryAll(root, "*")] as Partial<WattbillPanel>[];
+    const elements = [root, ...queryAll(root, "*")] as Partial<CoinOpPanel>[];
     await Promise.all(elements.map((element) => element.updateComplete));
   }
 }
@@ -61,11 +61,11 @@ export async function settle(root: Element) {
 /** `path` may carry a query, which HA leaves out of `route`. */
 export async function mountPanel(backend: FakeBackend, { path = "", narrow = false } = {}) {
   history.replaceState(null, "", PREFIX + path);
-  const panel = document.createElement("wattbill-panel") as WattbillPanel;
+  const panel = document.createElement("coinop-panel") as CoinOpPanel;
   panel.hass = backend.hass;
   panel.narrow = narrow;
   panel.route = { prefix: PREFIX, path: location.pathname.slice(PREFIX.length) };
-  panel.panel = { url_path: "wattbill", config: null };
+  panel.panel = { url_path: "coinop", config: null };
   // HA's router: a `location-changed` event or the back button becomes a new `route`.
   const followNavigation = () => {
     panel.route = { prefix: PREFIX, path: location.pathname.slice(PREFIX.length) };

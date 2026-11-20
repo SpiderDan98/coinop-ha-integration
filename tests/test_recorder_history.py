@@ -1,4 +1,4 @@
-"""Meter reports WattBill missed while it was stopped come from recorder history."""
+"""Meter reports Coin-op missed while it was stopped come from recorder history."""
 
 from typing import Any
 
@@ -12,7 +12,7 @@ from pytest_homeassistant_custom_component.typing import RecorderInstanceGenerat
 from .clock import Clock
 from .devices import add_device, add_hub
 from .test_dynamic_price import PRICE_ENTITY, set_price
-from .test_lifecycle import start_wattbill, stop_wattbill
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_measured import add_metered_device, electricity, set_meter
 from .test_runs import NO_MATERIAL, set_status, stored_runs
 
@@ -39,7 +39,7 @@ async def test_reports_missed_while_stopped_are_filled_from_recorder_history(
     await set_status(hass, "printing")
     await clock.advance(minutes=10)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(minutes=10)
     await set_meter(hass, 10.1)
     await clock.advance(minutes=10)
@@ -48,7 +48,7 @@ async def test_reports_missed_while_stopped_are_filled_from_recorder_history(
     await set_meter(hass, 10.5)
     await async_wait_recording_done(hass)
     await clock.advance(minutes=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [run] = stored_runs(hass_storage)
     assert run["ended"] == "2026-01-15T10:30:00+00:00"
@@ -65,14 +65,14 @@ async def test_price_changes_missed_while_stopped_come_from_recorder_history(
     await set_status(hass, "printing")
     await clock.advance(minutes=10)
 
-    await stop_wattbill(hass, entry)
+    await stop_coinop(hass, entry)
     await clock.advance(minutes=20)
     await set_price(hass, 0.40)
     await clock.advance(minutes=30)
     await set_status(hass, "finished")
     await async_wait_recording_done(hass)
     await clock.advance(minutes=1)
-    await start_wattbill(hass, entry)
+    await start_coinop(hass, entry)
 
     [run] = stored_runs(hass_storage)
     assert [s["unit_price"] for s in electricity(run)["segments"]] == [0.20, 0.40]

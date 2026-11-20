@@ -58,7 +58,7 @@ def read(pdf: bytes) -> tuple[list[str], tuple[int, int]]:
 
 async def export(panel: PanelClient, browser: HttpClient, **options: Any) -> Statement:
     """Export the way the panel does: create it, then download the signed path."""
-    result = await panel.call("wattbill/cost_statement/create", **options)
+    result = await panel.call("coinop/cost_statement/create", **options)
     status, headers, body = await browser.download(result["path"])
     assert status == 200, (status, body)
     assert headers["Content-Type"] == "application/pdf"
@@ -78,7 +78,7 @@ def pictures(pdf: bytes) -> list[tuple[int, str, tuple[int, int]]]:
 
 
 async def upload(http: HttpClient, run_id: str, *photos: bytes) -> list[str]:
-    status, body = await http.upload(f"/api/wattbill/runs/{run_id}/images", *photos)
+    status, body = await http.upload(f"/api/coinop/runs/{run_id}/images", *photos)
     assert status == 200, body
     return [image["id"] for image in body["images"]]
 
@@ -97,7 +97,7 @@ async def photographed(
     await add_hub(hass)
     await upload(http, "benchy", picture("red", size=(4000, 3000)))
     _, blue = await upload(http, "helmet", picture("green"), picture("blue"))
-    await panel.call("wattbill/images/set_cover", run_id="helmet", image_id=blue)
+    await panel.call("coinop/images/set_cover", run_id="helmet", image_id=blue)
 
 
 def benchy(started: datetime = BENCHY, **fields: Any) -> dict[str, Any]:
@@ -252,7 +252,7 @@ async def test_the_default_markup_is_a_hub_option(
     result = await set_options(hass, entry, markup=10)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert await panel.call("wattbill/cost_statement/defaults") == {"markup": 10}
+    assert await panel.call("coinop/cost_statement/defaults") == {"markup": 10}
     statement = await export(panel, browser, run_ids=["benchy", "helmet"])
     assert statement.lines[-4:-1] == [
         "Subtotal €0.31",
@@ -265,7 +265,7 @@ async def test_the_default_markup_is_a_hub_option(
 async def test_without_markup_there_is_no_markup_line(
     clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
-    assert await panel.call("wattbill/cost_statement/defaults") == {"markup": 0}
+    assert await panel.call("coinop/cost_statement/defaults") == {"markup": 0}
 
     statement = await export(panel, browser, run_ids=["benchy", "helmet"], markup=0)
 
@@ -281,7 +281,7 @@ async def test_markup_cannot_be_negative(
     with pytest.raises(InvalidData):
         await set_options(hass, entry, markup=-5)
     error = await panel.error(
-        "wattbill/cost_statement/create", run_ids=["benchy"], markup=-5
+        "coinop/cost_statement/create", run_ids=["benchy"], markup=-5
     )
     assert error["code"] == "invalid_format"
 
@@ -405,7 +405,7 @@ async def test_internal_details_stay_off_the_statement(
     )
     await add_hub(hass)
     run = await panel.call(
-        "wattbill/line_items/update",
+        "coinop/line_items/update",
         run_id="benchy",
         line_item_id="electricity",
         amount=0.15,
@@ -518,10 +518,10 @@ async def test_the_pdf_shows_the_runs_as_they_are_at_download(
     clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
     result = await panel.call(
-        "wattbill/cost_statement/create", run_ids=["benchy", "helmet"]
+        "coinop/cost_statement/create", run_ids=["benchy", "helmet"]
     )
-    await panel.call("wattbill/runs/update", run_id="benchy", name="Benchy v2")
-    await panel.call("wattbill/runs/delete", run_ids=["helmet"])
+    await panel.call("coinop/runs/update", run_id="benchy", name="Benchy v2")
+    await panel.call("coinop/runs/delete", run_ids=["helmet"])
 
     status, _, body = await browser.download(result["path"])
 
@@ -544,15 +544,15 @@ async def test_only_final_runs_can_be_exported(
     await add_hub(hass)
 
     open_run = await panel.error(
-        "wattbill/cost_statement/create", run_ids=["benchy", "live"]
+        "coinop/cost_statement/create", run_ids=["benchy", "live"]
     )
     waiting = await panel.error(
-        "wattbill/cost_statement/create", run_ids=["benchy", "waiting"]
+        "coinop/cost_statement/create", run_ids=["benchy", "waiting"]
     )
     missing = await panel.error(
-        "wattbill/cost_statement/create", run_ids=["benchy", "gone"]
+        "coinop/cost_statement/create", run_ids=["benchy", "gone"]
     )
-    empty = await panel.error("wattbill/cost_statement/create", run_ids=[])
+    empty = await panel.error("coinop/cost_statement/create", run_ids=[])
 
     assert [open_run["code"], waiting["code"], missing["code"], empty["code"]] == [
         "not_allowed",
@@ -571,10 +571,10 @@ async def test_only_admins_export(
     panel: PanelClient,
 ) -> None:
     user = connect_panel(hass_read_only_user)
-    error = await user.error("wattbill/cost_statement/create", run_ids=["benchy"])
+    error = await user.error("coinop/cost_statement/create", run_ids=["benchy"])
     assert error["code"] == "unauthorized"
 
-    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+    result = await panel.call("coinop/cost_statement/create", run_ids=["benchy"])
     status, _ = await connect_http(hass_read_only_user).get(result["path"])
     assert status == 401
 
@@ -583,7 +583,7 @@ async def test_only_admins_export(
 async def test_the_download_needs_its_signature_and_expires(
     clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
-    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+    result = await panel.call("coinop/cost_statement/create", run_ids=["benchy"])
     unsigned = result["path"].split("?")[0]
 
     assert (await browser.get(unsigned))[0] == 401
@@ -599,7 +599,7 @@ async def test_a_phones_download_manager_can_fetch_the_signed_path_again(
 ) -> None:
     """The Android app's web view opens the link, then its download manager fetches
     it again later, sending the app's auth header and the signature both."""
-    result = await panel.call("wattbill/cost_statement/create", run_ids=["benchy"])
+    result = await panel.call("coinop/cost_statement/create", run_ids=["benchy"])
 
     first = await browser.download(result["path"])
     await clock.advance(minutes=1)

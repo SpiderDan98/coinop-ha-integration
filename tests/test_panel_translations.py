@@ -8,8 +8,8 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 PANEL = ROOT / "frontend" / "src" / "translations"
-BACKEND = ROOT / "custom_components" / "wattbill" / "translations"
-STATEMENT = ROOT / "custom_components" / "wattbill" / "statement" / "strings"
+BACKEND = ROOT / "custom_components" / "coinop" / "translations"
+STATEMENT = ROOT / "custom_components" / "coinop" / "statement" / "strings"
 LANGUAGES = sorted(path.stem for path in PANEL.glob("*.json"))
 
 # Terms both sides show: panel key -> backend key. Add a pair whenever the panel

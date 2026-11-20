@@ -16,9 +16,9 @@ const press = async (panel: Element, input: HTMLElement, key: string) => {
   await settle(panel);
 };
 
-/** A backend whose `wattbill/runs/update` returns the Run with the Tags it was sent. */
+/** A backend whose `coinop/runs/update` returns the Run with the Tags it was sent. */
 function taggingBackend() {
-  return recordedBackend().reply("wattbill/runs/update", (msg: Message) => ({
+  return recordedBackend().reply("coinop/runs/update", (msg: Message) => ({
     run: { ...recorded.run(msg.run_id as string), tags: msg.tags },
   }));
 }
@@ -34,15 +34,15 @@ describe("Tags tab", () => {
   };
   const tagsBackend = () =>
     recordedBackend()
-      .reply("wattbill/tags/rename", (msg) => ({ tag: msg.name }))
-      .reply("wattbill/tags/delete", () => ({}));
+      .reply("coinop/tags/rename", (msg) => ({ tag: msg.name }))
+      .reply("coinop/tags/delete", () => ({}));
 
   it("opens from the toolbar between Line Item Templates and Devices", async () => {
     const panel = await mountPanel(recordedBackend());
 
     await click(panel, query(panel, `a.tab[href$="/tags"]`));
 
-    expect(location.pathname).toBe("/wattbill/tags");
+    expect(location.pathname).toBe("/coinop/tags");
     expect(queryAll(panel, "a.tab").map((tab) => tab.title)).toEqual([
       "Overview",
       "Runs",
@@ -76,14 +76,14 @@ describe("Tags tab", () => {
     expect(queryAll(panel, ".merge-hint")).toHaveLength(0);
     await click(panel, button(panel, "Save"));
 
-    expect(backend.sent("wattbill/tags/rename")).toEqual([
-      { type: "wattbill/tags/rename", tag: "Gift", name: "Present" },
+    expect(backend.sent("coinop/tags/rename")).toEqual([
+      { type: "coinop/tags/rename", tag: "Gift", name: "Present" },
     ]);
     expect(queryAll(panel, "tr.tag input")).toHaveLength(0);
   });
 
   it("creates a Tag from the floating button, but not one that already exists", async () => {
-    const backend = recordedBackend().reply("wattbill/tags/create", (msg) => ({ tag: msg.name }));
+    const backend = recordedBackend().reply("coinop/tags/create", (msg) => ({ tag: msg.name }));
     const panel = await mountPanel(backend, { path: "/tags" });
 
     await click(panel, query(panel, "ha-button.new-tag.fab"));
@@ -98,8 +98,8 @@ describe("Tags tab", () => {
     expect(queryAll(panel, ".exists-hint")).toHaveLength(0);
     await click(panel, button(panel, "Create"));
 
-    expect(backend.sent("wattbill/tags/create")).toEqual([
-      { type: "wattbill/tags/create", name: "Batch 8" },
+    expect(backend.sent("coinop/tags/create")).toEqual([
+      { type: "coinop/tags/create", name: "Batch 8" },
     ]);
     expect(queryAll(panel, "form.new")).toHaveLength(0);
     expect(queryAll(panel, "ha-button.new-tag.fab")).toHaveLength(1);
@@ -113,7 +113,7 @@ describe("Tags tab", () => {
     await press(panel, query(panel, "form.new input"), "Escape");
 
     expect(queryAll(panel, "form.new")).toHaveLength(0);
-    expect(backend.sent("wattbill/tags/create")).toEqual([]);
+    expect(backend.sent("coinop/tags/create")).toEqual([]);
   });
 
   it("deletes a Tag only once confirmed", async () => {
@@ -125,12 +125,12 @@ describe("Tags tab", () => {
       "Removes “Gift” from 2 Runs and from every Device's Tags for new Runs.",
     );
     await click(panel, button(panel, "Cancel"));
-    expect(backend.sent("wattbill/tags/delete")).toEqual([]);
+    expect(backend.sent("coinop/tags/delete")).toEqual([]);
 
     await click(panel, button(row(panel, "Gift"), "Delete"));
     await click(panel, button(panel, "Delete for good"));
-    expect(backend.sent("wattbill/tags/delete")).toEqual([
-      { type: "wattbill/tags/delete", tag: "Gift" },
+    expect(backend.sent("coinop/tags/delete")).toEqual([
+      { type: "coinop/tags/delete", tag: "Gift" },
     ]);
   });
 
@@ -138,14 +138,14 @@ describe("Tags tab", () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend, { path: "/tags" });
 
-    backend.push("wattbill/catalog/subscribe", { tags: ["Cosplay helmet", "Present"] });
+    backend.push("coinop/catalog/subscribe", { tags: ["Cosplay helmet", "Present"] });
     await settle(panel);
 
     expect(queryAll(panel, "tr.tag .tag-name").map(text)).toEqual(["Cosplay helmet", "Present"]);
   });
 
   it("says when there are no Tags yet", async () => {
-    const backend = recordedBackend().subscription("wattbill/catalog/subscribe", () => [
+    const backend = recordedBackend().subscription("coinop/catalog/subscribe", () => [
       recorded.catalog.empty,
     ]);
 
@@ -163,7 +163,7 @@ describe("Tags tab", () => {
 
 describe("Tags in the gallery", () => {
   const tagged = (tags: Record<string, string[]>) =>
-    recordedBackend().subscription("wattbill/runs/subscribe", () => [
+    recordedBackend().subscription("coinop/runs/subscribe", () => [
       { runs: recorded.snapshot.runs.map((run) => ({ ...run, tags: tags[run.id] ?? run.tags })) },
     ]);
   const shown = (panel: Element) => queryAll(panel, ".tile .strong").map((name) => text(name));
@@ -212,12 +212,12 @@ describe("Tags in the gallery", () => {
     await fill(panel, query(panel, "select.device-filter"), "device-kobra");
 
     expect(shown(panel)).toEqual(["Helmet"]);
-    expect(text(query(panel, "wattbill-run-list .head"))).toBe("1 Run · €0.30");
+    expect(text(query(panel, "coinop-run-list .head"))).toBe("1 Run · €0.30");
   });
 });
 
 describe("Tags for new Runs", () => {
-  const UPDATE = "wattbill/devices/update_settings";
+  const UPDATE = "coinop/devices/update_settings";
 
   it("are set per Device in its settings dialog and saved with it", async () => {
     const backend = recordedBackend().reply(UPDATE, (msg) => ({
@@ -281,8 +281,8 @@ describe("Tags on a Run", () => {
       "Create “s”",
     ]);
     await click(panel, button(panel, "Spare parts"));
-    expect(backend.sent("wattbill/runs/update").at(-1)).toEqual({
-      type: "wattbill/runs/update",
+    expect(backend.sent("coinop/runs/update").at(-1)).toEqual({
+      type: "coinop/runs/update",
       run_id: "benchy",
       tags: ["Gift", "Spare parts"],
     });
@@ -302,7 +302,7 @@ describe("Tags on a Run", () => {
     await fill(panel, input, "gift");
     await press(panel, input, "Enter");
 
-    expect(backend.sent("wattbill/runs/update").map((call) => call.tags)).toEqual([
+    expect(backend.sent("coinop/runs/update").map((call) => call.tags)).toEqual([
       ["Batch 7", "Gift"],
       ["Batch 7", "Gift", "Spare parts"],
     ]);
@@ -315,7 +315,7 @@ describe("Tags on a Run", () => {
 
     await click(panel, iconButton(panel, "Remove Gift"));
 
-    expect(backend.sent("wattbill/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
+    expect(backend.sent("coinop/runs/update").at(-1)?.tags).toEqual(["Cosplay helmet"]);
     expect(chips(panel)).toEqual(["Cosplay helmet"]);
   });
 });
@@ -332,7 +332,7 @@ describe("The Tag field", () => {
     expect(text(query(panel, ".suggestion.active"))).toBe("Spare parts");
     await press(panel, input, "Enter");
 
-    expect(backend.sent("wattbill/runs/update").at(-1)).toMatchObject({
+    expect(backend.sent("coinop/runs/update").at(-1)).toMatchObject({
       tags: ["Gift", "Spare parts"],
     });
   });

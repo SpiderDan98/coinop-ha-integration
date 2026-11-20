@@ -1,4 +1,4 @@
-"""Fetch from WattBill's HTTP views the way the panel does, as a given user."""
+"""Fetch from Coin-op's HTTP views the way the panel does, as a given user."""
 
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
@@ -14,7 +14,7 @@ from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 
 class HttpClient:
-    """Starts the test HTTP server on first use, so set WattBill up before."""
+    """Starts the test HTTP server on first use, so set Coin-op up before."""
 
     def __init__(
         self, connect: Callable[[], Awaitable[TestClient[web.Request, web.Application]]]
