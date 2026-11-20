@@ -72,9 +72,21 @@
             "doses": {
               "dose-detergent": 75.0
             }
+          },
+          "programs": {
+            "Wool": {
+              "doses": {
+                "dose-detergent": 40.0
+              }
+            }
           }
         }
-      }
+      },
+      "known_programs": [
+        "Cotton 60°",
+        "Wool",
+        "Eco 40-60"
+      ]
     }
   ]
 }

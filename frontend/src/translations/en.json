@@ -374,7 +374,13 @@
   "device.program": "Program",
   "device.default_row": "Default",
   "device.default_amount": "Default amount of {dose}",
-  "device.program_defaults_hint": "Amounts per Run in the Material's unit. An empty cell means not dosed.",
+  "device.program_defaults_hint": "Amounts per Run in the Material's unit. An empty cell means not dosed. A Run uses the row of its Program, else the Default row.",
   "flag.ended_early_defaults": "The Run ended early but was charged defaults for a whole cycle: check the amounts",
-  "dose_source.default_row": "From the Default row"
+  "dose_source.default_row": "From the Default row",
+  "device.program_rows": "Program rows",
+  "device.suggested": "Suggested",
+  "device.program_amount": "{dose} for {program}",
+  "device.remove_program": "Remove the row of {program}",
+  "device.add_program": "+ Add Program",
+  "dose_source.program_default": "From the Program's defaults"
 }

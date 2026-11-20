@@ -376,7 +376,11 @@ async def test_record_a_washing_machine_and_its_run(
     )
     hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
     hass.states.async_set(WASHER_STATUS, "off")
-    hass.states.async_set("sensor.washer_program", "Cotton 60°")
+    hass.states.async_set(
+        "sensor.washer_program",
+        "Cotton 60°",
+        {"options": ["Cotton 60°", "Wool", "Eco 40-60"]},
+    )
     subentry = await add_washing_machine(
         hass,
         await add_hub(hass),
@@ -391,7 +395,10 @@ async def test_record_a_washing_machine_and_its_run(
                 {"id": "dose-detergent", "material_id": "material-detergent"},
                 {"id": "dose-pods", "material_id": "material-pods"},
             ],
-            "program_defaults": {"default": {"doses": {"dose-detergent": 75}}},
+            "program_defaults": {
+                "default": {"doses": {"dose-detergent": 75}},
+                "programs": {"Wool": {"doses": {"dose-detergent": 40}}},
+            },
         },
     )
     hass.states.async_set(WASHER_STATUS, "running")
