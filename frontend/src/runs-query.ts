@@ -7,7 +7,8 @@ import { deviceName, runName } from "./run-parts";
 
 export const OUTCOME_FILTERS = ["open", ...OUTCOMES, "failed_cancelled"] as const;
 
-/** Tags match any of `tags`, or no Tag at all with `untagged`. */
+/** Tags match any of `tags`, or no Tag at all with `untagged`; `noProgram` matches the Runs
+ * without a Program of the Devices that record one. */
 export const NO_FILTER = {
   name: "",
   deviceId: "",
@@ -16,6 +17,8 @@ export const NO_FILTER = {
   flagged: false,
   tags: [] as string[],
   untagged: false,
+  program: "",
+  noProgram: false,
 };
 
 export type Filter = typeof NO_FILTER;
@@ -23,7 +26,20 @@ export type Filter = typeof NO_FILTER;
 /** Only final Runs go into a Cost Statement or can be deleted. */
 export const selectable = (run: RunSummary) => run.finalised;
 
-export function matches(run: RunSummary, filter: Filter, t: Localize, format: Format) {
+/** A Run of a Device that records Programs, or one that has a Program. */
+export const programmed = (run: RunSummary, devices?: Device[]) =>
+  run.program !== null ||
+  !!devices?.some(
+    (device) => device.id === run.device_id && device.capabilities.includes("program"),
+  );
+
+export function matches(
+  run: RunSummary,
+  filter: Filter,
+  t: Localize,
+  format: Format,
+  devices?: Device[],
+) {
   const outcome = run.ended === null ? "open" : (run.outcome ?? "unknown");
   const name = filter.name.trim().toLocaleLowerCase();
   return (
@@ -37,7 +53,9 @@ export function matches(run: RunSummary, filter: Filter, t: Localize, format: Fo
     (!filter.flagged || run.flags.length > 0) &&
     ((!filter.tags.length && !filter.untagged) ||
       (filter.untagged && !run.tags.length) ||
-      run.tags.some((tag) => filter.tags.includes(tag)))
+      run.tags.some((tag) => filter.tags.includes(tag))) &&
+    (!filter.program || run.program === filter.program) &&
+    (!filter.noProgram || (run.program === null && programmed(run, devices)))
   );
 }
 
@@ -82,6 +100,8 @@ export function filterOf(search: string): Filter {
     flagged: params.has("flagged"),
     tags: params.getAll("tag"),
     untagged: params.has("untagged"),
+    program: params.get("program") ?? "",
+    noProgram: params.has("no_program"),
   };
 }
 
@@ -95,6 +115,8 @@ export function searchOf(filter: Partial<Filter>, sort = DEFAULT_SORT) {
   if (filter.flagged) params.set("flagged", "1");
   for (const tag of filter.tags ?? []) params.append("tag", tag);
   if (filter.untagged) params.set("untagged", "1");
+  if (filter.program) params.set("program", filter.program);
+  if (filter.noProgram) params.set("no_program", "1");
   if (sort.by !== DEFAULT_SORT.by || sort.descending !== DEFAULT_SORT.descending) {
     params.set("sort", sort.by);
     params.set("order", sort.descending ? "desc" : "asc");

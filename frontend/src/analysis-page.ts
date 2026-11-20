@@ -2,32 +2,45 @@
 // read afresh whenever a Run changes. Rows with a matching Runs filter link to those Runs.
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { KINDS, OUTCOMES, getGroupings, type Device, type Group, type RunSummary } from "./api";
+import {
+  KINDS,
+  OUTCOMES,
+  getAggregates,
+  getGroupings,
+  type Device,
+  type Group,
+  type RunSummary,
+} from "./api";
 import { formatter, type Format } from "./format";
 import { followLink, type HomeAssistant } from "./hass";
 import { localize, type Localize } from "./localize";
 import { deviceName } from "./run-parts";
-import { runsPath, type Filter } from "./runs-query";
+import { programmed, runsPath, type Filter } from "./runs-query";
 import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
 type Aggregates = Awaited<ReturnType<typeof loadAggregates>>;
 
-async function loadAggregates(hass: HomeAssistant) {
-  const { total, material, ...groups } = await getGroupings(hass, {
-    total: [],
-    kind: ["kind"],
-    device: ["device"],
-    month: ["month"],
-    material: ["kind", "material"],
-    outcome: ["outcome"],
-    tag: ["tag"],
-  });
+/** `programRuns` are the Runs compared by Program; none, no Program table. */
+async function loadAggregates(hass: HomeAssistant, programRuns: string[]) {
+  const [{ total, material, ...groups }, program] = await Promise.all([
+    getGroupings(hass, {
+      total: [],
+      kind: ["kind"],
+      device: ["device"],
+      month: ["month"],
+      material: ["kind", "material"],
+      outcome: ["outcome"],
+      tag: ["tag"],
+    }),
+    programRuns.length ? getAggregates(hass, ["program"], { run_ids: programRuns }) : undefined,
+  ]);
   return {
     ...groups,
     cost: total[0]?.cost ?? 0,
     // Electricity and Other Line Items have no Material either.
     material: material.filter((group) => group.kind === "material"),
+    program,
   };
 }
 
@@ -81,7 +94,7 @@ export class AnalysisPage extends LitElement {
   private request = 0;
 
   protected override willUpdate(changed: PropertyValues<this>) {
-    if (changed.has("runs")) void this.load();
+    if (changed.has("runs") || changed.has("devices")) void this.load();
   }
 
   private link(label: string, filter: Partial<Filter>) {
@@ -90,7 +103,10 @@ export class AnalysisPage extends LitElement {
 
   private async load() {
     const request = ++this.request;
-    const aggregates = await loadAggregates(this.hass).catch(() => null);
+    const programRuns = [...this.runs.values()]
+      .filter((run) => programmed(run, this.devices))
+      .map((run) => run.id);
+    const aggregates = await loadAggregates(this.hass, programRuns).catch(() => null);
     if (request === this.request) this.aggregates = aggregates;
   }
 
@@ -114,6 +130,7 @@ export class AnalysisPage extends LitElement {
                   ${this.renderMaterials(aggregates, t, format)}
                   ${this.renderOutcomes(aggregates, t, format)}
                   ${this.renderTags(aggregates, t, format)}
+                  ${this.renderPrograms(aggregates, t, format)}
                 </div>`
       }
     `;
@@ -215,6 +232,22 @@ export class AnalysisPage extends LitElement {
       ]),
       hint: t("analysis.tag_overlap"),
       empty: t("tags.empty"),
+    });
+  }
+
+  private renderPrograms({ program }: Aggregates, t: Localize, format: Format) {
+    if (!program) return nothing;
+    return totals("by-program", t("analysis.by_program"), {
+      head: [t("run.program"), t("runs.title"), t("analysis.cost"), t("analysis.per_run")],
+      rows: program.map((group) => [
+        group.program
+          ? this.link(group.program, { program: group.program })
+          : this.link(t("runs.no_program"), { noProgram: true }),
+        group.runs,
+        format.money(group.cost),
+        format.money(group.cost / group.runs),
+      ]),
+      empty: t("analysis.empty"),
     });
   }
 

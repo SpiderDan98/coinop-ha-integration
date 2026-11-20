@@ -219,6 +219,29 @@ async def test_a_run_counts_once_in_each_of_its_tags(
     ]
 
 
+async def test_runs_group_by_their_program_none_as_no_program(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    started = CLOCK_START - DAY
+    rinse = receipt(started, 2, 0.24, line_item("other", 0.5, id="rinse"))
+    place_runs(
+        hass_storage,
+        stored_run("monday", program="Cotton 60°"),
+        stored_run("tuesday", program="Cotton 60°", line_items=rinse),
+        stored_run("wednesday", program="Eco 40-60"),
+        stored_run("thursday"),
+    )
+    await add_hub(hass)
+
+    by_program = await groups(panel, "program")
+
+    assert pick(by_program, "program", "runs", "cost") == [
+        {"program": "Cotton 60°", "runs": 2, "cost": 0.63},
+        {"program": "Eco 40-60", "runs": 1, "cost": 0.07},
+        {"program": None, "runs": 1, "cost": 0.07},
+    ]
+
+
 async def test_an_open_run_counts_at_its_provisional_cost(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

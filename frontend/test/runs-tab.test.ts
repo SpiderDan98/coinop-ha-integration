@@ -14,6 +14,18 @@ const pick = (panel: Element, name: string) =>
   );
 const basket = (panel: Element) => text(query(panel, ".basket"));
 const url = () => location.pathname + location.search;
+/** Kobra's "Vase" and the washing machine's Runs, two of them "Cotton 60°". */
+const washing = () =>
+  recordedBackend()
+    .subscription(SUBSCRIBE, () => [{ runs: recorded.programs.runs }])
+    .reply("coinop/devices/list", () => ({ devices: [...recorded.devices, recorded.washer] }));
+const choose = (panel: Element, select: HTMLElement, label: string) =>
+  fill(
+    panel,
+    select,
+    [...(select as HTMLSelectElement).options].find((option) => text(option) === label)?.value ??
+      `no option ${label}`,
+  );
 
 describe("Runs tab", () => {
   it("opens from the toolbar with every Run, its filters and no tiles or charts", async () => {
@@ -102,6 +114,40 @@ describe("Runs tab filters", () => {
 
     // Every Run is from January: a month filter would choose nothing.
     expect(queryAll(panel, ".month-filter")).toHaveLength(0);
+  });
+
+  it("find washing machine Runs by Program, or those without one", async () => {
+    const panel = await mountPanel(washing(), RUNS);
+    const program = query(panel, ".program-filter") as HTMLSelectElement;
+
+    expect([...program.options].map(text)).toEqual([
+      "All Programs",
+      "Cotton 60°",
+      "Eco 40-60",
+      "No Program",
+    ]);
+    await choose(panel, program, "Cotton 60°");
+    expect(url()).toBe("/coinop/runs?program=Cotton+60%C2%B0");
+    expect(names(panel)).toEqual(["Cotton 60°", "Cotton 60°"]);
+    await choose(panel, query(panel, ".program-filter"), "No Program");
+    expect(url()).toBe("/coinop/runs?no_program=1");
+    expect(names(panel)).toEqual(["Untitled Run"]);
+    await choose(panel, query(panel, ".program-filter"), "All Programs");
+    expect(names(panel)).toHaveLength(5);
+  });
+
+  it("reads the Program filter from the URL", async () => {
+    const panel = await mountPanel(washing(), { path: "/runs?program=Eco+40-60" });
+
+    expect(names(panel)).toEqual(["Eco 40-60"]);
+    const program = query(panel, ".program-filter") as HTMLSelectElement;
+    expect(program.selectedOptions[0] && text(program.selectedOptions[0])).toBe("Eco 40-60");
+  });
+
+  it("offers no Program filter without a Device that records Programs", async () => {
+    const panel = await mountPanel(recordedBackend(), RUNS);
+
+    expect(queryAll(panel, ".program-filter")).toEqual([]);
   });
 
   it("offers the Runs in progress as an Outcome", async () => {
