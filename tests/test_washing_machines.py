@@ -68,7 +68,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
     assert result["step_id"] == "program"
     result = await configure(hass, result, {})
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["energy", "power", "per_program"]
+    assert result["menu_options"] == ["energy", "power", "per_program", "none"]
     result = await configure(hass, result, {"next_step_id": "power"})
     assert fields(result) == ["entity_id", "attribute"]
 

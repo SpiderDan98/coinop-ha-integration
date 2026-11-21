@@ -81,7 +81,7 @@ async def test_an_oven_walks_the_washing_machines_steps_without_water(
     result = await configure(hass, result, {})
     assert (result["step_id"], result["menu_options"]) == (
         "consumption",
-        ["energy", "power", "per_program"],
+        ["energy", "power", "per_program", "none"],
     )
     result = await configure(hass, result, {"next_step_id": "per_program"})
     assert result["step_id"] == "price"

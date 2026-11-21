@@ -183,12 +183,13 @@
         },
         "consumption": {
           "title": "Electricity consumption",
-          "description": "How should Coin-op determine the electricity a Run uses?",
+          "description": "How should Coin-op determine the electricity a Run uses?\n\nWith **None**, new Runs get no Electricity Line Item. You can still add one by hand on a single Run.",
           "menu_options": {
             "energy": "Energy meter",
             "power": "Power sensor",
             "estimate": "Estimate from average power",
-            "per_program": "Per Program (kWh in the Program Defaults)"
+            "per_program": "Per Program (kWh in the Program Defaults)",
+            "none": "None"
           }
         },
         "energy": {

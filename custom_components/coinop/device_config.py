@@ -31,18 +31,23 @@ class Target(StrEnum):
     IGNORED = "ignored"
 
 
+# The source of a quantity a Device doesn't follow: its Runs get no Line Item of it.
+NO_SOURCE = "none"
+
+
 class ConsumptionSource(StrEnum):
     ENERGY = "energy"
     POWER = "power"
     ESTIMATE = "estimate"
     PER_PROGRAM = "per_program"
+    NONE = NO_SOURCE
 
 
 class WaterSource(StrEnum):
     METER = "meter"
     FLOW = "flow"
     PER_PROGRAM = "per_program"
-    NONE = "none"
+    NONE = NO_SOURCE
 
 
 class Capability(StrEnum):

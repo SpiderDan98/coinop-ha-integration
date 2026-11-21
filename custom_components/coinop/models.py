@@ -571,10 +571,6 @@ class Run:
     def paused(self) -> bool:
         return bool(self.pauses) and self.pauses[-1].end is None
 
-    @property
-    def electricity(self) -> LineItem:
-        return next(i for i in self.line_items if i.kind is LineItemKind.ELECTRICITY)
-
     def locked(self, item: LineItem) -> bool:
         """Computed values update live until the Run is final; then they are the user's."""
         return not self.finalised and item.is_computed

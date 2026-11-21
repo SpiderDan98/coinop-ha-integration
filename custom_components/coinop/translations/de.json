@@ -183,12 +183,13 @@
         },
         "consumption": {
           "title": "Stromverbrauch",
-          "description": "Wie soll Coin-op den Strom bestimmen, den ein Lauf verbraucht?",
+          "description": "Wie soll Coin-op den Strom bestimmen, den ein Lauf verbraucht?\n\nMit **Keine** erhalten neue Läufe keinen Strom-Posten. An einem einzelnen Lauf kannst du ihn weiterhin von Hand hinzufügen.",
           "menu_options": {
             "energy": "Energiezähler",
             "power": "Leistungssensor",
             "estimate": "Aus Durchschnittsleistung schätzen",
-            "per_program": "Je Programm (kWh in den Programmvorgaben)"
+            "per_program": "Je Programm (kWh in den Programmvorgaben)",
+            "none": "Keine"
           }
         },
         "energy": {

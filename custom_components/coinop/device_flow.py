@@ -29,6 +29,7 @@ from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import (
     CAPABILITIES,
     ENDING_TARGETS,
+    NO_SOURCE,
     Capability,
     ConsumptionSource,
     Target,
@@ -153,8 +154,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "water": self.async_step_water,
             "water_price": self.async_step_water_price,
         }
-        if (self._data.get("water") or {}).get("source") == WaterSource.NONE:
-            del sections["water_price"]
+        for quantity in (ELECTRICITY, WATER):
+            source = (self._data.get(quantity.source_key) or {}).get("source")
+            if source == NO_SOURCE:
+                del sections[quantity.price_key]
         return self._fitting(sections)
 
     def _fitting[T](self, sections: Mapping[str, T]) -> dict[str, T]:
@@ -776,6 +779,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             sources.append(ConsumptionSource.ESTIMATE)
         if Capability.PROGRAM_CONSUMPTION in self._capabilities():
             sources.append(ConsumptionSource.PER_PROGRAM)
+        sources.append(ConsumptionSource.NONE)
         return self.async_show_menu(
             step_id="consumption", menu_options=[s.value for s in sources]
         )
@@ -840,6 +844,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         return await self._async_unit_step(WATER, WaterSource.FLOW, user_input)
+
+    async def async_step_none(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        self._meter = {"source": ConsumptionSource.NONE.value}
+        return await self._meter_done(ELECTRICITY)
 
     async def async_step_water_none(
         self, user_input: dict[str, Any] | None = None
@@ -959,12 +969,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         if user_input is not None:
-            self._data["consumption"] = {
+            self._meter = {
                 "source": "estimate",
                 "running_power": user_input["running_power"],
                 "paused_power": user_input.get("paused_power"),
             }
-            return await self._section_done("consumption")
+            return await self._meter_done(ELECTRICITY)
         schema = vol.Schema(
             {
                 vol.Required("running_power"): _watts(1),
