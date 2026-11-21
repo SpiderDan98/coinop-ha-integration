@@ -598,6 +598,113 @@ async def test_record_a_dishwasher(
     )
 
 
+async def test_record_a_tumble_dryer(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A Tumble dryer on an energy meter with dryer sheets as its Dose."""
+    place_materials(
+        hass_storage,
+        stored_material(
+            "material-sheets",
+            name="Dryer sheets",
+            form="laundry_additive",
+            type="Dryer sheets",
+            density=None,
+            diameter=None,
+            price={
+                "source": "fixed",
+                "pack_price": 4.0,
+                "pack_size": 80.0,
+                "pack_unit": "pcs",
+            },
+        ),
+    )
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set(
+        "sensor.washer_program",
+        "Cupboard dry",
+        {"options": ["Cupboard dry", "Iron dry"]},
+    )
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        name="Tumble dryer",
+        device_type="tumble_dryer",
+        program={"entity_id": "sensor.washer_program"},
+        water=None,
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [{"id": "dose-sheets", "material_id": "material-sheets"}],
+            "program_defaults": {
+                "default": {"doses": {"dose-sheets": 1}, "kwh": 2.0},
+                "programs": {"Cupboard dry": {"doses": {"dose-sheets": 2}, "kwh": 2.4}},
+            },
+        },
+    )
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-tumble-dryer",
+        stable_ids(devices, {subentry.subentry_id: "device-dryer"}),
+    )
+
+
+async def test_record_an_oven(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """An Oven on an energy meter, a Device with a Program and no Doses, after a
+    measured "Fan plus 180°" Run."""
+    hass.config.currency = "EUR"
+    kwh = {"unit_of_measurement": "kWh"}
+    hass.states.async_set(WASHER_ENERGY, "100", kwh)
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set(
+        "sensor.washer_program",
+        "Fan plus 180°",
+        {"options": ["Fan plus 180°", "Conventional heat"]},
+    )
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        name="Oven",
+        device_type="oven",
+        program={"entity_id": "sensor.washer_program"},
+        water=None,
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}, "kwh": 1.0},
+                "programs": {"Fan plus 180°": {"doses": {}, "kwh": 1.6}},
+            }
+        },
+    )
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(minutes=50)
+    hass.states.async_set(WASHER_ENERGY, "101.4", kwh)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+    hass.states.async_set(WASHER_ENERGY, "101.4", kwh, force_update=True)
+    await hass.async_block_till_done()
+
+    devices = await panel.call("coinop/devices/list")
+    suggestions = await panel.call(
+        "coinop/devices/measured_suggestions", device_id=subentry.subentry_id
+    )
+
+    assert_recorded(
+        "devices-list-oven", stable_ids(devices, {subentry.subentry_id: "device-oven"})
+    )
+    assert_recorded("devices-measured-suggestions-oven", suggestions)
+
+
 async def test_record_what_deleting_a_run_drops(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

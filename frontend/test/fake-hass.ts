@@ -26,9 +26,12 @@ import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
+import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
+import devicesListTumbleDryer from "./fixtures/backend/devices-list-tumble-dryer.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
+import devicesMeasuredSuggestionsOven from "./fixtures/backend/devices-measured-suggestions-oven.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
@@ -130,6 +133,18 @@ export const recorded = {
   /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
    * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
   dishwasher: devicesListDishwasher.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dryer", a Tumble dryer on an energy meter,
+   * dosing "material-sheets" (not in a recorded catalogue): 1 in the Default row, 2 for
+   * "Cupboard dry". */
+  tumbleDryer: devicesListTumbleDryer.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-oven", an Oven (a Program and no Doses) on an
+   * energy meter: the Default row 1 kWh, "Fan plus 180°" 1.6 kWh. */
+  oven: devicesListOven.devices[0] as Device,
+  /** `coinop/devices/measured_suggestions` of "device-oven" after a "Fan plus 180°" Run:
+   * 1.4 kWh from 1 Run for that Program, nothing for the Default row. */
+  ovenSuggestions: devicesMeasuredSuggestionsOven.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
