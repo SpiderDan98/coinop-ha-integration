@@ -13,7 +13,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 from homeassistant.setup import async_setup_component
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util, slugify
 from homeassistant.util.yaml import load_yaml_dict
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
@@ -345,12 +345,24 @@ async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_i
             assert PIECES[name].group == device_type, (
                 f"no Quick Start Piece of {domain} for {device_type}"
             )
-        answers = {"price": 0.32} | (
-            {"meter": PLUG_POWER} if "meter" in fields(result) else {}
-        )
+        meters = ["meter", "optional_meter"] if (own := plug(name)) else []
+        answers = {"price": 0.32} | {
+            meter: own for meter in meters if meter in fields(result)
+        }
         result = await configure(hass, result, answers)
         assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
         assert list(entry.subentries.values())[-1].data["device_type"] == device_type
+
+
+def plug(piece: str) -> str | None:
+    """The metering plug of the dev configuration.yaml on one of the Piece's helpers."""
+    [sensors] = load_yaml_dict(CONFIG)["template"]
+    plugs = {
+        helper: f"sensor.{slugify(sensor['name'])}"
+        for sensor in sensors["sensor"]
+        for helper in re.findall(r"states\('([^']+)'\)", sensor["state"])
+    }
+    return next((plugs[h] for h in PIECES[piece].helpers if h in plugs), None)
 
 
 @pytest.mark.usefixtures("helpers")
