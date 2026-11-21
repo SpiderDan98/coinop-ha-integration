@@ -211,15 +211,23 @@ def _home_connect(find: Find) -> dict[str, Any]:
     }
 
 
-# By Device Type, then integration domain.
+# By Device Type, then integration domain: the integration's name and its profile.
 PROFILES = {
-    DEVICE_TYPE_3D_PRINTER: {"anycubic": _anycubic, "anycubic_cloud": _anycubic_cloud},
+    DEVICE_TYPE_3D_PRINTER: {
+        "anycubic": ("Anycubic 3D Printer - Local Control", _anycubic),
+        "anycubic_cloud": ("Anycubic Cloud & LAN", _anycubic_cloud),
+    },
     DEVICE_TYPE_WASHING_MACHINE: {
-        "ha_washdata": _washdata,
-        "miele": _miele,
-        "home_connect": _home_connect,
+        "ha_washdata": ("WashData", _washdata),
+        "miele": ("Miele", _miele),
+        "home_connect": ("Home Connect", _home_connect),
     },
 }
+
+
+def known_integrations(device_type: str) -> str:
+    """The names of the integrations with a profile for the Device Type."""
+    return ", ".join(name for name, _ in PROFILES[device_type].values())
 
 
 def detect(
@@ -273,4 +281,5 @@ def detect(
             None,
         )
 
-    return profiles[domain](find)
+    _, profile = profiles[domain]
+    return profile(find)

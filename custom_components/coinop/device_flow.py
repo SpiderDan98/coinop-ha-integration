@@ -39,7 +39,7 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
-from .profiles import METERS, detect
+from .profiles import METERS, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
 
@@ -209,6 +209,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="device",
             data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
+            description_placeholders={
+                "integrations": known_integrations(self._data["device_type"])
+            },
         )
 
     async def async_step_name(

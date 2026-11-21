@@ -2,10 +2,11 @@
 
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigSubentry
+from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
+import pytest
 
 from .anycubic import add_anycubic_local
 from .clock import Clock
@@ -329,6 +330,27 @@ async def test_profiles_only_detect_for_their_device_type(
         )
         assert result["step_id"] == "status"
         assert suggested(result, "entity_id") is None
+
+
+@pytest.mark.parametrize(
+    ("device_type", "integrations"),
+    [
+        ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
+        ("washing_machine", "WashData, Miele, Home Connect"),
+    ],
+)
+async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(
+    hass: HomeAssistant, device_type: str, integrations: str
+) -> None:
+    entry = await add_hub(hass)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": SOURCE_USER}
+    )
+
+    result = await configure(hass, result, {"device_type": device_type})
+
+    assert result["step_id"] == "device"
+    assert result["description_placeholders"] == {"integrations": integrations}
 
 
 async def test_washdatas_placeholder_programs_never_name_a_run_or_a_row(

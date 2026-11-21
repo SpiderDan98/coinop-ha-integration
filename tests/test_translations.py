@@ -77,6 +77,7 @@ async def test_add_device_texts_load_in_home_assistant(
     assert translations[f"{prefix}.initiate_flow.user"]
     assert translations[f"{prefix}.step.estimate.data_description.running_power"]
     assert translations[f"{prefix}.error.no_ending_value"]
+    assert "{integrations}" in translations[f"{prefix}.step.device.description"]
 
 
 async def test_entities_are_named_in_the_configured_language(
