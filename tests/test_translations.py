@@ -93,11 +93,6 @@ async def test_add_device_texts_load_in_home_assistant(
     )
 
 
-# Still worded for a 3D printer, though an Other Device without a Program sees it
-# too; every other step is shared between Device Types and held to the rule.
-PRINTER_STEPS = {"estimate"}
-
-
 @pytest.mark.parametrize(
     ("language", "words", "device_inputs"),
     [
@@ -124,12 +119,7 @@ def test_steps_shared_between_device_types_speak_of_none_of_them(
         ]
 
     steps = _load(language)["config_subentries"]["device"]["step"]
-    shared = [
-        text
-        for name, step in steps.items()
-        if name not in PRINTER_STEPS
-        for text in texts(step)
-    ]
+    shared = [text for step in steps.values() for text in texts(step)]
 
     assert [text for text in shared if any(word in plain(text) for word in words)] == []
 

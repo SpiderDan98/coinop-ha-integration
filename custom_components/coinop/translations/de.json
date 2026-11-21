@@ -274,7 +274,7 @@
             "paused_power": "Leistung in Pause (optional)"
           },
           "data_description": {
-            "running_power": "Die durchschnittliche Leistung über einen ganzen Druck, typisch 80–150 W für einen FDM-Tischdrucker mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt weit über dem echten Durchschnitt.",
+            "running_power": "Die durchschnittliche Leistung des Geräts über einen ganzen Lauf, z. B. 80–150 W bei einem FDM-Tischgerät mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt meist weit über dem echten Durchschnitt.",
             "paused_power": "Leistung während einer Pause. Leer lassen, um die Betriebsleistung zu verwenden."
           }
         },

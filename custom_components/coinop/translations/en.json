@@ -274,7 +274,7 @@
             "paused_power": "Paused power (optional)"
           },
           "data_description": {
-            "running_power": "The average draw over a whole print, typically 80–150 W for a desktop FDM printer with a heated bed. Do not enter the rated power from the label or power supply: it is far higher than the real average.",
+            "running_power": "The Device's average draw over a whole Run, e.g. 80–150 W for a desktop FDM device with a heated bed. Do not enter the rated power from the label or power supply: it is usually far higher than the real average.",
             "paused_power": "Draw while paused. Leave empty to use the running power."
           }
         },
