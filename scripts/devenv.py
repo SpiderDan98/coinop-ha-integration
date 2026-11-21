@@ -92,6 +92,8 @@ def start() -> None:
         ROOT / "dev" / "configuration.yaml": "/config/configuration.yaml:ro",
         ROOT / "custom_components" / "coinop": "/config/custom_components/coinop:ro",
         ROOT / "dev" / "coinop_dev": "/config/custom_components/coinop_dev:ro",
+        ROOT / "dev" / "ha_washdata": "/config/custom_components/ha_washdata:ro",
+        ROOT / "dev" / "anycubic_cloud": "/config/custom_components/anycubic_cloud:ro",
     }
     run(
         "docker",
