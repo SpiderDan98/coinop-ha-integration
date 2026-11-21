@@ -18,7 +18,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Device Types
 
-The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source with its price, and every Run takes Line Items you add by hand or from templates. The electricity source of every Device Type can also be [None](#electricity-source-none), for a Device whose electricity you don't follow.
+The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source with its price, and every Run takes Line Items you add by hand or from templates. The electricity source of every Device Type can also be [None](docs/electricity.md#electricity-source-none), for a Device whose electricity you don't follow.
 
 | Device Type | A Run records | Pre-filled for |
 |---|---|---|
@@ -28,24 +28,15 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 | Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
 | Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](docs/supported-integrations.md#washing-machines-and-other-appliances) |
 | Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
-| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector, evcc, OCPP, Easee, Zaptec, go-e Charger MQTT, go-e Charger API v2, Wallbox](docs/supported-integrations.md#ev-chargers) |
-| Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
-| Other | Its electricity and whatever you pick for it: a Program, Doses, water, a job with its Material, images, a Part Count. See [Other Devices](#other-devices) | no integration: set up manually |
+| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](docs/ev-chargers.md) | [Tesla Wall Connector, evcc, OCPP, Easee, Zaptec, go-e Charger MQTT, go-e Charger API v2, Wallbox](docs/supported-integrations.md#ev-chargers) |
+| Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](docs/robotic-mowers.md) | no integration: set up manually |
+| Other | Its electricity and whatever you pick for it: a Program, Doses, water, a job with its Material, images, a Part Count. See [Other Devices](docs/other-devices.md) | no integration: set up manually |
 
 **Other** is for a Device none of the shipped Device Types fits. You give it a Type Name and pick what it has yourself, and unlike the Device Type, both can be changed later.
 
-"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), which adds each as the Device Type its integration says it is, and manual setup comes pre-filled for them whenever you pick a Device Type the integration is named for. What each profile fills in, and its notes, are under [Supported integrations](docs/supported-integrations.md). A device of any other integration is set up manually, by picking its entities yourself.
+"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](docs/adding-a-device.md#quick-start), which adds each as the Device Type its integration says it is, and manual setup comes pre-filled for them whenever you pick a Device Type the integration is named for. What each profile fills in, and its notes, are under [Supported integrations](docs/supported-integrations.md). A device of any other integration is set up manually, by picking its entities yourself.
 
-A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
-
-So does a coffee machine. Each drink is a Run named after its Program, such as "Cappuccino", and beans and milk are Doses with an amount per drink in the Program Defaults, so a cappuccino costs more than an espresso. A Program's litres take amounts down to the millilitre: enter an espresso's 40 ml as 0.04.
-
-Very short Runs, such as a coffee, are better priced "per Program" than from a meter. A metering plug counts in steps and reports at intervals that are coarse against a Run of under a minute, so what it measures for one drink is mostly chance. Choose "per Program" as the electricity source and give each drink its kWh in the Program Defaults.
-
-A tumble dryer and an oven are set up like a washing machine without the water source and the water price. They have no water sensors, and their Run event's `ended` carries the Program but no litres. What [Washing machines](#washing-machines) says about the Program, the Program Defaults, Flags and manual Runs applies to both, with these differences:
-
-- **Tumble dryer**: the Dose list is optional (dryer sheets, fragrance); an empty one adds nothing to a Run. Its Program Defaults have the kWh and a column per Dose, never litres.
-- **Oven**: it has no Dose list. Its Program Defaults are just the kWh per Program, with rows suggested from the Program input and past Runs and the measured kWh suggested per Program, as for a washing machine.
+Washing machines and the other appliances, EV chargers, robotic mowers and Other Devices each have a page of their own, listed under [Documentation](#documentation).
 
 ## Installation
 
@@ -60,371 +51,18 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 
 ## Quick Start
 
-Add Device always starts with **Quick Start**. It lists the devices of the integrations Coin-op has an Integration Profile for (see [Supported integrations](docs/supported-integrations.md)), and picking one sets the Device up in two forms.
+Add Device always starts with **Quick Start**. It lists the devices of the integrations Coin-op has an Integration Profile for, takes over their Device Type, name and entities, and only asks for what no profile knows: the energy meter or power sensor and the prices. Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities.
 
-1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
-2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
-   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine, washer-dryer, dishwasher or tumble dryer and an EV charger with an energy counter bring their own meter and aren't asked, and neither is a SmartThings appliance that reports its energy.
-   - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
-   - for a Device Type with water (washing machine, dishwasher, coffee machine), optionally the **water price** per m³. With it, water comes from the Device's own meter or per Program from the Program Defaults; without it, no water is recorded.
+[Adding a Device](docs/adding-a-device.md) explains both ways and how to go back in the dialog.
 
-The Device Type can't be changed once the Device is added. If the second form names the wrong one, choose **Pick another device** in it and then **Set up manually**, where you choose the Device Type yourself; the steps still come pre-filled.
+## Documentation
 
-How each integration tells which Device Type a device becomes is under [Which Device Type a device becomes](docs/supported-integrations.md#which-device-type-a-device-becomes).
-
-Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; the Doses and Program Defaults of a Device that has them are set on its card in the panel's Devices tab.
-
-Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities. Devices Coin-op already follows aren't offered again. When Quick Start has nothing to offer, it says why: either it found no device of an integration it has an Integration Profile for, and names those integrations, or every device it found is already a Device or has its Status used by one. [Why isn't my device offered?](docs/supported-integrations.md#why-isnt-my-device-offered) lists every reason a device is left out.
-
-### Going back
-
-Add Device lets you go back instead of closing the dialog and starting over. Nothing you entered before going back is kept.
-
-- **Pick another device**, in Quick Start's Device Type step and its meter and prices step, shows the list of devices again. The meter and the prices may stay empty for it.
-- **Back to Quick Start**, among the Device Types of manual setup, shows Quick Start again.
-- **Change Device Type**, on the Home Assistant device step and on an Other Device's Type Name and what it has, returns to the Device Type choice. Reconfigure doesn't offer it: the Device Type is fixed once the Device is added.
-
-## Estimating electricity without a meter
-
-Without an energy meter or power sensor, CoinOp estimates electricity from the Device's average power while it runs. A desktop FDM printer with a heated bed typically averages 80–150 W over a whole print. Don't enter the rated power from the label or power supply: it is far higher than what the printer really draws on average. If you can, measure one print with a power-measuring plug and use that.
-
-## Electricity source "None"
-
-The electricity source menu of every Device ends with **None**, after the energy meter, the power sensor and, depending on the Device Type, the estimate from average power or "per Program". Pick it for a Device whose electricity you don't follow: one that only costs water, a Material or a flat amount per Run, or one you have no meter and no honest number for.
-
-- **Runs**: new Runs get no Electricity Line Item and no Flag about electricity, and a Run doesn't wait for an electricity meter when it ends. Water, Doses, Material, Tags and automatic Line Item Templates work as for every Device, so a flat cost per Run is an automatic template. A manual Run gets no Electricity Line Item either.
-- **Setup**: Add Device skips the electricity price, and the reconfigure menu offers the electricity source without the price. A Device with nothing else that is computed is a valid Device: its Runs cost nothing until Line Items are added by hand or by automatic templates.
-- **Switching**: change the source to or from None in the reconfigure menu at any time. The change applies from the next Run; the open Run keeps the source it started with, and ended Runs never change. Picking a source again asks for the electricity price if the Device has none. A price you entered before is kept while the source is None and used again afterwards; the other settings of the old source (average powers, the meter and its conversion factor) are entered anew.
-- **Program Defaults**: the kWh column and the measured kWh suggestions are hidden while the source is None. The kWh you entered are kept and shown again once the Device has a source. The litres and Dose columns stay as they are.
-- **Electricity by hand**: on a Run without an Electricity Line Item, the Run page offers **Add electricity**, also while the Run is open. It adds one in kWh with the quantity and unit price you enter, marked as entered by hand. A Run takes one Electricity Line Item, so the button is gone once it has one; an entered one can be edited and deleted.
-- **Panel, sensors and statements**: the Device's card shows "None" as its consumption source and no electricity price, and such a Run shows no Electricity card. The Device keeps its Electricity cost and Energy in Runs sensors, which count the electricity its Runs have, the Run event's `ended` reports an `energy_kwh` of 0, and a Cost Statement lists the Run without an electricity row.
-- [Quick Start](#quick-start) never picks None: choose it in manual setup, or afterwards in the reconfigure menu.
-
-None or an estimate? Estimate (or enter the kWh per Program) when electricity is a real part of what a Run costs and you know roughly how much, as for a printer without a meter. Pick None when it isn't a cost you want to see, as for a battery-driven or hand-operated Device or a negligible draw, or when any number would be made up. An average power of 0 W or a kWh default of 0 leaves a "0.00" Electricity Line Item on every Run; None leaves none.
-
-## Monthly costs on a dashboard
-
-The cost sensors are running totals that work with long-term statistics, so a statistic card can show what printing cost this month (replace the entity with your Device's Total cost sensor):
-
-```yaml
-type: statistic
-entity: sensor.my_printer_total_cost
-name: Printing this month
-period:
-  calendar:
-    period: month
-stat_type: change
-```
-
-For a bar per month, use a statistics graph card:
-
-```yaml
-type: statistics-graph
-entities:
-  - sensor.my_printer_total_cost
-period: month
-stat_types:
-  - change
-chart_type: bar
-days_to_show: 365
-```
-
-Corrections and deleted Runs change the totals at the moment you make them, so they show up in that month rather than rewriting earlier ones.
-
-## Washing machines
-
-Choose **Washing machine** as the Device Type when you add a Device. Like a printer, a washing machine is followed through entities its integration already provides: a Status opens and closes each load's Run, and its costs are frozen into Line Items when it ends. Coin-op doesn't detect wash cycles or programs itself.
-
-A washing machine's Runs get these Line Items:
-
-- **Electricity**, from an energy meter or a power sensor exactly as for printers, or "per Program" from the kWh in the Program Defaults. With the electricity source ["None"](#electricity-source-none) there is no Electricity Line Item, but you can add one by hand on a Run.
-- **Water**, from a water meter or a flow sensor (any of Home Assistant's volume and flow units), or "per Program" from the litres in the Program Defaults. It is priced per m³ from a fixed value or a price entity (per m³ or per litre, sub-units such as ct/L included). Include the wastewater charge in the price. With the water source "None" there is no Water Line Item, but you can add one by hand on a Run.
-- **Doses**: one Material Line Item for each detergent, fabric softener or other product the load uses.
-
-The setup asks for the Status, its mapping, an optional Program input, the electricity source and price, and the water source and price. Part Count, Slots, Material used, Thumbnail and Camera don't apply to washing machines and aren't shown. For the [supported integrations](docs/supported-integrations.md#washing-machines-and-other-appliances), the Status, its mapping and the Program are pre-filled.
-
-### Only a smart plug?
-
-Install [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`). It detects cycles and programs from the power curve of a plug that measures power, and Coin-op takes the Status and the Program from it. Pick the plug's energy meter as the electricity source, and choose "per Program" for water: each load then gets the litres you set for its Program.
-
-### Program
-
-The optional Program input is the entity (or one of its attributes) that reports which program runs. Each Run records its Program and is named after it until you rename it. While the Run is open the Program follows the input, so a recognition that arrives late or gets corrected is picked up, and a change of Program never splits a load into two Runs. Values the input reports while it knows no program (a placeholder such as `detecting...`) can be listed as values to ignore: they count as no Program.
-
-You can correct the Program of a Run on its page, also after it ended. The new Program's defaults then replace every Line Item that came from defaults and that you haven't changed: the kWh, the litres and the Doses (a Dose the new Program doesn't use disappears, one it uses appears). Measured, from-history and entered values, Doses measured by a stock input (also when it measured nothing used) and Doses you gave another Material stay as they are, a Flag you marked as checked stays checked, and saving the same Program again changes nothing.
-
-### Program Defaults and Doses
-
-Each washing machine's card in the panel's Devices tab has a Dose list and a Program Defaults table.
-
-- **Materials**: detergents, fabric softeners and laundry additives are Materials in the Materials tab, like filament. Built-in types (liquid and powder detergent, pods, fabric softener, whitener, stain remover, colour catcher sheets) pre-fill a typical density. Pods and sheets are priced per piece: 40 pods for €12 cost €0.30 each. Dishwasher products and beverage ingredients are Material forms of their own, with built-in types for dishwasher tabs (priced per piece), dishwasher powder, dishwasher salt, rinse aid, coffee beans, ground coffee and milk; Materials of these two forms are never linked to Spoolman. Whatever fits none of these goes under the form **Other**: you name its type yourself, pick g, ml or pieces as the pack unit and enter its density unless it is bought by the piece. It has no built-in types and is never linked to Spoolman either.
-- **Doses**: one entry per product that goes into the machine, each pointing to a Material. Each Dose a Run uses becomes its own Material Line Item.
-- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them. Every amount is stored as entered; water of under a litre reads to the millilitre everywhere (0.04 L), larger amounts to a tenth of a litre as before.
-- Rows are suggested from the values the Program input offers and from Programs seen on past Runs; a suggested row is stored once you enter a value.
-- With a meter, a row suggests the average measured kWh and litres of that Program's completed Runs, with the number of Runs. One click applies it; it is never applied automatically.
-
-Changes to the Program Defaults apply to the open Run at once and to future Runs, never to ended ones (only correcting a Run's Program re-applies them). Every amount stays editable on each Run, and each Dose shows where its amount came from: the Program's row, the Default row, a stock input or entered by hand.
-
-### Measuring detergent with a stock input
-
-A Dose can have a stock input: an entity that reports how much of the product is left, in a mass or volume unit, such as a scale under the bottle. The Dose's amount is then the decrease from the Run's start to its end; a refill during the load counts nothing. Coin-op waits up to 5 minutes after the end for a final report, and converts between g and ml through the Material's density. When the stock input reports nothing usable, the Program's amount is charged and the Run gets a Flag.
-
-Some machines only report a fill level in %, such as Miele's TwinDos. Turn it into ml with the tank's size in a template sensor (replace the entity and the 1400 ml tank size with yours), then pick that sensor as the stock input:
-
-```yaml
-template:
-  - sensor:
-      - name: Detergent tank
-        unique_id: detergent_tank_ml
-        unit_of_measurement: mL
-        device_class: volume_storage
-        state_class: measurement
-        availability: "{{ is_number(states('sensor.my_washer_detergent_level')) }}"
-        state: "{{ (states('sensor.my_washer_detergent_level') | float * 1400 / 100) | round(0) }}"
-```
-
-A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a single load's usage is only as exact as that.
-
-### Flags on washing machine Runs
-
-- **Ended early with defaults**: a Cancelled or Failed Run was charged water or Dose defaults meant for a whole Run. Lower them if it stopped early.
-- **Default missing**: neither a measurement nor a Program Default gave a quantity; enter it on the Run.
-- **Stock input unavailable**: a Dose's stock input reported nothing usable, so its default was charged.
-- A meter that reported nothing during a load (and has no recorder history for it) falls back to the Program's kWh or litres and marks the Run with a consumption gap.
-
-### Manual Runs, entities and statements
-
-- A manual Run of a washing machine asks for its Program (a known one or free text). Electricity and water come from recorder history when a meter covers the period, else from the Program Defaults; Doses come from the Program Defaults. With a source "None" the manual Run has no Line Item of that kind.
-- A washing machine's sensors are those of a printer, with **Water in Runs** (litres) and **Water cost** instead of Material used. Its Run event's `ended` carries the Program and the litres; Last Run cost carries the Program. Neither has a Part Count.
-- The Overview and Analysis show Water as a cost kind, and the Analysis compares Programs by Run count and cost per Run. The Runs tab filters by Program.
-- A Cost Statement shows each load's Program, Water and Doses, without Part Count.
-
-## EV chargers
-
-Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. For the [supported integrations](docs/supported-integrations.md#ev-chargers) every step is pre-filled; for any other charger, pick its entities yourself.
-
-- **Status**: the charger's status sensor. Map charging to Running, a car that is plugged in without charging (waiting, paused by load management or a solar surplus control, fully charged) to Paused, and the unplugged charger to Finished. The Run then lasts from the first charging until the car is unplugged, a break in charging doesn't split it, and its running time is the time the car really charged. To end the Run as soon as the car is full instead, map that value to Finished too.
-- **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger; [None](#electricity-source-none) follows its Runs without their electricity.
-- **Electricity price**: a fixed price per kWh or a price entity. With a dynamic tariff, pick its price entity: each kWh is priced at what it cost when it was charged, so a Run over the cheap hours of the night costs what you really paid.
-
-To tell cars apart, tag the Runs: set the usual car as the **Tags for new Runs** on the charger's card in the Devices tab and change the Tag on the Runs of another car. Automatic Line Item Templates work as for every Device. Filter the Runs tab by a Tag and select its Runs for a [Cost Statement](#cost-statement) of that car's Runs; it lists them without a Part Count.
-
-An EV charger's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count. A manual Run asks for its times and Outcome; its kWh come from recorder history when the meter covers the period, else you enter them.
-
-## Robotic mowers
-
-Choose **Robotic mower** as the Device Type when you add a Device. A Run is one mowing trip together with the recharge it causes. The mower runs on its battery, so its electricity is what the charging station draws: put a metering plug in front of the charging station and pick its energy meter (or its power sensor) as the electricity source. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else. No integration is pre-filled, so pick the entities yourself.
-
-Map the mower's Status like this:
-
-| The mower is | Status mapping |
-|---|---|
-| mowing, returning to the charging station | Running |
-| charging | Paused |
-| parked (in the station, charged) | Ended |
-
-- The Run stays open while the mower charges, so the electricity the charging station draws after mowing lands in the Run that caused it. Pauses don't count as running time, so the Run's running time is the mowing time without the charging.
-- While the mower charges, its open Run is paused: its running time stands still and its electricity keeps counting.
-- A mower that leaves again right after charging continues the same Run, so a day of mowing in several trips can be one Run. The Run ends once the mower is parked.
-- Map a stop by hand to Paused and an error to Fault, as for a printer. Ended gives the Run the Outcome Unknown; map parked to Finished instead if you want these Runs to end as Completed.
-
-This needs a Status that tells charging from parked. Many integrations report one value for both, such as `docked`: the Run would then end the moment the mower docks, without the electricity of its recharge. Give Coin-op a Status of your own in that case, in one of two ways:
-
-- A **template helper** that combines the mower's state with what tells you it is charging, such as its battery level or a charging sensor: `charging` while it is docked and not full, `parked` once it is.
-- **Following the charging station's plug**: the station draws clearly more power while it charges than while the mower is parked. The template sensor below reports `charging` while the mower is docked and the plug draws more than 5 W (set the threshold above your station's standby power). The first five minutes after docking count as charging too, so the Run doesn't end before the plug has reported the higher power:
-
-```yaml
-template:
-  - sensor:
-      - name: Mower status
-        state: >
-          {% if is_state('lawn_mower.my_mower', 'docked') %}
-            {% set just_docked = now() - states.lawn_mower.my_mower.last_changed < timedelta(minutes=5) %}
-            {{ 'charging' if just_docked or states('sensor.mower_station_power') | float(0) > 5 else 'parked' }}
-          {% else %}
-            {{ states('lawn_mower.my_mower') }}
-          {% endif %}
-```
-
-Pick that sensor as the Device's Status. Line Item Templates per running hour, such as blade wear, then count the mowing time only, and Tags for new Runs work as for every Device. A robotic mower's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count.
-
-## Other Devices
-
-Choose **Other**, the last entry of Add Device's Device Type step, for a Device Coin-op ships no Device Type for: garden irrigation, a CNC router or laser cutter, a bread maker, a kiln, a pool pump, a soda maker. Anything that has a Status to open and close its Runs can be followed this way.
-
-An Other Device is put together from what the shipped Device Types are made of: a Program, Doses, water, a job with its Material, images, a Part Count. Add Device asks two things a shipped Device Type answers by itself: a **Type Name**, and **what the Device has**. After that it is a Device like every other: Add Device asks only for the steps your choices bring, its Runs get the Line Items they bring, and its card, its Runs' pages, its sensors and its Run event show exactly those.
-
-When a shipped Device Type fits your Device, pick that one: only those are offered by [Quick Start](#quick-start) and come pre-filled for the integrations Coin-op knows. Pick Other when none fits, or when the one whose Runs record the right things would list the Device as something it isn't, such as an irrigation valve under "Washing machines".
-
-No integration pre-fills an Other Device, and Quick Start never adds one. Where Add Device opens with Quick Start, choose **Set up manually** to get to the Device Type step. In every step you pick the entities yourself: any entity works, optionally one of its attributes, and so does a helper or a template sensor of your own. The reconfigure menu of an Other Device has no **Detect again**.
-
-### Type Name
-
-The Type Name is your own name for the kind of Device, such as "Irrigation" or "CNC router". The panel's Devices tab lists an Other Device under its Type Name as the heading, where a washing machine stands under "Washing machines". Other Devices with exactly the same Type Name share a heading, and every other Type Name gets a heading of its own. Add Device offers the Type Names you already gave, so a second Device of the same kind gets the same one without retyping it.
-
-A Type Name is a heading and nothing more. Two Devices that share one may have different things switched on, and a Type Name that reads like a shipped Device Type's heading is still a group of its own.
-
-### What the Device has
-
-The step offers seven things to switch on. With nothing switched on, a Run records its running time and its electricity. Every combination works [but one](#what-cant-be-combined).
-
-| Switch on | Add Device then asks for | A Run gets | Entities and Run event |
-|---|---|---|---|
-| **Program** | The Program step: the entity that reports which program runs, and its values to ignore | Its Program, and its name from it. Electricity that nothing measures comes from the Program's kWh in the Program Defaults | No entity of its own. The Run event's `ended` and Last Run cost carry the Program |
-| **Doses** | Nothing. You list the Doses on the Device's card in the panel's Devices tab | One Material Line Item per Dose it uses, with the amount from the Program Defaults or a stock input | None |
-| **Water** | The water source and the water price | A Water Line Item | The sensors **Water in Runs** (litres) and **Water cost**. `ended` carries the litres |
-| **Job and Material** | The Job & Material step: the job name, Material used, Slot and Loaded slot entities, each optional | Its name from the job, and a Material Line Item: measured by the Device, or left for you to fill in | The sensor **Material used** (grams). `ended` carries the grams |
-| **Images** | The Images step: a Thumbnail image or camera entity, a camera, and whether to take a Snapshot | The Thumbnail while it is open (an image entity is copied whenever it changes, a camera, or an image entity without a state yet, is asked for its picture at the start and a few times more while the Run runs, the latest kept) and a Snapshot from the camera when it ends | None |
-| **Part Count** | Nothing | A Part Count, 1 until you change it on the Run, and with it a cost per part | No entity of its own. `ended` and Last Run cost carry the Part Count and the cost per part |
-| **Meters count each Run from 0** | Nothing | No meter reset Flag when a meter is back at 0 after its end, and no consumption gap Flag when a meter without a value starts it at 0. See [below](#meters-count-each-run-from-0) | None |
-
-Next to these, every Other Device has what every Device has: the Status and its mapping, an electricity source with its price, the sensors for cost totals, energy, Run count and running time, the current and last Run's cost, the Flagged Runs counter and the Run event.
-
-Each choice works as it does on the shipped Device Type that has it:
-
-- **Program**, **Doses** and **Water** are a washing machine's. What [Washing machines](#washing-machines) says about the Program, the Program Defaults, Doses, stock inputs and their Flags applies. The Program Defaults table on the Device's card has the columns the Device has: kWh with a Program, litres with a Program and Water, and one per Dose. With Doses and no Program the table is the Default row alone, which every Run uses.
-- **Job and Material**, **Images** and **Part Count** are a 3D printer's, and Images and Part Count don't need a job: a kiln can have both. The Material used entity reports a length or a mass. Without one, each Run gets a Material Line Item with an empty quantity, in grams or, for a Material bought by the piece, in pieces, and a Flag until you enter it. The Line Item's Material is the **Default Material** you set on the Device's card, or the one in a Slot.
-- Tags for new Runs and automatic Line Item Templates work as for every Device. A manual Run asks for the Program if the Device has one, and the Flags of a Run follow what the Device has: a Device without Job and Material is never asked for a Run's material.
-- A Material that fits none of the other Material forms goes under the form **Other** in the Materials tab, with g, ml or pieces as its pack unit.
-
-### Electricity and water sources
-
-The electricity source menu of an Other Device depends on whether it has a Program:
-
-| | Without a Program | With a Program |
-|---|---|---|
-| Measured | Energy meter, Power sensor | Energy meter, Power sensor |
-| Not measured | **Estimate from average power** | **Per Program (kWh in the Program Defaults)** |
-| Not followed | [None](#electricity-source-none) | [None](#electricity-source-none) |
-
-- **Estimate from average power** multiplies the running time by the average power you enter. Enter what the Device draws on average over a whole Run, not the rated power on its label. See [Estimating electricity without a meter](#estimating-electricity-without-a-meter).
-- **Per Program** takes the kWh of the Run's Program from the Program Defaults, and the Default row's for a Run without a Program or without a row of its own.
-- The two are never offered together. A Device with a Program takes electricity that nothing measured from the Program's kWh, so there is exactly one way to get electricity without a meter.
-- **None** is for a Device whose electricity you don't follow, such as a battery-driven valve. Its Runs get no Electricity Line Item, and Add Device skips the electricity price.
-
-With **Water**, the water source is a water meter, a flow sensor or None, and with a Program also **Per Program (litres in the Program Defaults)**. Without a Program there is no default for water: it is measured, or you add it by hand on a Run. Water is priced per m³, from a fixed price or a price entity.
-
-### Meters count each Run from 0
-
-Switch this on when the energy or water meter you pick counts the current Run only: a session or per-cycle sensor that starts each Run at 0 and drops back to 0 once the Run is over.
-
-Coin-op takes a meter that reads less than before for a meter reset. Such a Run is still counted correctly, but when the drop arrives in the minutes after the Run's end, while Coin-op waits for the meter's last report, the Run gets the meter reset Flag. With this switched on, a drop after the end of a Run is expected and raises no Flag.
-
-Such a sensor often has no value at all between two Runs, and still has none at the moment the Status starts the next one. Coin-op takes a meter without a value at a Run's start for a consumption gap, since a meter that only counts up and comes back later may have counted in between. With this switched on, a meter that has no value as the Run starts and then begins at 0 raises no Flag: it counted nothing before that 0. A meter whose first value is above 0, one that loses its value during the Run or never has one, and a power or flow sensor without a value get the consumption gap Flag either way.
-
-Leave it off for a meter that only counts up, such as a metering plug's total energy or a water meter on the supply: there a drop is a real reset, a meter that comes back at 0 after having no value lost what it counted, and the Flags are right. A counter that only drops once the next Run is already running gets that Run the Flag either way.
-
-### What can't be combined
-
-**Job and Material** can't be switched on together with **Program** or with **Doses**. The form refuses it and says why: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own Material Line Item and of its Flags. Every other combination works, including none at all.
-
-What to do instead:
-
-- **A Material now and then**: leave Job and Material off. On any Run, whatever its Device has, **Add Material Line Item** on the Run's page adds one by hand: pick the Material and enter the quantity.
-- **A product every Run uses**: that is a Dose. Switch on Doses and give it its amount, per Program if the Device has one.
-- **A flat cost per Run**, such as wear or a blank that always costs the same: create a Line Item Template and add it to the **Automatic templates** on the Device's card. It is then added to every Run that starts there.
-- **A job name and a Program**: switch on Program. A Run is named after its Program until you rename it, so you can still give it the job's name on its page.
-
-### Worked examples
-
-The amounts below assume an electricity price of €0.30 per kWh and a water price of €4.00 per m³.
-
-#### Irrigation
-
-A battery-driven valve on the garden tap. A Run is one watering and costs only its water.
-
-1. Device Type **Other**, Type Name "Irrigation", switch on **Water**.
-2. **Status**: the valve's entity, such as `switch.garden_valve`. Map `on` to Running and `off` to Finished.
-3. **Electricity consumption**: **None**. The electricity price isn't asked for.
-4. **Water consumption**: **Water meter**, with the meter on the garden line, then the water price per m³.
-
-A watering of half an hour that takes 360 L is then a Run with one Line Item: Water, 360 L, €1.44. It has no Electricity Line Item, its `ended` event carries 360 litres and an `energy_kwh` of 0, and the Device has the Water in Runs and Water cost sensors. The Run is untitled until you name it.
-
-- **No meter**: if you know what the valve lets through, a template sensor can report it as a flow. Pick it as the **Flow sensor** instead of a water meter; half an hour at 12 L/min is the same 360 L.
-
-  ```yaml
-  template:
-    - sensor:
-        - name: Garden valve flow
-          unit_of_measurement: L/min
-          state: "{{ 12 if is_state('switch.garden_valve', 'on') else 0 }}"
-  ```
-
-- **A meter that reports rarely**: Coin-op spreads what a meter counted between two reports evenly over that time. A meter that reports every litre or two is exact; one that reports every few minutes gives a short watering only a rough figure.
-- **Several valves**: add one Device per valve, each with the valve's own entity as its Status, and give them the same Type Name. They share the heading "Irrigation", and they can share one water meter as long as they don't water at the same time.
-- **A pump or a mains-powered valve**: pick a meter or the estimate from average power instead of None, and the Run gets an Electricity Line Item too.
-
-#### A CNC router or laser cutter
-
-A Run is one job: its name, the stock it used up, a Snapshot of what it made and the number of parts.
-
-1. Device Type **Other**, Type Name "CNC router", switch on **Job and Material**, **Images** and **Part Count**.
-2. **Status**: the controller's state entity. Map the value it reports while it cuts to Running, a feed hold to Paused and the value it returns to afterwards, such as `idle`, to Finished.
-3. **Job & Material**: the entity that reports the name of the current job, if the controller has one. Leave Material used, the Slots and Loaded slot empty unless the Device reports them.
-4. **Images**: a camera that looks at the bed as the Camera. Taking a Snapshot stays switched on.
-5. **Electricity consumption**: the energy meter of a metering plug, or **Estimate from average power**, here with 300 W.
-6. In the panel's Materials tab, add the stock as a Material of the form Other, such as "Plywood sheet", bought as 10 pieces for €40. On the Device's card in the Devices tab, set it as the Default Material.
-
-A job "Shelf sides" of one hour is then a Run named "Shelf sides" with a Snapshot, a Part Count of 1 and two Line Items: Electricity, 0.3 kWh estimated, €0.09, and a Material Line Item for the plywood sheet with an empty quantity. The Run carries the Flag "No material usage was reported: enter the quantity". Enter 2 sheets and the Line Item costs €8.00, the Flag is gone and the Run costs €8.09. Set the Part Count to 4, the number of parts cut from the two sheets, and the Run shows €2.02 per part.
-
-- A Device that reports what a job used up, as a length or a mass, takes that entity as Material used. The Material Line Item is then measured and needs no entering.
-- Without a job name entity the Runs are untitled until you name them.
-- The Material used sensor counts grams. Sheets entered by the piece count towards the Material cost sensor, not towards Material used.
-- A laser cutter is set up the same way under its own Type Name.
-
-#### A bread maker
-
-A Run is one loaf: its Program, the electricity the Program takes and the ingredients that went in.
-
-1. Device Type **Other**, Type Name "Bread maker", switch on **Program** and **Doses**.
-2. **Status**: an entity that tells whether it bakes. Map that value to Running and the one after to Finished. A bread maker rarely has an integration, so this is usually a helper you set, a template on its plug's power, or the State sensor of [WashData](https://github.com/3dg1luk43/ha_washdata) on its plug.
-3. **Program**: the entity that reports the program, such as a dropdown helper or WashData's Program sensor. List what it reports while it knows no program, such as `unknown` or `detecting...`, as values to ignore.
-4. **Electricity consumption**: **Per Program**, or the plug's energy meter. Then the electricity price.
-5. In the Materials tab, add the ingredients as Materials of the form Other: "Wheat flour" and "Wholemeal flour" by the gram, here 1000 g for €1.20 and for €1.60, and "Dry yeast" by the piece, 10 sachets for €2.00.
-6. On the Device's card, add the three as Doses and fill in the Program Defaults:
-
-   | Program | Electricity (kWh) | Wheat flour | Wholemeal flour | Dry yeast |
-   |---|---|---|---|---|
-   | Default | 0.3 | 500 | | 1 |
-   | Whole wheat | 0.4 | | 500 | 1 |
-
-A loaf on "Whole wheat" is then a Run named "Whole wheat" with three Line Items: Electricity, 0.4 kWh, €0.12, wholemeal flour, 500 g, €0.80, and dry yeast, 1 piece, €0.20, in all €1.12. A loaf on a Program without a row of its own, or without a Program, takes the Default row: 0.3 kWh, 500 g of wheat flour and one sachet, €0.89. An empty cell is not dosed, so the whole wheat loaf has no Line Item for wheat flour.
-
-With the plug's energy meter as the electricity source, the measured kWh replace the Program's, and the Program Defaults suggest each Program's average once Runs have completed.
-
-#### Further mixes
-
-| Device | Switch on | Electricity source |
-|---|---|---|
-| Kiln | Part Count, and Images with a camera | Estimate from average power, or a meter |
-| Pool pump | Nothing, or "Meters count each Run from 0" with a per-cycle energy sensor | Energy meter |
-| Soda maker | Doses, for the CO₂ and the syrup, each with its amount in the Default row | None |
-
-### Changing an Other Device later
-
-The reconfigure menu of an Other Device starts with **Type Name & what it has**. It opens the step from Add Device, filled with what the Device has now. As for every section, nothing is saved until you choose Save, and closing the dialog halfway changes nothing.
-
-The Device Type itself stays fixed: an Other Device never becomes a shipped Device Type and a shipped one never becomes Other. The reconfigure menu of a shipped Device Type has no such entry, and what it has can't be changed.
-
-- **Only without an open Run.** The entry is refused while the Device has a Run that is still open, or one that has just ended and waits for the last reports of its meters, which takes five minutes at most. The dialog then closes with an explanation and nothing is saved, changes to other sections made in the same dialog included, so that no Run changes what it records halfway. Try again a few minutes after the Run has ended. That also holds while Coin-op isn't loaded, for a Run that was open when it stopped: the Run goes on when Coin-op is loaded again, so load it and let the Run end first.
-- **The Type Name** can be changed alone, to fix a typo or to move the Device under another heading.
-- **What you switch on** is asked for right away: Coin-op walks the steps the new choice brings, such as the water source and the water price, and then returns to the menu.
-- **What you switch off** disappears from the menu, and the Device loses that choice's Device Inputs, its source and its price. Switching it on again later asks for them anew.
-- **A source the Device can no longer use** is asked for again: the estimate from average power once the Device has a Program, and "per Program", for electricity or for water, once it has none. The prices stay. A source that is still offered is kept, so a Device on a meter stays on it; a power sensor loses the average running power that filled its gaps once the Device has a Program.
-- **What is kept**: the Dose list, the Program Defaults and the Default Material stay stored while what they belong to is switched off. They are ignored meanwhile and apply again once it is switched back on. Tags for new Runs, automatic templates, the Device's name and every other section are untouched.
-- **Runs**: ended Runs never change. Their Line Items, Program and Part Count stay as they were recorded, also where the panel no longer shows a field the Device has lost, such as the Program. Runs that start after the change follow what the Device has then.
-- **Entities** follow the change: Water in Runs and Water cost appear with Water and are removed without it, and Material used likewise with Job and Material, so no dead entities are left behind. A sensor that comes back counts the Runs recorded before as well, because the totals are computed from the stored Runs.
-- The combination that [can't be had](#what-cant-be-combined) is refused here as in Add Device.
-
-## Spoolman
-
-You can set a Spoolman URL in Coin-op's integration options. Every Spoolman Filament then becomes a Material on its own: whenever Coin-op reads Spoolman (when the Materials tab opens, when a Run ends, at start and when the URL is saved), each Filament without a Material gets one, named after its vendor and Filament name. It is the default for its type when that type has none yet. Such a Material takes its name, type, density, diameter, colour, vendor and price from Spoolman and stays in sync: the Materials tab shows these read-only with a Spoolman badge and the price and weight Spoolman prices it by, such as "€24.99 / 1 kg" (the Filament's price and weight, else those of its newest priced spool). Only "default for its type" can be changed. A Material from Spoolman can be archived, and stays archived, but not deleted. Duplicating it gives an own Material at its current price. Deleting a Filament in Spoolman archives its Material; spools running empty or being archived change nothing. While Spoolman is connected, a filter above the Materials picks All, From Spoolman or Own.
-
-Your own Materials stay as they are, for every form, filament included. When an own filament Material has the same type as a Spoolman Filament (and the same colour, if the Material has one), that Filament waits instead of getting a Material, and the Materials tab says how many of your Materials match. Its dialog lists them, each with the matching Filaments (the same vendor first) and "Keep own". Merging links your Material to the Filament in place, so past Runs, totals and Devices that use it by default keep pointing at it; it takes everything from Spoolman from then on and keeps its default. Keeping your own gives the matching Filaments Materials of their own. Either way each Filament is asked about once.
-
-When Spoolman can't be reached, the Materials tab says so, the last price read is used and the Run gets a Flag. A Filament without a price shows "No price in Spoolman"; its Material keeps the last price read (a merged Material keeps its former price). Clearing the URL leaves the Materials from Spoolman with their last price.
-
-While no Spoolman URL is set and a Device uses Material, Coin-op looks for a Spoolman that is already in Home Assistant: the URL of the [Spoolman integration](https://github.com/Disane87/spoolman-homeassistant), or a running Spoolman add-on, Ingress add-ons included. When one answers, a repair under Settings > System > Repairs offers to connect it with one click. Ignore the repair if Coin-op should not read Spoolman. Coin-op looks again at every start and after each change to its Devices or options.
+- [Adding a Device](docs/adding-a-device.md): Quick Start, manual setup and going back
+- [Supported integrations](docs/supported-integrations.md): what each Integration Profile fills in, and why a device may not be offered
+- [Electricity](docs/electricity.md): estimating without a meter, and the electricity source "None"
+- [Washing machines and other appliances](docs/appliances.md), [EV chargers](docs/ev-chargers.md), [Robotic mowers](docs/robotic-mowers.md), [Other Devices](docs/other-devices.md)
+- [Spoolman](docs/spoolman.md): Filaments from Spoolman as Materials
+- [Dashboards](docs/dashboards.md): monthly costs with statistic cards
 
 ## Cost Statement
 

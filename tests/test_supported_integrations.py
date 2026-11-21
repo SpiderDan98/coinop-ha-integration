@@ -37,7 +37,14 @@ def test_the_page_says_why_a_device_isnt_offered() -> None:
     assert "why-isnt-my-device-offered" in anchors(PAGE.read_text(encoding="utf-8"))
 
 
-@pytest.mark.parametrize("document", ["README.md", "docs/supported-integrations.md"])
+@pytest.mark.parametrize(
+    "document",
+    [
+        "README.md",
+        "CONTRIBUTING.md",
+        *sorted(f"docs/{p.name}" for p in (ROOT / "docs").glob("*.md")),
+    ],
+)
 def test_every_link_to_a_section_finds_its_heading(document: str) -> None:
     path = ROOT / document
     own = anchors(path.read_text(encoding="utf-8"))
