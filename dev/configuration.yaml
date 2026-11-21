@@ -83,6 +83,18 @@ input_select:
   washdata_dryer_program:
     name: WashData dryer program
     options: [Cotton dry, Easy care, Wool finish]
+  kitchen_oven_status:
+    name: Kitchen oven status
+    options: ["off", running, paused, finished, cancelled]
+  kitchen_oven_program:
+    name: Kitchen oven program
+    options: ["Fan plus 180°", "Top/bottom heat 200°", Grill, "Pizza 220°"]
+  carport_charger_status:
+    name: Carport charger status
+    options: [disconnected, connected, charging, error]
+  robotic_mower_status:
+    name: Robotic mower status
+    options: [parked, mowing, returning, charging, error]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -181,6 +193,22 @@ input_number:
     unit_of_measurement: kWh
   washdata_dryer_energy:
     name: WashData dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # Counts each charging session from 0.
+  carport_charger_session:
+    name: Carport charger session energy
+    min: 0
+    max: 200
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # The plug of the mower's charging station.
+  robotic_mower_station_energy:
+    name: Robotic mower station energy
     min: 0
     max: 100000
     step: 0.001
