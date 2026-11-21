@@ -784,6 +784,54 @@ async def test_record_laundry_materials(
     )
 
 
+async def test_record_dishwasher_and_beverage_materials(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    created = []
+    for name, material in (
+        (
+            "tabs",
+            {
+                "name": "All-in-one tabs",
+                "form": "dishwasher_product",
+                "type": "Dishwasher tabs",
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 9,
+                    "pack_size": 60,
+                    "pack_unit": "pcs",
+                },
+            },
+        ),
+        (
+            "beans",
+            {
+                "name": "Espresso beans",
+                "form": "beverage_ingredient",
+                "type": "Coffee beans",
+                "density": 0.4,
+                "price": {
+                    "source": "fixed",
+                    "pack_price": 16,
+                    "pack_size": 1000,
+                    "pack_unit": "g",
+                },
+            },
+        ),
+    ):
+        result = await panel.call("coinop/materials/create", material=material)
+        created.append((result["material"], f"material-{name}"))
+
+    assert_recorded(
+        "materials-create-dishwasher-and-beverage",
+        stable_ids(
+            [material for material, _ in created],
+            {material["id"]: fixed for material, fixed in created},
+        ),
+    )
+
+
 async def test_record_a_run_split_across_slots(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

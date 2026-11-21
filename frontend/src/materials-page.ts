@@ -50,6 +50,8 @@ const USUAL_UNIT = {
   detergent: "ml",
   fabric_softener: "ml",
   laundry_additive: "g",
+  dishwasher_product: "pcs",
+  beverage_ingredient: "g",
 } satisfies Record<MaterialForm, PackUnit>;
 const usualUnit = (form: MaterialForm): PackUnit => USUAL_UNIT[form];
 
@@ -111,6 +113,7 @@ const filamentName = (filament: Filament) =>
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
 
+const UNLINKED_FORMS = new Set<MaterialForm>(["dishwasher_product", "beverage_ingredient"]);
 const byPiece = (draft: Draft) => draft.pack_unit === "pcs";
 const hasDiameter = (draft: Draft) => draft.form === "filament" && !byPiece(draft);
 
@@ -545,11 +548,12 @@ export class MaterialsPage extends LitElement {
   }
 
   /** Linking happens on existing Materials; new ones come from the Filament list.
-   * A Material bought by the piece is never linked. */
+   * A Material bought by the piece or of a form in `UNLINKED_FORMS` is never linked. */
   private renderCostSource(draft: Draft, set: (changes: Partial<Draft>) => void, t: Localize) {
     const linked = draft.price_source === "spoolman";
     const edited = this.materials?.find((material) => material.id === this.editing);
     if (!edited || edited.price_per_piece !== null || byPiece(draft)) return nothing;
+    if (UNLINKED_FORMS.has(edited.form) || UNLINKED_FORMS.has(draft.form)) return nothing;
     if (!linked && this.spoolman?.status !== "ok") return nothing;
     const filaments = this.spoolman?.filaments ?? [];
     const known = filaments.some((filament) => String(filament.id) === draft.filament_id);

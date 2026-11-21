@@ -167,6 +167,8 @@
   "form.detergent": "Waschmittel",
   "form.fabric_softener": "Weichspüler",
   "form.laundry_additive": "Waschzusatz",
+  "form.dishwasher_product": "Spülmaschinenprodukt",
+  "form.beverage_ingredient": "Getränkezutat",
   "run.tags": "Tags",
   "tags.add": "Tag hinzufügen…",
   "tags.remove": "{tag} entfernen",

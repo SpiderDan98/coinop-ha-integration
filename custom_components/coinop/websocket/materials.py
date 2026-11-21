@@ -168,11 +168,11 @@ async def _update(
         return
     changes = msg["material"]
     if changes.get("price", {}).get("source") == "spoolman":
-        if material.by_piece:
+        if not material.linkable:
             connection.send_error(
                 msg["id"],
                 websocket_api.ERR_NOT_ALLOWED,
-                "A Material priced per piece can't be linked to Spoolman",
+                "This Material can't be linked to Spoolman",
             )
             return
         filament_id = changes["price"]["filament_id"]
