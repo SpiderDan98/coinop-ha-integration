@@ -9,6 +9,10 @@ from .models import Run
 from .run_book import RunBook, RunChange
 
 
+def unique_id(device_id: str, key: str) -> str:
+    return f"{device_id}_{key}"
+
+
 class DeviceEntity(Entity):
     _attr_has_entity_name = True
     _attr_should_poll = False
@@ -17,7 +21,7 @@ class DeviceEntity(Entity):
         self._book = book
         self._device_id = device.device_id
         self._capabilities = device.capabilities
-        self._attr_unique_id = f"{device.device_id}_{key}"
+        self._attr_unique_id = unique_id(device.device_id, key)
         self._attr_device_info = device_info(device)
 
     async def async_added_to_hass(self) -> None:

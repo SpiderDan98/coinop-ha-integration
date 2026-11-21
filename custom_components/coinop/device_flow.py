@@ -52,6 +52,7 @@ from .device_inputs import (
 from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
+from .sensor import async_remove_lost
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
 ATTRIBUTE_UNITS: dict[str, list[str]] = {
@@ -232,9 +233,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         subentry = self._get_reconfigure_subentry()
+        had, has = capabilities_of(subentry.data), self._capabilities()
         # A Run may have started after the `other` step let the change through.
-        if self._capabilities() != capabilities_of(subentry.data) and self._recording():
+        if has != had and self._recording():
             return self.async_abort(reason="run_open")
+        # Only here: a setup or reload must never cost a Device an entity.
+        async_remove_lost(self.hass, subentry.subentry_id, had - has)
         return self.async_update_and_abort(self._get_entry(), subentry, data=self._data)
 
     async def async_step_user(
