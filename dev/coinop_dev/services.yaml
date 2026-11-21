@@ -38,16 +38,47 @@ load:
             - miele.washing_machine
             - home_connect.washing_machine
             - home_connect_alt.washing_machine
+            - lg_thinq.washing_machine
+            - smartthings.washing_machine
             - ha_washdata.dishwasher
             - miele.dishwasher
             - home_connect.dishwasher
             - homeconnect_ws.dishwasher
+            - lg_thinq.dishwasher
+            - smartthings.dishwasher
             - ha_washdata.tumble_dryer
             - miele.tumble_dryer
             - home_connect.tumble_dryer
+            - lg_thinq.tumble_dryer
+            - smartthings.tumble_dryer
             - miele.coffee_machine
             - home_connect.coffee_machine
             - miele.oven
             - home_connect.oven
+            - lg_thinq.oven
+            - smartthings.oven
             - tesla_wall_connector.ev_charger
+            - evcc_intg.ev_charger
+            - ocpp.ev_charger
+            - easee.ev_charger
+            - zaptec.ev_charger
+            - goecharger_mqtt.ev_charger
+            - goecharger_api2.ev_charger
+            - wallbox.ev_charger
             - irrigation
+    history:
+      name: History
+      description: How much history the Devices with history get.
+      default: short
+      selector:
+        select:
+          options:
+            - none
+            - short
+            - long
+    open_run:
+      name: Open Run
+      description: Whether each Device with history gets an open Run, which its helpers end.
+      default: false
+      selector:
+        boolean:

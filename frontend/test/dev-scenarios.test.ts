@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WsError, recordedBackend } from "./fake-hass";
-import { click, iconButton, mountPanel, query, queryAll, text } from "./render";
+import { change, click, iconButton, mountPanel, query, queryAll, text } from "./render";
 
 const SCENARIOS = {
   groups: [
@@ -41,28 +41,45 @@ const SCENARIOS = {
       ],
     },
   ],
+  options: { history: ["none", "short", "long"] },
   presets: [
     {
       name: "empty",
       title: "Empty",
       description: "The hub without any Device.",
-      selection: { pieces: [] },
+      selection: { pieces: [], history: "short", open_run: false },
     },
     {
       name: "few-runs",
       title: "3D printer, a few Runs",
       description: "The Prusa with its 7 Runs.",
-      selection: { pieces: ["prusa"] },
+      selection: { pieces: ["prusa"], history: "short", open_run: false },
+    },
+    {
+      name: "printing-now",
+      title: "3D printer, printing now",
+      description: "Like a few Runs, with an open Run.",
+      selection: { pieces: ["prusa"], history: "short", open_run: true },
+    },
+    {
+      name: "long-history",
+      title: "Long history",
+      description: "Two years of Runs on two printers.",
+      selection: { pieces: ["prusa", "bambu"], history: "long", open_run: false },
     },
     {
       name: "quick-start",
       title: "Quick Start",
       description: "Every Quick Start Piece.",
-      selection: { pieces: ["anycubic_cloud.3d_printer", "ha_washdata.washing_machine"] },
+      selection: {
+        pieces: ["anycubic_cloud.3d_printer", "ha_washdata.washing_machine"],
+        history: "short",
+        open_run: false,
+      },
     },
   ],
   preset: "few-runs",
-  selection: { pieces: ["prusa"] },
+  selection: { pieces: ["prusa"], history: "short", open_run: false },
 };
 
 const devBackend = (scenarios: object = SCENARIOS) => {
@@ -115,6 +132,17 @@ const pickedPreset = (dialog: HTMLElement) => {
 
 const loadButton = (dialog: HTMLElement) => query(dialog, "ha-button.load");
 
+const historySelect = (dialog: HTMLElement) =>
+  query(dialog, 'select[name="history"]') as HTMLSelectElement;
+
+const openRunBox = (dialog: HTMLElement) =>
+  query(dialog, 'input[name="open_run"]') as HTMLInputElement;
+
+const options = (dialog: HTMLElement) => ({
+  history: historySelect(dialog).value,
+  openRun: openRunBox(dialog).checked,
+});
+
 const selected = (dialog: HTMLElement) =>
   pieces(dialog)
     .filter(({ box }) => box.checked)
@@ -144,6 +172,37 @@ describe("Test data", () => {
         "Quick Start Kobra S1 · Anycubic Cloud & LAN A printer with its plug sensor as meter.",
     );
     expect(selected(dialog)).toEqual(["Prusa MK4"]);
+  });
+
+  it("shows the Options above the groups, as the stored selection has them", async () => {
+    const backend = devBackend({
+      ...SCENARIOS,
+      preset: null,
+      // happy-dom shows the wrong option when the third or a later one is rendered picked.
+      selection: { pieces: ["prusa"], history: "none", open_run: true },
+    }).reply("call_service", () => ({}));
+    vi.spyOn(window.location, "assign").mockImplementation(() => {});
+    const panel = await mountPanel(backend);
+
+    const dialog = await open(panel);
+
+    expect(options(dialog)).toEqual({ history: "none", openRun: true });
+    expect([...historySelect(dialog).options].map(text)).toEqual([
+      "None",
+      "A few weeks",
+      "Two years",
+    ]);
+    expect(text(query(dialog, ".options"))).toContain("An open Run on each Device with history");
+    expect(
+      historySelect(dialog).compareDocumentPosition(groups(dialog)[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await click(panel, loadButton(dialog));
+
+    expect(backend.sent("call_service")).toMatchObject([
+      { service_data: { pieces: ["prusa"], history: "none", open_run: true } },
+    ]);
   });
 
   it("shows on each group's checkbox whether all, some or none of its Pieces are picked", async () => {
@@ -218,6 +277,31 @@ describe("Test data", () => {
     expect(text(dialog)).not.toContain("Every Quick Start Piece.");
   });
 
+  it("fills in a Preset's Options, and an Option changed makes the selection one's own", async () => {
+    const panel = await mountPanel(devBackend());
+    const dialog = await open(panel);
+
+    await click(panel, presetButton(dialog, "Long history"));
+
+    expect(options(dialog)).toEqual({ history: "long", openRun: false });
+    expect(selected(dialog)).toEqual(["Prusa MK4", "Bambu Lab X1C"]);
+
+    await click(panel, presetButton(dialog, "3D printer, printing now"));
+
+    expect(options(dialog)).toEqual({ history: "short", openRun: true });
+
+    await click(panel, openRunBox(dialog));
+
+    expect(pickedPreset(dialog)).toBeUndefined();
+
+    await click(panel, presetButton(dialog, "3D printer, a few Runs"));
+    await change(panel, historySelect(dialog), "none");
+
+    expect(options(dialog)).toEqual({ history: "none", openRun: false });
+    expect(pickedPreset(dialog)).toBeUndefined();
+    expect(selected(dialog)).toEqual(["Prusa MK4"]);
+  });
+
   it("picks every Piece or none", async () => {
     const panel = await mountPanel(devBackend());
     const dialog = await open(panel);
@@ -242,14 +326,16 @@ describe("Test data", () => {
     const dialog = await open(panel);
     await click(panel, piece(dialog, "Washing machine"));
     await click(panel, piece(dialog, "Bambu Lab X1C"));
+    await change(panel, historySelect(dialog), "long");
+    await click(panel, openRunBox(dialog));
 
     await click(panel, loadButton(dialog));
 
-    expect(backend.calls.at(-1)).toMatchObject({
+    expect(backend.calls.at(-1)).toEqual({
       type: "call_service",
       domain: "coinop_dev",
       service: "load",
-      service_data: { pieces: ["prusa", "bambu", "washer"] },
+      service_data: { pieces: ["prusa", "bambu", "washer"], history: "long", open_run: true },
     });
     expect(loadButton(dialog)).toMatchObject({ loading: true });
     expect(text(loadButton(dialog))).toBe("Loading…");

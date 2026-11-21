@@ -191,69 +191,97 @@ input_number:
     mode: box
     unit_of_measurement: W
   # The plugs of the static stand-ins' appliances whose integration brings no meter.
-  miele_coffee_system_power:
-    name: Miele coffee system power
+  miele_coffee_system_energy:
+    name: Miele coffee system energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  miele_oven_power:
-    name: Miele oven power
+    unit_of_measurement: kWh
+  miele_oven_energy:
+    name: Miele oven energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  siemens_washer_power:
-    name: Siemens washer power
+    unit_of_measurement: kWh
+  siemens_washer_energy:
+    name: Siemens washer energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  siemens_dishwasher_power:
-    name: Siemens dishwasher power
+    unit_of_measurement: kWh
+  siemens_dishwasher_energy:
+    name: Siemens dishwasher energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  siemens_dryer_power:
-    name: Siemens dryer power
+    unit_of_measurement: kWh
+  siemens_dryer_energy:
+    name: Siemens dryer energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  siemens_coffee_maker_power:
-    name: Siemens coffee maker power
+    unit_of_measurement: kWh
+  siemens_coffee_maker_energy:
+    name: Siemens coffee maker energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  siemens_oven_power:
-    name: Siemens oven power
+    unit_of_measurement: kWh
+  siemens_oven_energy:
+    name: Siemens oven energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  bosch_dishwasher_power:
-    name: Bosch Dishwasher power
+    unit_of_measurement: kWh
+  bosch_dishwasher_energy:
+    name: Bosch Dishwasher energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
-  bosch_washer_power:
-    name: Bosch washer power
+    unit_of_measurement: kWh
+  bosch_washer_energy:
+    name: Bosch washer energy
     min: 0
-    max: 4000
-    step: 1
+    max: 100000
+    step: 0.001
     mode: box
-    unit_of_measurement: W
+    unit_of_measurement: kWh
+  washtower_washer_energy:
+    name: WashTower washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_dishwasher_energy:
+    name: LG dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washtower_dryer_energy:
+    name: WashTower dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_oven_energy:
+    name: LG oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -324,60 +352,84 @@ template:
         unit_of_measurement: W
         device_class: power
         state_class: measurement
-      - name: Miele coffee system plug power
-        unique_id: miele_coffee_system_plug_power
-        state: "{{ states('input_number.miele_coffee_system_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Miele oven plug power
-        unique_id: miele_oven_plug_power
-        state: "{{ states('input_number.miele_oven_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Siemens washer plug power
-        unique_id: siemens_washer_plug_power
-        state: "{{ states('input_number.siemens_washer_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Siemens dishwasher plug power
-        unique_id: siemens_dishwasher_plug_power
-        state: "{{ states('input_number.siemens_dishwasher_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Siemens dryer plug power
-        unique_id: siemens_dryer_plug_power
-        state: "{{ states('input_number.siemens_dryer_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Siemens coffee maker plug power
-        unique_id: siemens_coffee_maker_plug_power
-        state: "{{ states('input_number.siemens_coffee_maker_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Siemens oven plug power
-        unique_id: siemens_oven_plug_power
-        state: "{{ states('input_number.siemens_oven_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Bosch Dishwasher plug power
-        unique_id: bosch_dishwasher_plug_power
-        state: "{{ states('input_number.bosch_dishwasher_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
-      - name: Bosch washer plug power
-        unique_id: bosch_washer_plug_power
-        state: "{{ states('input_number.bosch_washer_power') }}"
-        unit_of_measurement: W
-        device_class: power
-        state_class: measurement
+      - name: Miele coffee system plug energy
+        unique_id: miele_coffee_system_plug_energy
+        state: "{{ states('input_number.miele_coffee_system_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Miele oven plug energy
+        unique_id: miele_oven_plug_energy
+        state: "{{ states('input_number.miele_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens washer plug energy
+        unique_id: siemens_washer_plug_energy
+        state: "{{ states('input_number.siemens_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dishwasher plug energy
+        unique_id: siemens_dishwasher_plug_energy
+        state: "{{ states('input_number.siemens_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dryer plug energy
+        unique_id: siemens_dryer_plug_energy
+        state: "{{ states('input_number.siemens_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens coffee maker plug energy
+        unique_id: siemens_coffee_maker_plug_energy
+        state: "{{ states('input_number.siemens_coffee_maker_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens oven plug energy
+        unique_id: siemens_oven_plug_energy
+        state: "{{ states('input_number.siemens_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch Dishwasher plug energy
+        unique_id: bosch_dishwasher_plug_energy
+        state: "{{ states('input_number.bosch_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch washer plug energy
+        unique_id: bosch_washer_plug_energy
+        state: "{{ states('input_number.bosch_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashTower washer plug energy
+        unique_id: washtower_washer_plug_energy
+        state: "{{ states('input_number.washtower_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG dishwasher plug energy
+        unique_id: lg_dishwasher_plug_energy
+        state: "{{ states('input_number.lg_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashTower dryer plug energy
+        unique_id: washtower_dryer_plug_energy
+        state: "{{ states('input_number.washtower_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG oven plug energy
+        unique_id: lg_oven_plug_energy
+        state: "{{ states('input_number.lg_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
 
 # A camera without hardware, for a Device's Snapshot: ffmpeg's test picture.
 camera:

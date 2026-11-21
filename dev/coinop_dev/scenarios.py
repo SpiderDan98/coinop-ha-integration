@@ -27,7 +27,7 @@ from custom_components.coinop.device_config import DEVICE_TYPES, stored_capabili
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
-from .stand_ins import Registration, appliances, printers
+from .stand_ins import Registration, appliances, ev_chargers, printers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -105,6 +105,13 @@ LOADS = [
     (3, "Eco 40-60", 0, 221, 0.74, 48.0, 74, "finished"),
     (1, "Wool", 0, 60, 0.41, 46.0, 39, "finished"),
 ]
+# A Program's minutes, kWh, litres and grams of detergent, for the long history.
+TYPICAL = {
+    "Cotton 60°": (128, 1.12, 57.0, 78),
+    "Eco 40-60": (219, 0.72, 48.5, 72),
+    "Wool": (61, 0.4, 45.0, 40),
+    "Quick 30": (31, 0.32, 38.0, 50),
+}
 # Days ago, hour it starts at, minutes, litres.
 WATERINGS = [
     (12, 6, 20, 182.0),
@@ -114,6 +121,8 @@ WATERINGS = [
     (2, 6, 25, 224.0),
     (1, 20, 15, 133.5),
 ]
+# How much history the Devices with history get: none leaves each alone.
+HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
 
 
@@ -172,6 +181,8 @@ class Seed:
         self.now = dt_util.now().replace(second=0, microsecond=0)
         self.materials: dict[str, dict[str, Any]] = {}
         self.templates: dict[str, dict[str, Any]] = {}
+        # Materials archived once every Piece is filled.
+        self.retired: set[str] = set()
 
     async def add_filaments(self) -> None:
         for name, type_, colour, vendor, pack_price in MATERIALS:
@@ -405,13 +416,13 @@ async def _bambu(seed: Seed) -> None:
         )
 
 
-async def _long_history(seed: Seed) -> None:
+async def _long_history(seed: Seed, printer: str, gaps: list[int]) -> None:
+    """Two years of Runs, `gaps` days apart."""
     box = seed.templates["Shipping box"]
     rng = seed.random
     names = [name for name, *_ in MATERIALS]
     day = 730
-    while day > 0:
-        day -= rng.choice([1, 1, 2, 3, 4])
+    while (day := day - rng.choice(gaps)) > 0:
         started = (
             seed.now
             - timedelta(days=day, hours=rng.randrange(14))
@@ -423,7 +434,7 @@ async def _long_history(seed: Seed) -> None:
         material = rng.choice(names[:-1] if day < 200 else names)
         weighed = rng.random() > 0.02
         run = await seed.add_run(
-            rng.choice(["prusa", "prusa", "bambu"]),
+            printer,
             part if rng.random() > 0.2 else f"{part} v{rng.randrange(2, 5)}",
             started,
             hours,
@@ -442,17 +453,26 @@ async def _long_history(seed: Seed) -> None:
                 template_id=box["id"],
             )
     # TPU went unused for the last 200 days.
-    await seed.api.call(
-        "coinop/materials/archive", material_id=seed.materials[names[-1]]["id"]
-    )
+    seed.retired.add(names[-1])
 
 
-async def _printing_now(seed: Seed) -> None:
-    await _prusa(seed)
+async def _prusa_long(seed: Seed) -> None:
+    await _long_history(seed, "prusa", [1, 2, 3, 4, 5, 6])
+
+
+async def _bambu_long(seed: Seed) -> None:
+    await _long_history(seed, "bambu", [3, 4, 5, 6, 7, 8, 9])
+
+
+async def _prusa_start(seed: Seed) -> None:
     await seed.set_printer("prusa", "printing", "Gridfinity bins 3x2.gcode")
 
 
-async def _washing(seed: Seed) -> None:
+async def _bambu_start(seed: Seed) -> None:
+    await seed.set_printer("bambu", "printing", "Spool holder.gcode")
+
+
+async def _washer_settings(seed: Seed) -> None:
     detergent, softener, whitener, sheets = (
         seed.materials[name]["id"] for name, *_ in LAUNDRY
     )
@@ -497,8 +517,40 @@ async def _washing(seed: Seed) -> None:
             },
         },
     )
+
+
+async def _washer_short(seed: Seed) -> None:
+    await _wash(seed, LOADS)
+
+
+async def _washer_long(seed: Seed) -> None:
+    """A load every few days for two years, then the short level's."""
+    rng = seed.random
+    loads, day = [], 730
+    while day > 30:
+        program = rng.choice([*TYPICAL, None])
+        minutes, kwh, litres, grams = TYPICAL[program or "Cotton 60°"]
+        outcome = rng.choices(["finished", "cancelled"], [95, 5])[0]
+        share = rng.uniform(0.2, 0.6) if outcome == "cancelled" else 1
+        loads.append(
+            (
+                day,
+                program,
+                0,
+                round(minutes * share * rng.uniform(0.95, 1.05)),
+                round(kwh * share * rng.uniform(0.9, 1.1), 2),
+                round(litres * share * rng.uniform(0.9, 1.1), 1),
+                round(grams * rng.uniform(0.9, 1.1)),
+                outcome,
+            )
+        )
+        day -= rng.randrange(4, 11)
+    await _wash(seed, [*loads, *LOADS])
+
+
+async def _wash(seed: Seed, loads: list[tuple[Any, ...]]) -> None:
     meters = {"washer_energy": 412.5, "washer_water": 18250.0, "detergent_scale": 650.0}
-    for days, program, recognised, minutes, kwh, litres, grams, outcome in LOADS:
+    for days, program, recognised, minutes, kwh, litres, grams, outcome in loads:
         if meters["detergent_scale"] < grams:
             # A new bottle; a refill between loads counts nothing.
             meters["detergent_scale"] += 1500
@@ -525,9 +577,32 @@ async def _washing(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.washer_status", "off")
 
 
-async def _irrigation(seed: Seed) -> None:
+async def _washer_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.washer_program", "Cotton 60°")
+    await _async_set(seed.hass, "input_select.washer_status", "running")
+
+
+async def _irrigation_short(seed: Seed) -> None:
+    await _water(seed, WATERINGS)
+
+
+async def _irrigation_long(seed: Seed) -> None:
+    """Every few days through two summers, then the short level's waterings."""
+    rng = seed.random
+    waterings = []
+    for summer in (1, 0):
+        day = 365 * summer + 300
+        while day > 365 * summer + 140:
+            minutes = rng.choice([15, 20, 20, 25, 35])
+            litres = round(minutes * rng.uniform(8, 9.5), 1)
+            waterings.append((day, 20 if minutes > 30 else 6, minutes, litres))
+            day -= rng.randrange(2, 5)
+    await _water(seed, [*waterings, *WATERINGS])
+
+
+async def _water(seed: Seed, waterings: list[tuple[int, int, int, float]]) -> None:
     meter = {"irrigation_water": 48200.0}
-    for days, hour, minutes, litres in WATERINGS:
+    for days, hour, minutes, litres in waterings:
         start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
         end = start + timedelta(minutes=minutes)
         await _replay_meters(seed.hass, meter, start)
@@ -541,6 +616,10 @@ async def _irrigation(seed: Seed) -> None:
         seed.hass, "input_number.irrigation_water", meter["irrigation_water"]
     )
     await _async_set(seed.hass, "input_select.irrigation_status", "off")
+
+
+async def _irrigation_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.irrigation_status", "watering")
 
 
 async def _replay_meters(
@@ -680,8 +759,20 @@ class DeviceWithHistory(Piece):
 
     section: ClassVar[str] = "device"
     device: Mapping[str, Any]
-    fill: Callable[[Seed], Awaitable[None]]
+    # The Runs of each history level but none, which leaves the Device alone.
+    short: Callable[[Seed], Awaitable[None]]
+    long: Callable[[Seed], Awaitable[None]]
+    # Starts a Run through its helpers, as its integration would report one.
+    start: Callable[[Seed], Awaitable[None]]
     needs: tuple[str, ...] = ()
+    # The panel settings it gets whatever its history, before its Runs.
+    setup: Callable[[Seed], Awaitable[None]] | None = None
+
+    async def fill(self, seed: Seed, history: str) -> None:
+        if self.setup:
+            await self.setup(seed)
+        if history != "none":
+            await (self.short if history == "short" else self.long)(seed)
 
 
 @dataclass(frozen=True)
@@ -736,23 +827,38 @@ def _printer_helpers(key: str, idle: str = "idle") -> dict[str, str | float]:
     return {f"input_text.{key}_job": "", f"input_select.{key}_status": idle}
 
 
+# One ThinQ device, which the integration registers as an HA device per half.
+_washtower = partial(
+    appliances.lg_thinq,
+    "DEVICE_WASHTOWER",
+    name="WashTower",
+    device_id="WT1-5B2E0C14-7F3A-4D8E-9A61-0C2D4E6F8A10",
+)
+
+
 PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
     "prusa": DeviceWithHistory(
         "3d_printer",
         "Prusa MK4",
-        "7 Runs over seven weeks on 3 of the 8 filaments, with Tags and Thumbnails.",
+        "Short history: 7 Runs over seven weeks on 3 of the 8 filaments; long: two "
+        "years of Runs on all 8. With Tags and Thumbnails.",
         _printer_helpers("prusa"),
         device=_printer("prusa"),
-        fill=_prusa,
+        short=_prusa,
+        long=_prusa_long,
+        start=_prusa_start,
         needs=("filaments", "tags", "template"),
     ),
     "bambu": DeviceWithHistory(
         "3d_printer",
         "Bambu Lab X1C",
-        "10 Runs over six weeks on 5 of the 8 filaments, with Tags and Thumbnails.",
+        "Short history: 10 Runs over six weeks on 5 of the 8 filaments; long: two "
+        "years of Runs on all 8. With Tags and Thumbnails.",
         _printer_helpers("bambu"),
         device=_printer("bambu"),
-        fill=_bambu,
+        short=_bambu,
+        long=_bambu_long,
+        start=_bambu_start,
         needs=("filaments", "tags", "template"),
     ),
     "anycubic.3d_printer": StaticPiece(
@@ -825,11 +931,15 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "washing_machine",
         "Washing machine",
         "Energy and water meters, a detergent scale, 4 laundry products as Doses "
-        "and Program Defaults; 10 loads over four weeks. Its helpers start the next.",
+        "and Program Defaults. Short history: 10 loads over four weeks; long: a load "
+        "every few days for two years.",
         {"input_select.washer_status": "off"},
         device=_washer(),
-        fill=_washing,
+        short=_washer_short,
+        long=_washer_long,
+        start=_washer_start,
         needs=("laundry",),
+        setup=_washer_settings,
     ),
     "ha_washdata.washing_machine": QuickStartPiece(
         "washing_machine",
@@ -854,7 +964,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Siemens washer · Home Connect",
         "A washer with its plug sensor as meter; set its operation state in the "
         "developer tools to run it.",
-        {"input_number.siemens_washer_power": 0},
+        {"input_number.siemens_washer_energy": 0},
         registration=partial(appliances.home_connect, "Washer", name="Siemens washer"),
     ),
     "home_connect_alt.washing_machine": StaticPiece(
@@ -863,8 +973,30 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "A washer whose kind its integration doesn't tell, so Quick Start asks for "
         "the Device Type, with its plug sensor as meter; set its operation state "
         "(`BSH.Common.EnumType.OperationState.Run`) in the developer tools to run it.",
-        {"input_number.bosch_washer_power": 0},
+        {"input_number.bosch_washer_energy": 0},
         registration=partial(appliances.home_connect_alt, name="Bosch washer"),
+    ),
+    "lg_thinq.washing_machine": StaticPiece(
+        "washing_machine",
+        "WashTower washer · LG ThinQ",
+        "The washer half of a WashTower, with its plug sensor as meter, on the "
+        "LG ThinQ entry its dryer half shares; set its current state in the "
+        "developer tools to run it.",
+        {"input_number.washtower_washer_energy": 0},
+        registration=partial(_washtower, sub_id="washer"),
+    ),
+    "smartthings.washing_machine": StaticPiece(
+        "washing_machine",
+        "Samsung washer · SmartThings",
+        "A washer, with its own energy meter; set its machine state in the "
+        "developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.smartthings,
+            "washer",
+            name="Samsung washer",
+            device_id="3b7e5c1a-2f40-4d6b-9a8e-1c5d7f9b2e04",
+        ),
     ),
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",
@@ -893,7 +1025,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Siemens dishwasher · Home Connect",
         "A dishwasher with its plug sensor as meter; set its operation state in the "
         "developer tools to run it.",
-        {"input_number.siemens_dishwasher_power": 0},
+        {"input_number.siemens_dishwasher_energy": 0},
         registration=partial(
             appliances.home_connect, "Dishwasher", name="Siemens dishwasher"
         ),
@@ -904,8 +1036,34 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "A dishwasher whose kind its integration doesn't tell, so Quick Start asks "
         "for the Device Type, with its plug sensor as meter; set its operation state "
         "in the developer tools to run it.",
-        {"input_number.bosch_dishwasher_power": 0},
+        {"input_number.bosch_dishwasher_energy": 0},
         registration=appliances.home_connect_local,
+    ),
+    "lg_thinq.dishwasher": StaticPiece(
+        "dishwasher",
+        "LG dishwasher · LG ThinQ",
+        "A dishwasher with its washing course as program and its plug sensor as "
+        "meter; set its current state in the developer tools to run it.",
+        {"input_number.lg_dishwasher_energy": 0},
+        registration=partial(
+            appliances.lg_thinq,
+            "DEVICE_DISH_WASHER",
+            name="LG dishwasher",
+            device_id="DW1-3C7A9E21-6B4D-4F10-8E2A-5D9C1B3F7E64",
+        ),
+    ),
+    "smartthings.dishwasher": StaticPiece(
+        "dishwasher",
+        "Samsung dishwasher · SmartThings",
+        "A dishwasher, with its own energy meter; set its machine state in the "
+        "developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.smartthings,
+            "dishwasher",
+            name="Samsung dishwasher",
+            device_id="8c1f4e2d-6a93-4b07-b5d2-9e3a7c1f6d58",
+        ),
     ),
     "ha_washdata.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
@@ -934,15 +1092,37 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Siemens dryer · Home Connect",
         "A dryer with its plug sensor as meter; set its operation state in the "
         "developer tools to run it.",
-        {"input_number.siemens_dryer_power": 0},
+        {"input_number.siemens_dryer_energy": 0},
         registration=partial(appliances.home_connect, "Dryer", name="Siemens dryer"),
+    ),
+    "lg_thinq.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "WashTower dryer · LG ThinQ",
+        "The dryer half of a WashTower, with its plug sensor as meter, on the "
+        "LG ThinQ entry its washer half shares; set its current state in the "
+        "developer tools to run it.",
+        {"input_number.washtower_dryer_energy": 0},
+        registration=partial(_washtower, sub_id="dryer"),
+    ),
+    "smartthings.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "Samsung dryer · SmartThings",
+        "A dryer, with its own energy meter; set its machine state in the "
+        "developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.smartthings,
+            "dryer",
+            name="Samsung dryer",
+            device_id="5e9a2c7b-1d84-4f3e-a6c0-2b8d4f7e1a93",
+        ),
     ),
     "miele.coffee_machine": StaticPiece(
         "coffee_machine",
         "Miele coffee system · Miele",
         "A coffee machine with its plug sensor as meter; set its status in the "
         "developer tools to run it.",
-        {"input_number.miele_coffee_system_power": 0},
+        {"input_number.miele_coffee_system_energy": 0},
         registration=partial(
             appliances.miele,
             "Coffee system",
@@ -955,7 +1135,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Siemens coffee maker · Home Connect",
         "A coffee maker with its plug sensor as meter; set its operation state in "
         "the developer tools to run it.",
-        {"input_number.siemens_coffee_maker_power": 0},
+        {"input_number.siemens_coffee_maker_energy": 0},
         registration=partial(
             appliances.home_connect, "CoffeeMaker", name="Siemens coffee maker"
         ),
@@ -965,7 +1145,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Miele oven · Miele",
         "An oven with its plug sensor as meter; set its status in the developer "
         "tools to run it.",
-        {"input_number.miele_oven_power": 0},
+        {"input_number.miele_oven_energy": 0},
         registration=partial(
             appliances.miele, "Oven", serial="000111000005", name="Miele oven"
         ),
@@ -975,8 +1155,34 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Siemens oven · Home Connect",
         "An oven with its plug sensor as meter; set its operation state in the "
         "developer tools to run it.",
-        {"input_number.siemens_oven_power": 0},
+        {"input_number.siemens_oven_energy": 0},
         registration=partial(appliances.home_connect, "Oven", name="Siemens oven"),
+    ),
+    "lg_thinq.oven": StaticPiece(
+        "oven",
+        "LG oven · LG ThinQ",
+        "An oven with its plug sensor as meter; set its oven current state in the "
+        "developer tools to run it.",
+        {"input_number.lg_oven_energy": 0},
+        registration=partial(
+            appliances.lg_thinq,
+            "DEVICE_OVEN",
+            name="LG oven",
+            device_id="OV1-8D4F2A63-1E5B-4C97-B3D0-7A6E9F2C4B18",
+        ),
+    ),
+    "smartthings.oven": StaticPiece(
+        "oven",
+        "Samsung oven · SmartThings",
+        "An oven, with its own energy meter; set its machine state in the "
+        "developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.smartthings,
+            "oven",
+            name="Samsung oven",
+            device_id="a4d81f6e-7c25-4e9b-8f13-6d2b9a5c3e70",
+        ),
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
@@ -986,15 +1192,74 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_select.wall_connector_status": "not_connected"},
         domain="tesla_wall_connector",
     ),
+    "evcc_intg.ev_charger": StaticPiece(
+        "ev_charger",
+        "evcc ☀️🚘 Solar Charging [evcc] · evcc",
+        "A site with one loadpoint, metered by its session counter, and a vehicle; "
+        "set its charging state to `on` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.evcc_site,
+    ),
+    "ocpp.ev_charger": StaticPiece(
+        "ev_charger",
+        "charger Connector 1 and 2 · OCPP",
+        "A charge point with two connectors, each a Device of its own with its "
+        "energy meter; set a connector's status to `Charging` in the developer "
+        "tools to run it.",
+        {},
+        registration=partial(ev_chargers.charge_point, connectors=2),
+    ),
+    "easee.ev_charger": StaticPiece(
+        "ev_charger",
+        "Garage · Easee",
+        "A charger with its lifetime energy counter; set its status to `charging` "
+        "in the developer tools to run it.",
+        {},
+        registration=ev_chargers.easee,
+    ),
+    "zaptec.ev_charger": StaticPiece(
+        "ev_charger",
+        "Driveway · Zaptec",
+        "A charger in its installation, metered by its session counter; set its "
+        "operation mode to `connected_charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.zaptec,
+    ),
+    "goecharger_mqtt.ev_charger": StaticPiece(
+        "ev_charger",
+        "go-eCharger · go-e Charger MQTT",
+        "A charger with its lifetime energy counter in Wh; set its car state to "
+        "`charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.goe_mqtt,
+    ),
+    "goecharger_api2.ev_charger": StaticPiece(
+        "ev_charger",
+        "go-e Charger · go-e Charger API v2",
+        "A charger with its lifetime energy counter; set its car state to "
+        "`Charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.goe_api2,
+    ),
+    "wallbox.ev_charger": StaticPiece(
+        "ev_charger",
+        "Wallbox Garage · Wallbox",
+        "A charger with its session energy counter; set its status description "
+        "to `Charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.wallbox,
+    ),
     "irrigation": DeviceWithHistory(
         "other",
         "Garden valve",
         'An Other Device under the Type Name "Irrigation" with water on a water '
-        "meter and the electricity source None; 6 waterings over two weeks, each "
-        "costing only its water. Its helpers start the next one.",
+        "meter and the electricity source None, each watering costing only its "
+        "water. Short history: 6 waterings over two weeks; long: two summers of them.",
         {"input_select.irrigation_status": "off"},
         device=_garden_valve(),
-        fill=_irrigation,
+        short=_irrigation_short,
+        long=_irrigation_long,
+        start=_irrigation_start,
     ),
 }
 
@@ -1004,8 +1269,16 @@ class Preset:
     title: str
     description: str
     pieces: tuple[str, ...]
-    # Contents of its own in place of its Devices with history's.
-    fill: Callable[[Seed], Awaitable[None]] | None = None
+    history: str = "short"
+    open_run: bool = False
+
+    @property
+    def selection(self) -> dict[str, Any]:
+        return {
+            "pieces": ordered(self.pieces),
+            "history": self.history,
+            "open_run": self.open_run,
+        }
 
 
 PRESETS = {
@@ -1023,7 +1296,7 @@ PRESETS = {
         "3D printer, printing now",
         "Like a few Runs, with an open Run; the printer's helpers end it.",
         ("prusa",),
-        _printing_now,
+        open_run=True,
     ),
     "two-printers": Preset(
         "Two printers", "The Prusa and the Bambu with their Runs.", ("prusa", "bambu")
@@ -1033,7 +1306,7 @@ PRESETS = {
         "Two years of Runs on two printers, 8 Materials (one archived), a Line Item "
         "Template.",
         ("prusa", "bambu"),
-        _long_history,
+        history="long",
     ),
     "washing-machine": Preset(
         "Washing machine", "The washing machine with its 10 loads.", ("washer",)
@@ -1060,12 +1333,10 @@ async def async_load(
 ) -> dict[str, Any]:
     """Replace whatever Coin-op holds by a Preset or a selection of Pieces; returns
     the selection loaded."""
-    preset: Preset | None = None
     if isinstance(choice, str):
-        preset = PRESETS[choice]
-        pieces = ordered(preset.pieces)
-    else:
-        pieces = ordered(choice["pieces"])
+        choice = PRESETS[choice].selection
+    pieces = ordered(choice["pieces"])
+    history, open_run = choice.get("history", "short"), choice.get("open_run", False)
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
@@ -1101,11 +1372,18 @@ async def async_load(
         if need in needs:
             await add(seed)
     for piece in (PIECES[name] for name in pieces):
-        if not (preset and preset.fill and isinstance(piece, DeviceWithHistory)):
+        if isinstance(piece, DeviceWithHistory):
+            await piece.fill(seed, history)
+        else:
             await piece.fill(seed)
-    if preset and preset.fill:
-        await preset.fill(seed)
-    return {"pieces": pieces}
+    for name in seed.retired:
+        await seed.api.call(
+            "coinop/materials/archive", material_id=seed.materials[name]["id"]
+        )
+    if open_run:
+        for piece in with_history:
+            await piece.start(seed)
+    return {"pieces": pieces, "history": history, "open_run": open_run}
 
 
 async def _async_add_hub(hass: HomeAssistant) -> ConfigEntry:

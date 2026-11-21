@@ -1,6 +1,7 @@
 """The dev container's Scenarios load through today's websocket API."""
 
 import asyncio
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,12 +17,18 @@ from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
 from dev.coinop_dev import async_setup
-from dev.coinop_dev.scenarios import PIECES, PRESETS, async_load
+from dev.coinop_dev.scenarios import (
+    HISTORIES,
+    PIECES,
+    PRESETS,
+    DeviceWithHistory,
+    async_load,
+)
 
 from .clock import Clock
 from .devices import configure
 from .test_device_flow import fields
-from .test_quick_start import offered, open_add_device
+from .test_quick_start import offered, open_add_device, pick
 from .websocket import PanelClient
 
 DEV = Path(__file__).parents[1] / "dev"
@@ -84,6 +91,88 @@ STATIC = {
     ),
 }
 
+# The static EV chargers' Pieces: each HA device Quick Start offers, as its label, its
+# Status entity and the counter it meters with, then a Status of a charging and of an
+# unplugged car.
+EV_CHARGERS = {
+    "evcc_intg.ev_charger": (
+        [
+            (
+                "evcc ☀️🚘 Solar Charging [evcc] · evcc",
+                "binary_sensor.evcc_garage_charging",
+                "sensor.evcc_garage_charged_energy",
+            )
+        ],
+        "on",
+        "off",
+    ),
+    "ocpp.ev_charger": (
+        [
+            (
+                f"charger Connector {n} · OCPP",
+                f"sensor.charger_conn{n}_status_connector",
+                f"sensor.charger_conn{n}_energy_active_import_register",
+            )
+            for n in (1, 2)
+        ],
+        "Charging",
+        "Available",
+    ),
+    "easee.ev_charger": (
+        [("Garage · Easee", "sensor.garage_status", "sensor.garage_lifetime_energy")],
+        "charging",
+        "disconnected",
+    ),
+    "zaptec.ev_charger": (
+        [
+            (
+                "Driveway · Zaptec",
+                "sensor.driveway_charger_operation_mode",
+                "sensor.driveway_total_charge_power_session",
+            )
+        ],
+        "connected_charging",
+        "disconnected",
+    ),
+    "goecharger_mqtt.ev_charger": (
+        [
+            (
+                "go-eCharger · go-e Charger MQTT",
+                "sensor.go_echarger_car",
+                "sensor.go_echarger_eto",
+            )
+        ],
+        "charging",
+        "idle",
+    ),
+    "goecharger_api2.ev_charger": (
+        [
+            (
+                "go-e Charger · go-e Charger API v2",
+                "sensor.go_e_charger_car_value",
+                "sensor.go_e_charger_eto",
+            )
+        ],
+        "Charging",
+        "Idle",
+    ),
+    "wallbox.ev_charger": (
+        [
+            (
+                "Wallbox Garage · Wallbox",
+                "sensor.wallbox_garage_status_description",
+                "sensor.wallbox_garage_added_energy",
+            )
+        ],
+        "Charging",
+        "Ready",
+    ),
+}
+
+EV_CHARGER_DEVICES = [
+    device for devices, _, _ in EV_CHARGERS.values() for device in devices
+]
+
 
 @pytest.fixture
 async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,11 +188,13 @@ async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
         assert await async_setup_component(hass, domain, {domain: config[domain]})
 
 
-def test_the_load_service_offers_every_preset_and_piece() -> None:
+def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     fields = load_yaml_dict(DEV / "coinop_dev" / "services.yaml")["load"]["fields"]
 
     assert fields["preset"]["selector"]["select"]["options"] == list(PRESETS)
     assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
+    assert fields["history"]["selector"]["select"]["options"] == list(HISTORIES)
+    assert "boolean" in fields["open_run"]["selector"]
 
 
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
@@ -188,17 +279,25 @@ async def test_a_device_with_history_loads_alone(
         ("miele.washing_machine", "Miele washing machine · Miele"),
         ("home_connect.washing_machine", "Siemens washer · Home Connect"),
         ("home_connect_alt.washing_machine", "Bosch washer · Home Connect Alt"),
+        ("lg_thinq.washing_machine", "WashTower washer · LG ThinQ"),
+        ("smartthings.washing_machine", "Samsung washer · SmartThings"),
         ("ha_washdata.dishwasher", "Dishwasher · WashData"),
         ("miele.dishwasher", "Miele dishwasher · Miele"),
         ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
         ("homeconnect_ws.dishwasher", "Bosch Dishwasher · Home Connect Local"),
+        ("lg_thinq.dishwasher", "LG dishwasher · LG ThinQ"),
+        ("smartthings.dishwasher", "Samsung dishwasher · SmartThings"),
         ("ha_washdata.tumble_dryer", "Tumble dryer · WashData"),
         ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
         ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
+        ("lg_thinq.tumble_dryer", "WashTower dryer · LG ThinQ"),
+        ("smartthings.tumble_dryer", "Samsung dryer · SmartThings"),
         ("miele.coffee_machine", "Miele coffee system · Miele"),
         ("home_connect.coffee_machine", "Siemens coffee maker · Home Connect"),
         ("miele.oven", "Miele oven · Miele"),
         ("home_connect.oven", "Siemens oven · Home Connect"),
+        ("lg_thinq.oven", "LG oven · LG ThinQ"),
+        ("smartthings.oven", "Samsung oven · SmartThings"),
         (
             "tesla_wall_connector.ev_charger",
             "Tesla Wall Connector · Tesla Wall Connector",
@@ -235,10 +334,103 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 25
+    assert len(offered(await open_add_device(hass, entry))) == 41
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
-    assert all(hass.states.get(row[5]) for row in APPLIANCES.values())
+    assert all(hass.states.get(status) for *_, status, _, _ in APPLIANCES.values())
+    assert all(hass.states.get(status) for _, status, _ in EV_CHARGER_DEVICES)
+
+
+DEVICES_WITH_HISTORY = [
+    n for n, p in PIECES.items() if isinstance(p, DeviceWithHistory)
+]
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_without_history_every_device_with_history_exists_without_a_run(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(
+        hass,
+        {"pieces": DEVICES_WITH_HISTORY, "history": "none", "open_run": False},
+        hass_admin_user,
+    )
+    await hass.async_block_till_done()
+
+    devices = (await panel.call("coinop/devices/list"))["devices"]
+    assert [device["name"] for device in devices] == [
+        "Prusa MK4",
+        "Bambu Lab X1C",
+        "Washing machine",
+        "Garden valve",
+    ]
+    assert (await panel.call("coinop/runs/list"))["runs"] == []
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("piece", DEVICES_WITH_HISTORY)
+async def test_a_device_with_long_history_has_runs_from_up_to_two_years_ago(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+) -> None:
+    await async_load(hass, {"pieces": [piece], "history": "long"}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    oldest = min(datetime.fromisoformat(run["started"]) for run in runs)
+    assert len(runs) > 50
+    assert timedelta(days=365) < dt_util.now() - oldest < timedelta(days=731)
+    assert all(run["ended"] for run in runs)
+
+
+# What ends each Device with history's open Run, set as its integration would.
+ENDS = {
+    "prusa": {"input_select.prusa_status": "finished"},
+    "bambu": {"input_select.bambu_status": "finished"},
+    "washer": {"input_select.washer_status": "finished"},
+    "irrigation": {"input_select.irrigation_status": "off"},
+}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("history", ["none", "short"])
+async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_end(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+    history: str,
+) -> None:
+    await async_load(
+        hass,
+        {"pieces": list(PIECES), "history": history, "open_run": True},
+        hass_admin_user,
+    )
+    await hass.async_block_till_done()
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    running = {run["id"]: run["device_name"] for run in runs if run["ended"] is None}
+
+    await clock.advance(minutes=30)
+    for helpers in ENDS.values():
+        for entity_id, value in helpers.items():
+            await set_helper(hass, entity_id, value)
+    await clock.advance(minutes=10)
+
+    assert list(ENDS) == DEVICES_WITH_HISTORY
+    assert sorted(running.values()) == [
+        "Bambu Lab X1C",
+        "Garden valve",
+        "Prusa MK4",
+        "Washing machine",
+    ]
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
+    assert not [run for run in runs if run["ended"] is None]
+    assert len(runs) == (4 if history == "none" else 33 + 4)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -396,7 +588,11 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
 
     await load(hass, hass_admin_user, {"preset": "two-printers"})
     from_preset = await panel.call("coinop_dev/scenarios")
-    await load(hass, hass_admin_user, {"pieces": ["irrigation", "washer"]})
+    await load(
+        hass,
+        hass_admin_user,
+        {"pieces": ["irrigation", "washer"], "history": "none", "open_run": True},
+    )
     picked = await panel.call("coinop_dev/scenarios")
 
     assert (before["preset"], before["selection"]) == (None, None)
@@ -427,6 +623,8 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "miele.washing_machine",
                 "home_connect.washing_machine",
                 "home_connect_alt.washing_machine",
+                "lg_thinq.washing_machine",
+                "smartthings.washing_machine",
             ],
         ),
         (
@@ -436,6 +634,8 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "miele.dishwasher",
                 "home_connect.dishwasher",
                 "homeconnect_ws.dishwasher",
+                "lg_thinq.dishwasher",
+                "smartthings.dishwasher",
             ],
         ),
         (
@@ -444,11 +644,16 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "ha_washdata.tumble_dryer",
                 "miele.tumble_dryer",
                 "home_connect.tumble_dryer",
+                "lg_thinq.tumble_dryer",
+                "smartthings.tumble_dryer",
             ],
         ),
         ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
-        ("oven", ["miele.oven", "home_connect.oven"]),
-        ("ev_charger", ["tesla_wall_connector.ev_charger"]),
+        (
+            "oven",
+            ["miele.oven", "home_connect.oven", "lg_thinq.oven", "smartthings.oven"],
+        ),
+        ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
     prusa, _, _, kobra, *_ = before["groups"][0]["pieces"]
@@ -470,7 +675,14 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "irrigation",
     ]
     assert presets["two-printers"]["title"] == "Two printers"
-    assert presets["two-printers"]["selection"] == {"pieces": ["prusa", "bambu"]}
+    assert before["options"] == {"history": ["none", "short", "long"]}
+    assert presets["two-printers"]["selection"] == {
+        "pieces": ["prusa", "bambu"],
+        "history": "short",
+        "open_run": False,
+    }
+    assert presets["long-history"]["selection"]["history"] == "long"
+    assert presets["printing-now"]["selection"]["open_run"] is True
     assert presets["quick-start"]["selection"]["pieces"] == [
         "anycubic.3d_printer",
         "anycubic_cloud.3d_printer",
@@ -484,26 +696,35 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "miele.washing_machine",
         "home_connect.washing_machine",
         "home_connect_alt.washing_machine",
+        "lg_thinq.washing_machine",
+        "smartthings.washing_machine",
         "ha_washdata.dishwasher",
         "miele.dishwasher",
         "home_connect.dishwasher",
         "homeconnect_ws.dishwasher",
+        "lg_thinq.dishwasher",
+        "smartthings.dishwasher",
         "ha_washdata.tumble_dryer",
         "miele.tumble_dryer",
         "home_connect.tumble_dryer",
+        "lg_thinq.tumble_dryer",
+        "smartthings.tumble_dryer",
         "miele.coffee_machine",
         "home_connect.coffee_machine",
         "miele.oven",
         "home_connect.oven",
+        "lg_thinq.oven",
+        "smartthings.oven",
         "tesla_wall_connector.ev_charger",
+        *EV_CHARGERS,
     ]
     assert (from_preset["preset"], from_preset["selection"]) == (
         "two-printers",
-        {"pieces": ["prusa", "bambu"]},
+        {"pieces": ["prusa", "bambu"], "history": "short", "open_run": False},
     )
     assert (picked["preset"], picked["selection"]) == (
         None,
-        {"pieces": ["washer", "irrigation"]},
+        {"pieces": ["washer", "irrigation"], "history": "none", "open_run": True},
     )
 
 
@@ -719,257 +940,70 @@ async def test_quick_start_adds_a_static_stand_ins_printer_run_through_its_statu
     assert electricity["quantity"] == pytest.approx(0.1)
 
 
-# The appliance integrations' static Pieces: the HA device's label in Quick Start, the
-# Device Type it is added as, whether Quick Start asks for it, the plug's power helper
-# and sensor where the integration brings no meter, its Status entity, and a Status of
-# a running and a finished program.
-APPLIANCES: dict[str, tuple[str, str, bool, str | None, str | None, str, str, str]] = {
-    "miele.washing_machine": (
-        "Miele washing machine · Miele",
-        "washing_machine",
-        False,
-        None,
-        None,
-        "sensor.miele_washing_machine_status",
-        "in_use",
-        "program_ended",
-    ),
-    "miele.dishwasher": (
-        "Miele dishwasher · Miele",
-        "dishwasher",
-        False,
-        None,
-        None,
-        "sensor.miele_dishwasher_status",
-        "in_use",
-        "program_ended",
-    ),
-    "miele.tumble_dryer": (
-        "Miele tumble dryer · Miele",
-        "tumble_dryer",
-        False,
-        None,
-        None,
-        "sensor.miele_tumble_dryer_status",
-        "in_use",
-        "program_ended",
-    ),
-    "miele.coffee_machine": (
-        "Miele coffee system · Miele",
-        "coffee_machine",
-        False,
-        "input_number.miele_coffee_system_power",
-        "sensor.miele_coffee_system_plug_power",
-        "sensor.miele_coffee_system_status",
-        "in_use",
-        "program_ended",
-    ),
-    "miele.oven": (
-        "Miele oven · Miele",
-        "oven",
-        False,
-        "input_number.miele_oven_power",
-        "sensor.miele_oven_plug_power",
-        "sensor.miele_oven_status",
-        "in_use",
-        "program_ended",
-    ),
-    "home_connect.washing_machine": (
-        "Siemens washer · Home Connect",
-        "washing_machine",
-        False,
-        "input_number.siemens_washer_power",
-        "sensor.siemens_washer_plug_power",
-        "sensor.siemens_washer_operation_state",
-        "run",
-        "finished",
-    ),
-    "home_connect.dishwasher": (
-        "Siemens dishwasher · Home Connect",
-        "dishwasher",
-        False,
-        "input_number.siemens_dishwasher_power",
-        "sensor.siemens_dishwasher_plug_power",
-        "sensor.siemens_dishwasher_operation_state",
-        "run",
-        "finished",
-    ),
-    "home_connect.tumble_dryer": (
-        "Siemens dryer · Home Connect",
-        "tumble_dryer",
-        False,
-        "input_number.siemens_dryer_power",
-        "sensor.siemens_dryer_plug_power",
-        "sensor.siemens_dryer_operation_state",
-        "run",
-        "finished",
-    ),
-    "home_connect.coffee_machine": (
-        "Siemens coffee maker · Home Connect",
-        "coffee_machine",
-        False,
-        "input_number.siemens_coffee_maker_power",
-        "sensor.siemens_coffee_maker_plug_power",
-        "sensor.siemens_coffee_maker_operation_state",
-        "run",
-        "finished",
-    ),
-    "home_connect.oven": (
-        "Siemens oven · Home Connect",
-        "oven",
-        False,
-        "input_number.siemens_oven_power",
-        "sensor.siemens_oven_plug_power",
-        "sensor.siemens_oven_operation_state",
-        "run",
-        "finished",
-    ),
-    "homeconnect_ws.dishwasher": (
-        "Bosch Dishwasher · Home Connect Local",
-        "dishwasher",
-        True,
-        "input_number.bosch_dishwasher_power",
-        "sensor.bosch_dishwasher_plug_power",
-        "sensor.bosch_dishwasher_operation_state",
-        "run",
-        "finished",
-    ),
-    "home_connect_alt.washing_machine": (
-        "Bosch washer · Home Connect Alt",
-        "washing_machine",
-        True,
-        "input_number.bosch_washer_power",
-        "sensor.bosch_washer_plug_power",
-        "sensor.bosch_washer_operation_state",
-        "BSH.Common.EnumType.OperationState.Run",
-        "BSH.Common.EnumType.OperationState.Finished",
-    ),
-}
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("piece", EV_CHARGERS)
+async def test_quick_start_adds_a_static_ev_charger_with_the_counter_it_brings(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+) -> None:
+    chargers, _, _ = EV_CHARGERS[piece]
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (0, 0, 0, 0)
+    [entry] = hass.config_entries.async_entries("coinop")
+    devices = {
+        o["label"]: o["value"] for o in offered(await open_add_device(hass, entry))
+    }
+    assert list(devices) == [label for label, _, _ in chargers] + ["manual"]
+    for label, status, counter in chargers:
+        result = await pick(hass, entry, devices[label])
+        assert fields(result) == ["price", "price_entity"]
+        result = await configure(hass, result, {"price": 0.32})
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+        data = list(entry.subentries.values())[-1].data
+        assert data["device_type"] == "ev_charger"
+        assert data["status"]["entity_id"] == status
+        assert data["consumption"]["entity_id"] == counter
 
 
 @pytest.mark.usefixtures("helpers")
-@pytest.mark.parametrize(
-    (
-        "piece",
-        "label",
-        "device_type",
-        "asked",
-        "power",
-        "plug",
-        "status",
-        "running",
-        "finished",
-    ),
-    [(piece, *row) for piece, row in APPLIANCES.items()],
-)
-async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_status(
+@pytest.mark.parametrize("piece", EV_CHARGERS)
+async def test_a_static_ev_chargers_charge_is_run_through_its_status(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
     files: Path,
     clock: Clock,
     piece: str,
-    label: str,
-    device_type: str,
-    asked: bool,
-    power: str | None,
-    plug: str | None,
-    status: str,
-    running: str,
-    finished: str,
 ) -> None:
-    """Offered as its Device Type, or asked for it where its integration can't tell,
-    with a meter to pick only where the integration brings none."""
+    """As a contributor sets the Status and the counter in the developer tools."""
+    [(label, status, counter), *_], charging, unplugged = EV_CHARGERS[piece]
     await async_load(hass, {"pieces": [piece]}, hass_admin_user)
     await hass.async_block_till_done()
     [entry] = hass.config_entries.async_entries("coinop")
     result = await open_add_device(hass, entry)
     [device_id] = [o["value"] for o in offered(result) if o["label"] == label]
-
     result = await configure(hass, result, {"device": device_id})
-    if asked:
-        assert result["step_id"] == "quick_start_device_type"
-        result = await configure(hass, result, {"device_type": device_type})
-    assert result["step_id"] == "quick_start_confirm"
-    assert ("optional_meter" in fields(result)) == (plug is not None)
-    meter = {"optional_meter": plug} if plug else {}
-    result = await configure(hass, result, meter | {"price": 0.32})
-    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await configure(hass, result, {"price": 0.32})
 
-    [device] = (await panel.call("coinop/devices/list"))["devices"]
-    assert device["type"] == device_type
-    if power:
-        await set_helper(hass, power, 100)
-    await set_state(hass, status, running)
+    reading = hass.states.get(counter)
+    assert reading is not None
+    per_kwh = 1000 if reading.attributes["unit_of_measurement"] == "Wh" else 1
+    await set_state(hass, status, charging)
     await clock.advance(hours=1)
-    await set_state(hass, status, finished)
+    await set_state(hass, counter, str(float(reading.state) + 7 * per_kwh))
+    await set_state(hass, status, unplugged)
     await clock.advance(minutes=10)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     assert run["outcome"] == "completed"
-    if power:
-        run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
-        [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
-        assert electricity["quantity"] == pytest.approx(0.1)
-
-
-@pytest.mark.usefixtures("helpers")
-async def test_quick_start_adds_the_dryer_washdata_follows_as_a_tumble_dryer(
-    hass: HomeAssistant,
-    hass_admin_user: MockUser,
-    panel: PanelClient,
-    files: Path,
-    clock: Clock,
-) -> None:
-    await async_load(hass, {"pieces": ["ha_washdata.tumble_dryer"]}, hass_admin_user)
-    await hass.async_block_till_done()
-    [entry] = hass.config_entries.async_entries("coinop")
-    result = await open_add_device(hass, entry)
-    [device_id] = [
-        o["value"] for o in offered(result) if o["label"] == "Tumble dryer · WashData"
-    ]
-
-    result = await configure(hass, result, {"device": device_id})
-    result = await configure(
-        hass,
-        result,
-        {"optional_meter": "sensor.washdata_dryer_plug_energy", "price": 0.32},
-    )
-    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
-
-    [device] = (await panel.call("coinop/devices/list"))["devices"]
-    assert (device["name"], device["type"]) == ("Tumble dryer", "tumble_dryer")
-    await set_helper(hass, "input_number.washdata_dryer_energy", 20)
-    await set_helper(hass, "input_select.washdata_dryer_program", "Cotton dry")
-    await set_helper(hass, "input_select.washdata_dryer_status", "running")
-    await clock.advance(hours=1)
-    await set_helper(hass, "input_number.washdata_dryer_energy", 21.5)
-    await set_helper(hass, "input_select.washdata_dryer_status", "finished")
-    await clock.advance(minutes=10)
-
-    [run] = (await panel.call("coinop/runs/list"))["runs"]
-    assert (run["program"], run["outcome"]) == ("Cotton dry", "completed")
     run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
     [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
-    assert electricity["quantity"] == pytest.approx(1.5)
-
-
-@pytest.mark.usefixtures("helpers")
-@pytest.mark.parametrize("domain", ["miele", "home_connect"])
-async def test_two_pieces_of_an_account_integration_load_under_one_config_entry(
-    hass: HomeAssistant, hass_admin_user: MockUser, files: Path, domain: str
-) -> None:
-    pieces = [f"{domain}.washing_machine", f"{domain}.oven"]
-    await async_load(hass, {"pieces": pieces}, hass_admin_user)
-    await hass.async_block_till_done()
-
-    assert len(hass.config_entries.async_entries(domain)) == 1
-    [entry] = hass.config_entries.async_entries("coinop")
-    assert [o["label"] for o in offered(await open_add_device(hass, entry))] == [
-        *(APPLIANCES[piece][0] for piece in pieces),
-        "manual",
-    ]
-    assert all(hass.states.get(APPLIANCES[piece][5]) for piece in pieces)
+    assert electricity["quantity"] == pytest.approx(7)
 
 
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
@@ -992,7 +1026,10 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "home_connect": 1,
         "homeconnect_ws": 1,
         "home_connect_alt": 1,
+        "lg_thinq": 1,
+        "smartthings": 1,
         "tesla_wall_connector": 1,
+        **{piece.split(".")[0]: 1 for piece in EV_CHARGERS},
     }
     await async_load(hass, "quick-start", hass_admin_user)
     assert {d: len(hass.config_entries.async_entries(d)) for d in stand_ins} == (
@@ -1003,6 +1040,8 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
 
     assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
     assert not any(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
+    assert not any(hass.states.get(status) for *_, status, _, _ in APPLIANCES.values())
+    assert not any(hass.states.get(status) for _, status, _ in EV_CHARGER_DEVICES)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -1087,7 +1126,16 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Siemens oven · Home Connect",
         "Bosch Dishwasher · Home Connect Local",
         "Bosch washer · Home Connect Alt",
+        "WashTower washer · LG ThinQ",
+        "LG dishwasher · LG ThinQ",
+        "WashTower dryer · LG ThinQ",
+        "LG oven · LG ThinQ",
+        "Samsung washer · SmartThings",
+        "Samsung dishwasher · SmartThings",
+        "Samsung dryer · SmartThings",
+        "Samsung oven · SmartThings",
         "Tesla Wall Connector · Tesla Wall Connector",
+        *(label for label, _, _ in EV_CHARGER_DEVICES),
         "manual",
     ]
     result = await configure(hass, result, {"device": devices[label]})
@@ -1124,3 +1172,329 @@ async def set_state(hass: HomeAssistant, entity_id: str, value: str) -> None:
         value = dt_util.utcnow().isoformat()
     hass.states.async_set(entity_id, value, attributes)
     await hass.async_block_till_done()
+
+
+# The static stand-ins' appliance Pieces: the HA device's label in Quick Start, the
+# Device Type it is offered as, the plug Quick Start is answered with where the
+# integration brings no meter, the energy entity counting, its Status entity, and a
+# Status of a running and a finished cycle.
+APPLIANCES = {
+    "miele.washing_machine": (
+        "Miele washing machine · Miele",
+        "washing_machine",
+        None,
+        "sensor.miele_washing_machine_energy_consumption",
+        "sensor.miele_washing_machine_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.dishwasher": (
+        "Miele dishwasher · Miele",
+        "dishwasher",
+        None,
+        "sensor.miele_dishwasher_energy_consumption",
+        "sensor.miele_dishwasher_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.tumble_dryer": (
+        "Miele tumble dryer · Miele",
+        "tumble_dryer",
+        None,
+        "sensor.miele_tumble_dryer_energy_consumption",
+        "sensor.miele_tumble_dryer_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.coffee_machine": (
+        "Miele coffee system · Miele",
+        "coffee_machine",
+        "sensor.miele_coffee_system_plug_energy",
+        "input_number.miele_coffee_system_energy",
+        "sensor.miele_coffee_system_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.oven": (
+        "Miele oven · Miele",
+        "oven",
+        "sensor.miele_oven_plug_energy",
+        "input_number.miele_oven_energy",
+        "sensor.miele_oven_status",
+        "in_use",
+        "program_ended",
+    ),
+    "home_connect.washing_machine": (
+        "Siemens washer · Home Connect",
+        "washing_machine",
+        "sensor.siemens_washer_plug_energy",
+        "input_number.siemens_washer_energy",
+        "sensor.siemens_washer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.dishwasher": (
+        "Siemens dishwasher · Home Connect",
+        "dishwasher",
+        "sensor.siemens_dishwasher_plug_energy",
+        "input_number.siemens_dishwasher_energy",
+        "sensor.siemens_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.tumble_dryer": (
+        "Siemens dryer · Home Connect",
+        "tumble_dryer",
+        "sensor.siemens_dryer_plug_energy",
+        "input_number.siemens_dryer_energy",
+        "sensor.siemens_dryer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.coffee_machine": (
+        "Siemens coffee maker · Home Connect",
+        "coffee_machine",
+        "sensor.siemens_coffee_maker_plug_energy",
+        "input_number.siemens_coffee_maker_energy",
+        "sensor.siemens_coffee_maker_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.oven": (
+        "Siemens oven · Home Connect",
+        "oven",
+        "sensor.siemens_oven_plug_energy",
+        "input_number.siemens_oven_energy",
+        "sensor.siemens_oven_operation_state",
+        "run",
+        "finished",
+    ),
+    "homeconnect_ws.dishwasher": (
+        "Bosch Dishwasher · Home Connect Local",
+        "dishwasher",
+        "sensor.bosch_dishwasher_plug_energy",
+        "input_number.bosch_dishwasher_energy",
+        "sensor.bosch_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect_alt.washing_machine": (
+        "Bosch washer · Home Connect Alt",
+        "washing_machine",
+        "sensor.bosch_washer_plug_energy",
+        "input_number.bosch_washer_energy",
+        "sensor.bosch_washer_operation_state",
+        "BSH.Common.EnumType.OperationState.Run",
+        "BSH.Common.EnumType.OperationState.Finished",
+    ),
+    "lg_thinq.washing_machine": (
+        "WashTower washer · LG ThinQ",
+        "washing_machine",
+        "sensor.washtower_washer_plug_energy",
+        "input_number.washtower_washer_energy",
+        "sensor.washtower_washer_washer_current_state",
+        "running",
+        "end",
+    ),
+    "lg_thinq.dishwasher": (
+        "LG dishwasher · LG ThinQ",
+        "dishwasher",
+        "sensor.lg_dishwasher_plug_energy",
+        "input_number.lg_dishwasher_energy",
+        "sensor.lg_dishwasher_current_state",
+        "running",
+        "end",
+    ),
+    "lg_thinq.tumble_dryer": (
+        "WashTower dryer · LG ThinQ",
+        "tumble_dryer",
+        "sensor.washtower_dryer_plug_energy",
+        "input_number.washtower_dryer_energy",
+        "sensor.washtower_dryer_dryer_current_state",
+        "drying",
+        "end",
+    ),
+    "lg_thinq.oven": (
+        "LG oven · LG ThinQ",
+        "oven",
+        "sensor.lg_oven_plug_energy",
+        "input_number.lg_oven_energy",
+        "sensor.lg_oven_oven_current_state",
+        "cooking_in_progress",
+        "cook_complete",
+    ),
+    "smartthings.washing_machine": (
+        "Samsung washer · SmartThings",
+        "washing_machine",
+        None,
+        "sensor.samsung_washer_energy",
+        "sensor.samsung_washer_machine_state",
+        "run",
+        "stop",
+    ),
+    "smartthings.dishwasher": (
+        "Samsung dishwasher · SmartThings",
+        "dishwasher",
+        None,
+        "sensor.samsung_dishwasher_energy",
+        "sensor.samsung_dishwasher_machine_state",
+        "run",
+        "stop",
+    ),
+    "smartthings.tumble_dryer": (
+        "Samsung dryer · SmartThings",
+        "tumble_dryer",
+        None,
+        "sensor.samsung_dryer_energy",
+        "sensor.samsung_dryer_machine_state",
+        "run",
+        "stop",
+    ),
+    "smartthings.oven": (
+        "Samsung oven · SmartThings",
+        "oven",
+        None,
+        "sensor.samsung_oven_energy",
+        "sensor.samsung_oven_machine_state",
+        "running",
+        "ready",
+    ),
+}
+# The appliance Pieces of an integration that can't tell the kind.
+ASKS_DEVICE_TYPE = {"homeconnect_ws.dishwasher", "home_connect_alt.washing_machine"}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "label", "device_type", "meter", "energy", "status", "running", "end"),
+    [(piece, *row) for piece, row in APPLIANCES.items()],
+)
+async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_status(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+    piece: str,
+    label: str,
+    device_type: str,
+    meter: str | None,
+    energy: str,
+    status: str,
+    running: str,
+    end: str,
+) -> None:
+    """Quick Start asks for a meter only where the integration brings none, and for
+    the Device Type only where it can't tell the kind."""
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    assert [option["label"] for option in offered(result)] == [label, "manual"]
+    [device_id, _] = [option["value"] for option in offered(result)]
+
+    result = await configure(hass, result, {"device": device_id})
+    if piece in ASKS_DEVICE_TYPE:
+        assert result["step_id"] == "quick_start_device_type"
+        result = await configure(hass, result, {"device_type": device_type})
+    assert result["step_id"] == "quick_start_confirm"
+    assert ("optional_meter" in fields(result)) is (meter is not None)
+    answers = {"price": 0.32} | ({"optional_meter": meter} if meter else {})
+    result = await configure(hass, result, answers)
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert device["type"] == device_type
+    await set_energy(hass, energy, 100)
+    await set_state(hass, status, running)
+    await clock.advance(hours=1)
+    await set_energy(hass, energy, 101.2)
+    await set_state(hass, status, end)
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert run["outcome"] == "completed"
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(1.2)
+
+
+async def set_energy(hass: HomeAssistant, entity_id: str, value: float) -> None:
+    """A plug's helper, or the integration's own meter as set in the developer tools."""
+    if entity_id.startswith("input_number."):
+        await set_helper(hass, entity_id, value)
+    else:
+        await set_state(hass, entity_id, str(value))
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_dryer_washdata_follows_as_a_tumble_dryer(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, {"pieces": ["ha_washdata.tumble_dryer"]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    [device_id] = [
+        o["value"] for o in offered(result) if o["label"] == "Tumble dryer · WashData"
+    ]
+
+    result = await configure(hass, result, {"device": device_id})
+    result = await configure(
+        hass,
+        result,
+        {"optional_meter": "sensor.washdata_dryer_plug_energy", "price": 0.32},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert (device["name"], device["type"]) == ("Tumble dryer", "tumble_dryer")
+    await set_helper(hass, "input_number.washdata_dryer_energy", 20)
+    await set_helper(hass, "input_select.washdata_dryer_program", "Cotton dry")
+    await set_helper(hass, "input_select.washdata_dryer_status", "running")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.washdata_dryer_energy", 21.5)
+    await set_helper(hass, "input_select.washdata_dryer_status", "finished")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["program"], run["outcome"]) == ("Cotton dry", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(1.5)
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("domain", ["miele", "home_connect", "lg_thinq", "smartthings"])
+async def test_an_accounts_pieces_load_together_on_its_one_config_entry(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    domain: str,
+) -> None:
+    """Of LG ThinQ, a WashTower's two halves, each added as what it is."""
+    pieces = {p: row for p, row in APPLIANCES.items() if p.startswith(f"{domain}.")}
+    await async_load(hass, {"pieces": list(pieces)}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert len(hass.config_entries.async_entries(domain)) == 1
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    labels = [label for label, *_ in pieces.values()]
+    assert [option["label"] for option in offered(result)] == [*labels, "manual"]
+    for label, _, meter, *_ in pieces.values():
+        result = await open_add_device(hass, entry)
+        [device_id] = [o["value"] for o in offered(result) if o["label"] == label]
+        result = await configure(hass, result, {"device": device_id})
+        answers = {"price": 0.32} | ({"optional_meter": meter} if meter else {})
+        result = await configure(hass, result, answers)
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    devices = (await panel.call("coinop/devices/list"))["devices"]
+    assert sorted(device["type"] for device in devices) == sorted(
+        device_type for _, device_type, *_ in pieces.values()
+    )
