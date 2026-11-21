@@ -53,6 +53,18 @@ INTEGRATIONS = {
         appliances.DEVICE_TYPES,
         appliances.home_connect_kind,
     ),
+    "homeconnect_ws": Integration(
+        "Home Connect Local",
+        appliances.home_connect_local,
+        appliances.DEVICE_TYPES,
+        appliances.cant_tell,
+    ),
+    "home_connect_alt": Integration(
+        "Home Connect Alt",
+        appliances.home_connect_alt,
+        appliances.DEVICE_TYPES,
+        appliances.cant_tell,
+    ),
     # EV chargers
 }
 
