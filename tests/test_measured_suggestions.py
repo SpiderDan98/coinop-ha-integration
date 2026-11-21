@@ -95,6 +95,26 @@ async def test_a_program_suggests_the_mean_of_its_measured_completed_runs(
     }
 
 
+async def test_a_mean_of_under_a_litre_is_suggested_to_the_millilitre(
+    hass: HomeAssistant, clock: Clock, washer: ConfigSubentry, panel: PanelClient
+) -> None:
+    await load(hass, clock, "Espresso", kwh=0.012, litres=0.04)
+    await load(hass, clock, "Espresso", kwh=0.012, litres=0.05)
+    await load(hass, clock, "Eco 40-60", kwh=0.8, litres=40.12)
+    await load(hass, clock, "Eco 40-60", kwh=0.8, litres=40.14)
+
+    assert (await suggestions(panel, washer))["programs"] == {
+        "Espresso": {
+            "kwh": {"mean": 0.012, "runs": 2},
+            "litres": {"mean": 0.045, "runs": 2},
+        },
+        "Eco 40-60": {
+            "kwh": {"mean": 0.8, "runs": 2},
+            "litres": {"mean": 40.1, "runs": 2},
+        },
+    }
+
+
 async def test_default_sourced_values_are_left_out(
     hass: HomeAssistant,
     clock: Clock,
