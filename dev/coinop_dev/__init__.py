@@ -11,7 +11,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from custom_components.coinop.schema import vol
 
-from .scenarios import SCENARIOS, async_load
+from .scenarios import PRESETS, async_load
 
 DOMAIN = "coinop_dev"
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
@@ -34,7 +34,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             {
                 "scenarios": [
                     {"name": name, "title": s.title, "description": s.description}
-                    for name, s in SCENARIOS.items()
+                    for name, s in PRESETS.items()
                 ],
                 "current": loaded.get("scenario"),
             },
@@ -53,6 +53,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         DOMAIN,
         "load",
         load,
-        vol.Schema({vol.Required("scenario"): vol.In(list(SCENARIOS))}),
+        vol.Schema({vol.Required("scenario"): vol.In(list(PRESETS))}),
     )
     return True

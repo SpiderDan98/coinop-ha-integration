@@ -61,14 +61,14 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     [
         ("empty", (0, 0, 0, 0)),
         ("quick-start", (0, 0, 0, 0)),
-        ("few-runs", (1, 3, 7, 0)),
-        ("printing-now", (1, 3, 8, 1)),
-        ("two-printers", (2, 5, 60, 0)),
+        ("few-runs", (1, 8, 7, 0)),
+        ("printing-now", (1, 8, 8, 1)),
+        ("two-printers", (2, 8, 17, 0)),
         ("washing-machine", (1, 4, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
 )
-async def test_a_scenario_fills_coinop_from_scratch(
+async def test_a_preset_fills_coinop_from_scratch(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
@@ -81,6 +81,30 @@ async def test_a_scenario_fills_coinop_from_scratch(
 
     assert await counts(panel) == expected
     assert len(hass.config_entries.async_entries("coinop")) == 1
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "expected"),
+    [
+        ("prusa", (1, 8, 7, 0)),
+        ("bambu", (1, 8, 10, 0)),
+        ("washer", (1, 4, 10, 0)),
+        ("irrigation", (1, 0, 6, 0)),
+    ],
+)
+async def test_a_device_with_history_loads_alone(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    expected: tuple[int, int, int, int],
+) -> None:
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == expected
 
 
 @pytest.mark.usefixtures("helpers")
