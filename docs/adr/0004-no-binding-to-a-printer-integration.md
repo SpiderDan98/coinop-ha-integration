@@ -1,6 +1,6 @@
 # No binding to a specific printer integration
 
-Coin-op never depends on a particular printer integration. Each Device reads configurable Device Inputs (an entity, optionally one of its attributes), and an Integration Profile only pre-fills them when the printer's HA device belongs to a known integration domain. What is stored is the concrete entities and values the user confirmed, never a reference to the profile. v1 ships profiles for `anycubic` (chrisfore/anycubic_ha_local) and `anycubic_cloud` (Nino6689/hass-anycubic); every other printer, Moonraker/Rinkhals included, is mapped by hand. The same holds for washing machines: profiles are registered per integration, each with the Device Types it serves, and washing machines have profiles for `ha_washdata` (WashData), `miele` and `home_connect`.
+Coin-op never depends on a particular printer integration. Each Device reads configurable Device Inputs (an entity, optionally one of its attributes), and an Integration Profile only pre-fills them when the printer's HA device belongs to a known integration domain. What is stored is the concrete entities and values the user confirmed, never a reference to the profile. v1 ships profiles for `anycubic` (chrisfore/anycubic_ha_local) and `anycubic_cloud` (Nino6689/hass-anycubic); every other printer, Moonraker/Rinkhals included, is mapped by hand. The same holds for every other Device Type: profiles are registered per integration, each with the Device Types it serves and a kind check that tells which of them an HA device is. `ha_washdata` (WashData) serves washing machines, dishwashers, tumble dryers, coffee machines and ovens; `miele` and `home_connect` serve washing machines.
 
 ## Why
 
@@ -10,12 +10,13 @@ Coin-op never depends on a particular printer integration. Each Device reads con
 
 ## Quick Start
 
-Add Device first offers the HA devices of integrations with a profile that the profile finds a Status for (Quick Start). Picking one stores what the profile finds without walking its steps, and asks only for what no profile knows: the electricity meter, the electricity price and, for a washing machine, the water price.
+Add Device first offers the HA devices of integrations with a profile that the profile finds a Status for and whose kind is a Device Type or can't be told (Quick Start). Picking one stores what the profile finds without walking its steps, and asks only for what no profile knows: the Device Type where the kind can't be told, the electricity meter, the electricity price and, for a Device Type with water, the water price.
 
 - Walking every step is a lot at once for a user whose integration Coin-op already knows, and most of them accept every pre-filled step anyway.
-- What is stored is unchanged: the concrete entities and values, in the shape the steps write them, never a reference to the profile. Reconfigure and Detect again work on such a Device as on any other.
-- A wrong profile is no longer seen before it is stored. In exchange the second form lists the entities found, the manual way stays one choice away, and a Run that starts or ends wrongly is corrected in the reconfigure menu.
-- Nothing is guessed: a printer without a meter is sent to the manual way instead of getting an invented average power, and a meter whose unit is neither energy nor power is refused.
+- What is stored is unchanged: the Device Type's key and the concrete entities and values, in the shape the steps write them, never a reference to the profile or the kind it told. Reconfigure and Detect again work on such a Device as on any other.
+- A wrong profile is no longer seen before it is stored. In exchange the second form names the Device Type and lists the entities found, the manual way stays one choice away, and a Run that starts or ends wrongly is corrected in the reconfigure menu.
+- Nothing is guessed: a printer without a meter is sent to the manual way instead of getting an invented average power, a meter whose unit is neither energy nor power is refused, and a device whose kind its integration doesn't tell is asked its Device Type, among those the integration serves.
+- The kind check only chooses what Quick Start offers and as which Device Type. Manual setup and Detect again never ask it: the Device Type the user chose is trusted, and the profile pre-fills whenever the HA device's integration serves it. A kind told wrongly therefore never blocks a Device, and a Device Type fixed at Add Device is never second-guessed later.
 
 ## Consequences
 
@@ -23,4 +24,5 @@ Add Device first offers the HA devices of integrations with a profile that the p
 - When an integration renames or replaces entities, a Device keeps pointing at the old ones until the user runs "Detect again", which re-applies the profile to Status, mapping, job, images and Program and never touches the electricity or water source or their prices (a profile may pre-fill a meter in Add Device, as Miele's per-cycle energy and water sensors).
 - Coin-op takes nothing else from the integration: its live telemetry and its own cost sensors (hass-anycubic's job energy and cost) are ignored.
 - Adding a profile is a code change in `profiles.py`; nothing in the stored data needs migrating. Its devices then show up in Quick Start by themselves.
-- Miele and Home Connect register every appliance with the same Status entities, so Quick Start lists their ovens and dishwashers too; the user picks.
+- An integration that serves several Device Types registers every appliance with the same Status entities, so the profile alone can't tell a dishwasher from a washing machine. Its kind check tells them apart from what the integration itself registers (WashData: the kind the user picked, kept in its config entry), answers "can't tell" where that says nothing (WashData's generic kinds), and "not a Device" for what is no Device Type (WashData's pump), which Quick Start leaves out. This replaces the earlier rule that Quick Start lists every appliance and the user picks. An integration that changes how it registers the kind makes Quick Start ask or mis-tell, not existing Devices change.
+- Miele and Home Connect have no kind check of their own yet: Quick Start still lists all their appliances as washing machines, and the user picks.

@@ -1,8 +1,9 @@
 """Dev container only: a stand-in for WashData (3dg1luk43/ha_washdata).
 
-Its device and two sensors are registered the way WashData registers them, so
-Coin-op's Integration Profile finds them, and they follow the washing machine's
-helpers from the dev configuration.yaml.
+Each config entry is one device, as in WashData: its two sensors are registered
+the way WashData registers them, so Coin-op's Integration Profile finds them, and
+the entry's data keeps the kind picked for it, which tells Coin-op its Device Type.
+The sensors follow the helpers of that kind from the dev configuration.yaml.
 """
 
 from homeassistant.config_entries import ConfigEntry

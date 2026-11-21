@@ -82,10 +82,13 @@ async def test_add_device_texts_load_in_home_assistant(
     unnamed = translations[f"{prefix}.step.device_without_profile.description"]
     assert unnamed
     assert "{" not in unnamed
+    asked = translations[f"{prefix}.step.quick_start_device_type.description"]
+    assert all(placeholder in asked for placeholder in ("{device}", "{integration}"))
+    assert translations[f"{prefix}.step.quick_start_device_type.data.device_type"]
     confirm = translations[f"{prefix}.step.quick_start_confirm.description"]
     assert all(
         placeholder in confirm
-        for placeholder in ("{device}", "{integration}", "{inputs}")
+        for placeholder in ("{device}", "{device_type}", "{integration}", "{inputs}")
     )
 
 

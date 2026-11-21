@@ -30,7 +30,7 @@ _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 
 **Quick Start**:
-The short way through Add Device: the user picks an HA device of an integration with an Integration Profile, and the Device takes every Device Input the profile finds without showing its steps, asking only for the meter and the prices.
+The short way through Add Device: the user picks an HA device of an integration with an Integration Profile, and the Device takes the Device Type the integration says it is and every Device Input the profile finds without showing its steps, asking only for the meter and the prices, and for the Device Type where the integration doesn't say.
 _Avoid_: Wizard, auto-setup, express setup
 _German UI_: Schnellstart
 

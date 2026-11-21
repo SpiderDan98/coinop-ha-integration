@@ -50,20 +50,36 @@ def offered(result: Any) -> list[dict[str, str]]:
     return options
 
 
-async def pick(hass: HomeAssistant, entry: ConfigEntry, device_id: str) -> Any:
-    """Open Add Device and pick the HA device in Quick Start; returns its second form."""
+async def pick(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    device_id: str,
+    device_type: str | None = None,
+) -> Any:
+    """Open Add Device and pick the HA device in Quick Start; returns its second form.
+    `device_type` answers the Device Type step of a device whose kind can't be told."""
     result = await open_add_device(hass, entry)
     assert result["step_id"] == "quick_start"
     result = await configure(hass, result, {"device": device_id})
+    if device_type is not None:
+        assert result["step_id"] == "quick_start_device_type", result.get("errors")
+        result = await configure(hass, result, {"device_type": device_type})
     assert result["step_id"] == "quick_start_confirm", result.get("errors")
     return result
 
 
 async def quick_start(
-    hass: HomeAssistant, entry: ConfigEntry, device_id: str, **answers: Any
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    device_id: str,
+    device_type: str | None = None,
+    **answers: Any,
 ) -> dict[str, Any]:
-    """Add the HA device through Quick Start; returns the new Device's data."""
-    result = await configure(hass, await pick(hass, entry, device_id), answers)
+    """Add the HA device through Quick Start, as `device_type` if it is asked for;
+    returns the new Device's data."""
+    result = await configure(
+        hass, await pick(hass, entry, device_id, device_type), answers
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     return dict(list(entry.subentries.values())[-1].data)
 
@@ -99,6 +115,20 @@ async def test_quick_start_offers_the_devices_of_known_integrations(
         {"value": "manual", "label": "manual"},
     ]
     assert suggested(result, "device") == printer.device.id
+
+
+async def test_a_device_whose_status_entity_is_disabled_is_not_offered(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    washer = add_washdata(hass)
+    entity_registry.async_update_entity(
+        washer["washer_state"], disabled_by=er.RegistryEntryDisabler.USER
+    )
+    entry = await add_hub(hass)
+
+    result = await open_add_device(hass, entry)
+
+    assert result["step_id"] == "user"
 
 
 async def test_a_renamed_ha_device_is_offered_by_the_users_name(
@@ -137,6 +167,7 @@ async def test_quick_start_shows_what_the_profile_found(hass: HomeAssistant) -> 
 
     assert result["description_placeholders"] == {
         "device": "Washer",
+        "device_type": "Washing machine",
         "integration": "WashData",
         "inputs": f"- Washer State\n- {washer['washer_program']}",
         "currency": "EUR",
