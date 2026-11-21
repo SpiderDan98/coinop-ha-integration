@@ -103,6 +103,14 @@ Every integration in `INTEGRATIONS` needs a Quick Start Piece for each Device Ty
 
 Then give it its counts in `test_a_device_with_history_loads_alone` (an appliance also its Device Type, Line Items and Programs in `APPLIANCES_WITH_HISTORY`) and its title in `test_without_history_every_device_with_history_exists_without_a_run`, the helper states that end its open Run in `ENDS`, and update the counts of `test_all_pieces_load_together_with_their_shared_data_once`. Each Quick Start Piece's title is its Quick Start label, which the tests take from it, and its plug the template sensor of `dev/configuration.yaml` on one of its helpers (`plug` in the tests). A static printer also gets a row in `STATIC`: its Status entity and the states of a running and a finished print, from which `test_quick_start_adds_a_static_stand_ins_printer_run_through_its_status` adds it through Quick Start and runs it to its end. A static EV charger instead gets a row in `EV_CHARGERS`: each HA device Quick Start offers (its label, its Status entity and its counter) and the states of a charging and an unplugged car, from which `test_quick_start_adds_a_static_ev_charger_with_the_counter_it_brings` checks what Quick Start finds and `test_a_static_ev_chargers_charge_is_run_through_its_status` runs a charge. A Preset is an entry in `PRESETS` (and in `services.yaml`) with the Pieces it picks and the Options it doesn't leave at their defaults; no two Presets may have the same selection.
 
+### README screenshots
+
+```sh
+uv run scripts/screenshots.py [name ...]   # or: make screenshots
+```
+
+Takes the README's screenshots in the dev container (started for the run and stopped again if it wasn't running) and saves them to `docs/images/screenshots`: English, dark theme, HA's sidebar hidden, 1280×800 at 1.5× scale. `SHOTS` lists them by the Preset each needs, so each Preset is loaded once; names retake only those. It drives the installed Google Chrome through Playwright, which needs no browser download. Retake them when the panel changes visibly, and commit them with that change. The README links every image by its absolute `raw.githubusercontent.com` URL on `main`, since HACS shows the README without resolving relative paths; a new image shows there only once it is on `main`.
+
 ## Test
 
 ```sh

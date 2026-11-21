@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-label="Coin-op: what each Run of your household devices costs">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#138C7C"/>
+      <stop offset="1" stop-color="#0B5F54"/>
+    </linearGradient>
+    <clipPath id="slot">
+      <rect x="0" y="0" width="512" height="236"/>
+    </clipPath>
+    <g id="coin">
+      <circle r="74" fill="#F5A214"/>
+      <circle r="52" fill="none" stroke="#DE7E0B" stroke-width="10"/>
+    </g>
+  </defs>
+
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+
+  <g opacity="0.12">
+    <use href="#coin" transform="translate(1150 70) scale(0.9)"/>
+    <use href="#coin" transform="translate(1060 255) scale(0.55)"/>
+    <use href="#coin" transform="translate(1225 230) scale(0.4)"/>
+  </g>
+
+  <g transform="translate(100 60) scale(0.390625)">
+    <rect width="512" height="512" rx="104" fill="#0F7A6B" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="6"/>
+    <path d="M132 76 H380 Q392 76 392 88 V410 L370 438 L347 410 L324 438 L301 410 L278 438 L256 410 L234 438 L211 410 L188 438 L165 410 L142 438 L120 410 V88 Q120 76 132 76 Z" fill="#FFFFFF"/>
+    <g clip-path="url(#slot)"><use href="#coin" transform="translate(256 185)"/></g>
+    <rect x="158" y="228" width="196" height="16" rx="8" fill="#0F7A6B"/>
+    <rect x="168" y="296" width="176" height="16" rx="8" fill="#C5D6D1"/>
+    <rect x="168" y="336" width="116" height="16" rx="8" fill="#C5D6D1"/>
+    <rect x="306" y="333" width="38" height="22" rx="5" fill="#0F7A6B"/>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <text x="360" y="160" font-size="92" font-weight="700" fill="#FFFFFF" letter-spacing="-1">Coin-op</text>
+    <text x="364" y="212" font-size="30" fill="#D4EEE8">What each Run of your household devices costs</text>
+    <text x="364" y="258" font-size="22" font-weight="600" fill="#F5A214" letter-spacing="1">ELECTRICITY · WATER · MATERIAL · DETERGENT</text>
+  </g>
+</svg>

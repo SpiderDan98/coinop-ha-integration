@@ -1,6 +1,20 @@
-# Coin-op
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/banner.svg" alt="Coin-op" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/SpiderDan98/coinop-ha-integration/releases"><img src="https://img.shields.io/github/v/release/SpiderDan98/coinop-ha-integration?include_prereleases&sort=semver" alt="Release"></a>
+  <a href="https://github.com/SpiderDan98/coinop-ha-integration/actions/workflows/ci.yaml"><img src="https://github.com/SpiderDan98/coinop-ha-integration/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://hacs.xyz/docs/faq/custom_repositories"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FSpiderDan98%2Fcoinop-ha-integration%2Fmain%2Fhacs.json&query=%24.homeassistant&label=Home%20Assistant&suffix=%2B&color=41BDF5&logo=homeassistant&logoColor=white" alt="Minimum Home Assistant version">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/SpiderDan98/coinop-ha-integration" alt="License"></a>
+</p>
 
 A Home Assistant custom integration that records what each Run of your household devices costs, such as each print of a 3D printer or each program of a washing machine or dishwasher: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/overview.png" alt="The Coin-op panel's overview: cost this month and in total, cost per month, cost by Material and the most recent Runs" width="100%">
+</p>
 
 Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
 
@@ -15,6 +29,41 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
 - Coin-op ships further Device Types besides the 3D printer: each load of a washing machine or dishwasher is a Run with electricity, water and the detergent and other products dosed into it. A Device none of them fits, such as garden irrigation, a CNC router or a bread maker, is added as **Other**: you name its kind and pick what it has. See [Device Types](#device-types).
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/runs.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/runs.png" alt="The Runs gallery"></a>
+      <br><sub>Every Run as a tile, filtered by Device, month, outcome and Tag</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/run.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/run.png" alt="A 3D print's Run with its Line Items"></a>
+      <br><sub>A Run's Line Items, each correctable afterwards</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/washing-machine.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/washing-machine.png" alt="A washing machine's Run"></a>
+      <br><sub>A washing machine load: electricity, water and detergent</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/analysis.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/analysis.png" alt="The analysis page"></a>
+      <br><sub>Costs by kind, Material, Device and month</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png" alt="The Cost Statement dialog"></a>
+      <br><sub>A Cost Statement PDF of the selected Runs</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/quick-start.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/quick-start.png" alt="Quick Start in the Add Device dialog"></a>
+      <br><sub>Quick Start offers the devices of known integrations</sub>
+    </td>
+  </tr>
+</table>
 
 ## Device Types
 

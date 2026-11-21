@@ -18,9 +18,14 @@ lint = [
     "ruff==0.17.4",
     "mypy==2.4.1",
 ]
+# Drives the installed Chrome for scripts/screenshots.py, so needs no browser download.
+screenshots = [
+    "playwright==1.64.1",
+]
 dev = [
     { include-group = "test" },
     { include-group = "lint" },
+    { include-group = "screenshots" },
 ]
 
 [tool.uv]

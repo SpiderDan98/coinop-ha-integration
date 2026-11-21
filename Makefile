@@ -2,7 +2,7 @@
 SCENARIO ?= few-runs
 VERSION ?= 0.0.0
 
-.PHONY: build dev dev-build dev-restart dev-scenario dev-logs dev-down
+.PHONY: build dev dev-build dev-restart dev-scenario dev-logs dev-down screenshots
 
 # Build the panel and the release asset dist/coinop.zip with $(VERSION) as its version.
 build: frontend/node_modules/.package-lock.json
@@ -34,3 +34,7 @@ dev-logs:
 
 dev-down:
 	uv run scripts/devenv.py down
+
+# Retake the README's screenshots in the dev container.
+screenshots:
+	uv run scripts/screenshots.py
