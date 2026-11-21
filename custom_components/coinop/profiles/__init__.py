@@ -37,6 +37,9 @@ INTEGRATIONS = {
         printers.DEVICE_TYPES,
         printers.KIND,
     ),
+    "bambu_lab": Integration(
+        "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
+    ),
     # Appliances
     "ha_washdata": Integration(
         "WashData",
@@ -64,6 +67,18 @@ INTEGRATIONS = {
         appliances.home_connect_alt,
         appliances.DEVICE_TYPES,
         appliances.cant_tell,
+    ),
+    "lg_thinq": Integration(
+        "LG ThinQ",
+        appliances.lg_thinq,
+        appliances.LG_THINQ_DEVICE_TYPES,
+        appliances.lg_thinq_kind,
+    ),
+    "smartthings": Integration(
+        "SmartThings",
+        appliances.smartthings,
+        appliances.SMARTTHINGS_DEVICE_TYPES,
+        appliances.smartthings_kind,
     ),
     # EV chargers
     "tesla_wall_connector": Integration(

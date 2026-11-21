@@ -91,3 +91,33 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
     }
+
+
+def bambu_lab(find: Find) -> dict[str, Any]:
+    """greghesp/ha-bambulab: unique ids `<serial>_<key>`; an AMS is its own HA device."""
+    status = find("sensor", "_print_status")
+    job = find("sensor", "_subtask_name")
+    # The slicer's planned weight of the whole print, not a measured one.
+    weight = find("sensor", "_print_weight")
+    thumbnail = find("image", "_cover_image")
+    # Missing where the printer's camera is turned off or offered as an image.
+    camera = find("camera", "_camera")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                # Heating and levelling belong to the Run.
+                running=["running", "prepare"],
+                paused=["pause"],
+                finished=["finish"],
+                # A print stopped on the printer, or one that failed.
+                cancelled=["failed"],
+                ignored=["idle", "init", "slicing", "offline", "unknown"],
+            ),
+        ),
+        "job": found(job, entity_id=job, attribute=None)
+        | found(weight, material={"entity_id": weight, "attribute": None, "unit": "g"}),
+        "images": found(thumbnail, thumbnail=thumbnail)
+        | found(camera, camera=camera, snapshot=True),
+    }
