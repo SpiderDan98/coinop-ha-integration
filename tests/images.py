@@ -113,18 +113,26 @@ async def add_thumbnail(
 async def add_camera(
     hass: HomeAssistant, *answers: bytes, entity_id: str = CAMERA
 ) -> FakeCamera:
-    entity = FakeCamera(entity_id)
+    [entity] = await add_cameras(hass, entity_id)
     entity.answers = list(answers)
-    await _add(hass, "camera", entity)
     return entity
 
 
-async def _add(hass: HomeAssistant, domain: str, entity: ImageEntity | Camera) -> None:
+async def add_cameras(hass: HomeAssistant, *entity_ids: str) -> list[FakeCamera]:
+    """Several cameras at once, none with an answer yet."""
+    entities = [FakeCamera(entity_id) for entity_id in entity_ids]
+    await _add(hass, "camera", *entities)
+    return entities
+
+
+async def _add(
+    hass: HomeAssistant, domain: str, *entities: ImageEntity | Camera
+) -> None:
     async def setup_platform(
         hass: HomeAssistant, config: object, add_entities: object, info: object = None
     ) -> None:
         assert callable(add_entities)
-        add_entities([entity])
+        add_entities(list(entities))
 
     mock_platform(
         hass,

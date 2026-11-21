@@ -10,7 +10,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What it does
 
-- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the two Anycubic integrations that support the Kobra S1, the entities are filled in automatically.
+- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the two Anycubic integrations that support the Kobra S1, the entities are filled in automatically.
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
@@ -304,7 +304,7 @@ The step offers seven things to switch on. With nothing switched on, a Run recor
 | **Doses** | Nothing. You list the Doses on the Device's card in the panel's Devices tab | One Material Line Item per Dose it uses, with the amount from the Program Defaults or a stock input | None |
 | **Water** | The water source and the water price | A Water Line Item | The sensors **Water in Runs** (litres) and **Water cost**. `ended` carries the litres |
 | **Job and Material** | The Job & Material step: the job name, Material used, Slot and Loaded slot entities, each optional | Its name from the job, and a Material Line Item: measured by the Device, or left for you to fill in | The sensor **Material used** (grams). `ended` carries the grams |
-| **Images** | The Images step: a Thumbnail image entity, a camera, and whether to take a Snapshot | The Thumbnail while it is open and a Snapshot from the camera when it ends | None |
+| **Images** | The Images step: a Thumbnail image or camera entity, a camera, and whether to take a Snapshot | The Thumbnail while it is open (an image entity is copied whenever it changes, a camera is asked for its picture while the Run runs) and a Snapshot from the camera when it ends | None |
 | **Part Count** | Nothing | A Part Count, 1 until you change it on the Run, and with it a cost per part | No entity of its own. `ended` and Last Run cost carry the Part Count and the cost per part |
 | **Meters count each Run from 0** | Nothing | No meter reset Flag when a meter is back at 0 after its end, and no consumption gap Flag when a meter without a value starts it at 0. See [below](#meters-count-each-run-from-0) | None |
 
