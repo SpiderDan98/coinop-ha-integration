@@ -148,6 +148,50 @@ def prusalink(find: Find) -> dict[str, Any]:
     }
 
 
+def octoprint(find: Find) -> dict[str, Any]:
+    """HA core `octoprint`: unique ids `<Name>-<device id>`, the camera's the device id.
+
+    The separator belongs to the name, or `Current File` would match `Current File Size`.
+    """
+    status = find("sensor", "Current State-", start=True)
+    job = find("sensor", "Current File-", start=True)
+    # Its only camera, there while the webcam is enabled in OctoPrint.
+    camera = find("camera", "")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=[
+                    "printing",
+                    "printing_sd",
+                    "starting",
+                    "starting_sd",
+                    "resuming",
+                ],
+                paused=["pausing", "paused"],
+                # Only a print that completed passes through it, for a few seconds.
+                finished=["finishing"],
+                cancelled=["cancelling"],
+                ended=["operational"],
+                fault=["error", "offline_after_error"],
+                # Sending a file to the SD card is an upload, not a print.
+                ignored=[
+                    "open_serial",
+                    "detect_serial",
+                    "connecting",
+                    "offline",
+                    "starting_streaming",
+                    "printing_streaming",
+                    "transferring_file",
+                ],
+            ),
+        ),
+        "job": found(job, entity_id=job, attribute=None),
+        "images": found(camera, camera=camera, snapshot=True),
+    }
+
+
 def moonraker(find: Find) -> dict[str, Any]:
     """marcolivierarsenault/moonraker-home-assistant: unique ids `<entry id>_<key>`."""
     # The print's state, not the printer's own `state` (ready, shutdown and so on).

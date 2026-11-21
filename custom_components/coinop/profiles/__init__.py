@@ -43,6 +43,9 @@ INTEGRATIONS = {
     "prusalink": Integration(
         "PrusaLink", printers.prusalink, printers.DEVICE_TYPES, printers.KIND
     ),
+    "octoprint": Integration(
+        "OctoPrint", printers.octoprint, printers.DEVICE_TYPES, printers.KIND
+    ),
     "moonraker": Integration(
         "Moonraker", printers.moonraker, printers.DEVICE_TYPES, printers.KIND
     ),
@@ -162,17 +165,22 @@ def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> F
 
     def find(
         platform: str,
-        *suffixes: str,
+        *keys: str,
+        start: bool = False,
         disabled: bool = False,
         exclude: str | None = None,
     ) -> str | None:
         return next(
             (
                 entity.entity_id
-                for suffix in suffixes
+                for key in keys
                 for entity in candidates
                 if entity.domain == platform
-                and entity.unique_id.endswith(suffix)
+                and (
+                    entity.unique_id.startswith(key)
+                    if start
+                    else entity.unique_id.endswith(key)
+                )
                 and not (exclude and entity.unique_id.endswith(exclude))
                 and (disabled or not entity.disabled)
             ),
