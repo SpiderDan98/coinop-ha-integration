@@ -397,8 +397,7 @@ async def test_a_miele_dishwashers_per_cycle_counters_count_each_run_once(
     assert water(first)["quantity"] == pytest.approx(12)
     assert electricity(second)["quantity"] == pytest.approx(0.7)
     assert water(second)["quantity"] == pytest.approx(9.5)
-    # A counter still unknown as its Run opens flags a gap, as any meter's would.
-    assert "meter_reset" not in first["flags"] + second["flags"]
+    assert first["flags"] == second["flags"] == []
 
 
 HOME_CONNECT_MAPPING = {
