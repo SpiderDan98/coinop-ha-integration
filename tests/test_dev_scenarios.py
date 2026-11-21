@@ -63,6 +63,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
         ("printing-now", (1, 3, 8, 1)),
         ("two-printers", (2, 5, 60, 0)),
         ("washing-machine", (1, 4, 10, 0)),
+        ("irrigation", (1, 0, 6, 0)),
     ],
 )
 async def test_a_scenario_fills_coinop_from_scratch(
@@ -132,6 +133,33 @@ async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
         None,
     }
     assert any("ended_early_defaults" in run["flags"] for run in runs)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_irrigation_is_listed_under_its_type_name_and_costs_only_its_water(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, "irrigation", hass_admin_user)
+    await hass.async_block_till_done()
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert (device["type"], device["type_name"]) == ("other", "Irrigation")
+    assert device["ha_settings"]["consumption"] == {"source": "none"}
+    assert device["ha_settings"]["water"]["source"] == "meter"
+    runs = [
+        (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+        for run in (await panel.call("coinop/runs/list"))["runs"]
+    ]
+    assert {
+        (item["kind"], item["method"]) for run in runs for item in run["line_items"]
+    } == {("water", "measured")}
+    assert all(len(run["line_items"]) == 1 for run in runs)
+    assert sum(run["line_items"][0]["quantity"] for run in runs) == pytest.approx(
+        1207.5
+    )
+    assert all(run["finalised"] and run["total"] > 0 for run in runs)
+    assert {(run["outcome"], *run["flags"]) for run in runs} == {("completed",)}
+    assert hass.states.is_state("input_select.irrigation_status", "off")
 
 
 @pytest.mark.usefixtures("helpers")

@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from PIL import Image, ImageDraw
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
+from custom_components.coinop.device_config import chosen_capabilities
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
@@ -30,6 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
 WASHER = "washer"
 DISHWASHER = "dishwasher"
+IRRIGATION = "irrigation"
 # What each stand-in's config flow in dev/ is started with, per device it registers.
 STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
     "anycubic_cloud": (None,),
@@ -37,7 +39,8 @@ STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
 }
 KOBRA = "kobra"
 TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
-    WASHER: "Washing machine"
+    WASHER: "Washing machine",
+    IRRIGATION: "Garden valve",
 }
 
 MATERIALS = [
@@ -110,6 +113,15 @@ LOADS = [
     (6, "Cotton 60°", 0, 131, 1.09, 57.0, 77, "finished"),
     (3, "Eco 40-60", 0, 221, 0.74, 48.0, 74, "finished"),
     (1, "Wool", 0, 60, 0.41, 46.0, 39, "finished"),
+]
+# Days ago, hour it starts at, minutes, litres.
+WATERINGS = [
+    (12, 6, 20, 182.0),
+    (9, 6, 20, 176.5),
+    (6, 20, 35, 311.0),
+    (4, 6, 20, 180.5),
+    (2, 6, 25, 224.0),
+    (1, 20, 15, 133.5),
 ]
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
 
@@ -512,6 +524,39 @@ async def _washing(seed: Seed) -> None:
     await _async_set_appliance(seed.hass, WASHER, "off", "Wool")
 
 
+async def _irrigation(seed: Seed) -> None:
+    meter = {"irrigation_water": 48200.0}
+    for days, hour, minutes, litres in WATERINGS:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        end = start + timedelta(minutes=minutes)
+        await _replay_meters(seed.hass, meter, start)
+        await _replay(seed.hass, "input_select.irrigation_status", "watering", start)
+        meter["irrigation_water"] = round(meter["irrigation_water"] + litres, 1)
+        await _replay_meters(seed.hass, meter, end - timedelta(minutes=1))
+        await _replay(seed.hass, "input_select.irrigation_status", "off", end)
+        # A report after the end spares the wait for it.
+        await _replay_meters(seed.hass, meter, end + timedelta(minutes=1))
+    await seed.hass.services.async_call(
+        "input_number",
+        "set_value",
+        {
+            "entity_id": "input_number.irrigation_water",
+            "value": meter["irrigation_water"],
+        },
+        blocking=True,
+    )
+    await _async_close_valve(seed.hass)
+
+
+async def _async_close_valve(hass: HomeAssistant) -> None:
+    await hass.services.async_call(
+        "input_select",
+        "select_option",
+        {"entity_id": "input_select.irrigation_status", "option": "off"},
+        blocking=True,
+    )
+
+
 async def _replay_meters(
     hass: HomeAssistant, meters: dict[str, float], at: datetime
 ) -> None:
@@ -618,6 +663,14 @@ SCENARIOS = {
         (WASHER,),
         _washing,
     ),
+    "irrigation": Scenario(
+        "Irrigation (Other Device)",
+        'A garden valve under the Type Name "Irrigation": an Other Device with '
+        "water on a water meter and the electricity source None; 6 waterings over "
+        "two weeks, each costing only its water. Its helpers start the next one.",
+        (IRRIGATION,),
+        _irrigation,
+    ),
 }
 
 
@@ -625,6 +678,8 @@ def _device(key: str) -> dict[str, Any]:
     """The Device's subentry data, as Add Device writes it."""
     if key == WASHER:
         return _washer()
+    if key == IRRIGATION:
+        return _garden_valve()
     return {
         "device_type": "3d_printer",
         "printer_device_id": None,
@@ -691,6 +746,36 @@ def _washer() -> dict[str, Any]:
     }
 
 
+def _garden_valve() -> dict[str, Any]:
+    """A battery-driven valve: an Other Device that has water and no electricity."""
+    return {
+        "device_type": "other",
+        "type_name": "Irrigation",
+        "capabilities": sorted(c.value for c in chosen_capabilities(["water"])),
+        "printer_device_id": None,
+        "status": {"entity_id": "input_select.irrigation_status", "attribute": None},
+        "mapping": {
+            "running": ["watering"],
+            "paused": [],
+            "finished": ["off"],
+            "cancelled": [],
+            "ended": [],
+            "fault": [],
+            "ignored": [],
+        },
+        "consumption": {"source": "none"},
+        "water": {
+            "source": "meter",
+            "entity_id": "input_number.irrigation_water",
+            "attribute": None,
+            "unit": "L",
+            "factor": None,
+        },
+        # Per m³; garden water is billed without wastewater.
+        "water_price": {"source": "fixed", "value": 2.1},
+    }
+
+
 async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     """Replace whatever Coin-op holds by the Scenario `name`."""
     scenario = SCENARIOS[name]
@@ -706,6 +791,8 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     for key in (WASHER, DISHWASHER):
         if program := hass.states.get(f"input_select.{key}_program"):
             await _async_set_appliance(hass, key, "off", program.state)
+    if hass.states.get("input_select.irrigation_status"):
+        await _async_close_valve(hass)
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
     for key in scenario.devices:
