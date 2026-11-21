@@ -22,12 +22,18 @@ class Clock:
 
     async def advance(self, delta: timedelta | None = None, **kwargs: float) -> None:
         """Move forward by `delta` or `timedelta(**kwargs)`, e.g. `minutes=5`."""
+        await self._settle()
         self._freezer.tick(delta if delta is not None else timedelta(**kwargs))
         await self._fire()
 
     async def move_to(self, moment: datetime) -> None:
+        await self._settle()
         self._freezer.move_to(moment)
         await self._fire()
+
+    async def _settle(self) -> None:
+        # Older Home Assistant runs state listeners a loop iteration after the change.
+        await self._hass.async_block_till_done()
 
     async def _fire(self) -> None:
         async_fire_time_changed(self._hass)

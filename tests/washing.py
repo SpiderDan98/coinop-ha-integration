@@ -116,3 +116,5 @@ async def washed(
     await set_washer(hass, outcome)
     if kwh is not None:
         await set_energy(hass, start + kwh)
+    # Older Home Assistant needs a second pass for the Run event's listeners.
+    await hass.async_block_till_done()
