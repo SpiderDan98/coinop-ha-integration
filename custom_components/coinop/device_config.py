@@ -146,6 +146,8 @@ TYPE_KEYS = frozenset({"device_type", "type_name", "capabilities"})
 CHOICES = {
     "program": frozenset({Capability.PROGRAM, Capability.PROGRAM_CONSUMPTION}),
     "water": frozenset({Capability.WATER}),
+    "images": frozenset({Capability.IMAGES}),
+    "part_count": frozenset({Capability.PART_COUNT}),
     "per_run_meters": frozenset({Capability.PER_RUN_METERS}),
 }
 

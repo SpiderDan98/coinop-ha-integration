@@ -50,7 +50,7 @@ _Avoid_: Result, status (for the ending)
 _German UI_: Ausgang (Abgeschlossen, Abgebrochen, Fehlgeschlagen, Unbekannt)
 
 **Part Count**:
-The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of 3D printers have one.
+The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of a Device that has a Part Count have one: a 3D printer, or an Other Device it was picked for.
 _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 
@@ -70,7 +70,7 @@ _Avoid_: Warning, error, notice
 _German UI_: Hinweis
 
 **Thumbnail**:
-The preview image of the model a Run produces, taken from the Device's thumbnail.
+The preview image of what a Run produces, such as the model a 3D printer prints, taken from the Device's thumbnail.
 _Avoid_: Preview, model image
 _German UI_: Vorschaubild
 

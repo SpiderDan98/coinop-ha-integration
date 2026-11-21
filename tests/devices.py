@@ -199,16 +199,7 @@ async def add_device(
         assert result["step_id"] == "material_unit", result.get("errors")
         result = await configure(hass, result, {"unit": material_unit})
     assert result["step_id"] == "images", result.get("errors")
-    images = {
-        key: value
-        for key, value in (
-            ("thumbnail", thumbnail),
-            ("camera", camera),
-            ("snapshot", snapshot),
-        )
-        if value is not None
-    }
-    result = await configure(hass, result, images)
+    result = await configure(hass, result, images_input(thumbnail, camera, snapshot))
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     if source == "estimate":
@@ -324,6 +315,9 @@ async def add_other_device(
     has: Iterable[str] = (),
     device: str | None = None,
     mapping: dict[str, list[str]] = OTHER_MAPPING,
+    thumbnail: str | None = None,
+    camera: str | None = None,
+    snapshot: bool | None = None,
     program: dict[str, Any] | None = None,
     source: str = "estimate",
     meter: dict[str, Any] | None = None,
@@ -336,12 +330,13 @@ async def add_other_device(
     """Walk Add Device to the end for an Other Device with `type_name` that has the
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
 
-    With the choice "program", `program` is the Program step's input (no Program
-    input without it). `source` is "estimate" (from `running_power`), "energy" or
-    "power" (read from `meter`), "per_program" or "none", which takes no price.
-    With the choice "water", `water` is its source: "meter" or "flow" (read from
-    `water_meter`) or "none"; a fixed `water_price` is per m³. It fails on any step
-    beyond those the choices bring.
+    With "images" among `has`, `thumbnail`, `camera` and `snapshot` answer the images
+    step, each left as the step has it when not given. With the choice "program",
+    `program` is the Program step's input (no Program input without it). `source` is
+    "estimate" (from `running_power`), "energy" or "power" (read from `meter`),
+    "per_program" or "none", which takes no price. With the choice "water", `water`
+    is its source: "meter" or "flow" (read from `water_meter`) or "none"; a fixed
+    `water_price` is per m³. It fails on any step beyond those the choices bring.
     """
     has = list(has)
     result = await walk_to_mapping(
@@ -354,6 +349,11 @@ async def add_other_device(
         other=other_input(type_name, has),
     )
     result = await configure(hass, result, mapping)
+    if "images" in has:
+        assert result["step_id"] == "images", result.get("errors")
+        result = await configure(
+            hass, result, images_input(thumbnail, camera, snapshot)
+        )
     if "program" in has:
         assert result["step_id"] == "program", result.get("errors")
         result = await configure(hass, result, program or {})
@@ -454,6 +454,21 @@ async def add_washing_machine(
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+def images_input(
+    thumbnail: str | None, camera: str | None, snapshot: bool | None
+) -> dict[str, Any]:
+    """The images step's input; what is None is left as the step has it."""
+    return {
+        key: value
+        for key, value in (
+            ("thumbnail", thumbnail),
+            ("camera", camera),
+            ("snapshot", snapshot),
+        )
+        if value is not None
+    }
 
 
 def price_choice(price: float | dict[str, Any]) -> dict[str, str]:

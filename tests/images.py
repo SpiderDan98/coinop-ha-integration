@@ -60,13 +60,13 @@ def colour(data: bytes) -> str:
 
 
 class FakeThumbnail(ImageEntity):
-    """The printer integration's image entity: `show` a new picture, or none."""
+    """The image entity of the Device's integration: `show` a new picture, or none."""
 
     _attr_content_type = "image/jpeg"
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, entity_id: str) -> None:
         super().__init__(hass)
-        self.entity_id = THUMBNAIL
+        self.entity_id = entity_id
         self.content = b""
 
     async def async_image(self) -> bytes | None:
@@ -84,9 +84,9 @@ class FakeCamera(Camera):
 
     _attr_content_type = "image/jpeg"
 
-    def __init__(self) -> None:
+    def __init__(self, entity_id: str) -> None:
         super().__init__()
-        self.entity_id = CAMERA
+        self.entity_id = entity_id
         self.answers: list[bytes] = []
         self.requests = 0
 
@@ -99,8 +99,10 @@ class FakeCamera(Camera):
         return self.answers.pop(0)
 
 
-async def add_thumbnail(hass: HomeAssistant, content: bytes = b"") -> FakeThumbnail:
-    entity = FakeThumbnail(hass)
+async def add_thumbnail(
+    hass: HomeAssistant, content: bytes = b"", *, entity_id: str = THUMBNAIL
+) -> FakeThumbnail:
+    entity = FakeThumbnail(hass, entity_id)
     entity.content = content
     if content:
         entity._attr_image_last_updated = dt_util.utcnow()
@@ -108,8 +110,10 @@ async def add_thumbnail(hass: HomeAssistant, content: bytes = b"") -> FakeThumbn
     return entity
 
 
-async def add_camera(hass: HomeAssistant, *answers: bytes) -> FakeCamera:
-    entity = FakeCamera()
+async def add_camera(
+    hass: HomeAssistant, *answers: bytes, entity_id: str = CAMERA
+) -> FakeCamera:
+    entity = FakeCamera(entity_id)
     entity.answers = list(answers)
     await _add(hass, "camera", entity)
     return entity
