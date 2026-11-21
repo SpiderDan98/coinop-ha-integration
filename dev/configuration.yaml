@@ -226,6 +226,20 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
+  bosch_dishwasher_power:
+    name: Bosch Dishwasher power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  bosch_washer_power:
+    name: Bosch washer power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -329,6 +343,18 @@ template:
       - name: Siemens oven plug power
         unique_id: siemens_oven_plug_power
         state: "{{ states('input_number.siemens_oven_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Bosch Dishwasher plug power
+        unique_id: bosch_dishwasher_plug_power
+        state: "{{ states('input_number.bosch_dishwasher_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Bosch washer plug power
+        unique_id: bosch_washer_plug_power
+        state: "{{ states('input_number.bosch_washer_power') }}"
         unit_of_measurement: W
         device_class: power
         state_class: measurement

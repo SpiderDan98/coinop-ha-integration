@@ -187,9 +187,11 @@ async def test_a_device_with_history_loads_alone(
         ("ha_washdata.washing_machine", "Washing machine · WashData"),
         ("miele.washing_machine", "Miele washing machine · Miele"),
         ("home_connect.washing_machine", "Siemens washer · Home Connect"),
+        ("home_connect_alt.washing_machine", "Bosch washer · Home Connect Alt"),
         ("ha_washdata.dishwasher", "Dishwasher · WashData"),
         ("miele.dishwasher", "Miele dishwasher · Miele"),
         ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
+        ("homeconnect_ws.dishwasher", "Bosch Dishwasher · Home Connect Local"),
         ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
         ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
         ("miele.coffee_machine", "Miele coffee system · Miele"),
@@ -232,7 +234,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 22
+    assert len(offered(await open_add_device(hass, entry))) == 24
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
     assert all(hass.states.get(row[5]) for row in APPLIANCES.values())
@@ -423,11 +425,17 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "ha_washdata.washing_machine",
                 "miele.washing_machine",
                 "home_connect.washing_machine",
+                "home_connect_alt.washing_machine",
             ],
         ),
         (
             "dishwasher",
-            ["ha_washdata.dishwasher", "miele.dishwasher", "home_connect.dishwasher"],
+            [
+                "ha_washdata.dishwasher",
+                "miele.dishwasher",
+                "home_connect.dishwasher",
+                "homeconnect_ws.dishwasher",
+            ],
         ),
         ("tumble_dryer", ["miele.tumble_dryer", "home_connect.tumble_dryer"]),
         ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
@@ -467,9 +475,11 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "ha_washdata.washing_machine",
         "miele.washing_machine",
         "home_connect.washing_machine",
+        "home_connect_alt.washing_machine",
         "ha_washdata.dishwasher",
         "miele.dishwasher",
         "home_connect.dishwasher",
+        "homeconnect_ws.dishwasher",
         "miele.tumble_dryer",
         "home_connect.tumble_dryer",
         "miele.coffee_machine",
@@ -805,6 +815,26 @@ APPLIANCES: dict[str, tuple[str, str, bool, str | None, str | None, str, str, st
         "run",
         "finished",
     ),
+    "homeconnect_ws.dishwasher": (
+        "Bosch Dishwasher · Home Connect Local",
+        "dishwasher",
+        True,
+        "input_number.bosch_dishwasher_power",
+        "sensor.bosch_dishwasher_plug_power",
+        "sensor.bosch_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect_alt.washing_machine": (
+        "Bosch washer · Home Connect Alt",
+        "washing_machine",
+        True,
+        "input_number.bosch_washer_power",
+        "sensor.bosch_washer_plug_power",
+        "sensor.bosch_washer_operation_state",
+        "BSH.Common.EnumType.OperationState.Run",
+        "BSH.Common.EnumType.OperationState.Finished",
+    ),
 }
 
 
@@ -910,6 +940,8 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "ha_washdata": 2,
         "miele": 1,
         "home_connect": 1,
+        "homeconnect_ws": 1,
+        "home_connect_alt": 1,
         "tesla_wall_connector": 1,
     }
     await async_load(hass, "quick-start", hass_admin_user)
@@ -1002,6 +1034,8 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Siemens dryer · Home Connect",
         "Siemens coffee maker · Home Connect",
         "Siemens oven · Home Connect",
+        "Bosch Dishwasher · Home Connect Local",
+        "Bosch washer · Home Connect Alt",
         "Tesla Wall Connector · Tesla Wall Connector",
         "manual",
     ]

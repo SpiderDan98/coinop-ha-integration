@@ -857,6 +857,15 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_number.siemens_washer_power": 0},
         registration=partial(appliances.home_connect, "Washer", name="Siemens washer"),
     ),
+    "home_connect_alt.washing_machine": StaticPiece(
+        "washing_machine",
+        "Bosch washer · Home Connect Alt",
+        "A washer whose kind its integration doesn't tell, so Quick Start asks for "
+        "the Device Type, with its plug sensor as meter; set its operation state "
+        "(`BSH.Common.EnumType.OperationState.Run`) in the developer tools to run it.",
+        {"input_number.bosch_washer_power": 0},
+        registration=partial(appliances.home_connect_alt, name="Bosch washer"),
+    ),
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",
         "Dishwasher · WashData",
@@ -888,6 +897,15 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         registration=partial(
             appliances.home_connect, "Dishwasher", name="Siemens dishwasher"
         ),
+    ),
+    "homeconnect_ws.dishwasher": StaticPiece(
+        "dishwasher",
+        "Bosch Dishwasher · Home Connect Local",
+        "A dishwasher whose kind its integration doesn't tell, so Quick Start asks "
+        "for the Device Type, with its plug sensor as meter; set its operation state "
+        "in the developer tools to run it.",
+        {"input_number.bosch_dishwasher_power": 0},
+        registration=appliances.home_connect_local,
     ),
     "miele.tumble_dryer": StaticPiece(
         "tumble_dryer",

@@ -448,12 +448,14 @@ def home_connect_local(appliance_type: str = "Dishwasher") -> Registration:
     )
 
 
-def home_connect_alt(*, active_program: bool = True) -> Registration:
+def home_connect_alt(
+    *, active_program: bool = True, name: str = "Washer"
+) -> Registration:
     """ekutner/home-connect-hass (domain `home_connect_alt`): every appliance of an
     account on one config entry, unique ids `<haId>_<BSH key in lower case, dots as
-    underscores>`, the haId in lower case with underscores; a washer here. Its active
-    program sensor is registered only once the appliance has run a program while the
-    integration was loaded. Its states are the API's own."""
+    underscores>`, the haId in lower case with underscores; a washer named `name`
+    here. Its active program sensor is registered only once the appliance has run a
+    program while the integration was loaded. Its states are the API's own."""
     ha_id = "BOSCH-WAT28400-68A40E000000"
     safe_ha_id = ha_id.lower().replace("-", "_")
     program = HOME_CONNECT_PROGRAMS["Washer"]
@@ -487,14 +489,14 @@ def home_connect_alt(*, active_program: bool = True) -> Registration:
                     "identifiers": {("home_connect_alt", safe_ha_id)},
                     "manufacturer": "Bosch",
                     "model": "WAT28400",
-                    "name": "Washer",
+                    "name": name,
                 },
                 {
                     key: EntityShape(
                         platform,
                         f"{safe_ha_id}_{key.lower().replace('.', '_')}",
                         state=state,
-                        object_id=f"Washer {suffix}",
+                        object_id=f"{name} {suffix}",
                     )
                     for key, (platform, suffix, state) in keys.items()
                 },

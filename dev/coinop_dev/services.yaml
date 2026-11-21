@@ -37,9 +37,11 @@ load:
             - ha_washdata.washing_machine
             - miele.washing_machine
             - home_connect.washing_machine
+            - home_connect_alt.washing_machine
             - ha_washdata.dishwasher
             - miele.dishwasher
             - home_connect.dishwasher
+            - homeconnect_ws.dishwasher
             - miele.tumble_dryer
             - home_connect.tumble_dryer
             - miele.coffee_machine
