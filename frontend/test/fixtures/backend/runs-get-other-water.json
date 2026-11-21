@@ -1,0 +1,105 @@
+{
+  "run": {
+    "id": "watering",
+    "device_id": "device-garden-valve",
+    "device_name": "Garden valve",
+    "name": null,
+    "job_name": null,
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T10:30:00+00:00",
+    "ended": "2026-01-15T10:30:00+00:00",
+    "outcome": "unknown",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": null,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "none"
+        },
+        "cost_source": null,
+        "prices": []
+      },
+      "water": {
+        "source": {
+          "source": "meter",
+          "entity_id": "sensor.garden_valve_water",
+          "attribute": null,
+          "unit": "L",
+          "factor": null
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 4.0
+        },
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        null,
+        null
+      ]
+    ],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "watering-water",
+        "kind": "water",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 120.0,
+        "unit": "L",
+        "unit_price": 0.004,
+        "amount": 0.48,
+        "method": "measured",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T10:30:00+00:00",
+            "kwh": 120.0,
+            "unit_price": 0.004
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "program": null,
+    "running_seconds": 1800,
+    "total": 0.48,
+    "cost_per_part": null,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.0,
+      "water": 0.48,
+      "material": 0.0,
+      "other": 0.0
+    }
+  }
+}

@@ -45,6 +45,7 @@ from .test_other_images_and_parts import (
     add_kiln_preview,
 )
 from .test_other_programs import add_bread_maker, bake, set_bread_program
+from .test_other_water import add_irrigation, irrigate, set_valve_water
 from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
     add_spoolman_hub,
@@ -609,6 +610,29 @@ async def test_record_a_device_with_electricity_source_none(
     assert_recorded("devices-list-electricity-none", stable_ids(devices, ids))
     assert_recorded("runs-get-electricity-none", stable_ids(detail, ids))
     assert_recorded("line-items-add-electricity", stable_ids(added, ids))
+
+
+async def test_record_an_other_device_with_water_and_a_watering(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A garden valve under the Type Name "Irrigation": an Other Device that has water,
+    on a water meter and with the electricity source none; and a watering of 120 L."""
+    await set_valve_water(hass, 1000)
+    valve = await add_irrigation(hass)
+    await irrigate(hass, clock, start=1000, litres=120)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [water] = detail["run"]["line_items"]
+    ids = {
+        valve.subentry_id: "device-garden-valve",
+        run["id"]: "watering",
+        water["id"]: "watering-water",
+    }
+    assert_recorded("devices-list-other-water", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-water", stable_ids(detail, ids))
 
 
 async def test_record_a_dishwasher(

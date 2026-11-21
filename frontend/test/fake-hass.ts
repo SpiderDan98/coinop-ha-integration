@@ -33,6 +33,7 @@ import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.jso
 import devicesListOther from "./fixtures/backend/devices-list-other.json";
 import devicesListOtherImages from "./fixtures/backend/devices-list-other-images.json";
 import devicesListOtherProgram from "./fixtures/backend/devices-list-other-program.json";
+import devicesListOtherWater from "./fixtures/backend/devices-list-other-water.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
@@ -69,6 +70,7 @@ import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none
 import runsGetOther from "./fixtures/backend/runs-get-other.json";
 import runsGetOtherImages from "./fixtures/backend/runs-get-other-images.json";
 import runsGetOtherProgram from "./fixtures/backend/runs-get-other-program.json";
+import runsGetOtherWater from "./fixtures/backend/runs-get-other-water.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -243,6 +245,13 @@ export const recorded = {
   /** `coinop/line_items/add`: 0.4 kWh at 0.30 ("unpowered-electricity") added to it by
    * hand. */
   lineItemsAddElectricity: lineItemsAddElectricity as { run: RunDetail },
+  /** `coinop/devices/list` with only "device-garden-valve", an Other Device under the Type
+   * Name "Irrigation" that has water: on a water meter at 4.00 per m³, with the electricity
+   * source none. */
+  irrigation: devicesListOtherWater.devices[0] as Device,
+  /** `coinop/runs/get` of its unnamed Run "watering": 120 L measured at 4.00 per m³
+   * ("watering-water") and no Electricity Line Item; ended with Outcome Unknown. */
+  watering: runsGetOtherWater.run as RunDetail,
   /**
    * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
