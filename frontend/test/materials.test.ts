@@ -651,3 +651,140 @@ describe("Dishwasher products and beverage ingredients", () => {
     ]);
   });
 });
+
+describe("Materials of the form Other", () => {
+  const listed = [{ ...recorded.catalog.filled, materials: [recorded.otherMaterial] }];
+
+  it("are listed under the form Other", async () => {
+    const panel = await mountPanel(
+      catalogBackend().subscription(CATALOG, () => listed),
+      { path: "/materials" },
+    );
+
+    expect(rows(panel)).toEqual([
+      "Liquid fertiliser Other · Fertiliser 1.2 g/cm³ €6.00 / 500 ml €10.00 / kg",
+    ]);
+  });
+
+  it("name their form in German", async () => {
+    const panel = await mountPanel(
+      recordedBackend({ language: "de" }).subscription(CATALOG, () => listed),
+      { path: "/materials" },
+    );
+
+    expect(rows(panel).map((row) => row.split(" · ")[0])).toEqual(["Liquid fertiliser Sonstiges"]);
+  });
+
+  it.each(["g", "ml", "pcs"])("keep the pack unit %s when the form is picked", async (unit) => {
+    const panel = await mountPanel(catalogBackend(), { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+    await fill(panel, field(panel, "pack_unit"), unit);
+
+    await fill(panel, field(panel, "form"), "other");
+
+    expect((field(panel, "form") as HTMLSelectElement).value).toBe("other");
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe(unit);
+    expect(queryAll(panel, `${DIALOG} [name=diameter]`)).toHaveLength(0);
+  });
+
+  it.each([
+    ["g", 1.2],
+    ["ml", 1.2],
+    ["pcs", null],
+  ] as const)("are created by the %s with a density the user gives", async (unit, density) => {
+    const backend = catalogBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "form"), "other");
+    await fill(panel, field(panel, "pack_unit"), unit);
+    await fill(panel, field(panel, "name"), "Liquid fertiliser");
+    await fill(panel, field(panel, "type"), "Fertiliser");
+    const densities = queryAll(panel, `${DIALOG} [name=density]`) as HTMLInputElement[];
+    expect(densities.map((input) => input.value)).toEqual(density ? [""] : []);
+    for (const input of densities) await fill(panel, input, String(density));
+    await fill(panel, field(panel, "pack_price"), "6");
+    await fill(panel, field(panel, "pack_size"), "500");
+    await save(panel);
+
+    expect(backend.sent(CREATE)).toEqual([
+      {
+        type: CREATE,
+        material: {
+          name: "Liquid fertiliser",
+          form: "other",
+          type: "Fertiliser",
+          density,
+          vendor: null,
+          colour: null,
+          diameter: null,
+          default_for_type: false,
+          price: { source: "fixed", pack_price: 6, pack_size: 500, pack_unit: unit },
+        },
+      },
+    ]);
+  });
+
+  it("are suggested the types of their form's Materials and no built-in type", async () => {
+    const backend = catalogBackend().subscription(CATALOG, () => [
+      {
+        ...recorded.catalog.filled,
+        materials: [...recorded.catalog.filled.materials, recorded.otherMaterial],
+      },
+    ]);
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+    const suggested = () =>
+      queryAll(panel, `datalist#${field(panel, "type").getAttribute("list")} option`).map(
+        (option) => option.getAttribute("value"),
+      );
+    expect(suggested()).toEqual(expect.arrayContaining(["PLA", "Milk", "Fertiliser"]));
+
+    await fill(panel, field(panel, "form"), "other");
+
+    expect(suggested()).toEqual(["Fertiliser"]);
+  });
+
+  it("keep their form, pack unit and density when the type reads like a built-in one", async () => {
+    const panel = await mountPanel(catalogBackend(), { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+    await fill(panel, field(panel, "form"), "other");
+    await fill(panel, field(panel, "pack_unit"), "g");
+    await fill(panel, field(panel, "density"), "0.9");
+
+    await fill(panel, field(panel, "type"), "Milk");
+
+    expect((field(panel, "form") as HTMLSelectElement).value).toBe("other");
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe("g");
+    expect((field(panel, "density") as HTMLInputElement).value).toBe("0.9");
+  });
+
+  it("are edited to another pack unit", async () => {
+    const backend = catalogBackend().subscription(CATALOG, () => listed);
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "Liquid fertiliser"), "Edit"));
+
+    expect(queryAll(panel, `${DIALOG} [name=diameter]`)).toHaveLength(0);
+    await fill(panel, field(panel, "pack_unit"), "pcs");
+    await fill(panel, field(panel, "pack_size"), "20");
+    await save(panel);
+
+    expect(backend.sent(UPDATE)).toEqual([
+      {
+        type: UPDATE,
+        material_id: "material-fertiliser",
+        material: {
+          name: "Liquid fertiliser",
+          form: "other",
+          type: "Fertiliser",
+          density: null,
+          vendor: null,
+          colour: null,
+          diameter: null,
+          default_for_type: false,
+          price: { source: "fixed", pack_price: 6, pack_size: 20, pack_unit: "pcs" },
+        },
+      },
+    ]);
+  });
+});

@@ -55,6 +55,7 @@ import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateDishwasherAndBeverage from "./fixtures/backend/materials-create-dishwasher-and-beverage.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
+import materialsCreateOther from "./fixtures/backend/materials-create-other.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
@@ -253,6 +254,9 @@ export const recorded = {
   /** `coinop/materials/create` of "material-tabs" (60 pieces for 9.00) and
    * "material-beans" (1,000 g for 16.00), each answer's Material. */
   dishwasherAndBeverage: materialsCreateDishwasherAndBeverage as Material[],
+  /** `coinop/materials/create` of "material-fertiliser" (form Other, 500 ml for 6.00):
+   * the answer's Material. */
+  otherMaterial: materialsCreateOther as Material,
   material: (id: string) =>
     found(
       recorded.catalog.filled.materials.find((material) => material.id === id),

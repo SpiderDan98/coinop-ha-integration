@@ -465,6 +465,7 @@ export const MATERIAL_FORMS = [
   "laundry_additive",
   "dishwasher_product",
   "beverage_ingredient",
+  "other",
 ] as const;
 export type MaterialForm = (typeof MATERIAL_FORMS)[number];
 export const PACK_UNITS = ["g", "ml", "pcs"] as const;

@@ -641,3 +641,90 @@ async def test_built_in_dishwasher_and_beverage_types_pre_fill_form_density_and_
         "Ground coffee": ("beverage_ingredient", "g", 0.35),
         "Milk": ("beverage_ingredient", "ml", 1.03),
     }
+
+
+FERTILISER = {"name": "Liquid fertiliser", "form": "other", "type": "Fertiliser"}
+
+
+def pack(unit: str | None = None) -> dict[str, Any]:
+    """A pack of 20 for 6.00, in `unit` when one is named."""
+    price = {"source": "fixed", "pack_price": 6, "pack_size": 20}
+    return price | ({"pack_unit": unit} if unit else {})
+
+
+@pytest.mark.parametrize(
+    ("unit", "density", "per_gram", "per_piece"),
+    [("g", 1.25, 0.30, None), ("ml", 1.25, 0.24, None), ("pcs", None, None, 0.30)],
+)
+async def test_a_material_of_the_form_other_is_priced_in_the_pack_unit_picked(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    unit: str,
+    density: float | None,
+    per_gram: float | None,
+    per_piece: float | None,
+) -> None:
+    await add_hub(hass)
+
+    created = await create(
+        panel, **FERTILISER, density=density, diameter=1.75, price=pack(unit)
+    )
+
+    assert (created["form"], created["price"]["pack_unit"]) == ("other", unit)
+    assert created["price_per_gram"] == (per_gram and pytest.approx(per_gram))
+    assert created["price_per_piece"] == (per_piece and pytest.approx(per_piece))
+    assert (created["density"], created["diameter"]) == (density, None)
+    assert await materials(panel) == [created]
+
+
+async def test_a_material_of_the_form_other_is_edited_to_another_pack_unit(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+    by_weight = await create(panel, **FERTILISER, density=1.25, price=pack("g"))
+
+    async def edit(**changes: Any) -> dict[str, Any]:
+        result = await panel.call(
+            "coinop/materials/update", material_id=by_weight["id"], material=changes
+        )
+        edited: dict[str, Any] = result["material"]
+        return edited
+
+    by_piece = await edit(name="Fertiliser sticks", price=pack("pcs"))
+    by_volume = await edit(density=1.25, price=pack("ml"))
+
+    assert (by_piece["name"], by_piece["form"]) == ("Fertiliser sticks", "other")
+    assert (by_piece["price_per_piece"], by_piece["price_per_gram"]) == (
+        pytest.approx(0.30),
+        None,
+    )
+    assert (by_piece["density"], by_piece["diameter"]) == (None, None)
+    assert by_volume["price"]["pack_unit"] == "ml"
+    assert (by_volume["price_per_gram"], by_volume["price_per_piece"]) == (
+        pytest.approx(0.24),
+        None,
+    )
+    assert await materials(panel) == [by_volume]
+
+
+async def test_a_material_of_the_form_other_without_a_pack_unit_is_bought_by_the_gram(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    created = await create(panel, **FERTILISER, density=1.25, price=pack())
+
+    assert created["price"]["pack_unit"] == "g"
+    assert created["price_per_gram"] == pytest.approx(0.30)
+
+
+async def test_the_form_other_has_no_built_in_types(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    result = await panel.call("coinop/materials/types")
+
+    assert "other" not in {entry["form"] for entry in result["types"]}
+    assert "filament" in {entry["form"] for entry in result["types"]}

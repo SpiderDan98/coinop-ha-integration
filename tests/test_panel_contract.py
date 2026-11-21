@@ -1255,6 +1255,34 @@ async def test_record_dishwasher_and_beverage_materials(
     )
 
 
+async def test_record_a_material_of_the_form_other(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    result = await panel.call(
+        "coinop/materials/create",
+        material={
+            "name": "Liquid fertiliser",
+            "form": "other",
+            "type": "Fertiliser",
+            "density": 1.2,
+            "price": {
+                "source": "fixed",
+                "pack_price": 6,
+                "pack_size": 500,
+                "pack_unit": "ml",
+            },
+        },
+    )
+
+    material = result["material"]
+    assert_recorded(
+        "materials-create-other",
+        stable_ids(material, {material["id"]: "material-fertiliser"}),
+    )
+
+
 async def test_record_a_run_split_across_slots(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
