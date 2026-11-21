@@ -844,11 +844,12 @@ async def async_load(
 ) -> dict[str, Any]:
     """Replace whatever Coin-op holds by a Preset or a selection of Pieces; returns
     the selection loaded."""
+    preset: Preset | None = None
     if isinstance(choice, str):
-        preset: Preset | None = PRESETS[choice]
+        preset = PRESETS[choice]
         pieces = ordered(preset.pieces)
     else:
-        preset, pieces = None, ordered(choice["pieces"])
+        pieces = ordered(choice["pieces"])
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
