@@ -57,6 +57,12 @@ input_select:
   dryer_program:
     name: Heat pump dryer program
     options: [Cotton cupboard dry, Cotton iron dry, Synthetics, Wool finish]
+  coffee_status:
+    name: Espresso machine status
+    options: ["off", running, finished, cancelled]
+  coffee_program:
+    name: Espresso machine program
+    options: [Espresso, Lungo, Cappuccino, Latte macchiato]
   # The devices of the WashData stand-in in dev/ha_washdata.
   washdata_washer_status:
     name: WashData washing machine status

@@ -186,6 +186,39 @@ TYPICAL_TUMBLES = {
     "Wool finish": (12, 0.08),
 }
 DRYER_METERS = {"dryer_energy": 734.2}
+COFFEE_PRODUCTS = [
+    (
+        "Espresso beans Crema",
+        "Coffee beans",
+        "beverage_ingredient",
+        0.4,
+        "g",
+        14.99,
+        1000,
+    ),
+    ("Whole milk", "Milk", "beverage_ingredient", 1.03, "ml", 1.19, 1000),
+]
+# Electricity and water are per Program, so a drink counts on no meter.
+DRINKS = [
+    (10, 7, "Espresso", 0.4, "finished"),
+    (9, 8, "Cappuccino", 1.0, "finished"),
+    (8, 7, "Lungo", 0.8, "finished"),
+    (7, 15, "Espresso", 0.4, "finished"),
+    (6, 8, "Latte macchiato", 1.3, "finished"),
+    (5, 7, "Espresso", 0.2, "cancelled"),
+    (5, 15, "Cappuccino", 1.0, "finished"),
+    (4, 7, "Espresso", 0.4, "finished"),
+    (3, 8, "Lungo", 0.8, "finished"),
+    (2, 7, "Cappuccino", 1.0, "finished"),
+    (1, 7, "Latte macchiato", 1.3, "finished"),
+    (1, 15, "Espresso", 0.4, "finished"),
+]
+TYPICAL_DRINKS = {
+    "Espresso": (0.4,),
+    "Lungo": (0.8,),
+    "Cappuccino": (1.0,),
+    "Latte macchiato": (1.3,),
+}
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -365,6 +398,7 @@ SHARED: dict[str, Callable[[Seed], Awaitable[None]]] = {
     "laundry": partial(Seed.add_products, products=LAUNDRY),
     "dishwasher": partial(Seed.add_products, products=DISHWASHER_PRODUCTS),
     "dryer": partial(Seed.add_products, products=DRYER_PRODUCTS),
+    "coffee": partial(Seed.add_products, products=COFFEE_PRODUCTS),
     "tags": Seed.add_tags,
     "template": Seed.add_template,
 }
@@ -788,6 +822,15 @@ async def _dryer_short(seed: Seed) -> None:
 async def _dryer_long(seed: Seed) -> None:
     long = _years_of(seed, TYPICAL_TUMBLES, range(4, 11), (10, 11, 18))
     await _replay_cycles(seed, "dryer", DRYER_METERS, [*long, *TUMBLES])
+
+
+async def _coffee_short(seed: Seed) -> None:
+    await _replay_cycles(seed, "coffee", {}, DRINKS)
+
+
+async def _coffee_long(seed: Seed) -> None:
+    long = _years_of(seed, TYPICAL_DRINKS, range(3, 9), (7, 8, 15))
+    await _replay_cycles(seed, "coffee", {}, [*long, *DRINKS])
 
 
 async def _replay_meters(
@@ -1253,6 +1296,44 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
                         "doses": {"sheets": 1, "fragrance": 5},
                     },
                     "Wool finish": {"kwh": 0.08, "doses": {}},
+                },
+            },
+        ),
+    ),
+    "coffee": DeviceWithHistory(
+        "coffee_machine",
+        "Espresso machine",
+        "Electricity and water per Program, coffee beans and milk as Doses. Short "
+        "history: 12 drinks over ten days; long: a drink every few days for two years.",
+        {
+            "input_select.coffee_status": "off",
+            "input_select.coffee_program": "Espresso",
+        },
+        device=_appliance(
+            "coffee_machine", "coffee", metered=False, water="per_program"
+        ),
+        short=_coffee_short,
+        long=_coffee_long,
+        start=partial(_start_cycle, key="coffee", program="Cappuccino"),
+        needs=("coffee",),
+        setup=partial(
+            _set_doses,
+            device="coffee",
+            doses={"beans": "Espresso beans Crema", "milk": "Whole milk"},
+            defaults={
+                "default": {"kwh": 0.02, "litres": 0.125, "doses": {"beans": 8}},
+                "programs": {
+                    "Espresso": {"kwh": 0.012, "litres": 0.04, "doses": {"beans": 8}},
+                    "Cappuccino": {
+                        "kwh": 0.025,
+                        "litres": 0.06,
+                        "doses": {"beans": 9, "milk": 120},
+                    },
+                    "Latte macchiato": {
+                        "kwh": 0.03,
+                        "litres": 0.06,
+                        "doses": {"beans": 9, "milk": 180},
+                    },
                 },
             },
         ),
