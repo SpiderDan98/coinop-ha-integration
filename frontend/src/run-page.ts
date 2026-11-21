@@ -410,21 +410,29 @@ export class RunPage extends LitElement {
         : { invalid: ["quantity"] };
     }
     const { kind } = adding;
-    const priceless = typeof price !== "number" || (kind !== "other" && price < 0);
-    const invalid = [
-      ...((kind === "other" ? quantity !== null && !amount : !amount) ? ["quantity"] : []),
-      ...(priceless ? ["unit_price"] : []),
-    ];
-    if (invalid.length || typeof price !== "number" || quantity === undefined) return { invalid };
-    return kind === "other"
-      ? add({
-          kind,
-          label: adding.label.trim() || null,
-          quantity,
-          unit: adding.unit.trim(),
-          unit_price: price,
-        })
-      : add({ kind, quantity, unit_price: price / priceUnit(CONSUMED_UNITS[kind]).factor });
+    const priced = typeof price === "number";
+    const { valid, item } =
+      kind === "other"
+        ? {
+            valid: { quantity: quantity === null || amount, unit_price: priced },
+            item: (unit_price: number) => ({
+              kind,
+              label: adding.label.trim() || null,
+              quantity,
+              unit: adding.unit.trim(),
+              unit_price,
+            }),
+          }
+        : {
+            valid: { quantity: amount, unit_price: priced && price >= 0 },
+            item: (unit_price: number) => ({
+              kind,
+              quantity,
+              unit_price: unit_price / priceUnit(CONSUMED_UNITS[kind]).factor,
+            }),
+          };
+    const invalid = Object.entries(valid).flatMap(([name, ok]) => (ok ? [] : [name]));
+    return invalid.length || typeof price !== "number" ? { invalid } : add(item(price));
   }
 
   private saveNew(adding: ReturnType<typeof newItem>) {
