@@ -6,10 +6,13 @@ Detect again leaves alone like every meter.
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import device_registry as dr
+
 from custom_components.coinop.const import DEVICE_TYPE_EV_CHARGER
 from custom_components.coinop.device_config import ConsumptionSource
 
-from .base import Find, always, found, mapping
+from .base import Find, NoDeviceType, always, found, mapping
 
 DEVICE_TYPES = (DEVICE_TYPE_EV_CHARGER,)
 KIND = always(DEVICE_TYPE_EV_CHARGER)
@@ -112,3 +115,138 @@ def ocpp(find: Find) -> dict[str, Any]:
             session=".energy_session.sensor",
         ),
     }
+
+
+def easee(find: Find) -> dict[str, Any]:
+    """HACS `easee`: unique ids `<charger id>_<key>`.
+
+    Its states are `EASEE_STATUS` in its const.py; codes it doesn't know are
+    `unknown <code>`.
+    """
+    status = find("sensor", "_status")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["charging"],
+                paused=[
+                    "awaiting_start",
+                    "completed",
+                    "ready_to_charge",
+                    "awaiting_authorization",
+                    "de_authorizing",
+                    # Transitions with the car plugged in: the Run starts at `charging`.
+                    "start_charging",
+                    "stop_charging",
+                    "awaiting_load_balancing",
+                    "awaiting_smart_start",
+                    "awaiting_scheduled_start",
+                    "authenticating",
+                    "paused_due_to_equalizer",
+                ],
+                finished=["disconnected"],
+                fault=[
+                    "error",
+                    "erratic_ev",
+                    "error_temperature_too_high",
+                    "error_dead_powerboard",
+                    "error_overcurrent",
+                    "error_pen_fault",
+                ],
+                # They say nothing about the car.
+                ignored=["offline", "searching_for_master"],
+            ),
+        ),
+        "consumption": energy_meter(
+            find, lifetime="_lifetime_energy", session="_session_energy"
+        ),
+    }
+
+
+def zaptec(find: Find) -> dict[str, Any]:
+    """HACS `zaptec`: unique ids `<charger id>_<key>`.
+
+    Its states are the API's `ChargerOperationModes` in lower case; it has no fault
+    state. The signed meter value, registered only for a charger that reports it, is
+    published about hourly, so it comes after the session counter.
+    """
+    status = find("sensor", "_charger_operation_mode")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["connected_charging"],
+                paused=["connected_requesting", "connected_finished"],
+                finished=["disconnected"],
+                ignored=["unknown"],
+            ),
+        ),
+        "consumption": energy_meter(
+            find,
+            lifetime="_signed_meter_value_kwh",
+            session="_total_charge_power_session",
+            session_first=True,
+        ),
+    }
+
+
+def goe_mqtt(find: Find) -> dict[str, Any]:
+    """HACS `goecharger_mqtt`: unique ids `<serial>-<platform>-<key>-<attribute or 0>`.
+
+    Its car states are `_CODE_STATES["car"]` in its definitions/sensor.py.
+    """
+    status = find("sensor", "-sensor-car-car")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["charging"],
+                paused=["wait_for_car", "complete"],
+                finished=["idle"],
+                fault=["error", "unknown_error"],
+            ),
+        ),
+        "consumption": energy_meter(
+            find, lifetime="-sensor-eto-0", session="-sensor-wh-0"
+        ),
+    }
+
+
+def goe_api2(find: Find) -> dict[str, Any]:
+    """HACS `goecharger_api2`: unique ids `goecharger_api2.goe_<serial>_<key>`, or
+    `goe_wan_<serial>` in cloud mode.
+
+    Its car states are display texts from `TRANSLATIONS[...]["car"]` in its
+    pygoecharger_ha/const.py, in German where HA's language is `de`, else English.
+    """
+    status = find("sensor", "_car_value")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["Charging", "Laden"],
+                paused=[
+                    "Wait for car",
+                    "Warte auf Fahrzeug",
+                    "Complete",
+                    "Abgeschlossen",
+                ],
+                finished=["Idle", "Inaktiv/Frei"],
+                fault=["Error", "Fehler", "Unknown/Error", "Unbekannt/Fehler"],
+            ),
+        ),
+        "consumption": energy_meter(find, lifetime="_eto", session="_wh"),
+    }
+
+
+def zaptec_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """An installation finds its chargers' Status through them, but is none itself."""
+    if device.model == "Zaptec Installation":
+        return NoDeviceType.NOT_A_DEVICE
+    return DEVICE_TYPE_EV_CHARGER
