@@ -28,7 +28,7 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 | Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
 | Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
 | Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
-| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | no integration: set up manually |
+| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector](#ev-charger-integration-profiles) |
 | Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
 | Other | Its electricity and whatever you pick for it: a Program, Doses, water, a job with its Material, images, a Part Count. See [Other Devices](#other-devices) | no integration: set up manually |
 
@@ -60,11 +60,11 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 
 ## Quick Start
 
-If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [WashData, Miele and Home Connect](#washing-machine-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
+If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [WashData, Miele and Home Connect](#washing-machine-integration-profiles), [EV chargers](#ev-charger-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
 
 1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
 2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
-   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine, washer-dryer, dishwasher or tumble dryer brings its own meter and isn't asked.
+   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine, washer-dryer, dishwasher or tumble dryer and an EV charger with an energy counter bring their own meter and aren't asked.
    - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
    - for a Device Type with water (washing machine, dishwasher, coffee machine), optionally the **water price** per m³. With it, water comes from the Device's own meter or per Program from the Program Defaults; without it, no water is recorded.
 
@@ -231,7 +231,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ## EV chargers
 
-Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. No integration is pre-filled, so pick your charger's entities yourself.
+Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. For the integrations [below](#ev-charger-integration-profiles) every step is pre-filled; for any other charger, pick its entities yourself.
 
 - **Status**: the charger's status sensor. Map charging to Running, a car that is plugged in without charging (waiting, paused by load management or a solar surplus control, fully charged) to Paused, and the unplugged charger to Finished. The Run then lasts from the first charging until the car is unplugged, a break in charging doesn't split it, and its running time is the time the car really charged. To end the Run as soon as the car is full instead, map that value to Finished too.
 - **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger; [None](#electricity-source-none) follows its Runs without their electricity.
@@ -240,6 +240,19 @@ Choose **EV charger** as the Device Type when you add a Device. A charging sessi
 To tell cars apart, tag the Runs: set the usual car as the **Tags for new Runs** on the charger's card in the Devices tab and change the Tag on the Runs of another car. Automatic Line Item Templates work as for every Device. Filter the Runs tab by a Tag and select its Runs for a [Cost Statement](#cost-statement) of that car's Runs; it lists them without a Part Count.
 
 An EV charger's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count. A manual Run asks for its times and Outcome; its kWh come from recorder history when the meter covers the period, else you enter them.
+
+### EV charger Integration Profiles
+
+[Quick Start](#quick-start) offers the chargers of these integrations as EV chargers and asks for nothing but the electricity price. When you set one up manually as an EV charger and pick its Home Assistant device, the Status, its mapping and the electricity source are pre-filled. Check each step and change what you like.
+
+| Integration | Status | Electricity |
+|---|---|---|
+| [Tesla Wall Connector](https://www.home-assistant.io/integrations/tesla_wall_connector/) (`tesla_wall_connector`) | Status sensor | Energy sensor (lifetime), else Session energy sensor |
+
+- The mapping follows the advice above: charging (also at reduced current) is Running; a car that is plugged in without charging (connected, ready, negotiating, waiting for the car, charging finished) is Paused; the unplugged charger is Finished, and an error is a Fault, which gives the Run its Flag. Booting is ignored.
+- The electricity source is the charger's lifetime energy counter where the integration registers one and you haven't disabled it, else its session energy counter; with neither, Quick Start asks for a meter. The lifetime counter is preferred because it avoids the meter reset Flag a session counter can get.
+- The charger integration's own cost or price sensors are ignored: Coin-op computes every cost itself.
+- **Detect again** in the reconfigure menu re-applies the Status and the mapping, and leaves the electricity source and the price as they are.
 
 ## Robotic mowers
 

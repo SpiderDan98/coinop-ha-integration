@@ -16,7 +16,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from custom_components.coinop.quantities import ELECTRICITY, WATER
 
-from . import appliances, printers
+from . import appliances, ev_chargers, printers
 from .base import Find, Integration, NoDeviceType
 
 # Sections a profile pre-fills only in Add Device: Detect again leaves them alone.
@@ -54,6 +54,12 @@ INTEGRATIONS = {
         appliances.home_connect_kind,
     ),
     # EV chargers
+    "tesla_wall_connector": Integration(
+        "Tesla Wall Connector",
+        ev_chargers.tesla_wall_connector,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+    ),
 }
 
 

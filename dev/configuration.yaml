@@ -50,6 +50,10 @@ input_select:
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
+  # The Tesla Wall Connector's states, for the stand-in in dev/tesla_wall_connector.
+  wall_connector_status:
+    name: Wall Connector status
+    options: [not_connected, connected, charging, waiting_car, charging_finished, error]
 
 input_text:
   prusa_job:
@@ -102,6 +106,13 @@ input_number:
     step: 0.1
     mode: box
     unit_of_measurement: L
+  wall_connector_energy:
+    name: Wall Connector energy
+    min: 0
+    max: 1000000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
 
 # The metering plugs, which Quick Start offers as meters.
 template:

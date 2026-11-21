@@ -36,6 +36,7 @@ IRRIGATION = "irrigation"
 STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
     "anycubic_cloud": (None,),
     "ha_washdata": (None, {"name": "Dishwasher", "device_type": "dishwasher"}),
+    "tesla_wall_connector": (None,),
 }
 KOBRA = "kobra"
 TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
@@ -593,8 +594,8 @@ async def _nothing(seed: Seed) -> None:
 
 
 async def _quick_start(seed: Seed) -> None:
-    """A printer, a washing machine and a dishwasher of known integrations, for Add
-    Device's Quick Start to offer."""
+    """A printer, a washing machine, a dishwasher and an EV charger of known
+    integrations, for Add Device's Quick Start to offer."""
     for domain, devices in STAND_INS.items():
         for device in devices:
             await seed.hass.config_entries.flow.async_init(
@@ -614,10 +615,12 @@ SCENARIOS = {
     "empty": Scenario("Empty", "The hub without any Device.", (), _nothing),
     "quick-start": Scenario(
         "Quick Start",
-        "The hub without any Device, an Anycubic printer, and a washing machine and "
-        "a dishwasher WashData follows: Add Device offers all three in Quick Start, "
-        "each as its Device Type, with their plug sensors as meters. The Kobra's, "
-        "the washing machine's and the dishwasher's helpers run them.",
+        "The hub without any Device, an Anycubic printer, a washing machine and "
+        "a dishwasher WashData follows, and a Tesla Wall Connector: Add Device "
+        "offers all four in Quick Start, each as its Device Type, with their plug "
+        "sensors as meters and the Wall Connector with its own. The Kobra's, the "
+        "washing machine's, the dishwasher's and the Wall Connector's helpers run "
+        "them.",
         (),
         _quick_start,
     ),
