@@ -26,7 +26,9 @@ import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
+import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
+import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
@@ -50,6 +52,7 @@ import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
+import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
 import runsGetWater from "./fixtures/backend/runs-get-water.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -130,6 +133,15 @@ export const recorded = {
   /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
    * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
   dishwasher: devicesListDishwasher.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-wallbox", an EV charger on its session energy
+   * sensor; per-Run meters is its only Capability. */
+  wallbox: devicesListEvCharger.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-mower", a robotic mower (no Capability at all)
+   * on its charging station's energy meter, with charging mapped to Paused. */
+  mower: devicesListRoboticMower.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "mowing": 65 minutes of mowing, then 55 minutes paused
+   * while it charged 0.25 kWh at 0.30 ("mowing-electricity"); ended with Outcome Unknown. */
+  mowing: runsGetRoboticMower.run as RunDetail,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,

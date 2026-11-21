@@ -10,6 +10,8 @@ from homeassistant.config_entries import ConfigSubentry
 from .const import (
     DEVICE_TYPE_3D_PRINTER,
     DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_EV_CHARGER,
+    DEVICE_TYPE_ROBOTIC_MOWER,
     DEVICE_TYPE_WASHING_MACHINE,
 )
 
@@ -94,6 +96,9 @@ CAPABILITIES = {
             Capability.PER_RUN_METERS,
         }
     ),
+    # A session energy sensor starts each charging session from 0.
+    DEVICE_TYPE_EV_CHARGER: frozenset({Capability.PER_RUN_METERS}),
+    DEVICE_TYPE_ROBOTIC_MOWER: frozenset[Capability](),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

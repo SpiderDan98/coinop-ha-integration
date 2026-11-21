@@ -170,6 +170,27 @@ describe("Run page", () => {
     expect(text(query(panel, ".totals"))).toBe("Total €0.75");
   });
 
+  it("has no Program, Part Count or Water for a robotic mower's Run", async () => {
+    const backend = recordedBackend()
+      .reply("coinop/devices/list", () => ({ devices: [recorded.mower] }))
+      .reply(GET, () => ({ run: recorded.mowing }));
+
+    const panel = await mountPanel(backend, { path: "/run/mowing" });
+
+    expect(facts(panel)).not.toMatch(/Program|Part Count/);
+    expect(facts(panel)).toContain("Running time 1 h 5 min");
+    expect(cards(panel)).toEqual([
+      ["Electricity €0.08", "Measured by an energy meter 0.25 kWh × €0.30 = €0.08"],
+      ["Material €0.00"],
+      ["Other €0.00"],
+    ]);
+    await click(panel, query(panel, ".facts ha-icon-button.edit"));
+    expect(queryAll(panel, ".run-dialog [name=program], .run-dialog [name=part_count]")).toEqual(
+      [],
+    );
+    expect(text(query(panel, ".totals"))).toBe("Total €0.08");
+  });
+
   it("collapses to one column on narrow screens", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy", narrow: true });
 

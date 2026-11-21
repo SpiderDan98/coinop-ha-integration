@@ -36,6 +36,8 @@ from .stored import (
     stored_material,
     stored_run,
 )
+from .test_ev_chargers import add_charger
+from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
     add_spoolman_hub,
     filament,
@@ -681,6 +683,40 @@ async def test_record_washing_machine_runs_by_program(
     )
 
     assert_recorded("aggregates-by-program", runs | {"aggregates": [by_program]})
+
+
+async def test_record_a_robotic_mower_and_its_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A robotic mower, the Device Type without any Capability, and a mowing Run that
+    was paused while the mower charged."""
+    mower = await add_mower(hass)
+    await mow(hass, clock)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        mower.subentry_id: "device-mower",
+        run["id"]: "mowing",
+        electricity["id"]: "mowing-electricity",
+    }
+    assert_recorded("devices-list-robotic-mower", stable_ids(devices, ids))
+    assert_recorded("runs-get-robotic-mower", stable_ids(detail, ids))
+
+
+async def test_record_an_ev_charger(hass: HomeAssistant, panel: PanelClient) -> None:
+    """An EV charger on its session energy sensor."""
+    charger = await add_charger(hass)
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-ev-charger",
+        stable_ids(devices, {charger.subentry_id: "device-wallbox"}),
+    )
 
 
 async def test_record_what_the_image_commands_answer(
