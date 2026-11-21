@@ -51,6 +51,12 @@ input_select:
   dishwasher_program:
     name: Dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  kitchen_oven_status:
+    name: Kitchen oven status
+    options: ["off", running, paused, finished, cancelled]
+  kitchen_oven_program:
+    name: Kitchen oven program
+    options: ["Fan plus 180°", "Top/bottom heat 200°", Grill, "Pizza 220°"]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]

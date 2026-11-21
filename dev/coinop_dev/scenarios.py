@@ -121,6 +121,25 @@ WATERINGS = [
     (2, 6, 25, 224.0),
     (1, 20, 15, 133.5),
 ]
+# Days ago, hour it starts at, Program (None: never recognised), minutes, Outcome.
+COOKINGS = [
+    (27, 18, "Fan plus 180°", 55, "finished"),
+    (24, 12, "Pizza 220°", 25, "finished"),
+    (21, 18, "Top/bottom heat 200°", 70, "finished"),
+    (18, 19, None, 40, "finished"),
+    (15, 17, "Fan plus 180°", 90, "finished"),
+    (12, 18, "Grill", 20, "cancelled"),
+    (9, 13, "Fan plus 180°", 45, "finished"),
+    (6, 19, "Pizza 220°", 22, "finished"),
+    (4, 18, "Top/bottom heat 200°", 65, "finished"),
+    (1, 18, "Grill", 30, "finished"),
+]
+OVEN_PROGRAMS = {
+    "Fan plus 180°": 1.1,
+    "Top/bottom heat 200°": 1.4,
+    "Grill": 0.9,
+    "Pizza 220°": 0.8,
+}
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -582,6 +601,63 @@ async def _washer_start(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.washer_status", "running")
 
 
+async def _oven_settings(seed: Seed) -> None:
+    await seed.api.call(
+        "coinop/devices/update_settings",
+        device_id=seed.devices["oven"],
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}, "kwh": 1.0},
+                "programs": {
+                    program: {"doses": {}, "kwh": kwh}
+                    for program, kwh in OVEN_PROGRAMS.items()
+                },
+            }
+        },
+    )
+
+
+async def _oven_short(seed: Seed) -> None:
+    await _cook(seed, COOKINGS)
+
+
+async def _oven_long(seed: Seed) -> None:
+    """A meal every few days for two years, then the short level's."""
+    rng = seed.random
+    cookings, day = [], 730
+    while day > 30:
+        outcome = rng.choices(["finished", "cancelled"], [96, 4])[0]
+        cookings.append(
+            (
+                day,
+                rng.choice([12, 13, 17, 18, 19]),
+                rng.choice([*OVEN_PROGRAMS, None]),
+                rng.randrange(20, 95, 5),
+                outcome,
+            )
+        )
+        day -= rng.randrange(3, 10)
+    await _cook(seed, [*cookings, *COOKINGS])
+
+
+async def _cook(seed: Seed, cookings: list[tuple[Any, ...]]) -> None:
+    for days, hour, program, minutes, outcome in cookings:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay(
+            seed.hass, "input_select.kitchen_oven_program", program or "", start
+        )
+        await _replay(seed.hass, "input_select.kitchen_oven_status", "running", start)
+        end = start + timedelta(minutes=minutes)
+        await _replay(seed.hass, "input_select.kitchen_oven_status", outcome, end)
+    await _async_set(seed.hass, "input_select.kitchen_oven_program", "Fan plus 180°")
+    await _async_set(seed.hass, "input_select.kitchen_oven_status", "off")
+
+
+async def _oven_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.kitchen_oven_program", "Pizza 220°")
+    await _async_set(seed.hass, "input_select.kitchen_oven_status", "running")
+
+
 async def _irrigation_short(seed: Seed) -> None:
     await _water(seed, WATERINGS)
 
@@ -711,6 +787,30 @@ def _washer() -> dict[str, Any]:
         },
         # Per m³, wastewater included.
         "water_price": {"source": "fixed", "value": 4.2},
+    }
+
+
+def _oven() -> dict[str, Any]:
+    """An oven without a meter: its electricity comes from its Program Defaults."""
+    return {
+        "device_type": "oven",
+        "printer_device_id": None,
+        "status": {"entity_id": "input_select.kitchen_oven_status", "attribute": None},
+        "mapping": {
+            "running": ["running"],
+            "paused": ["paused"],
+            "finished": ["finished"],
+            "cancelled": ["cancelled"],
+            "ended": [],
+            "fault": [],
+            "ignored": ["off"],
+        },
+        "program": {
+            "entity_id": "input_select.kitchen_oven_program",
+            "attribute": None,
+        },
+        "consumption": {"source": "per_program"},
+        "price": {"source": "fixed", "value": 0.32},
     }
 
 
@@ -948,6 +1048,19 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_select.dishwasher_status": "off"},
         domain="ha_washdata",
         data={"name": "Dishwasher", "device_type": "dishwasher"},
+    ),
+    "oven": DeviceWithHistory(
+        "oven",
+        "Kitchen oven",
+        "A Program input and electricity from Program Defaults, without a meter. "
+        "Short history: 10 meals over four weeks; long: a meal every few days for "
+        "two years.",
+        {"input_select.kitchen_oven_status": "off"},
+        device=_oven(),
+        short=_oven_short,
+        long=_oven_long,
+        start=_oven_start,
+        setup=_oven_settings,
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
