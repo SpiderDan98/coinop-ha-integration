@@ -1,0 +1,85 @@
+name: Integration missing
+description: Ask for an Integration Profile so Quick Start offers your device and fills in its entities.
+title: "Integration Profile: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Coin-op works with any integration whose device has a status entity: until a profile exists, set the Device up manually by picking its entities yourself. A profile lets Quick Start offer the device and fill them in.
+
+        Please check [Supported integrations](https://github.com/SpiderDan98/coinop-ha-integration/blob/main/docs/supported-integrations.md) first: if your integration is listed but your device isn't offered, see [Why isn't my device offered?](https://github.com/SpiderDan98/coinop-ha-integration/blob/main/docs/supported-integrations.md#why-isnt-my-device-offered) or open a bug report.
+  - type: input
+    id: integration
+    attributes:
+      label: Integration
+      description: Its name and domain.
+      placeholder: e.g. PrusaLink (prusalink)
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Its Home Assistant docs page or repository.
+      placeholder: https://www.home-assistant.io/integrations/... or https://github.com/...
+    validations:
+      required: true
+  - type: dropdown
+    id: device-type
+    attributes:
+      label: Device Type
+      description: What Coin-op should add the device as.
+      options:
+        - 3D printer
+        - Washing machine
+        - Dishwasher
+        - Tumble dryer
+        - Coffee machine
+        - Oven
+        - EV charger
+        - Robotic mower
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Device model
+      placeholder: e.g. Prusa MK4S
+  - type: textarea
+    id: status
+    attributes:
+      label: Status entity and its states
+      description: |
+        The entity that tells whether the device is running, and the states it goes through during one job, program or charge (Developer tools > States). Include what it shows when idle, running, finished, paused, cancelled and on error, as far as you know.
+      placeholder: |
+        sensor.mk4s_status
+        idle -> printing -> finished
+        paused while paused, error on failure
+    validations:
+      required: true
+  - type: textarea
+    id: entities
+    attributes:
+      label: Other entities of the device
+      description: |
+        Every other entity the integration creates for the device, with an example state and unit. Coin-op can use energy or power, water, job or program name, material used, loaded slots, thumbnail or camera, progress and similar.
+      placeholder: |
+        sensor.mk4s_job_name: benchy.gcode
+        sensor.mk4s_material: PLA
+        camera.mk4s_preview
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: manual
+    attributes:
+      label: Manual setup
+      options:
+        - label: I set this device up manually in Coin-op and its Runs are recorded correctly.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Quirks of the integration, such as states that flicker, entities that are only present during a run, or one config entry for several devices.

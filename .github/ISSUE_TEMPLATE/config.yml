@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/SpiderDan98/coinop-ha-integration#readme
+    about: How to set up Devices, Runs, Line Items and everything else.
+  - name: Supported integrations
+    url: https://github.com/SpiderDan98/coinop-ha-integration/blob/main/docs/supported-integrations.md
+    about: Which integrations Quick Start knows and why a device may not be offered.

@@ -113,4 +113,4 @@ When nothing is left to offer, Quick Start says whether it found no device of th
 
 ## Integration missing?
 
-If your device's integration isn't on this page, set the Device up manually by picking its entities yourself. To ask for an Integration Profile, [open an issue](https://github.com/SpiderDan98/coinop-ha-integration/issues/new) with the integration's name, a link to it and the entities it creates for your device.
+If your device's integration isn't on this page, set the Device up manually by picking its entities yourself. To ask for an Integration Profile, [open an "Integration missing" issue](https://github.com/SpiderDan98/coinop-ha-integration/issues/new?template=integration_profile.yml) with the integration's name, a link to it and the entities it creates for your device.

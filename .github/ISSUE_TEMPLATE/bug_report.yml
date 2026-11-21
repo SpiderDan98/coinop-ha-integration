@@ -1,0 +1,99 @@
+name: Bug report
+description: Something in Coin-op doesn't work as described.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check the [README](https://github.com/SpiderDan98/coinop-ha-integration#readme) first: it describes how Coin-op is meant to behave.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a washing machine via Quick Start
+        2. Start a program
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Add Device / Quick Start / reconfigure
+        - Runs (opening, closing, live cost)
+        - Line Items / costs
+        - Sidebar panel
+        - Sensors / Run event
+        - Materials / Spoolman
+        - Cost Statement (PDF)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: device-type
+    attributes:
+      label: Device Type
+      description: The Device Type of the affected Device, if any.
+      options:
+        - Not Device-specific
+        - 3D printer
+        - Washing machine
+        - Dishwasher
+        - Tumble dryer
+        - Coffee machine
+        - Oven
+        - EV charger
+        - Robotic mower
+        - Other
+  - type: input
+    id: device-integration
+    attributes:
+      label: Device's integration
+      description: The integration that provides the device's entities, and whether it was set up via Quick Start or manually.
+      placeholder: e.g. Bambu Lab, Quick Start
+  - type: input
+    id: coinop-version
+    attributes:
+      label: Coin-op version
+      placeholder: e.g. 0.4.0
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      description: Settings > About.
+      placeholder: e.g. 2026.11.2
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Installed through
+      options:
+        - HACS
+        - Marketplace
+        - Manually
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Errors or warnings from Coin-op (Settings > System > Logs). For more detail, enable debug logging on the Coin-op integration page, reproduce the issue and paste the downloaded log here.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, the states of the entities involved (Developer tools > States), ...

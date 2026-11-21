@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest something Coin-op should do, such as a new Device Type or cost kind.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The situation or problem, not the solution yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Coin-op help?
+      description: What you imagine Coin-op doing, in the panel, Add Device, sensors or elsewhere.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today instead?
+      description: Workarounds you use, such as manual Line Items or templates.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
