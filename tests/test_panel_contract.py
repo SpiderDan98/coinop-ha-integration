@@ -552,8 +552,8 @@ async def test_record_a_dishwasher(
         hass_storage,
         stored_material(
             "material-tabs",
-            name="Dishwasher tabs",
-            form="detergent",
+            name="All-in-one tabs",
+            form="dishwasher_product",
             type="Dishwasher tabs",
             density=None,
             diameter=None,

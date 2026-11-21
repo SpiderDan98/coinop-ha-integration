@@ -33,7 +33,7 @@ from .websocket import PanelClient
 # 0.15 per tab, 0.005 per ml.
 TABS = stored_material(
     "tabs",
-    form="detergent",
+    form="dishwasher_product",
     type="Dishwasher tabs",
     density=None,
     diameter=None,
@@ -46,9 +46,9 @@ TABS = stored_material(
 )
 RINSE_AID = stored_material(
     "rinse-aid",
-    form="laundry_additive",
+    form="dishwasher_product",
     type="Rinse aid",
-    density=1.0,
+    density=1.02,
     diameter=None,
     price={
         "source": "fixed",

@@ -361,12 +361,10 @@ describe("Devices tab", () => {
   });
 
   it("shows a dishwasher with a washing machine's parts", async () => {
-    const [, pods] = recorded.laundry;
-    const tabs = { ...pods, id: "material-tabs", name: "Dishwasher tabs" };
     const backend = recordedBackend()
       .reply(LIST, () => ({ devices: [recorded.dishwasher] }))
       .subscription("coinop/catalog/subscribe", () => [
-        { ...recorded.catalog.filled, materials: [tabs] },
+        { ...recorded.catalog.filled, materials: recorded.dishwasherAndBeverage },
       ]);
 
     const panel = await mountPanel(backend, { path: "/devices" });
@@ -380,7 +378,7 @@ describe("Devices tab", () => {
         "Water source Per Program (litres in the Program Defaults) " +
         "Water price €4.00 per m³ " +
         "Reconfigure in Home Assistant " +
-        "Doses Dishwasher tabs 1 pcs " +
+        "Doses All-in-one tabs 1 pcs " +
         "Program rows Eco 50° " +
         "Tags for new Runs None " +
         "Automatic templates None",

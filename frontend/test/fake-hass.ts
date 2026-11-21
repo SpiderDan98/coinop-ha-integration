@@ -128,7 +128,7 @@ export const recorded = {
   /** `coinop/devices/list` with only "device-washer", a washing machine on an energy meter. */
   washer: devicesListWashingMachine.devices[0] as Device,
   /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
-   * with water per Program, dosing one of "material-tabs" (not in a recorded catalogue). */
+   * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
   dishwasher: devicesListDishwasher.devices[0] as Device,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
