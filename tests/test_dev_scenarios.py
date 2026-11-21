@@ -2,26 +2,42 @@
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
+from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import Context, HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 from homeassistant.setup import async_setup_component
 from homeassistant.util.yaml import load_yaml_dict
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
+import custom_components
 from dev.coinop_dev import async_setup
 from dev.coinop_dev.scenarios import async_load
 
+from .clock import Clock
+from .devices import configure
+from .test_quick_start import offered
 from .websocket import PanelClient
 
-CONFIG = Path(__file__).parents[1] / "dev" / "configuration.yaml"
+DEV = Path(__file__).parents[1] / "dev"
+CONFIG = DEV / "configuration.yaml"
+PLUG_ENERGY = "sensor.washing_machine_plug_energy"
+PLUG_POWER = "sensor.kobra_s1_plug_power"
 
 
 @pytest.fixture
-async def helpers(hass: HomeAssistant) -> None:
-    """The Devices' helpers from the dev configuration.yaml."""
+async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Devices' helpers from the dev configuration.yaml, and the dev container's
+    integrations where Home Assistant finds them."""
+    monkeypatch.setattr(
+        custom_components, "__path__", [*custom_components.__path__, str(DEV)]
+    )
+    hass.data.pop(DATA_CUSTOM_COMPONENTS, None)
     config = await hass.async_add_executor_job(load_yaml_dict, CONFIG)
-    for domain in ("input_select", "input_text", "input_number"):
+    for domain in ("input_select", "input_text", "input_number", "template"):
         assert await async_setup_component(hass, domain, {domain: config[domain]})
 
 
@@ -41,6 +57,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     ("name", "expected"),
     [
         ("empty", (0, 0, 0, 0)),
+        ("quick-start", (0, 0, 0, 0)),
         ("few-runs", (1, 3, 7, 0)),
         ("printing-now", (1, 3, 8, 1)),
         ("two-printers", (2, 5, 60, 0)),
@@ -134,3 +151,108 @@ async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
         await hass.async_create_task(call)
 
     assert await counts(panel) == (1, 4, 10, 0)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_washing_machine_washdata_follows(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await hass.async_block_till_done()
+
+    await quick_start(
+        hass, "Washing machine · WashData", optional_meter=PLUG_ENERGY, price=0.32
+    )
+
+    await set_helper(hass, "input_number.washer_energy", 100)
+    await set_helper(hass, "input_select.washer_program", "Eco 40-60")
+    await set_helper(hass, "input_select.washer_status", "running")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.washer_energy", 100.7)
+    await set_helper(hass, "input_select.washer_status", "cancelled")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["program"], run["outcome"]) == ("Eco 40-60", "cancelled")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(0.7)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_printer_of_the_anycubic_stand_in(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await hass.async_block_till_done()
+
+    await quick_start(
+        hass, "Kobra S1 · Anycubic Cloud & LAN", meter=PLUG_POWER, price=0.32
+    )
+
+    await set_helper(hass, "input_number.kobra_power", 120)
+    await set_helper(hass, "input_text.kobra_job", "Benchy.gcode")
+    await set_helper(hass, "input_select.kobra_status", "printing")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_select.kobra_status", "finished")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["name"], run["outcome"]) == ("Benchy", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(0.12)
+
+
+async def test_the_next_scenario_takes_the_stand_ins_devices_away(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    helpers: None,
+    files: Path,
+) -> None:
+    stand_ins = ("anycubic_cloud", "ha_washdata")
+    await async_load(hass, "quick-start", hass_admin_user)
+    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [1, 1]
+
+    await async_load(hass, "empty", hass_admin_user)
+
+    assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
+
+
+async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
+    """Add the HA device Quick Start offers as `label`."""
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": SOURCE_USER}
+    )
+    assert result["step_id"] == "quick_start"
+    devices = {option["label"]: option["value"] for option in offered(result)}
+    assert list(devices) == [
+        "Kobra S1 · Anycubic Cloud & LAN",
+        "Washing machine · WashData",
+        "manual",
+    ]
+    result = await configure(hass, result, {"device": devices[label]})
+    result = await configure(hass, result, answers)
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+
+async def set_helper(hass: HomeAssistant, entity_id: str, value: str | float) -> None:
+    domain = entity_id.split(".")[0]
+    service, field = (
+        ("select_option", "option")
+        if domain == "input_select"
+        else ("set_value", "value")
+    )
+    await hass.services.async_call(
+        domain, service, {"entity_id": entity_id, field: value}, blocking=True
+    )
+    await hass.async_block_till_done()

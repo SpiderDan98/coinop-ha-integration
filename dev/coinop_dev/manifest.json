@@ -1,7 +1,7 @@
 {
   "domain": "coinop_dev",
   "name": "Coin-op dev scenarios",
-  "after_dependencies": ["input_select", "input_text", "coinop"],
+  "after_dependencies": ["input_select", "input_text", "coinop", "anycubic_cloud", "ha_washdata"],
   "codeowners": [],
   "dependencies": ["websocket_api"],
   "documentation": "https://github.com/SpiderDan98/coinop-ha-integration/blob/main/CONTRIBUTING.md",

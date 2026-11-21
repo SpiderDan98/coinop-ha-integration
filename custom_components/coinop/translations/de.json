@@ -2,11 +2,11 @@
   "config": {
     "step": {
       "user": {
-        "description": "Coin-op erfasst, was jeder Druck deiner 3D-Drucker kostet. Füge nach der Einrichtung jeden Drucker als Gerät hinzu."
+        "description": "Coin-op erfasst, was jeder Lauf deiner Geräte kostet, etwa jeder Druck eines 3D-Druckers oder jede Wäsche einer Waschmaschine. Füge nach der Einrichtung jedes davon als Gerät hinzu."
       }
     },
     "abort": {
-      "single_instance_allowed": "Coin-op ist bereits eingerichtet. Füge weitere Drucker als Geräte zum bestehenden Eintrag hinzu."
+      "single_instance_allowed": "Coin-op ist bereits eingerichtet. Füge weitere Geräte zum bestehenden Eintrag hinzu."
     }
   },
   "config_subentries": {
@@ -19,7 +19,7 @@
       "step": {
         "reconfigure": {
           "title": "Gerät neu konfigurieren",
-          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch Status, Auftrag und Bilder, vorausgefüllt aus dem Integrationsprofil der Drucker-Integration, z. B. wenn ein Update ihre Entitäten umbenannt hat; Verbrauchsquelle und Preis bleiben unverändert.",
+          "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch die Geräteeingänge, die das Integrationsprofil der Integration des Geräts kennt, vorausgefüllt aus ihren Entitäten, z. B. wenn ein Update sie umbenannt hat; Verbrauchsquellen und Preise bleiben unverändert.",
           "menu_options": {
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
@@ -40,9 +40,34 @@
             "device_type": "Gerätetyp"
           }
         },
+        "quick_start": {
+          "title": "Schnellstart",
+          "description": "Coin-op hat Geräte von Integrationen gefunden, die es kennt. Wähle eines, um es mit den Geräteeingängen aus seinem Integrationsprofil einzurichten; Coin-op fragt dann nur noch nach Zähler und Preisen. Oder richte ein Gerät manuell ein und gehe jeden Schritt selbst durch.",
+          "data": {
+            "device": "Gerät"
+          }
+        },
+        "quick_start_confirm": {
+          "title": "Zähler & Preise",
+          "description": "**{device}** wird mit den Geräteeingängen eingerichtet, die Coin-op bei {integration} gefunden hat:\n\n{inputs}\n\nSie und die Status-Zuordnung kannst du später unter „Gerät neu konfigurieren“ prüfen und ändern.",
+          "data": {
+            "meter": "Energiezähler oder Leistungssensor",
+            "optional_meter": "Energiezähler oder Leistungssensor (optional)",
+            "price": "Fester Strompreis pro kWh",
+            "price_entity": "oder Strompreis-Entität",
+            "water_price": "Wasserpreis pro m³ (optional)"
+          },
+          "data_description": {
+            "meter": "Der Sensor, der die Energie (z. B. kWh) oder die Leistung (W) des Geräts misst, etwa der einer Messsteckdose. Ohne einen solchen Sensor richte das Gerät manuell ein: Dort lässt sich der Strom aus der Durchschnittsleistung schätzen.",
+            "optional_meter": "Der Sensor, der die Energie (z. B. kWh) oder die Leistung (W) des Geräts misst, etwa der einer Messsteckdose. Leer lassen, um den Strom je Programm aus den Programmvorgaben zu nehmen.",
+            "price": "Was du pro kWh zahlst, in {currency}. Leer lassen, wenn eine Entität den Preis meldet.",
+            "price_entity": "Meldet den aktuellen Preis pro kWh, z. B. bei einem dynamischen Tarif. Leer lassen bei einem festen Preis.",
+            "water_price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser. Das Wasser kommt vom Zähler des Geräts, wenn es einen hat, sonst je Programm aus den Programmvorgaben. Leer lassen, um kein Wasser zu erfassen."
+          }
+        },
         "device": {
           "title": "Home-Assistant-Gerät",
-          "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op kennt (3D-Drucker: Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
+          "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op für diesen Gerätetyp kennt ({integrations}), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
           "data": {
             "device": "Home-Assistant-Gerät (optional)"
           },
@@ -81,7 +106,7 @@
             "ignored": "Ignoriert"
           },
           "data_description": {
-            "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn der Drucker nur „druckt / druckt nicht“ meldet."
+            "ended": "Beendet den Lauf mit Ausgang Unbekannt, z. B. wenn das Gerät nur „läuft / läuft nicht“ meldet."
           }
         },
         "job": {
@@ -356,8 +381,11 @@
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
         "unknown_unit": "Coin-op erkennt diese Einheit nicht. Gib einen Umrechnungsfaktor ein oder wähle eine andere Entität.",
-        "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Druckstatus. Jeder Druck würde doppelt erfasst.",
-        "not_length_or_mass": "Coin-op kann als Materialverbrauch nur eine Länge (z. B. mm) oder eine Masse (z. B. g) nutzen. Wähle eine andere Entität oder Einheit."
+        "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Status. Jeder Lauf würde doppelt erfasst.",
+        "not_length_or_mass": "Coin-op kann als Materialverbrauch nur eine Länge (z. B. mm) oder eine Masse (z. B. g) nutzen. Wähle eine andere Entität oder Einheit.",
+        "not_energy_or_power": "Coin-op erkennt die Einheit dieser Entität weder als Energie noch als Leistung. Wähle eine andere Entität oder richte das Gerät manuell ein.",
+        "one_price": "Gib entweder einen festen Preis ein oder wähle eine Preis-Entität.",
+        "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen."
       },
       "abort": {
         "reconfigure_successful": "Das Gerät wurde gespeichert."
@@ -478,6 +506,11 @@
     }
   },
   "selector": {
+    "quick_start_device": {
+      "options": {
+        "manual": "Manuell einrichten"
+      }
+    },
     "device_type": {
       "options": {
         "3d_printer": "3D-Drucker",

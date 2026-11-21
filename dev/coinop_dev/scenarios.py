@@ -29,6 +29,10 @@ _LOGGER = logging.getLogger(__name__)
 # Each Device's inputs are helpers from the dev configuration.yaml.
 PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
 WASHER = "washer"
+# The stand-ins in dev/ for integrations with an Integration Profile: WashData and
+# Anycubic Cloud & LAN, whose printer follows the Kobra's helpers.
+STAND_INS = ("anycubic_cloud", "ha_washdata")
+KOBRA = "kobra"
 TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
     WASHER: "Washing machine"
 }
@@ -547,6 +551,15 @@ async def _nothing(seed: Seed) -> None:
     pass
 
 
+async def _quick_start(seed: Seed) -> None:
+    """A printer and a washing machine of known integrations, for Add Device's
+    Quick Start to offer."""
+    for domain in STAND_INS:
+        await seed.hass.config_entries.flow.async_init(
+            domain, context={"source": SOURCE_USER}
+        )
+
+
 @dataclass(frozen=True)
 class Scenario:
     title: str
@@ -557,6 +570,14 @@ class Scenario:
 
 SCENARIOS = {
     "empty": Scenario("Empty", "The hub without any Device.", (), _nothing),
+    "quick-start": Scenario(
+        "Quick Start",
+        "The hub without any Device, an Anycubic printer and a washing machine "
+        "WashData follows: Add Device offers both in Quick Start, with their plug "
+        "sensors as meters. The Kobra's and the washing machine's helpers run them.",
+        (),
+        _quick_start,
+    ),
     "few-runs": Scenario(
         "3D printer, a few Runs",
         "One printer, 3 Materials and 7 Runs.",
@@ -667,9 +688,10 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
-    for old in hass.config_entries.async_entries(COINOP):
-        await hass.config_entries.async_remove(old.entry_id)
-    for key in PRINTERS:
+    for domain in (COINOP, *STAND_INS):
+        for old in hass.config_entries.async_entries(domain):
+            await hass.config_entries.async_remove(old.entry_id)
+    for key in (*PRINTERS, KOBRA):
         if hass.states.get(f"input_select.{key}_status"):
             await _async_set_printer(hass, key, "idle")
     if program := hass.states.get("input_select.washer_program"):

@@ -67,10 +67,12 @@ async def start_add_device(
     device_type: str = "3d_printer",
 ) -> Any:
     """Open Add Device, pick the Device Type and the HA device (or none); returns the
-    name form."""
+    name form. Where Quick Start offers a device, it is set up manually."""
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
+    if result["step_id"] == "quick_start":
+        result = await configure(hass, result, {"device": "manual"})
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": device_type})
     assert result["step_id"] == "device", result.get("errors")

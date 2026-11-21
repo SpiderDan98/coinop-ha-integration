@@ -27,6 +27,20 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 3. Download Coin-op. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
 4. Go to **Settings > Devices & services > Add integration**, pick **Coin-op** and add your first Device.
 
+## Quick Start
+
+If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [washing machines](#washing-machine-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
+
+1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions.
+2. Check the list of entities Coin-op found, then fill in what no profile knows:
+   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine brings its own meters and isn't asked.
+   - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
+   - for a washing machine, optionally the **water price** per m³. With it, water comes from the machine's own meter or per Program from the Program Defaults; without it, no water is recorded.
+
+Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; a washing machine's Doses and Program Defaults are set on its card in the panel's Devices tab. Miele and Home Connect also list their other appliances: pick only the ones you want to follow as a washing machine.
+
+Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities. Devices Coin-op already follows aren't offered again.
+
 ## Estimating electricity without a meter
 
 Without an energy meter or power sensor, CoinOp estimates electricity from the Device's average power while it runs. A desktop FDM printer with a heated bed typically averages 80–150 W over a whole print. Don't enter the rated power from the label or power supply: it is far higher than what the printer really draws on average. If you can, measure one print with a power-measuring plug and use that.
@@ -62,7 +76,7 @@ Corrections and deleted Runs change the totals at the moment you make them, so t
 
 ## Anycubic printers
 
-When you add a Device and pick a printer's Home Assistant device from one of these integrations, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration.
+[Quick Start](#quick-start) offers the printers of these integrations. When you set a Device up manually and pick a printer's Home Assistant device from one of them, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration.
 
 | Integration | Status | Material used | Thumbnail | Slots |
 |---|---|---|---|---|
@@ -147,7 +161,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Washing machine Integration Profiles
 
-When you add a washing machine and pick its Home Assistant device from one of these integrations, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
+[Quick Start](#quick-start) offers the washing machines of these integrations. When you set one up manually and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
 
 | Integration | Status | Program | Electricity | Water |
 |---|---|---|---|---|

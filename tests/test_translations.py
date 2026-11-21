@@ -77,6 +77,23 @@ async def test_add_device_texts_load_in_home_assistant(
     assert translations[f"{prefix}.initiate_flow.user"]
     assert translations[f"{prefix}.step.estimate.data_description.running_power"]
     assert translations[f"{prefix}.error.no_ending_value"]
+    assert "{integrations}" in translations[f"{prefix}.step.device.description"]
+    confirm = translations[f"{prefix}.step.quick_start_confirm.description"]
+    assert all(
+        placeholder in confirm
+        for placeholder in ("{device}", "{integration}", "{inputs}")
+    )
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+async def test_quick_starts_manual_choice_is_translated(
+    hass: HomeAssistant, language: str
+) -> None:
+    translations = await async_get_translations(hass, language, "selector", [DOMAIN])
+
+    assert translations[
+        f"component.{DOMAIN}.selector.quick_start_device.options.manual"
+    ] not in ("", "manual")
 
 
 async def test_entities_are_named_in_the_configured_language(

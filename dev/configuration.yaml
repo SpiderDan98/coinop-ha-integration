@@ -31,6 +31,10 @@ input_select:
   bambu_status:
     name: Bambu Lab X1C status
     options: [idle, printing, paused, finished, cancelled, error]
+  # hass-anycubic's job states, for the stand-in in dev/anycubic_cloud.
+  kobra_status:
+    name: Kobra S1 status
+    options: [idle, printing, paused, finished, cancelled]
   washer_status:
     name: Washing machine status
     options: ["off", running, paused, finished, cancelled]
@@ -43,8 +47,17 @@ input_text:
     name: Prusa MK4 job
   bambu_job:
     name: Bambu Lab X1C job
+  kobra_job:
+    name: Kobra S1 job
 
 input_number:
+  kobra_power:
+    name: Kobra S1 power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
   washer_energy:
     name: Washing machine energy
     min: 0
@@ -66,3 +79,19 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: g
+
+# The metering plugs, which Quick Start offers as meters.
+template:
+  - sensor:
+      - name: Kobra S1 plug power
+        unique_id: kobra_plug_power
+        state: "{{ states('input_number.kobra_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Washing machine plug energy
+        unique_id: washer_plug_energy
+        state: "{{ states('input_number.washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing

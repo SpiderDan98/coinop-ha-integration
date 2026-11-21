@@ -211,15 +211,23 @@ def _home_connect(find: Find) -> dict[str, Any]:
     }
 
 
-# By Device Type, then integration domain.
+# By Device Type, then integration domain: the integration's name and its profile.
 PROFILES = {
-    DEVICE_TYPE_3D_PRINTER: {"anycubic": _anycubic, "anycubic_cloud": _anycubic_cloud},
+    DEVICE_TYPE_3D_PRINTER: {
+        "anycubic": ("Anycubic 3D Printer - Local Control", _anycubic),
+        "anycubic_cloud": ("Anycubic Cloud & LAN", _anycubic_cloud),
+    },
     DEVICE_TYPE_WASHING_MACHINE: {
-        "ha_washdata": _washdata,
-        "miele": _miele,
-        "home_connect": _home_connect,
+        "ha_washdata": ("WashData", _washdata),
+        "miele": ("Miele", _miele),
+        "home_connect": ("Home Connect", _home_connect),
     },
 }
+
+
+def known_integrations(device_type: str) -> str:
+    """The names of the integrations with a profile for the Device Type."""
+    return ", ".join(name for name, _ in PROFILES[device_type].values())
 
 
 def detect(
@@ -273,4 +281,27 @@ def detect(
             None,
         )
 
-    return profiles[domain](find)
+    _, profile = profiles[domain]
+    return profile(find)
+
+
+def candidates(hass: HomeAssistant) -> dict[str, tuple[str, str, dict[str, Any]]]:
+    """The HA devices Quick Start can add, by device id: their Device Type, their
+    integration's name and the sections its profile fills in.
+
+    Those are the devices a profile finds a Status for, so not a multi-material unit.
+    """
+    devices = dr.async_get(hass)
+    found: dict[str, tuple[str, str, dict[str, Any]]] = {}
+    for device_type, profiles in PROFILES.items():
+        for domain, (name, _) in profiles.items():
+            for config_entry in hass.config_entries.async_entries(
+                domain, include_ignore=False, include_disabled=False
+            ):
+                for device in dr.async_entries_for_config_entry(
+                    devices, config_entry.entry_id
+                ):
+                    sections = detect(hass, device_type, device.id)
+                    if sections and sections["status"]:
+                        found.setdefault(device.id, (device_type, name, sections))
+    return found

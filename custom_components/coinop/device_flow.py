@@ -17,6 +17,7 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -39,7 +40,7 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
-from .profiles import METERS, detect
+from .profiles import METERS, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
 
@@ -54,6 +55,21 @@ USAGE_UNITS = ["mm", "cm", "m", "g", "kg"]
 FACTOR = NumberSelector(
     NumberSelectorConfig(min=0, step="any", mode=NumberSelectorMode.BOX)
 )
+# Quick Start's choice to walk every step instead.
+MANUAL = "manual"
+# The sections a profile may fill only in part, as their steps store them unused.
+UNUSED: dict[str, dict[str, Any]] = {
+    "job": {
+        "entity_id": None,
+        "attribute": None,
+        "material": None,
+        "slots": [],
+        "colour_attribute": None,
+        "loaded_slot": None,
+    },
+    "images": {"thumbnail": None, "camera": None, "snapshot": False},
+    "program": {"entity_id": None, "attribute": None},
+}
 
 
 def _watts(minimum: float) -> NumberSelector:
@@ -62,6 +78,17 @@ def _watts(minimum: float) -> NumberSelector:
             min=minimum,
             step="any",
             unit_of_measurement="W",
+            mode=NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _price_selector(quantity: Quantity, currency: str) -> NumberSelector:
+    return NumberSelector(
+        NumberSelectorConfig(
+            min=0,
+            step="any",
+            unit_of_measurement=f"{currency}/{quantity.price_unit}",
             mode=NumberSelectorMode.BOX,
         )
     )
@@ -87,7 +114,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     """Each step stores its own section of the Device's data under one key.
 
     Add Device walks the sections in order; reconfigure offers them as a menu
-    and returns to it after each section.
+    and returns to it after each section. Quick Start takes the sections from an
+    Integration Profile and asks only for what no profile knows.
     """
 
     def __init__(self) -> None:
@@ -99,6 +127,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._job: dict[str, Any] = {}
         # The profile's sections while Detect again walks them.
         self._detecting: dict[str, Any] = {}
+        # The name of the integration Quick Start took the sections from.
+        self._integration = ""
 
     def _capabilities(self) -> frozenset[Capability]:
         return CAPABILITIES[self._data["device_type"]]
@@ -182,10 +212,16 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """The Device Type, fixed once the Device is added."""
+        """The Device Type, fixed once the Device is added; Quick Start comes first
+        where it has a device to offer."""
         if user_input is not None:
             self._data["device_type"] = user_input["device_type"]
             return await self.async_step_device()
+        if self._quick_start_devices():
+            return await self.async_step_quick_start()
+        return self._device_type_form()
+
+    def _device_type_form(self) -> SubentryFlowResult:
         schema = vol.Schema(
             {
                 vol.Required("device_type"): SelectSelector(
@@ -199,6 +235,219 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
+    def _quick_start_devices(self) -> dict[str, tuple[str, str, dict[str, Any]]]:
+        """The HA devices of known integrations that no Device follows yet."""
+        followed = {
+            subentry.data["printer_device_id"]
+            for subentry in self._get_entry().subentries.values()
+            if subentry.subentry_type == SUBENTRY_DEVICE
+        }
+        return {
+            device_id: candidate
+            for device_id, candidate in candidates(self.hass).items()
+            if device_id not in followed
+            and not self._status_used_elsewhere(candidate[2]["status"]["entity_id"])
+        }
+
+    async def async_step_quick_start(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        offered = self._quick_start_devices()
+        devices = dr.async_get(self.hass)
+        names = {
+            device_id: device.name_by_user or device.name or device_id
+            for device_id in offered
+            if (device := devices.async_get(device_id))
+        }
+        if user_input is not None:
+            device_id = user_input["device"]
+            if device_id == MANUAL:
+                return self._device_type_form()
+            device_type, self._integration, sections = offered[device_id]
+            self._name = names[device_id]
+            self._data = {"device_type": device_type, "printer_device_id": device_id}
+            self._data |= {
+                name: values
+                for name, values in sections.items()
+                if name not in UNUSED and name not in METERS
+            }
+            self._data |= {
+                name: unused | sections.get(name, {})
+                for name, unused in UNUSED.items()
+                if name in self._sections()
+            }
+            for quantity in (ELECTRICITY, WATER):
+                found = sections.get(quantity.source_key)
+                if found and (
+                    meter := self._meter_of(
+                        quantity, found["entity_id"], [found["source"]]
+                    )
+                ):
+                    self._data[quantity.source_key] = meter
+            return await self.async_step_quick_start_confirm()
+        options = [
+            SelectOptionDict(
+                value=device_id, label=f"{names[device_id]} · {integration}"
+            )
+            for device_id, (_, integration, _) in offered.items()
+        ]
+        schema = vol.Schema(
+            {
+                vol.Required("device"): SelectSelector(
+                    SelectSelectorConfig(
+                        # Manual setup's label is its translation.
+                        options=[
+                            *options,
+                            SelectOptionDict(value=MANUAL, label=MANUAL),
+                        ],
+                        translation_key="quick_start_device",
+                        mode=SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="quick_start",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, {"device": next(iter(offered))}
+            ),
+        )
+
+    def _meter_of(
+        self, quantity: Quantity, entity_id: str, sources: list[str]
+    ) -> dict[str, Any] | None:
+        """The entity's section as the one of `sources` its unit makes it; None if
+        its unit fits none."""
+        unit = entity_unit(self.hass, entity_id)
+        source = next(
+            (s for s in sources if unit_scale(quantity, s, unit) is not None), None
+        )
+        if source is None:
+            return None
+        gaps = {"running_power": None} if self._fills_power_gaps(source) else {}
+        return {
+            "source": source,
+            "entity_id": entity_id,
+            "attribute": None,
+            "unit": unit,
+            "factor": None,
+        } | gaps
+
+    async def async_step_quick_start_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """What the profile found, and what no profile knows: the meter and the prices."""
+        errors: dict[str, str] = {}
+        currency = self.hass.config.currency
+        capabilities = self._capabilities()
+        per_program = Capability.PROGRAM_CONSUMPTION in capabilities
+        meter_field = "optional_meter" if per_program else "meter"
+        needs_meter = ELECTRICITY.source_key not in self._data
+        if user_input is not None:
+            data = dict(self._data)
+            if needs_meter:
+                data["consumption"] = self._quick_meter(user_input.get(meter_field))
+                if data["consumption"] is None:
+                    errors[meter_field] = "not_energy_or_power"
+            price, price_entity = (
+                user_input.get("price"),
+                user_input.get("price_entity"),
+            )
+            if (price is None) == (price_entity is None):
+                errors["price"] = "one_price"
+            elif price_entity is None:
+                data["price"] = {"source": "fixed", "value": price}
+            elif entity_price := self._quick_price(price_entity, currency):
+                data["price"] = entity_price
+            else:
+                errors["price_entity"] = "unknown_price_unit"
+            if Capability.WATER in capabilities:
+                if (water_price := user_input.get("water_price")) is None:
+                    data["water"] = {"source": WaterSource.NONE.value}
+                else:
+                    data.setdefault("water", {"source": WaterSource.PER_PROGRAM.value})
+                    data["water_price"] = {"source": "fixed", "value": water_price}
+            if not errors:
+                return self.async_create_entry(title=self._name, data=data)
+        schema: dict[Any, Any] = {}
+        if needs_meter:
+            required = vol.Optional if per_program else vol.Required
+            schema[required(meter_field)] = EntitySelector(
+                EntitySelectorConfig(domain="sensor", device_class=["energy", "power"])
+            )
+        schema[vol.Optional("price")] = _price_selector(ELECTRICITY, currency)
+        schema[vol.Optional("price_entity")] = EntitySelector()
+        if Capability.WATER in capabilities:
+            schema[vol.Optional("water_price")] = _price_selector(WATER, currency)
+        last_fixed = self._stored_price(ELECTRICITY, "fixed")
+        last_price = self._stored_price(ELECTRICITY, "entity")
+        last_water = self._stored_price(WATER, "fixed")
+        suggested = {
+            "price": last_fixed["value"] if last_fixed else None,
+            "price_entity": last_price["entity_id"] if last_price else None,
+            "water_price": last_water["value"] if last_water else None,
+        }
+        return self.async_show_form(
+            step_id="quick_start_confirm",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(schema), user_input or suggested
+            ),
+            errors=errors,
+            description_placeholders={
+                "device": self._name,
+                "integration": self._integration,
+                "inputs": "\n".join(f"- {name}" for name in self._found_inputs()),
+                "currency": currency,
+            },
+        )
+
+    def _quick_meter(self, entity_id: str | None) -> dict[str, Any] | None:
+        """Electricity from the picked meter, per Program without one; None if the
+        entity reports neither energy nor power."""
+        if entity_id is None:
+            return {"source": ConsumptionSource.PER_PROGRAM.value}
+        return self._meter_of(
+            ELECTRICITY, entity_id, [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
+        )
+
+    def _quick_price(self, entity_id: str, currency: str) -> dict[str, Any] | None:
+        """The price entity's section, the last Device's if it reads the same entity;
+        None if its unit is no price."""
+        last = self._stored_price(ELECTRICITY, "entity")
+        if last and last["entity_id"] == entity_id:
+            return dict(last)
+        unit = entity_unit(self.hass, entity_id)
+        if price_scale(ELECTRICITY, unit, currency) is None:
+            return None
+        return {
+            "source": "entity",
+            "entity_id": entity_id,
+            "attribute": None,
+            "unit": unit,
+            "factor": None,
+        }
+
+    def _found_inputs(self) -> list[str]:
+        """The names of the entities Quick Start took from the profile."""
+        job = self._data.get("job", {})
+        images = self._data.get("images", {})
+        entity_ids = [
+            self._data["status"]["entity_id"],
+            self._data.get("program", {}).get("entity_id"),
+            job.get("entity_id"),
+            (job.get("material") or {}).get("entity_id"),
+            *job.get("slots", []),
+            job.get("loaded_slot"),
+            images.get("thumbnail"),
+            images.get("camera"),
+            *(self._data.get(key, {}).get("entity_id") for key in METERS),
+        ]
+        return [
+            state.name if (state := self.hass.states.get(entity_id)) else entity_id
+            for entity_id in entity_ids
+            if entity_id
+        ]
+
     async def async_step_device(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
@@ -209,6 +458,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="device",
             data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
+            description_placeholders={
+                "integrations": known_integrations(self._data["device_type"])
+            },
         )
 
     async def async_step_name(
@@ -726,16 +978,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             return await self._price_done(quantity)
         currency = self.hass.config.currency
         schema = vol.Schema(
-            {
-                vol.Required("price"): NumberSelector(
-                    NumberSelectorConfig(
-                        min=0,
-                        step="any",
-                        unit_of_measurement=f"{currency}/{quantity.price_unit}",
-                        mode=NumberSelectorMode.BOX,
-                    )
-                )
-            }
+            {vol.Required("price"): _price_selector(quantity, currency)}
         )
         stored = self._stored_price(quantity, "fixed")
         return self.async_show_form(
