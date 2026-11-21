@@ -175,6 +175,11 @@ def chosen_capabilities(choices: Iterable[str]) -> frozenset[Capability]:
     return capabilities | {Capability.AVERAGE_POWER}
 
 
+def stored_capabilities(choices: Iterable[str]) -> list[str]:
+    """What an Other Device with these of `CHOICES` stores as its `capabilities`."""
+    return sorted(capability.value for capability in chosen_capabilities(choices))
+
+
 def picked_choices(capabilities: frozenset[Capability]) -> list[str]:
     """Those of `CHOICES` an Other Device with these Capabilities has: it stores what
     its choices brought, not the choices."""

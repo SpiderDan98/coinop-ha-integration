@@ -37,10 +37,10 @@ from .device_config import (
     Target,
     WaterSource,
     capabilities_of,
-    chosen_capabilities,
     picked_choices,
     picks_capabilities,
     refused_combination,
+    stored_capabilities,
 )
 from .device_inputs import (
     entity_unit,
@@ -295,9 +295,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 errors["base"] = refused
             if not errors:
                 self._data["type_name"] = type_name
-                self._data["capabilities"] = sorted(
-                    capability.value for capability in chosen_capabilities(picked)
-                )
+                self._data["capabilities"] = stored_capabilities(picked)
                 if self.source == SOURCE_RECONFIGURE:
                     return await self._async_fit_sections()
                 return await self.async_step_device()
