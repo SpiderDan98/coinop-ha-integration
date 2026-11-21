@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Coin-op records what each Run of your Devices costs, for 3D printers, washing machines and other household appliances. After setup, add each of them as a Device."
+        "description": "Coin-op records what each Run of your Devices costs, for 3D printers, washing machines and the other Device Types it knows. After setup, add each of yours as a Device."
       }
     },
     "abort": {

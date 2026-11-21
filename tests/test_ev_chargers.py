@@ -121,7 +121,7 @@ async def test_reconfiguring_an_ev_charger_offers_only_what_every_device_has(
     assert result["menu_options"] == ["status", "consumption", "price", "save"]
 
 
-async def test_a_session_energy_sensor_back_at_zero_between_sessions_is_no_reset(
+async def test_a_session_energy_sensor_back_at_zero_between_runs_is_no_reset(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     await add_charger(hass)
@@ -157,7 +157,7 @@ async def test_a_session_sensor_dropping_before_it_reported_the_end_is_no_reset(
     assert run["flags"] == []
 
 
-async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_session(
+async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], panel: PanelClient
 ) -> None:
     await add_charger(hass)
@@ -180,7 +180,7 @@ async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_session(
     assert listed["running_seconds"] == 90 * 60
 
 
-async def test_a_charging_session_is_priced_with_the_price_of_each_hour(
+async def test_a_charging_run_is_priced_with_the_price_of_each_hour(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     await set_price(hass, 0.20)
@@ -264,7 +264,7 @@ async def test_an_ev_charger_has_no_water_sensors_and_its_ended_event_no_program
     }.isdisjoint(ended)
 
 
-async def test_charging_sessions_take_the_tags_and_templates_for_new_runs(
+async def test_charging_runs_take_the_tags_and_templates_for_new_runs(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     charger = await add_charger(hass)
@@ -295,7 +295,7 @@ async def test_charging_sessions_take_the_tags_and_templates_for_new_runs(
     assert retagged["run"]["tags"] == ["Guest car"]
 
 
-async def test_a_cost_statement_lists_a_charging_session_without_part_count(
+async def test_a_cost_statement_lists_a_charging_run_without_part_count(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
     await add_charger(hass)
