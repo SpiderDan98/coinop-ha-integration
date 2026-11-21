@@ -41,8 +41,7 @@ PRESETS = {
     "empty": Preset("Empty", "The hub without any Device.", ()),
     "quick-start": Preset(
         "Quick Start",
-        "The hub without any Device, and every Quick Start Piece: Add Device offers "
-        "each HA device in Quick Start as its Device Type.",
+        "Every Quick Start Piece, for Add Device to offer each HA device in Quick Start.",
         tuple(n for n, p in PIECES.items() if isinstance(p, QuickStartPiece)),
     ),
     "few-runs": Preset(

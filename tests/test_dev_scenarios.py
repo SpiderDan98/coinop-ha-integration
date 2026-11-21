@@ -202,6 +202,13 @@ def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     assert "boolean" in fields["open_run"]["selector"]
 
 
+def test_every_piece_and_preset_has_a_one_line_description() -> None:
+    """What it adds, in a sentence; how to run a stand-in is in CONTRIBUTING."""
+    descriptions = [p.description for p in [*PIECES.values(), *PRESETS.values()]]
+
+    assert [d for d in descriptions if len(d) > 100 or ". " in d] == []
+
+
 def test_no_two_presets_have_the_same_selection() -> None:
     """A selection loaded is stored as loaded from the Preset that has it."""
     selections = [json.dumps(p.selection, sort_keys=True) for p in PRESETS.values()]

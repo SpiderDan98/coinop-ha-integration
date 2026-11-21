@@ -129,8 +129,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "prusa": DeviceWithHistory(
         "3d_printer",
         "Prusa MK4",
-        "Short history: 7 Runs over seven weeks on 3 of the 8 filaments; long: two "
-        "years of Runs on all 8. With Tags and Thumbnails.",
+        "7 Runs on 3 filaments, or two years of them on all 8; with Tags and Thumbnails.",
         _printer_helpers("prusa"),
         device=devices.printer("prusa"),
         short=histories.prusa,
@@ -144,8 +143,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "bambu": DeviceWithHistory(
         "3d_printer",
         "Bambu Lab X1C",
-        "Short history: 10 Runs over six weeks on 5 of the 8 filaments; long: two "
-        "years of Runs on all 8. With Tags and Thumbnails.",
+        "10 Runs on 5 filaments, or two years of them on all 8; with Tags and Thumbnails.",
         _printer_helpers("bambu"),
         device=devices.printer("bambu"),
         short=histories.bambu,
@@ -159,31 +157,28 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "anycubic.3d_printer": QuickStartPiece(
         "3d_printer",
         "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
-        "A printer with an ACE Pro and its plug sensor as meter; set its print "
-        "event's state and `event_type` in the developer tools to run it.",
+        "A printer with an ACE Pro and a metering plug.",
         {"input_number.anycubic_kobra_power": 0},
         registration=printers.anycubic_local,
     ),
     "anycubic_cloud.3d_printer": QuickStartPiece(
         "3d_printer",
         "Kobra S1 · Anycubic Cloud & LAN",
-        "A printer with its plug sensor as meter; the Kobra's helpers run it.",
+        "A printer with an ACE Pro and a metering plug; the Kobra's helpers run it.",
         _printer_helpers("kobra") | {"input_number.kobra_power": 0},
         registration=printers.anycubic_cloud,
     ),
     "bambu_lab.3d_printer": QuickStartPiece(
         "3d_printer",
         "P1S · Bambu Lab",
-        "A printer with an AMS and its plug sensor as meter; set its print status "
-        "in the developer tools to run it.",
+        "A printer with an AMS and a metering plug.",
         {"input_number.p1s_power": 0},
         registration=printers.bambu_lab,
     ),
     "prusalink.3d_printer": QuickStartPiece(
         "3d_printer",
         "Prusa Core One · PrusaLink",
-        "A printer with its job preview and its plug sensor as meter; set its state "
-        "in the developer tools to run it.",
+        "A printer with its job preview and a metering plug.",
         {"input_number.core_one_power": 0},
         # Named apart from the Prusa MK4 Device with history.
         registration=partial(printers.prusalink, title="Prusa Core One"),
@@ -191,33 +186,28 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "octoprint.3d_printer": QuickStartPiece(
         "3d_printer",
         "OctoPrint · OctoPrint",
-        "A printer with a webcam and its plug sensor as meter; set its current "
-        "state in the developer tools to run it.",
+        "A printer with a webcam and a metering plug.",
         {"input_number.octoprint_power": 0},
         registration=printers.octoprint,
     ),
     "ha_creality_ws.3d_printer": QuickStartPiece(
         "3d_printer",
         "K1C · Creality",
-        "A printer with its print preview and its plug sensor as meter; set its "
-        "print status, with the job's `file` attribute, in the developer tools to "
-        "run it.",
+        "A printer with its print preview and a metering plug.",
         {"input_number.k1c_power": 0},
         registration=printers.creality,
     ),
     "elegoo_printer.3d_printer": QuickStartPiece(
         "3d_printer",
         "Centauri Carbon · Elegoo",
-        "A printer with its cover image and its plug sensor as meter; set its print "
-        "status in the developer tools to run it.",
+        "A printer with its cover image and a metering plug.",
         {"input_number.centauri_carbon_power": 0},
         registration=printers.elegoo,
     ),
     "moonraker.3d_printer": QuickStartPiece(
         "3d_printer",
         "Voron 2.4 · Moonraker",
-        "A printer with its preview camera, a webcam and its plug sensor as meter; "
-        "the Voron's helpers run it.",
+        "A printer with a preview camera, a webcam and a metering plug; the Voron's helpers run it.",
         _printer_helpers("voron", "standby")
         | {"input_number.voron_filament": 0, "input_number.voron_power": 0},
         registration=printers.moonraker,
@@ -225,9 +215,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "washer": DeviceWithHistory(
         "washing_machine",
         "Washing machine",
-        "Energy and water meters, a detergent scale, 4 laundry products as Doses "
-        "and Program Defaults. Short history: 10 loads over four weeks; long: a load "
-        "every few days for two years.",
+        "Meters, a detergent scale, Doses and Program Defaults; 10 loads, or two years of them.",
         {
             "input_select.washer_status": "off",
             "input_select.washer_program": "Cotton 60°",
@@ -246,8 +234,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "ha_washdata.washing_machine": QuickStartPiece(
         "washing_machine",
         "Washing machine · WashData",
-        "A washing machine WashData follows, with its plug sensor as meter; the "
-        "washing machine's helpers run it.",
+        "A washing machine with a metering plug; its WashData helpers run it.",
         _washdata_helpers("washdata_washer", "Cotton 60°"),
         registration=partial(
             appliances.washdata, "washing_machine", name="Washing machine"
@@ -256,8 +243,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "miele.washing_machine": QuickStartPiece(
         "washing_machine",
         "Miele washing machine · Miele",
-        "A washing machine with its own energy and water meters for the cycle; set "
-        "its status in the developer tools to run it.",
+        "A washing machine that meters its cycle's energy and water.",
         {},
         registration=partial(
             appliances.miele, serial="000111000001", name="Miele washing machine"
@@ -266,34 +252,28 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "home_connect.washing_machine": QuickStartPiece(
         "washing_machine",
         "Siemens washer · Home Connect",
-        "A washer with its plug sensor as meter; set its operation state in the "
-        "developer tools to run it.",
+        "A washer with a metering plug.",
         {"input_number.siemens_washer_energy": 0},
         registration=partial(appliances.home_connect, "Washer", name="Siemens washer"),
     ),
     "home_connect_alt.washing_machine": QuickStartPiece(
         "washing_machine",
         "Bosch washer · Home Connect Alt",
-        "A washer whose kind its integration doesn't tell, so Quick Start asks for "
-        "the Device Type, with its plug sensor as meter; set its operation state "
-        "(`BSH.Common.EnumType.OperationState.Run`) in the developer tools to run it.",
+        "A washer of a kind Quick Start asks for, with a metering plug.",
         {"input_number.bosch_washer_energy": 0},
         registration=partial(appliances.home_connect_alt, name="Bosch washer"),
     ),
     "lg_thinq.washing_machine": QuickStartPiece(
         "washing_machine",
         "WashTower washer · LG ThinQ",
-        "The washer half of a WashTower, with its plug sensor as meter, on the "
-        "LG ThinQ entry its dryer half shares; set its current state in the "
-        "developer tools to run it.",
+        "The washer half of a WashTower, with a metering plug.",
         {"input_number.washtower_washer_energy": 0},
         registration=partial(_washtower, sub_id="washer"),
     ),
     "smartthings.washing_machine": QuickStartPiece(
         "washing_machine",
         "Samsung washer · SmartThings",
-        "A washer, with its own energy meter; set its machine state in the "
-        "developer tools to run it.",
+        "A washer with its own energy meter.",
         {},
         registration=partial(
             appliances.smartthings,
@@ -305,9 +285,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "dishwasher": DeviceWithHistory(
         "dishwasher",
         "Kitchen dishwasher",
-        "Energy and water meters, tabs, salt and rinse aid as Doses and Program "
-        "Defaults. Short history: 10 cycles over four weeks; long: a cycle every few "
-        "days for two years.",
+        "Meters, tabs, salt and rinse aid as Doses, Program Defaults; 10 cycles, or two years of them.",
         {
             "input_select.dishwasher_status": "off",
             "input_select.dishwasher_program": "Eco 50°",
@@ -367,16 +345,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",
         "Dishwasher · WashData",
-        "A dishwasher WashData follows, with its plug sensor as meter; the "
-        "dishwasher's helpers run it.",
+        "A dishwasher with a metering plug; its WashData helpers run it.",
         _washdata_helpers("washdata_dishwasher", "Eco 50°"),
         registration=partial(appliances.washdata, "dishwasher", name="Dishwasher"),
     ),
     "miele.dishwasher": QuickStartPiece(
         "dishwasher",
         "Miele dishwasher · Miele",
-        "A dishwasher with its own energy and water meters for the cycle; set its "
-        "status in the developer tools to run it.",
+        "A dishwasher that meters its cycle's energy and water.",
         {},
         registration=partial(
             appliances.miele,
@@ -388,8 +364,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "home_connect.dishwasher": QuickStartPiece(
         "dishwasher",
         "Siemens dishwasher · Home Connect",
-        "A dishwasher with its plug sensor as meter; set its operation state in the "
-        "developer tools to run it.",
+        "A dishwasher with a metering plug.",
         {"input_number.siemens_dishwasher_energy": 0},
         registration=partial(
             appliances.home_connect, "Dishwasher", name="Siemens dishwasher"
@@ -398,17 +373,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "homeconnect_ws.dishwasher": QuickStartPiece(
         "dishwasher",
         "Bosch Dishwasher · Home Connect Local",
-        "A dishwasher whose kind its integration doesn't tell, so Quick Start asks "
-        "for the Device Type, with its plug sensor as meter; set its operation state "
-        "in the developer tools to run it.",
+        "A dishwasher of a kind Quick Start asks for, with a metering plug.",
         {"input_number.bosch_dishwasher_energy": 0},
         registration=appliances.home_connect_local,
     ),
     "lg_thinq.dishwasher": QuickStartPiece(
         "dishwasher",
         "LG dishwasher · LG ThinQ",
-        "A dishwasher with its washing course as program and its plug sensor as "
-        "meter; set its current state in the developer tools to run it.",
+        "A dishwasher with its washing course as program and a metering plug.",
         {"input_number.lg_dishwasher_energy": 0},
         registration=partial(
             appliances.lg_thinq,
@@ -420,8 +392,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "smartthings.dishwasher": QuickStartPiece(
         "dishwasher",
         "Samsung dishwasher · SmartThings",
-        "A dishwasher, with its own energy meter; set its machine state in the "
-        "developer tools to run it.",
+        "A dishwasher with its own energy meter.",
         {},
         registration=partial(
             appliances.smartthings,
@@ -433,9 +404,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "dryer": DeviceWithHistory(
         "tumble_dryer",
         "Heat pump dryer",
-        "An energy meter, dryer sheets and fragrance as Doses and Program Defaults, "
-        "no water. Short history: 9 loads over four weeks; long: a load every week or "
-        "so for two years.",
+        "An energy meter, two Doses and Program Defaults, no water; 9 loads, or two years of them.",
         {
             "input_select.dryer_status": "off",
             "input_select.dryer_program": "Cotton cupboard dry",
@@ -480,16 +449,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "ha_washdata.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
         "Tumble dryer · WashData",
-        "A tumble dryer WashData follows, with its plug sensor as meter; the "
-        "WashData dryer's helpers run it.",
+        "A tumble dryer with a metering plug; its WashData helpers run it.",
         _washdata_helpers("washdata_dryer", "Cotton dry"),
         registration=partial(appliances.washdata, "dryer", name="Tumble dryer"),
     ),
     "miele.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
         "Miele tumble dryer · Miele",
-        "A tumble dryer with its own energy meter for the cycle; set its status in "
-        "the developer tools to run it.",
+        "A tumble dryer that meters its cycle's energy.",
         {},
         registration=partial(
             appliances.miele,
@@ -501,25 +468,21 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "home_connect.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
         "Siemens dryer · Home Connect",
-        "A dryer with its plug sensor as meter; set its operation state in the "
-        "developer tools to run it.",
+        "A dryer with a metering plug.",
         {"input_number.siemens_dryer_energy": 0},
         registration=partial(appliances.home_connect, "Dryer", name="Siemens dryer"),
     ),
     "lg_thinq.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
         "WashTower dryer · LG ThinQ",
-        "The dryer half of a WashTower, with its plug sensor as meter, on the "
-        "LG ThinQ entry its washer half shares; set its current state in the "
-        "developer tools to run it.",
+        "The dryer half of a WashTower, with a metering plug.",
         {"input_number.washtower_dryer_energy": 0},
         registration=partial(_washtower, sub_id="dryer"),
     ),
     "smartthings.tumble_dryer": QuickStartPiece(
         "tumble_dryer",
         "Samsung dryer · SmartThings",
-        "A dryer, with its own energy meter; set its machine state in the "
-        "developer tools to run it.",
+        "A dryer with its own energy meter.",
         {},
         registration=partial(
             appliances.smartthings,
@@ -531,8 +494,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "coffee": DeviceWithHistory(
         "coffee_machine",
         "Espresso machine",
-        "Electricity and water per Program, coffee beans and milk as Doses. Short "
-        "history: 12 drinks over ten days; long: a drink every few days for two years.",
+        "Electricity and water per Program, beans and milk as Doses; 12 drinks, or two years of them.",
         {
             "input_select.coffee_status": "off",
             "input_select.coffee_program": "Espresso",
@@ -579,8 +541,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "miele.coffee_machine": QuickStartPiece(
         "coffee_machine",
         "Miele coffee system · Miele",
-        "A coffee machine with its plug sensor as meter; set its status in the "
-        "developer tools to run it.",
+        "A coffee machine with a metering plug.",
         {"input_number.miele_coffee_system_energy": 0},
         registration=partial(
             appliances.miele,
@@ -592,8 +553,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "home_connect.coffee_machine": QuickStartPiece(
         "coffee_machine",
         "Siemens coffee maker · Home Connect",
-        "A coffee maker with its plug sensor as meter; set its operation state in "
-        "the developer tools to run it.",
+        "A coffee maker with a metering plug.",
         {"input_number.siemens_coffee_maker_energy": 0},
         registration=partial(
             appliances.home_connect, "CoffeeMaker", name="Siemens coffee maker"
@@ -602,9 +562,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "oven": DeviceWithHistory(
         "oven",
         "Kitchen oven",
-        "A Program input and electricity from Program Defaults, without a meter. "
-        "Short history: 10 meals over four weeks; long: a meal every few days for "
-        "two years.",
+        "Electricity from Program Defaults, without a meter; 10 meals, or two years of them.",
         {
             "input_select.kitchen_oven_status": "off",
             "input_select.kitchen_oven_program": "Fan plus 180°",
@@ -630,8 +588,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "miele.oven": QuickStartPiece(
         "oven",
         "Miele oven · Miele",
-        "An oven with its plug sensor as meter; set its status in the developer "
-        "tools to run it.",
+        "An oven with a metering plug.",
         {"input_number.miele_oven_energy": 0},
         registration=partial(
             appliances.miele, "Oven", serial="000111000005", name="Miele oven"
@@ -640,16 +597,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "home_connect.oven": QuickStartPiece(
         "oven",
         "Siemens oven · Home Connect",
-        "An oven with its plug sensor as meter; set its operation state in the "
-        "developer tools to run it.",
+        "An oven with a metering plug.",
         {"input_number.siemens_oven_energy": 0},
         registration=partial(appliances.home_connect, "Oven", name="Siemens oven"),
     ),
     "lg_thinq.oven": QuickStartPiece(
         "oven",
         "LG oven · LG ThinQ",
-        "An oven with its plug sensor as meter; set its oven current state in the "
-        "developer tools to run it.",
+        "An oven with a metering plug.",
         {"input_number.lg_oven_energy": 0},
         registration=partial(
             appliances.lg_thinq,
@@ -661,8 +616,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "smartthings.oven": QuickStartPiece(
         "oven",
         "Samsung oven · SmartThings",
-        "An oven, with its own energy meter; set its machine state in the "
-        "developer tools to run it.",
+        "An oven with its own energy meter.",
         {},
         registration=partial(
             appliances.smartthings,
@@ -674,9 +628,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "charger": DeviceWithHistory(
         "ev_charger",
         "Carport charger",
-        "A session energy sensor that counts each charge from 0; a car left plugged "
-        "in once full is Paused. Short history: 10 charges over four weeks; long: a "
-        "charge every few days for two years.",
+        "A session energy sensor, Paused while the car is full; 10 charges, or two years of them.",
         {
             "input_select.carport_charger_status": "disconnected",
             "input_number.carport_charger_session": 0,
@@ -689,74 +641,63 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
         "Tesla Wall Connector · Tesla Wall Connector",
-        "A charger with its own lifetime energy meter; the Wall Connector's helpers "
-        "run it.",
+        "A charger with its own lifetime energy meter; the Wall Connector's helpers run it.",
         {"input_select.wall_connector_status": "not_connected"},
         registration=ev_chargers.wall_connector,
     ),
     "evcc_intg.ev_charger": QuickStartPiece(
         "ev_charger",
         "evcc ☀️🚘 Solar Charging [evcc] · evcc",
-        "A site with one loadpoint, metered by its session counter, and a vehicle; "
-        "set its charging state to `on` in the developer tools to run it.",
+        "A site with one loadpoint, metered by its session counter, and a vehicle.",
         {},
         registration=ev_chargers.evcc_site,
     ),
     "ocpp.ev_charger": QuickStartPiece(
         "ev_charger",
         "charger Connector 1 and 2 · OCPP",
-        "A charge point with two connectors, each a Device of its own with its "
-        "energy meter; set a connector's status to `Charging` in the developer "
-        "tools to run it.",
+        "A charge point with two connectors, each a Device with its own energy meter.",
         {},
         registration=partial(ev_chargers.charge_point, connectors=2),
     ),
     "easee.ev_charger": QuickStartPiece(
         "ev_charger",
         "Garage · Easee",
-        "A charger with its lifetime energy counter; set its status to `charging` "
-        "in the developer tools to run it.",
+        "A charger with its lifetime energy counter.",
         {},
         registration=ev_chargers.easee,
     ),
     "zaptec.ev_charger": QuickStartPiece(
         "ev_charger",
         "Driveway · Zaptec",
-        "A charger in its installation, metered by its session counter; set its "
-        "operation mode to `connected_charging` in the developer tools to run it.",
+        "A charger in its installation, metered by its session counter.",
         {},
         registration=ev_chargers.zaptec,
     ),
     "goecharger_mqtt.ev_charger": QuickStartPiece(
         "ev_charger",
         "go-eCharger · go-e Charger MQTT",
-        "A charger with its lifetime energy counter in Wh; set its car state to "
-        "`charging` in the developer tools to run it.",
+        "A charger with its lifetime energy counter in Wh.",
         {},
         registration=ev_chargers.goe_mqtt,
     ),
     "goecharger_api2.ev_charger": QuickStartPiece(
         "ev_charger",
         "go-e Charger · go-e Charger API v2",
-        "A charger with its lifetime energy counter; set its car state to "
-        "`Charging` in the developer tools to run it.",
+        "A charger with its lifetime energy counter.",
         {},
         registration=ev_chargers.goe_api2,
     ),
     "wallbox.ev_charger": QuickStartPiece(
         "ev_charger",
         "Wallbox Garage · Wallbox",
-        "A charger with its session energy counter; set its status description "
-        "to `Charging` in the developer tools to run it.",
+        "A charger with its session energy counter.",
         {},
         registration=ev_chargers.wallbox,
     ),
     "mower": DeviceWithHistory(
         "robotic_mower",
         "Robotic mower",
-        "Its charging station's energy meter, charging after mowing as Paused, and "
-        "a mow it got stuck on as a Fault. Short history: 10 mows over three weeks; "
-        "long: two summers of them.",
+        "Its station's energy meter, recharging as Paused, a stuck mow as a Fault; 10 mows, or two summers.",
         {
             "input_select.robotic_mower_status": "parked",
             "input_number.robotic_mower_station_energy": 85.0,
@@ -769,9 +710,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
     "irrigation": DeviceWithHistory(
         "other",
         "Garden valve",
-        'An Other Device under the Type Name "Irrigation" with water on a water '
-        "meter and the electricity source None, each watering costing only its "
-        "water. Short history: 6 waterings over two weeks; long: two summers of them.",
+        'An Other Device "Irrigation" that costs only its metered water; 6 waterings, or two summers.',
         {
             "input_select.irrigation_status": "off",
             "input_number.irrigation_water": IRRIGATION_WATER,
