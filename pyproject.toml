@@ -40,6 +40,10 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT", "TID"]
 # The formatter owns line length.
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# A static stand-in imports its base from the sibling it is mounted next to.
+"dev/*/{__init__,config_flow}.py" = ["TID252"]
+
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 known-first-party = ["custom_components.coinop"]

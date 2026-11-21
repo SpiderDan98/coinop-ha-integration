@@ -3,26 +3,19 @@ fixture: from the integration's `Registration` in `dev/coinop_dev/stand_ins`, wh
 the dev container's stand-ins register from too."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, Concatenate
+from typing import Concatenate
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from dev.coinop_dev.stand_ins import Registration, appliances, ev_chargers, printers
-
-
-@dataclass
-class HaDevice:
-    device: dr.DeviceEntry
-    # A second HA device linked to `device` with `via_device_id`, such as an ACE unit.
-    linked: dr.DeviceEntry | None
-    # Entity ids by the integration's entity key.
-    entities: dict[str, str]
-
-    def __getitem__(self, key: str) -> str:
-        return self.entities[key]
+from dev.coinop_dev.stand_ins import (
+    HaDevice as HaDevice,
+    Registration,
+    appliances,
+    ev_chargers,
+    printers,
+    register,
+)
 
 
 def add_ha_devices(hass: HomeAssistant, registration: Registration) -> list[HaDevice]:
@@ -35,45 +28,7 @@ def add_ha_devices(hass: HomeAssistant, registration: Registration) -> list[HaDe
     else:
         entry = MockConfigEntry(domain=domain, **registration.entry)
         entry.add_to_hass(hass)
-    devices = dr.async_get(hass)
-    entities = er.async_get(hass)
-
-    def create(fields: dict[str, Any], parent: dr.DeviceEntry | None) -> dr.DeviceEntry:
-        created = devices.async_get_or_create(config_entry_id=entry.entry_id, **fields)
-        if parent is None:
-            return created
-        # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
-        updated = devices.async_update_device(created.id, via_device_id=parent.id)
-        assert updated is not None
-        return updated
-
-    added: list[HaDevice] = []
-    for shape in registration.of_entry(entry.entry_id).devices:
-        device = create(
-            shape.fields, None if shape.via is None else added[shape.via].device
-        )
-        linked = None if shape.linked is None else create(shape.linked, device)
-        assert linked or not any(spec.linked for spec in shape.entities.values()), (
-            "a linked entity needs a linked HA device"
-        )
-        ids = {
-            key: entities.async_get_or_create(
-                spec.platform,
-                domain,
-                spec.unique_id,
-                config_entry=entry,
-                device_id=(linked if spec.linked and linked else device).id,
-                suggested_object_id=shape.suggested_object_id(key),
-                unit_of_measurement=spec.unit,
-                capabilities=spec.capabilities,
-                disabled_by=er.RegistryEntryDisabler.INTEGRATION
-                if spec.disabled
-                else None,
-            ).entity_id
-            for key, spec in shape.entities.items()
-        }
-        added.append(HaDevice(device, linked, ids))
-    return added
+    return register(hass, entry, registration)
 
 
 def first(devices: list[HaDevice]) -> HaDevice:
