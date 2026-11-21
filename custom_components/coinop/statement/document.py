@@ -1,12 +1,14 @@
 """The Cost Statement PDF, laid out with fpdf2 in Noto Sans.
 
+It opens with the total and what it is made of, then lists the Runs.
+
 Blocking (fonts, layout): run it in the executor, on copies of the Runs. Every
 amount is rounded first and every sum adds rounded amounts, so each column adds
 up; Markup applies to the rounded subtotal only.
 """
 
 from collections.abc import Callable, Mapping, Sequence
-from datetime import datetime, tzinfo
+from datetime import datetime, timedelta, tzinfo
 from decimal import ROUND_HALF_UP, Decimal
 from functools import partial
 from io import BytesIO
@@ -26,17 +28,44 @@ from .text import Text
 
 FONTS = Path(__file__).parent / "fonts"
 FONT = "NotoSans"
+LOGO = Path(__file__).parents[1] / "brand" / "icon.png"
+BRAND = "Coin-op"
 LETTER_COUNTRIES = ("US", "CA")
-MARGIN = 18
-FOOTER = 14
-GREY = (110, 110, 110)
-RULE = (200, 200, 200)
-HEADINGS = FontFace(emphasis="BOLD", fill_color=(242, 242, 242))
-TOTAL_ROW = FontFace(emphasis="BOLD")
+MARGIN = 22
+# From the page's bottom edge to where the text ends, and to the footer line.
+BOTTOM = 26
+FOOTER = 17
+INK = (28, 36, 34)
+GREY = (104, 114, 111)
+RULE = (224, 231, 229)
+ACCENT = (14, 118, 104)
+WHITE = (255, 255, 255)
+# The panel's colours for the same kinds (frontend/src/styles.ts).
+KIND_COLOURS = {
+    LineItemKind.ELECTRICITY: (249, 168, 37),
+    LineItemKind.WATER: (30, 136, 229),
+    LineItemKind.MATERIAL: (38, 166, 154),
+    LineItemKind.OTHER: (126, 87, 194),
+}
+MARKUP_COLOUR = (120, 134, 131)
+BAR = 4.6
+# The narrowest a legend entry gets before the legend wraps.
+LEGEND_COLUMN = 40
 # Pixels: sharp at the printed size (about 300 dpi), small in the file.
-COVER_EDGE = 800
+COVER_EDGE = 300
 # The largest a Cover Image is printed, width and height in mm.
-COVER_BOX = (64, 48)
+COVER_BOX = (24, 18)
+COVER_RADIUS = 1.8
+# What the Cover Images take of a section's width, when any Run has one.
+COVER_COLUMN = 29
+# The width kept for a Run's total beside its name.
+AMOUNT = 34
+# Less room than this and a section starts on the next page.
+SECTION_START = 30
+GAP = 2
+HEADINGS = FontFace(color=GREY)
+QUIET = FontFace(color=GREY, size_pt=8.5)
+TOTAL_ROW = FontFace(emphasis="BOLD")
 
 
 class _Document(FPDF):
@@ -45,28 +74,71 @@ class _Document(FPDF):
         self.t = text
         self.add_font(FONT, "", FONTS / "NotoSans-Regular.ttf")
         self.add_font(FONT, "B", FONTS / "NotoSans-Bold.ttf")
-        self.alias_nb_pages(align="R")
         self.set_margins(MARGIN, MARGIN)
-        self.set_auto_page_break(True, MARGIN + FOOTER)
+        self.set_auto_page_break(True, BOTTOM)
+        self.c_margin = 0
         self.set_draw_color(*RULE)
         self.set_line_width(0.2)
 
-    def footer(self) -> None:
-        self.set_y(-MARGIN - 4)
-        self.set_font(FONT, "", 8)
-        self.set_text_color(*GREY)
-        self.cell(self.epw / 2, 5, self.t("footer"))
-        page = self.t("page", page=self.page_no(), pages=self.str_alias_nb_pages)
-        self.cell(self.epw / 2, 5, page, align="R")
-        self.set_text_color(0)
+    def footers(self) -> None:
+        """Every page's footer, drawn last: fpdf2's page count alias leaves a gap."""
+        self.set_auto_page_break(False)
+        self.style(8, colour=GREY)
+        pages = self.pages_count
+        for number in range(1, pages + 1):
+            self.page = number
+            self.set_y(-FOOTER)
+            self.cell(self.epw / 2, 5, self.t("footer"))
+            page = self.t("page", page=number, pages=pages)
+            self.cell(self.epw / 2, 5, page, align="R")
 
-    def line_of_text(
-        self, text: str, size: float, style: str = "", grey: bool = False
+    def style(
+        self, size: float, style: str = "", colour: tuple[int, int, int] = INK
     ) -> None:
         self.set_font(FONT, style, size)
-        self.set_text_color(*(GREY if grey else (0, 0, 0)))
-        self.multi_cell(0, size * 0.5, text, new_x="LMARGIN", new_y="NEXT")
-        self.set_text_color(0)
+        self.set_text_color(*colour)
+
+    def paragraph(self, text: str, height: float, width: float = 0) -> None:
+        """Wrapped text from the current position, in the current style."""
+        self.multi_cell(width, height, text, align="L", new_x="LEFT", new_y="NEXT")
+
+    def dot(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        colour: tuple[int, int, int],
+    ) -> None:
+        """A filled box with round ends."""
+        # A fill colour left set would fill every table cell after it.
+        with self.local_context(fill_color=colour):
+            self.rect(
+                x,
+                y,
+                width,
+                height,
+                "F",
+                round_corners=True,
+                # fpdf2 misreads a radius of half the side or more.
+                corner_radius=min(height, width) * 0.49,
+            )
+
+    def rule(self) -> None:
+        self.line(self.l_margin, self.y, self.w - self.r_margin, self.y)
+
+    def round_corners(self, x: float, y: float, width: float, height: float) -> None:
+        """fpdf2 can't clip an image to a rounded box: a white frame covers its corners."""
+        frame = COVER_RADIUS / 2
+        with self.local_context(draw_color=WHITE, line_width=frame):
+            self.rect(
+                x - frame / 2,
+                y - frame / 2,
+                width + frame,
+                height + frame,
+                round_corners=True,
+                corner_radius=COVER_RADIUS + frame / 2,
+            )
 
     def keep_together(self, draw: Callable[[], None]) -> None:
         """On one page unless it is longer than a page; then it breaks."""
@@ -82,27 +154,41 @@ class _Document(FPDF):
         self,
         widths: Sequence[float],
         align: Sequence[str],
-        headings: Sequence[str],
         rows: Sequence[Sequence[str]],
+        *,
+        headings: Sequence[str] = (),
+        styles: Mapping[int, FontFace] | None = None,
         total: Sequence[str] | None = None,
         width: float | None = None,
+        ruled: bool = False,
     ) -> None:
-        self.set_font(FONT, "", 9)
+        """A table at the right margin; `styles` are the rows' own by column."""
+        self.style(9)
+        last = len(widths) - 1
+        space = 1.1 if ruled else 0.2
         with self.table(
             col_widths=widths,
             text_align=align,
             width=width,
             align="RIGHT",
-            borders_layout="HORIZONTAL_LINES",
+            v_align="TOP",
+            borders_layout="HORIZONTAL_LINES" if ruled else "NONE",
             headings_style=HEADINGS,
             first_row_as_headings=bool(headings),
-            line_height=5,
-            padding=(1, 1.5),
+            line_height=4.4,
         ) as table:
-            for row in [headings, *rows] if headings else rows:
-                table.row(row)
-            if total:
-                table.row(total, style=TOTAL_ROW)
+            for cells, row_style in [
+                *([(headings, None)] if headings else []),
+                *((row, None) for row in rows),
+                *([(total, TOTAL_ROW)] if total else []),
+            ]:
+                row = table.row(style=row_style)
+                for column, cell in enumerate(cells):
+                    row.cell(
+                        cell,
+                        style=(styles or {}).get(column) if cells in rows else None,
+                        padding=(space, 0 if column == last else GAP, space, 0),
+                    )
 
 
 def _total(run: Run, decimals: int) -> Decimal:
@@ -139,27 +225,131 @@ def _unit_price(item: LineItem, text: Text) -> str:
     return text.unit_price(item.unit_price)
 
 
-def _parts(count: int, text: Text) -> str:
-    return text("part_one") if count == 1 else text("parts", count=count)
+def _quantity(item: LineItem, text: Text) -> str:
+    if item.quantity is None:
+        return ""
+    return f"{text.quantity(item.quantity, item.unit)} × {_unit_price(item, text)}"  # noqa: RUF001
 
 
-def _header(pdf: _Document, runs: list[Run], options: Options, now: datetime) -> None:
+def _details(run: Run, now: datetime, text: Text) -> str:
+    details = [
+        run.device_name,
+        text.date(run.started),
+        *([text("program", program=run.program)] if run.program else []),
+        text("running_time", duration=text.duration(running_time(run, now))),
+    ]
+    # One part costs what the Run costs.
+    if (count := run.part_count) is not None and count > 1:
+        amount = text.money(_per_part(run, count, text.decimals))
+        details += [text("parts", count=count), text("per_part", amount=amount)]
+    if outcome := _outcome(run, text):
+        details.append(outcome)
+    return " · ".join(details)
+
+
+def _header(
+    pdf: _Document, runs: list[Run], options: Options, now: datetime, total: Decimal
+) -> None:
     text = pdf.t
-    pdf.line_of_text(options.title or text("title"), 18, "B")
-    pdf.ln(1)
-    pdf.line_of_text(text("created", date=text.date(now)), 9, grey=True)
+    top = pdf.y
+    pdf.image(LOGO, x=pdf.l_margin, y=top, w=9)
+    pdf.set_xy(pdf.l_margin + 12, top + 2)
+    pdf.style(10.5, "B", ACCENT)
+    pdf.cell(pdf.epw / 2 - 12, 5, BRAND)
+    pdf.style(8.5, colour=GREY)
+    pdf.cell(pdf.epw / 2, 5, text("created", date=text.date(now)), align="R")
+    pdf.set_y(top + 21)
+    pdf.style(11, "B", ACCENT)
+    pdf.paragraph(options.title or text("title"), 5.5)
+    pdf.ln(1.5)
+    pdf.style(36, "B")
+    pdf.paragraph(text.money(total), 15)
+    pdf.ln(1.5)
     start = text.date(runs[0].started)
     end = text.date(max(run.ended or run.started for run in runs))
-    period = (
-        text("period_day", day=start)
-        if start == end
-        else text("period", start=start, end=end)
+    time = sum((running_time(run, now) for run in runs), timedelta())
+    pdf.style(9.5, colour=GREY)
+    pdf.paragraph(
+        " · ".join(
+            [
+                text("run_one") if len(runs) == 1 else text("runs", count=len(runs)),
+                start if start == end else text("period", start=start, end=end),
+                text("running_time", duration=text.duration(time)),
+            ]
+        ),
+        4.8,
     )
-    pdf.line_of_text(period, 9, grey=True)
     if options.note:
-        pdf.ln(3)
-        pdf.line_of_text(options.note, 10)
-    pdf.ln(6)
+        pdf.ln(3.5)
+        pdf.style(10)
+        pdf.paragraph(options.note, 5)
+    pdf.ln(8)
+
+
+def _breakdown(
+    pdf: _Document, runs: list[Run], percent: float, markup: Decimal
+) -> None:
+    """What the total is made of: a bar and its legend, largest kind first.
+
+    The bar is left out when an amount is negative, as no length shows that.
+    """
+    text = pdf.t
+    kinds = sorted(
+        (
+            (kind, amount)
+            for kind in LineItemKind
+            if (
+                amount := rounded_sum(
+                    (
+                        item.amount
+                        for run in runs
+                        for item in run.line_items
+                        if item.kind is kind
+                    ),
+                    text.decimals,
+                )
+            )
+        ),
+        key=lambda share: -share[1],
+    )
+    shares = [
+        *((text(f"kind.{kind}"), amount, KIND_COLOURS[kind]) for kind, amount in kinds),
+        *(
+            [(text("markup", percent=text.percent(percent)), markup, MARKUP_COLOUR)]
+            if markup
+            else []
+        ),
+    ]
+    if len(shares) < 2:
+        return
+    total = sum((amount for _, amount, _ in shares), Decimal(0))
+    proportional = all(amount > 0 for _, amount, _ in shares)
+    if proportional:
+        x = pdf.l_margin
+        length = pdf.epw - 0.7 * (len(shares) - 1)
+        for _, amount, colour in shares:
+            width = length * float(amount / total)
+            pdf.dot(x, pdf.y, width, BAR, colour)
+            x += width + 0.7
+        pdf.ln(BAR + 4.5)
+    columns = int(pdf.epw // LEGEND_COLUMN)
+    top = pdf.y
+    for index, (label, amount, colour) in enumerate(shares):
+        x = pdf.l_margin + index % columns * pdf.epw / columns
+        y = top + index // columns * 14
+        pdf.dot(x, y + 1.1, 2.6, 2.6, colour)
+        pdf.set_xy(x + 4.2, y)
+        pdf.style(9, colour=GREY)
+        pdf.cell(text=label, h=4.8)
+        pdf.set_xy(x + 4.2, y + 5.2)
+        pdf.style(10.5, "B")
+        pdf.cell(text=text.money(amount), h=5.4)
+        if proportional and index < len(kinds):
+            share = text.number(float(amount / total) * 100, 0)
+            pdf.set_xy(pdf.x + 1.8, y + 5.5)
+            pdf.style(8.5, colour=GREY)
+            pdf.cell(text=text("share", percent=share), h=5.4)
+    pdf.set_y(top + (len(shares) + columns - 1) // columns * 14 + 2)
 
 
 def _cover(path: Path) -> tuple[bytes, float, float] | None:
@@ -179,49 +369,47 @@ def _section(
     run: Run,
     now: datetime,
     cover: tuple[bytes, float, float] | None,
+    indent: float,
 ) -> None:
-    text, decimals = pdf.t, pdf.t.decimals
-    pdf.line_of_text(_name(run, text), 12, "B")
-    details = [
-        run.device_name,
-        text.date(run.started),
-        *([text("program", program=run.program)] if run.program else []),
-        text("running_time", duration=text.duration(running_time(run, now))),
-    ]
-    if (count := run.part_count) is not None:
-        details += [
-            _parts(count, text),
-            text("per_part", amount=text.money(_per_part(run, count, decimals))),
-        ]
-    pdf.line_of_text(" · ".join(details), 9, grey=True)
-    if outcome := _outcome(run, text):
-        pdf.line_of_text(text("outcome", outcome=outcome), 9, grey=True)
-    pdf.ln(1.5)
+    """`indent`: how far its text starts from the margin, past the Cover Images."""
+    text = pdf.t
+    if pdf.will_page_break(SECTION_START):
+        pdf.add_page()
+    pdf.rule()
+    pdf.ln(5.5)
+    top, page, left = pdf.y, pdf.page, pdf.l_margin + indent
     if cover:
         data, width, height = cover
-        pdf.image(BytesIO(data), w=width, h=height)
-        pdf.ln(2)
-    pdf.rows(
-        (46, 18, 18, 18),
-        ("LEFT", "RIGHT", "RIGHT", "RIGHT"),
-        [
-            text(f"column.{column}")
-            for column in ("line_item", "quantity", "unit_price", "amount")
-        ],
-        [
-            (
-                _label(item, text),
-                ""
-                if item.quantity is None
-                else text.quantity(item.quantity, item.unit),
-                _unit_price(item, text),
-                text.money(round_amount(item.amount, decimals)),
-            )
-            for item in run.line_items
-        ],
-        total=(text("run_total"), "", "", text.money(_total(run, decimals))),
-    )
-    pdf.ln(7)
+        pdf.image(BytesIO(data), x=pdf.l_margin, y=top, w=width, h=height)
+        pdf.round_corners(pdf.l_margin, top, width, height)
+    pdf.set_xy(left, top)
+    pdf.style(11, "B")
+    pdf.paragraph(_name(run, text), 5.5, pdf.epw - indent - AMOUNT)
+    below = pdf.y
+    pdf.set_xy(pdf.w - pdf.r_margin - AMOUNT, top)
+    pdf.cell(AMOUNT, 5.5, text.money(_total(run, text.decimals)), align="R")
+    pdf.set_xy(left, below)
+    pdf.style(8.5, colour=GREY)
+    pdf.paragraph(_details(run, now, text), 4.4, pdf.epw - indent)
+    pdf.ln(1.8)
+    if run.line_items:
+        pdf.rows(
+            (9, 7, 4),
+            ("LEFT", "LEFT", "RIGHT"),
+            [
+                (
+                    _label(item, text),
+                    _quantity(item, text),
+                    text.money(round_amount(item.amount, text.decimals)),
+                )
+                for item in run.line_items
+            ],
+            styles={1: QUIET},
+            width=pdf.epw - indent,
+        )
+    if cover and pdf.page == page:
+        pdf.set_y(max(pdf.y, top + cover[2]))
+    pdf.ln(5)
 
 
 def _compact(pdf: _Document, runs: list[Run]) -> None:
@@ -260,10 +448,6 @@ def _compact(pdf: _Document, runs: list[Run]) -> None:
             "RIGHT",
         ),
         [
-            text(f"column.{column}")
-            for column in ("run", "device", *programs, "started", *columns, "total")
-        ],
-        [
             (
                 name(run),
                 run.device_name,
@@ -274,25 +458,26 @@ def _compact(pdf: _Document, runs: list[Run]) -> None:
             )
             for run in runs
         ],
+        headings=[
+            text(f"column.{column}")
+            for column in ("run", "device", *programs, "started", *columns, "total")
+        ],
+        ruled=True,
     )
-    pdf.ln(7)
 
 
-def _totals(pdf: _Document, runs: list[Run], markup: float) -> None:
-    text, decimals = pdf.t, pdf.t.decimals
-    subtotal = sum((_total(run, decimals) for run in runs), Decimal(0))
-    amount = (subtotal * Decimal(repr(markup)) / 100).quantize(
-        Decimal(1).scaleb(-decimals), ROUND_HALF_UP
-    )
-    rows = [(text("subtotal"), text.money(subtotal))]
-    if markup:
-        rows.append((text("markup", percent=text.percent(markup)), text.money(amount)))
+def _totals(pdf: _Document, subtotal: Decimal, percent: float, markup: Decimal) -> None:
+    """How the Runs' amounts and the Markup make the total."""
+    text = pdf.t
+    pdf.ln(6)
     pdf.rows(
         (1, 1),
         ("LEFT", "RIGHT"),
-        [],
-        rows,
-        total=(text("total"), text.money(subtotal + amount)),
+        [
+            (text("subtotal"), text.money(subtotal)),
+            (text("markup", percent=text.percent(percent)), text.money(markup)),
+        ],
+        total=(text("total"), text.money(subtotal + markup)),
         width=80,
     )
 
@@ -312,12 +497,28 @@ def render(
     pdf = _Document(text, "Letter" if country in LETTER_COUNTRIES else "A4")
     pdf.set_title(options.title or text("title"))
     pdf.add_page()
-    _header(pdf, runs, options, now)
+    subtotal = sum((_total(run, text.decimals) for run in runs), Decimal(0))
+    markup = (subtotal * Decimal(repr(options.markup)) / 100).quantize(
+        Decimal(1).scaleb(-text.decimals), ROUND_HALF_UP
+    )
+    _header(pdf, runs, options, now, subtotal + markup)
+    _breakdown(pdf, runs, options.markup, markup)
+    pdf.ln(5)
     if options.detail is Detail.COMPACT:
         _compact(pdf, runs)
     else:
+        printed = {
+            run.id: cover
+            for run in runs
+            if run.id in covers and (cover := _cover(covers[run.id]))
+        }
+        indent = COVER_COLUMN if printed else 0
         for run in runs:
-            cover = _cover(covers[run.id]) if run.id in covers else None
-            pdf.keep_together(partial(_section, pdf, run, now, cover))
-    pdf.keep_together(partial(_totals, pdf, runs, options.markup))
+            pdf.keep_together(
+                partial(_section, pdf, run, now, printed.get(run.id), indent)
+            )
+        pdf.rule()
+    if options.markup:
+        pdf.keep_together(partial(_totals, pdf, subtotal, options.markup, markup))
+    pdf.footers()
     return bytes(pdf.output())

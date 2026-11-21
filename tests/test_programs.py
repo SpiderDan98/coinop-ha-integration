@@ -290,7 +290,7 @@ async def test_a_cost_statement_shows_the_program(
         "Washer · Jan 15, 2026 · Program Cotton 60° · Running time 1 h 30 min"
         in detailed.lines
     )
-    assert compact.lines[3:5] == [
+    assert compact.lines[4:6] == [
         "Run Device Program Start Total",
         "Towels Washer Cotton 60° Jan 15, 2026 €0.60",
     ]
