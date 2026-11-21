@@ -119,6 +119,9 @@ INTEGRATIONS = {
         ev_chargers.DEVICE_TYPES,
         ev_chargers.KIND,
     ),
+    "wallbox": Integration(
+        "Wallbox", ev_chargers.wallbox, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
+    ),
 }
 
 

@@ -371,3 +371,43 @@ def add_goe_api2(
         model="Gemini",
         name="go-e Charger",
     )
+
+
+def add_wallbox(
+    hass: HomeAssistant,
+    *,
+    disabled: tuple[str, ...] = (),
+    missing: tuple[str, ...] = (),
+    serial: str = "123456",
+) -> HaDevice:
+    """HA core `wallbox`: one HA device per charger, unique ids `<key>-<serial>`.
+
+    Every energy counter is the session's: Wallbox has no lifetime one.
+    """
+    keys = {
+        "status_description": ("sensor", None),
+        "added_energy": ("sensor", "kWh"),
+        "added_green_energy": ("sensor", "kWh"),
+        "added_grid_energy": ("sensor", "kWh"),
+        "added_range": ("sensor", "km"),
+        "charging_power": ("sensor", "kW"),
+        "cost": ("sensor", "EUR"),
+        "energy_price": ("sensor", "EUR/kWh"),
+        "depot_price": ("sensor", "EUR/kWh"),
+        "locked": ("lock", None),
+        "paused": ("switch", None),
+    }
+    return _charger(
+        hass,
+        "wallbox",
+        {
+            key: (platform, f"{key}-{serial}", unit)
+            for key, (platform, unit) in keys.items()
+        },
+        disabled=disabled,
+        missing=missing,
+        identifiers={("wallbox", serial)},
+        manufacturer="Wallbox",
+        model="PLP1",
+        name="Wallbox Garage",
+    )
