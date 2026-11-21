@@ -120,7 +120,7 @@ _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
 
 **Dose**:
-One product a Device's Runs use, such as a washing machine's detergent or a dishwasher's tabs, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
+One product a Device's Runs use, such as a washing machine's detergent, a dishwasher's tabs or a soda maker's CO₂, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
 _Avoid_: Additive, dosage, detergent (as the generic term)
 _German UI_: Dosierung
 
@@ -130,6 +130,6 @@ _Avoid_: Level sensor, fill level
 _German UI_: Bestandssensor
 
 **Program Defaults**:
-A Device's kWh, litres and Dose amounts for each Program, whichever of them the Device has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+A Device's kWh, litres and Dose amounts for each Program, whichever of them the Device has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure. On a Device with Doses and no Program they are the Default row alone, which every Run uses.
 _Avoid_: Presets, program profiles, estimates
 _German UI_: Programmvorgaben
