@@ -461,7 +461,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 errors["price_entity"] = "unknown_price_unit"
             if Capability.WATER in capabilities:
                 if (water_price := user_input.get("water_price")) is None:
-                    data["water"] = {"source": WaterSource.NONE.value}
+                    data["water"] = {"source": NO_SOURCE}
                 else:
                     data.setdefault("water", {"source": WaterSource.PER_PROGRAM.value})
                     data["water_price"] = {"source": "fixed", "value": water_price}
@@ -898,13 +898,13 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_none(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        self._meter = {"source": ConsumptionSource.NONE.value}
+        self._meter = {"source": NO_SOURCE}
         return await self._meter_done(ELECTRICITY)
 
     async def async_step_water_none(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        self._meter = {"source": WaterSource.NONE.value}
+        self._meter = {"source": NO_SOURCE}
         return await self._meter_done(WATER)
 
     async def async_step_per_program(

@@ -696,9 +696,15 @@ export class DevicesPage extends LitElement {
             })}
           </td>`,
       );
-    const [kwh, litres] = (["kwh", "litres"] as const).map((key) => consumed.includes(key));
-    const beside = kwh ? (litres ? "" : "_unwatered") : litres ? "_unpowered" : "_doses";
-    const hint = dosed ? beside : "_undosed";
+    const kwh = consumed.includes("kwh");
+    const litres = consumed.includes("litres");
+    const hint = () => {
+      if (!dosed) return t("device.program_defaults_hint_undosed");
+      if (kwh && litres) return t("device.program_defaults_hint");
+      if (kwh) return t("device.program_defaults_hint_unwatered");
+      if (litres) return t("device.program_defaults_hint_unpowered");
+      return t("device.program_defaults_hint_doses");
+    };
     const hasPrograms = capabilities.includes("program");
     const programNames = hasPrograms
       ? [...new Set([...known_programs, ...Object.keys(programs)])]
@@ -761,7 +767,7 @@ export class DevicesPage extends LitElement {
       {
         name: "program-defaults",
         group: true,
-        hint: t(`device.program_defaults_hint${hint}`),
+        hint: hint(),
       },
     );
   }

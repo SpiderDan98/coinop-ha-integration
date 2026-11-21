@@ -398,7 +398,10 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
     .subscription("coinop/catalog/subscribe", () => [recorded.catalog.filled])
     .reply("coinop/materials/types", () => recorded.materialTypes)
     .reply("coinop/runs/get", (msg) => {
-      const run = recorded.runs.find((candidate) => candidate.id === msg.run_id);
+      // "unpowered" is the one recorded Run that still takes its electricity by hand.
+      const run = [...recorded.runs, recorded.unpoweredWash].find(
+        (candidate) => candidate.id === msg.run_id,
+      );
       if (!run) throw new WsError("not_found");
       return { run };
     })
