@@ -20,7 +20,12 @@ const SECTIONS = [
 
 // `Selection` names the shape the Presets and the stored selection share.
 const listScenarios = <
-  Selection extends { pieces: string[]; history: "none" | "short" | "long"; open_run: boolean },
+  Selection extends {
+    pieces: string[];
+    history: "none" | "short" | "long";
+    open_run: boolean;
+    spoolman: boolean;
+  },
 >(
   hass: HomeAssistant,
 ) =>
@@ -50,6 +55,7 @@ export class DevScenariosDialog extends LitElement {
   // As the stored selection has them, once listed.
   @state() private history!: NonNullable<typeof this.list>["selection"]["history"];
   @state() private openRun!: boolean;
+  @state() private spoolman!: boolean;
   @state() private preset = "";
   @state() private loading = false;
   @state() private error?: string;
@@ -146,6 +152,13 @@ export class DevScenariosDialog extends LitElement {
         disabled: this.loading,
         onChange: (open_run) => this.pick({ open_run }),
       })}
+      ${checkbox({
+        name: "spoolman",
+        label: t("dev.spoolman"),
+        checked: this.spoolman,
+        disabled: this.loading,
+        onChange: (spoolman) => this.pick({ spoolman }),
+      })}
     </div>`;
   }
 
@@ -156,6 +169,7 @@ export class DevScenariosDialog extends LitElement {
       pieces = this.picked,
       history = this.history,
       open_run = this.openRun,
+      spoolman = this.spoolman,
     }: Partial<Omit<NonNullable<typeof this.list>["selection"], "pieces">> & {
       pieces?: Iterable<string>;
     },
@@ -164,6 +178,7 @@ export class DevScenariosDialog extends LitElement {
     this.picked = new Set(pieces);
     this.history = history;
     this.openRun = open_run;
+    this.spoolman = spoolman;
     this.preset = preset;
   }
 
@@ -185,6 +200,7 @@ export class DevScenariosDialog extends LitElement {
           pieces,
           history: this.history,
           open_run: this.openRun,
+          spoolman: this.spoolman,
         } satisfies NonNullable<typeof this.list>["selection"],
       });
     } catch (error) {

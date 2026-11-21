@@ -14,6 +14,7 @@ from homeassistant.auth.models import User
 from homeassistant.components.websocket_api import ActiveConnection
 from homeassistant.components.websocket_api.http import WebSocketAdapter
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from PIL import Image, ImageDraw
 
@@ -34,8 +35,9 @@ from .data import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class ScenarioError(Exception):
-    """A websocket command a Scenario sent failed."""
+class ScenarioError(HomeAssistantError):
+    """A Scenario couldn't be loaded: a websocket command it sent failed, or Spoolman
+    didn't answer."""
 
 
 class Api:
@@ -82,6 +84,7 @@ class Seed:
         entry: CoinOpConfigEntry,
         devices: Mapping[str, str],
         history: str,
+        filaments: Mapping[str, int],
     ) -> None:
         self.hass = hass
         self.api = api
@@ -89,6 +92,8 @@ class Seed:
         # Each Device with history's subentry id, by its Piece's name.
         self.devices = devices
         self.history = history
+        # The Spoolman Filament each Material is linked to, by its name.
+        self.filaments = filaments
         self.random = random.Random(42)
         self.now = dt_util.now().replace(second=0, microsecond=0)
         self.materials: dict[str, dict[str, Any]] = {}
@@ -113,6 +118,14 @@ class Seed:
                 "diameter": 1.75,
             }
             created = await self.api.call("coinop/materials/create", material=material)
+            if (filament_id := self.filaments.get(name)) is not None:
+                created = await self.api.call(
+                    "coinop/materials/update",
+                    material_id=created["material"]["id"],
+                    material={
+                        "price": {"source": "spoolman", "filament_id": filament_id}
+                    },
+                )
             self.materials[name] = created["material"]
 
     async def add_products(self, products: Iterable[Product]) -> None:

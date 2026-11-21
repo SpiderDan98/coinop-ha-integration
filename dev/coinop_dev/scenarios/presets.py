@@ -17,6 +17,7 @@ SELECTION = vol.Schema(
         vol.Required("pieces"): vol.All([vol.In(list(PIECES))], ordered),
         vol.Optional("history", default="short"): vol.In(HISTORIES),
         vol.Optional("open_run", default=False): bool,
+        vol.Optional("spoolman", default=False): bool,
     }
 )
 
@@ -62,6 +63,12 @@ PRESETS = {
         "Template.",
         ("prusa", "bambu"),
         {"history": "long"},
+    ),
+    "spoolman": Preset(
+        "3D printer on Spoolman",
+        "Like a few Runs, with the 8 filaments linked to Spoolman, which prices them.",
+        ("prusa",),
+        {"spoolman": True},
     ),
     "washing-machine": Preset(
         "Washing machine", "The washing machine with its 10 loads.", ("washer",)

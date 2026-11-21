@@ -13,6 +13,8 @@ Usage: uv run scripts/devenv.py <command>
 
 The container runs the Home Assistant version of the project's .venv, keeps its
 config in .dev/ and is reachable on http://localhost:8124 only from this machine.
+A Spoolman container runs next to it on http://localhost:7913, which every load
+fills afresh.
 """
 
 import argparse
@@ -36,6 +38,11 @@ AUTH = ROOT / ".dev" / "auth.json"
 CONTAINER = "coinop-dev"
 URL = "http://127.0.0.1:8124"
 CLIENT_ID = f"{URL}/"
+# coinop_dev reaches it under its name, on the network the two share.
+SPOOLMAN = "coinop-dev-spoolman"
+SPOOLMAN_IMAGE = "ghcr.io/donkie/spoolman:0.27.1"
+SPOOLMAN_URL = "http://127.0.0.1:7913"
+NETWORK = "coinop-dev"
 DEFAULT_PRESET = "few-runs"
 
 
@@ -86,7 +93,21 @@ def build_panel() -> None:
 
 def start() -> None:
     CONFIG.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
+    subprocess.run(["docker", "rm", "-f", CONTAINER, SPOOLMAN], capture_output=True)
+    # Fails once the network exists.
+    subprocess.run(["docker", "network", "create", NETWORK], capture_output=True)
+    run(
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        SPOOLMAN,
+        "--network",
+        NETWORK,
+        "-p",
+        "127.0.0.1:7913:8000",
+        SPOOLMAN_IMAGE,
+    )
     mounts = {
         CONFIG: "/config",
         ROOT / "dev" / "configuration.yaml": "/config/configuration.yaml:ro",
@@ -103,6 +124,8 @@ def start() -> None:
         "-d",
         "--name",
         CONTAINER,
+        "--network",
+        NETWORK,
         "-p",
         "127.0.0.1:8124:8123",
         "-e",
@@ -118,6 +141,7 @@ def start() -> None:
 
 def prepare(preset: str, *, quiet: bool = False) -> None:
     wait_until_up(quiet=quiet)
+    wait_for_spoolman()
     onboard()
     load(preset)
     print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/coinop", flush=True)
@@ -170,11 +194,14 @@ def stop() -> None:
     """Stop Home Assistant gracefully, so Coin-op saves what it holds, then remove it."""
     # A second Ctrl+C must not cut the shutdown short.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    if subprocess.run(["docker", "inspect", CONTAINER], capture_output=True).returncode:
-        return
-    print("Stopping Home Assistant", flush=True)
-    subprocess.run(["docker", "stop", "-t", "60", CONTAINER], capture_output=True)
-    subprocess.run(["docker", "rm", CONTAINER], capture_output=True)
+    if not subprocess.run(
+        ["docker", "inspect", CONTAINER], capture_output=True
+    ).returncode:
+        print("Stopping Home Assistant", flush=True)
+        subprocess.run(["docker", "stop", "-t", "60", CONTAINER], capture_output=True)
+        subprocess.run(["docker", "rm", CONTAINER], capture_output=True)
+    subprocess.run(["docker", "rm", "-f", SPOOLMAN], capture_output=True)
+    subprocess.run(["docker", "network", "rm", NETWORK], capture_output=True)
 
 
 def host_time_zone() -> str:
@@ -201,6 +228,17 @@ def wait_until_up(*, quiet: bool = False) -> None:
         progress("\n")
         return
     sys.exit("\nHome Assistant did not start; see: uv run scripts/devenv.py logs")
+
+
+def wait_for_spoolman() -> None:
+    for _ in range(60):
+        try:
+            urllib.request.urlopen(f"{SPOOLMAN_URL}/api/v1/info", timeout=2)
+        except OSError:
+            time.sleep(1)
+            continue
+        return
+    sys.exit(f"Spoolman did not start; see: docker logs {SPOOLMAN}")
 
 
 def onboard() -> None:
