@@ -40,6 +40,31 @@
             "device_type": "Device Type"
           }
         },
+        "quick_start": {
+          "title": "Quick Start",
+          "description": "Coin-op found devices of integrations it knows. Pick one to set it up with the Device Inputs from its Integration Profile; Coin-op then only asks for the meter and the prices. Or set a Device up manually and walk every step yourself.",
+          "data": {
+            "device": "Device"
+          }
+        },
+        "quick_start_confirm": {
+          "title": "Meter & prices",
+          "description": "**{device}** is set up with the Device Inputs Coin-op found at {integration}:\n\n{inputs}\n\nYou can check and change them and the Status mapping later under “Reconfigure Device”.",
+          "data": {
+            "meter": "Energy meter or power sensor",
+            "optional_meter": "Energy meter or power sensor (optional)",
+            "price": "Fixed electricity price per kWh",
+            "price_entity": "or electricity price entity",
+            "water_price": "Water price per m³ (optional)"
+          },
+          "data_description": {
+            "meter": "The sensor that measures the Device's energy (e.g. kWh) or power (W), such as a metering plug's. Without one, set the Device up manually: there, electricity can be estimated from the average power.",
+            "optional_meter": "The sensor that measures the Device's energy (e.g. kWh) or power (W), such as a metering plug's. Leave empty to take the electricity per Program from the Program Defaults.",
+            "price": "What you pay per kWh, in {currency}. Leave empty if an entity reports the price.",
+            "price_entity": "Reports the current price per kWh, e.g. on a dynamic tariff. Leave empty for a fixed price.",
+            "water_price": "What you pay per m³, in {currency}, including wastewater. The water comes from the Device's own meter if it has one, otherwise per Program from the Program Defaults. Leave empty to record no water."
+          }
+        },
         "device": {
           "title": "Home Assistant device",
           "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows for this Device Type ({integrations}), the next steps come pre-filled from its entities; check and change them as you like.",
@@ -357,7 +382,10 @@
         "value_mapped_twice": "Each value can be mapped to one target only.",
         "unknown_unit": "Coin-op does not recognise this unit. Enter a conversion factor, or pick another entity.",
         "status_already_used": "Another Device already uses this entity as its Status. Each Run would be recorded twice.",
-        "not_length_or_mass": "Coin-op can only use a length (e.g. mm) or a mass (e.g. g) as Material used. Pick another entity or unit."
+        "not_length_or_mass": "Coin-op can only use a length (e.g. mm) or a mass (e.g. g) as Material used. Pick another entity or unit.",
+        "not_energy_or_power": "Coin-op doesn't recognise this entity's unit as energy or power. Pick another entity or set the Device up manually.",
+        "one_price": "Enter either a fixed price or pick a price entity.",
+        "unknown_price_unit": "Coin-op doesn't recognise this entity's unit as a price per kWh. Pick another entity or enter a fixed price; with a conversion factor it can be set later under “Reconfigure Device”."
       },
       "abort": {
         "reconfigure_successful": "The Device was saved."
@@ -478,6 +506,11 @@
     }
   },
   "selector": {
+    "quick_start_device": {
+      "options": {
+        "manual": "Set up manually"
+      }
+    },
     "device_type": {
       "options": {
         "3d_printer": "3D printer",

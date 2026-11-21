@@ -29,6 +29,11 @@ The known Device Inputs of a specific integration for one Device Type, used to f
 _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 
+**Quick Start**:
+The short way through Add Device: the user picks an HA device of an integration with an Integration Profile, and the Device takes every Device Input the profile finds without showing its steps, asking only for the meter and the prices.
+_Avoid_: Wizard, auto-setup, express setup
+_German UI_: Schnellstart
+
 **Run**:
 One working cycle of a Device, such as a single print job, from start to end and together with its costs, whatever its Outcome.
 _Avoid_: Job, session, cycle, print

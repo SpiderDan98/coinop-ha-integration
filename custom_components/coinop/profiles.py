@@ -283,3 +283,25 @@ def detect(
 
     _, profile = profiles[domain]
     return profile(find)
+
+
+def candidates(hass: HomeAssistant) -> dict[str, tuple[str, str, dict[str, Any]]]:
+    """The HA devices Quick Start can add, by device id: their Device Type, their
+    integration's name and the sections its profile fills in.
+
+    Those are the devices a profile finds a Status for, so not a multi-material unit.
+    """
+    devices = dr.async_get(hass)
+    found: dict[str, tuple[str, str, dict[str, Any]]] = {}
+    for device_type, profiles in PROFILES.items():
+        for domain, (name, _) in profiles.items():
+            for config_entry in hass.config_entries.async_entries(
+                domain, include_ignore=False, include_disabled=False
+            ):
+                for device in dr.async_entries_for_config_entry(
+                    devices, config_entry.entry_id
+                ):
+                    sections = detect(hass, device_type, device.id)
+                    if sections and sections["status"]:
+                        found.setdefault(device.id, (device_type, name, sections))
+    return found
