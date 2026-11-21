@@ -45,6 +45,7 @@ from .test_other_images_and_parts import (
     add_kiln_camera,
     add_kiln_preview,
 )
+from .test_other_jobs import add_cnc_router, cut
 from .test_other_programs import add_bread_maker, bake, set_bread_program
 from .test_other_water import add_irrigation, irrigate, set_valve_water
 from .test_robotic_mowers import add_mower, mow
@@ -1200,6 +1201,37 @@ async def test_record_an_other_device_with_a_program_doses_and_water(
         "devices-list-other-program-doses",
         stable_ids(devices, {brew_kettle.subentry_id: "device-brew-kettle"}),
     )
+
+
+async def test_record_an_other_device_with_job_and_material_and_its_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A CNC router ("CNC router"): an Other Device with Job and Material, Images and
+    a Part Count, with its job name and Material used inputs, no image input and the
+    default Material "mdf", and its Run "Sign Oak" of 3 parts that used 120 g. The
+    catalogue holds "mdf" (by g) and "plywood" (by piece)."""
+    router = await add_cnc_router(
+        hass, panel, hass_storage, has=["job", "images", "part_count"]
+    )
+    await cut(hass, clock, "Sign_Oak.gcode", grams=120)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], part_count=3)
+
+    devices = await panel.call("coinop/devices/list")
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalogue = await panel.event()
+
+    electricity, material = detail["run"]["line_items"]
+    ids = {
+        router.subentry_id: "device-cnc-router",
+        run["id"]: "sign",
+        electricity["id"]: "sign-electricity",
+        material["id"]: "sign-material",
+    }
+    assert_recorded("devices-list-other-job", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-job", stable_ids(detail, ids))
+    assert_recorded("catalog-subscribe-other-job", catalogue)
 
 
 async def test_record_what_the_image_commands_answer(
