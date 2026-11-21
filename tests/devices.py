@@ -328,13 +328,17 @@ async def add_other_device(
     meter: dict[str, Any] | None = None,
     running_power: float = 120,
     price: float | dict[str, Any] = 0.30,
+    water: str = "none",
+    water_meter: dict[str, Any] | None = None,
+    water_price: float | dict[str, Any] = 4.0,
 ) -> ConfigSubentry:
     """Walk Add Device to the end for an Other Device with `type_name` that has the
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
 
     `source` is "estimate" (from `running_power`), "energy" or "power" (read from
-    `meter`) or "none", which takes no price. It fails on any step beyond those the
-    choices bring.
+    `meter`) or "none", which takes no price. With "water" among `has`, `water` is
+    its source: "meter" or "flow" (read from `water_meter`) or "none"; a fixed
+    `water_price` is per m³. It fails on any step beyond those the choices bring.
     """
     result = await walk_to_mapping(
         hass,
@@ -356,11 +360,37 @@ async def add_other_device(
         assert result["step_id"] == "price", result.get("errors")
         result = await configure(hass, result, price_choice(price))
         result = await configure(hass, result, price_input(price))
+    if "water" in has:
+        result = await answer_water(hass, result, water, water_meter, water_price)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+async def answer_water(
+    hass: HomeAssistant,
+    result: Any,
+    source: str,
+    meter: dict[str, Any] | None,
+    price: float | dict[str, Any],
+) -> Any:
+    """Answer Add Device's water steps from the water source menu `result`: the
+    `source`, its `meter` for "meter" and "flow", and the `price` unless it is "none"."""
+    assert result["step_id"] == "water", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": f"water_{source}"})
+    if source in ("meter", "flow"):
+        result = await configure(hass, result, meter)
+    if source != "none":
+        assert result["step_id"] == "water_price", result.get("errors")
+        result = await configure(
+            hass,
+            result,
+            {"next_step_id": f"water_{price_choice(price)['next_step_id']}"},
+        )
+        result = await configure(hass, result, price_input(price))
+    return result
 
 
 async def add_washing_machine(
@@ -409,20 +439,9 @@ async def add_washing_machine(
         result = await configure(hass, result, price_choice(price))
         result = await configure(hass, result, price_input(price))
     if water is not None:
-        assert result["step_id"] == "water", result.get("errors")
-        result = await configure(hass, result, {"next_step_id": f"water_{water}"})
-    if water in ("meter", "flow"):
-        result = await configure(
-            hass, result, water_meter or {"entity_id": WASHER_WATER}
+        result = await answer_water(
+            hass, result, water, water_meter or {"entity_id": WASHER_WATER}, water_price
         )
-    if water not in (None, "none"):
-        assert result["step_id"] == "water_price", result.get("errors")
-        result = await configure(
-            hass,
-            result,
-            {"next_step_id": f"water_{price_choice(water_price)['next_step_id']}"},
-        )
-        result = await configure(hass, result, price_input(water_price))
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]

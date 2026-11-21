@@ -144,6 +144,7 @@ TYPE_KEYS = frozenset({"device_type", "type_name", "capabilities"})
 # What an Other Device can have, in the order its step offers the choices, and the
 # Capabilities each choice brings.
 CHOICES = {
+    "water": frozenset({Capability.WATER}),
     "per_run_meters": frozenset({Capability.PER_RUN_METERS}),
 }
 
