@@ -28,7 +28,7 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 | Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](#washing-machine-integration-profiles) |
 | Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](#washing-machine-integration-profiles) |
 | Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](#washing-machine-integration-profiles) |
-| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector](#ev-charger-integration-profiles) |
+| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector, Easee, Zaptec, go-e Charger MQTT, go-e Charger API v2](#ev-charger-integration-profiles) |
 | Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
 | Other | Its electricity and whatever you pick for it: a Program, Doses, water, a job with its Material, images, a Part Count. See [Other Devices](#other-devices) | no integration: set up manually |
 
@@ -253,9 +253,16 @@ An EV charger's sensors are those of a printer without Material used, and its Ru
 | Integration | Status | Electricity |
 |---|---|---|
 | [Tesla Wall Connector](https://www.home-assistant.io/integrations/tesla_wall_connector/) (`tesla_wall_connector`) | Status sensor | Energy sensor (lifetime), else Session energy sensor |
+| [Easee](https://github.com/nordicopen/easee_hass) (`easee`) | Status sensor | Lifetime energy sensor, else Session energy sensor |
+| [Zaptec](https://github.com/custom-components/zaptec) (`zaptec`) | Charger operation mode sensor | Session total charge sensor, else Energy meter sensor (lifetime, only on chargers that report it) |
+| [go-e Charger MQTT](https://github.com/syssi/homeassistant-goecharger-mqtt) (`goecharger_mqtt`) | Car state sensor | Total energy sensor (lifetime), else Charged energy sensor |
+| [go-e Charger API v2](https://github.com/marq24/ha-goecharger-api2) (`goecharger_api2`) | Car state sensor (the text, not the code) | Energy total sensor (lifetime), else Energy since car connected sensor |
 
 - The mapping follows the advice above: charging (also at reduced current) is Running; a car that is plugged in without charging (connected, ready, negotiating, waiting for the car, charging finished) is Paused; the unplugged charger is Finished, and an error is a Fault, which gives the Run its Flag. Booting is ignored.
 - The electricity source is the charger's lifetime energy counter where the integration registers one and you haven't disabled it, else its session energy counter; with neither, Quick Start asks for a meter. The lifetime counter is preferred because it avoids the meter reset Flag a session counter can get.
+- Zaptec is the exception: its Energy meter sensor is updated only about once an hour, so a Run measured on it would miss the energy charged since the last update. Its session counter is pre-filled first, and the Energy meter only where you disabled the session counter. Only a Zaptec charger is offered, not the installation it belongs to.
+- Easee's further states follow the same advice: waiting for load balancing, a smart or scheduled start, authentication or the equalizer, and starting or stopping a charge are Paused; its specific errors (erratic EV, temperature too high, overcurrent and the like) are Faults; offline and searching for its master are ignored.
+- go-e: waiting for the car and complete are Paused, idle is Finished, and an error, the unknown one included, is a Fault. go-e Charger API v2 reports the car state as a text in Home Assistant's language, German or else English; the mapping holds both.
 - The charger integration's own cost or price sensors are ignored: Coin-op computes every cost itself.
 - **Detect again** in the reconfigure menu re-applies the Status and the mapping, and leaves the electricity source and the price as they are.
 

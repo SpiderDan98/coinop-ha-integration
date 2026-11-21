@@ -72,6 +72,24 @@ INTEGRATIONS = {
         ev_chargers.DEVICE_TYPES,
         ev_chargers.KIND,
     ),
+    "easee": Integration(
+        "Easee", ev_chargers.easee, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
+    ),
+    "zaptec": Integration(
+        "Zaptec", ev_chargers.zaptec, ev_chargers.DEVICE_TYPES, ev_chargers.zaptec_kind
+    ),
+    "goecharger_mqtt": Integration(
+        "go-e Charger MQTT",
+        ev_chargers.goe_mqtt,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+    ),
+    "goecharger_api2": Integration(
+        "go-e Charger API v2",
+        ev_chargers.goe_api2,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+    ),
 }
 
 

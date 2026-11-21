@@ -209,9 +209,7 @@ async def test_manual_setup_of_a_wall_connector_comes_pre_filled(
     result = await configure(hass, result, {"device": "manual"})
     result = await configure(hass, result, {"device_type": "ev_charger"})
     assert result["step_id"] == "device"
-    assert result["description_placeholders"] == {
-        "integrations": "Tesla Wall Connector"
-    }
+    assert "Tesla Wall Connector" in result["description_placeholders"]["integrations"]
     result = await configure(hass, result, {"device": charger.device.id})
     result = await configure(hass, result, {"name": "Wall Connector"})
 
