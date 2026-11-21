@@ -40,6 +40,9 @@ INTEGRATIONS = {
     "bambu_lab": Integration(
         "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
     ),
+    "prusalink": Integration(
+        "PrusaLink", printers.prusalink, printers.DEVICE_TYPES, printers.KIND
+    ),
     "ha_creality_ws": Integration(
         "Creality", printers.creality, printers.DEVICE_TYPES, printers.KIND
     ),
@@ -93,6 +96,35 @@ INTEGRATIONS = {
         ev_chargers.DEVICE_TYPES,
         ev_chargers.KIND,
     ),
+    "evcc_intg": Integration(
+        "evcc", ev_chargers.evcc, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
+    ),
+    # Each connector of a charge point with several is an HA device linked to it.
+    "ocpp": Integration(
+        "OCPP",
+        ev_chargers.ocpp,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+        linked_devices=False,
+    ),
+    "easee": Integration(
+        "Easee", ev_chargers.easee, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
+    ),
+    "zaptec": Integration(
+        "Zaptec", ev_chargers.zaptec, ev_chargers.DEVICE_TYPES, ev_chargers.zaptec_kind
+    ),
+    "goecharger_mqtt": Integration(
+        "go-e Charger MQTT",
+        ev_chargers.goe_mqtt,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+    ),
+    "goecharger_api2": Integration(
+        "go-e Charger API v2",
+        ev_chargers.goe_api2,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+    ),
 }
 
 
@@ -110,14 +142,16 @@ def known_integrations(device_type: str) -> str:
 
 
 def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:
-    """Finds the integration's entities of the HA device and the devices linked to it."""
+    """Finds the integration's entities of the HA device and, unless its integration
+    says otherwise, the devices linked to it."""
     # A multi-material unit is its own HA device, linked to the printer's.
+    linked = INTEGRATIONS[config_entry.domain].linked_devices
     device_ids = [
         device.id
         for device in dr.async_entries_for_config_entry(
             dr.async_get(hass), config_entry.entry_id
         )
-        if device_id in (device.id, device.via_device_id)
+        if device.id == device_id or (linked and device.via_device_id == device_id)
     ]
     entities = er.async_get(hass)
     candidates = [
