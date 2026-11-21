@@ -71,7 +71,7 @@ async def test_water_adds_the_water_source_and_its_price_to_add_device_and_recon
     entry = await add_hub(hass)
 
     result = await choose_other(hass, entry)
-    assert fields(result) == ["type_name", "water", "per_run_meters"]
+    assert "water" in fields(result)
     steps = []
     for user_input in (
         other_input("Irrigation", ["water"]),

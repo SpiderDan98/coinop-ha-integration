@@ -324,6 +324,7 @@ async def add_other_device(
     has: Iterable[str] = (),
     device: str | None = None,
     mapping: dict[str, list[str]] = OTHER_MAPPING,
+    program: dict[str, Any] | None = None,
     source: str = "estimate",
     meter: dict[str, Any] | None = None,
     running_power: float = 120,
@@ -335,11 +336,14 @@ async def add_other_device(
     """Walk Add Device to the end for an Other Device with `type_name` that has the
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
 
-    `source` is "estimate" (from `running_power`), "energy" or "power" (read from
-    `meter`) or "none", which takes no price. With "water" among `has`, `water` is
-    its source: "meter" or "flow" (read from `water_meter`) or "none"; a fixed
-    `water_price` is per m³. It fails on any step beyond those the choices bring.
+    With the choice "program", `program` is the Program step's input (no Program
+    input without it). `source` is "estimate" (from `running_power`), "energy" or
+    "power" (read from `meter`), "per_program" or "none", which takes no price.
+    With the choice "water", `water` is its source: "meter" or "flow" (read from
+    `water_meter`) or "none"; a fixed `water_price` is per m³. It fails on any step
+    beyond those the choices bring.
     """
+    has = list(has)
     result = await walk_to_mapping(
         hass,
         entry,
@@ -350,11 +354,14 @@ async def add_other_device(
         other=other_input(type_name, has),
     )
     result = await configure(hass, result, mapping)
+    if "program" in has:
+        assert result["step_id"] == "program", result.get("errors")
+        result = await configure(hass, result, program or {})
     assert result["step_id"] == "consumption", result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     if source == "estimate":
         result = await configure(hass, result, {"running_power": running_power})
-    elif source != "none":
+    elif source not in ("per_program", "none"):
         result = await configure(hass, result, meter)
     if source != "none":
         assert result["step_id"] == "price", result.get("errors")
