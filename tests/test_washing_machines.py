@@ -52,6 +52,7 @@ async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> No
         "oven",
         "ev_charger",
         "robotic_mower",
+        "other",
     ]
 
 

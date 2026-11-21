@@ -191,6 +191,23 @@ describe("Run page", () => {
     expect(text(query(panel, ".totals"))).toBe("Total €0.08");
   });
 
+  it("has no Program, Part Count or Water for the Run of an Other Device that has nothing", async () => {
+    const backend = recordedBackend()
+      .reply("coinop/devices/list", () => ({ devices: recorded.others }))
+      .reply(GET, () => ({ run: recorded.firing }));
+
+    const panel = await mountPanel(backend, { path: "/run/firing" });
+
+    expect(facts(panel)).not.toMatch(/Program|Part Count/);
+    expect(facts(panel)).toContain("Device Kiln");
+    expect(cards(panel)).toEqual([
+      ["Electricity €0.90", "Estimated from average power 3 kWh × €0.30 = €0.90"],
+      ["Material €0.00"],
+      ["Other €0.00"],
+    ]);
+    expect(text(query(panel, ".totals"))).toBe("Total €0.90");
+  });
+
   it("collapses to one column on narrow screens", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy", narrow: true });
 

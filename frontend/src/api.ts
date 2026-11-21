@@ -117,6 +117,8 @@ export interface Device {
   /** The Device Type, which the Devices tab groups by: every key with a `device_type.<key>`
    * heading in the translations. */
   type: keyof { [K in Key as K extends `device_type.${infer Type}` ? Type : never]: unknown };
+  /** Only an Other Device has one: the heading it is grouped under instead. */
+  type_name?: string;
   capabilities: (typeof CAPABILITIES)[number][];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {

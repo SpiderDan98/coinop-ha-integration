@@ -72,6 +72,18 @@
             "water_price": "What you pay per m³, in {currency}, including wastewater. The water comes from the Device's own meter if it has one, otherwise per Program from the Program Defaults. Leave empty to record no water."
           }
         },
+        "other": {
+          "title": "Type Name & what the Device has",
+          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.",
+          "data": {
+            "type_name": "Type Name",
+            "per_run_meters": "Meters count each Run from 0"
+          },
+          "data_description": {
+            "type_name": "What kind of Device it is, such as “Kiln” or “Pool pump”: the heading the panel lists it under. Devices with the same Type Name share a heading.",
+            "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset."
+          }
+        },
         "device": {
           "title": "Home Assistant device",
           "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows for this Device Type ({integrations}), the next steps come pre-filled from its entities; check and change them as you like.",
@@ -395,6 +407,7 @@
         }
       },
       "error": {
+        "type_name_required": "Enter a Type Name.",
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
@@ -538,7 +551,8 @@
         "coffee_machine": "Coffee machine",
         "oven": "Oven",
         "ev_charger": "EV charger",
-        "robotic_mower": "Robotic mower"
+        "robotic_mower": "Robotic mower",
+        "other": "Other"
       }
     }
   }

@@ -1,6 +1,6 @@
 """A Device's settings as written by the Add Device flow into its subentry."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -12,6 +12,7 @@ from .const import (
     DEVICE_TYPE_COFFEE_MACHINE,
     DEVICE_TYPE_DISHWASHER,
     DEVICE_TYPE_EV_CHARGER,
+    DEVICE_TYPE_OTHER,
     DEVICE_TYPE_OVEN,
     DEVICE_TYPE_ROBOTIC_MOWER,
     DEVICE_TYPE_TUMBLE_DRYER,
@@ -50,7 +51,7 @@ class WaterSource(StrEnum):
 
 
 class Capability(StrEnum):
-    """What a Device Type has; code branches on these, not on the type."""
+    """What a Device can have; code branches on these, not on the Device Type."""
 
     # The job name, Material used, Slots and Loaded slot inputs.
     JOB = "job"
@@ -74,7 +75,7 @@ class Capability(StrEnum):
     PER_RUN_METERS = "per_run_meters"
 
 
-# Every Device Type, in the order Add Device lists them.
+# What each shipped Device Type has, in the order Add Device lists them.
 CAPABILITIES = {
     DEVICE_TYPE_3D_PRINTER: frozenset(
         {
@@ -132,6 +133,44 @@ CAPABILITIES = {
     DEVICE_TYPE_ROBOTIC_MOWER: frozenset[Capability](),
 }
 
+# Every Device Type, in the order Add Device lists them. Other has no set here: each
+# of its Devices stores its own (ADR 0009).
+DEVICE_TYPES = (*CAPABILITIES, DEVICE_TYPE_OTHER)
+
+# The subentry keys that say what kind of Device it is; the others are its sections.
+# Only an Other Device stores the last two.
+TYPE_KEYS = frozenset({"device_type", "type_name", "capabilities"})
+
+# What an Other Device can have, in the order its step offers the choices, and the
+# Capabilities each choice brings.
+CHOICES = {
+    "per_run_meters": frozenset({Capability.PER_RUN_METERS}),
+}
+
+
+def picks_capabilities(device_type: str) -> bool:
+    """Whether the user picks what a Device of the type has, as no set is shipped."""
+    return device_type not in CAPABILITIES
+
+
+def chosen_capabilities(choices: Iterable[str]) -> frozenset[Capability]:
+    """What an Other Device with these of `CHOICES` has."""
+    capabilities = frozenset[Capability]().union(*(CHOICES[c] for c in choices))
+    if Capability.PROGRAM_CONSUMPTION in capabilities:
+        return capabilities
+    # Without a Program's kWh, unmeasured electricity is estimated from average powers.
+    return capabilities | {Capability.AVERAGE_POWER}
+
+
+def capabilities_of(data: Mapping[str, Any]) -> frozenset[Capability]:
+    """What the Device with this subentry data has: its Device Type's shipped set, or
+    the one stored with an Other Device."""
+    shipped = CAPABILITIES.get(data["device_type"])
+    if shipped is not None:
+        return shipped
+    return frozenset(Capability(name) for name in data["capabilities"])
+
+
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})
 
 
@@ -140,6 +179,9 @@ class DeviceConfig:
     device_id: str
     name: str
     device_type: str
+    # The heading an Other Device is listed under; None for a shipped Device Type.
+    type_name: str | None
+    capabilities: frozenset[Capability]
     printer_device_id: str | None
     status_entity_id: str
     status_attribute: str | None
@@ -174,6 +216,8 @@ class DeviceConfig:
             device_id=subentry.subentry_id,
             name=subentry.title,
             device_type=data["device_type"],
+            type_name=data.get("type_name"),
+            capabilities=capabilities_of(data),
             printer_device_id=data["printer_device_id"],
             status_entity_id=data["status"]["entity_id"],
             status_attribute=data["status"]["attribute"],
@@ -197,10 +241,6 @@ class DeviceConfig:
             consumption=data["consumption"],
             flow_data=data,
         )
-
-    @property
-    def capabilities(self) -> frozenset[Capability]:
-        return CAPABILITIES[self.device_type]
 
     def target(self, value: str) -> Target:
         return self.mapping.get(value, Target.IGNORED)

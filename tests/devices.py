@@ -1,5 +1,6 @@
 """Set up the hub and add Devices through the real flows, the way a user does."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -65,9 +66,11 @@ async def start_add_device(
     *,
     printer: str | None = None,
     device_type: str = "3d_printer",
+    other: dict[str, Any] | None = None,
 ) -> Any:
     """Open Add Device, pick the Device Type and the HA device (or none); returns the
-    name form. Where Quick Start offers a device, it is set up manually."""
+    name form. Where Quick Start offers a device, it is set up manually. `other`
+    answers the step only the Device Type Other has (see `other_input`)."""
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
@@ -75,6 +78,9 @@ async def start_add_device(
         result = await configure(hass, result, {"device": "manual"})
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": device_type})
+    if other is not None:
+        assert result["step_id"] == "other", result.get("errors")
+        result = await configure(hass, result, other)
     assert result["step_id"] in ("device", "device_without_profile"), result.get(
         "errors"
     )
@@ -104,10 +110,13 @@ async def walk_to_mapping(
     status: str = STATUS,
     attribute: str | None = None,
     device_type: str = "3d_printer",
+    other: dict[str, Any] | None = None,
 ) -> Any:
     result = await configure(
         hass,
-        await start_add_device(hass, entry, printer=printer, device_type=device_type),
+        await start_add_device(
+            hass, entry, printer=printer, device_type=device_type, other=other
+        ),
         {"name": name},
     )
     assert result["step_id"] == "status"
@@ -294,6 +303,64 @@ def coinop_entities(entity_registry: er.EntityRegistry) -> list[str]:
         for entity in entity_registry.entities.values()
         if entity.platform == "coinop"
     )
+
+
+OTHER_MAPPING = {"running": ["on"], "ended": ["off"]}
+
+
+def other_input(type_name: str, has: Iterable[str] = ()) -> dict[str, Any]:
+    """The input of the step only the Device Type Other has: its Type Name and the
+    choices picked of what the Device has, by key (such as "per_run_meters")."""
+    return {"type_name": type_name} | dict.fromkeys(has, True)
+
+
+async def add_other_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    type_name: str,
+    name: str,
+    status: str,
+    has: Iterable[str] = (),
+    device: str | None = None,
+    mapping: dict[str, list[str]] = OTHER_MAPPING,
+    source: str = "estimate",
+    meter: dict[str, Any] | None = None,
+    running_power: float = 120,
+    price: float | dict[str, Any] = 0.30,
+) -> ConfigSubentry:
+    """Walk Add Device to the end for an Other Device with `type_name` that has the
+    choices `has`, running while its Status is "on" unless `mapping` says otherwise.
+
+    `source` is "estimate" (from `running_power`), "energy" or "power" (read from
+    `meter`) or "none", which takes no price. It fails on any step beyond those the
+    choices bring.
+    """
+    result = await walk_to_mapping(
+        hass,
+        entry,
+        name=name,
+        printer=device,
+        status=status,
+        device_type="other",
+        other=other_input(type_name, has),
+    )
+    result = await configure(hass, result, mapping)
+    assert result["step_id"] == "consumption", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    if source == "estimate":
+        result = await configure(hass, result, {"running_power": running_power})
+    elif source != "none":
+        result = await configure(hass, result, meter)
+    if source != "none":
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await hass.async_block_till_done()
+    subentry = list(entry.subentries.values())[-1]
+    assert subentry.title == name
+    return subentry
 
 
 async def add_washing_machine(

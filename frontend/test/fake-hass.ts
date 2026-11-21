@@ -29,6 +29,7 @@ import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-mac
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
 import devicesListElectricityNone from "./fixtures/backend/devices-list-electricity-none.json";
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
+import devicesListOther from "./fixtures/backend/devices-list-other.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
@@ -62,6 +63,7 @@ import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
 import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
+import runsGetOther from "./fixtures/backend/runs-get-other.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -177,6 +179,14 @@ export const recorded = {
   /** `coinop/runs/get` of its Run "mowing": 65 minutes of mowing, then 55 minutes paused
    * while it charged 0.25 kWh at 0.30 ("mowing-electricity"); ended with Outcome Unknown. */
   mowing: runsGetRoboticMower.run as RunDetail,
+  /** `coinop/devices/list` with three Other Devices under two Type Names: "device-kiln"
+   * ("Kiln"), which has nothing and estimates its electricity from 2 kW, then
+   * "device-pool-pump" and "device-pond-pump" (both "Pump") on a cycle energy sensor,
+   * whose meters count each Run from 0. */
+  others: devicesListOther.devices as Device[],
+  /** `coinop/runs/get` of the kiln's unnamed Run "firing": 90 minutes estimated as 3 kWh
+   * at 0.30 ("firing-electricity"); ended with Outcome Unknown. */
+  firing: runsGetOther.run as RunDetail,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,

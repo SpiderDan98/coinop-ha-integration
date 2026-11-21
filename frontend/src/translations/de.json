@@ -122,6 +122,7 @@
   "device_type.oven": "Backöfen",
   "device_type.ev_charger": "Wallboxen",
   "device_type.robotic_mower": "Mähroboter",
+  "device_type.other": "Sonstiges",
   "device.none": "Keine",
   "device.edit": "Einstellungen von {device} bearbeiten",
   "device.settings_title": "Einstellungen von {device}",

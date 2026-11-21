@@ -37,6 +37,7 @@ from .stored import (
     stored_run,
 )
 from .test_ev_chargers import add_charger
+from .test_other_devices import add_kiln, add_pump, fire
 from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
     add_spoolman_hub,
@@ -1019,6 +1020,36 @@ async def test_record_an_ev_charger(hass: HomeAssistant, panel: PanelClient) -> 
         "devices-list-ev-charger",
         stable_ids(devices, {charger.subentry_id: "device-wallbox"}),
     )
+
+
+async def test_record_other_devices_and_a_firing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """Other Devices under two Type Names: a kiln ("Kiln") that has nothing and
+    estimates its electricity, and a pool pump and a pond pump (both "Pump") whose
+    meters count each Run from 0; and a firing of the kiln."""
+    entry = await add_hub(hass)
+    kiln = await add_kiln(hass, entry)
+    pool = await add_pump(hass, entry)
+    pond = await add_pump(
+        hass, entry, name="Pond pump", status="sensor.pond_pump_status"
+    )
+    await fire(hass, clock)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        kiln.subentry_id: "device-kiln",
+        pool.subentry_id: "device-pool-pump",
+        pond.subentry_id: "device-pond-pump",
+        run["id"]: "firing",
+        electricity["id"]: "firing-electricity",
+    }
+    assert_recorded("devices-list-other", stable_ids(devices, ids))
+    assert_recorded("runs-get-other", stable_ids(detail, ids))
 
 
 async def test_record_what_the_image_commands_answer(

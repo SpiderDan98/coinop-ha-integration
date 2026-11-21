@@ -193,7 +193,11 @@ export class DevicesPage extends LitElement {
     if (this.devices === null) return html`<p class="muted">${t("devices.error")}</p>`;
     if (!this.devices) return html`<p class="muted">${t("devices.loading")}</p>`;
     const devices = this.devices;
-    const types = [...new Set(devices.map((device) => device.type))];
+    // A Type Name may read like a Device Type's key or heading and is still its own group.
+    const groupOf = ({ type, type_name }: Device) => JSON.stringify([type, type_name]);
+    const groups = [...new Set(devices.map(groupOf))].map((group) =>
+      devices.filter((device) => groupOf(device) === group),
+    );
     return html`
       <ha-button class="new-device fab" @click=${() => navigate(RECONFIGURE)}>
         <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
@@ -201,15 +205,11 @@ export class DevicesPage extends LitElement {
       </ha-button>
       ${
         devices.length
-          ? types.map(
-              (type) =>
-                html`<section class="device-type" data-type=${type}>
-                  <h2>${t(`device_type.${type}`)}</h2>
-                  <div class="cards">
-                    ${devices
-                      .filter((device) => device.type === type)
-                      .map((device) => this.renderDevice(device, t))}
-                  </div>
+          ? groups.map(
+              (group) =>
+                html`<section class="device-type" data-type=${group[0].type}>
+                  <h2>${group[0].type_name ?? t(`device_type.${group[0].type}`)}</h2>
+                  <div class="cards">${group.map((device) => this.renderDevice(device, t))}</div>
                 </section>`,
             )
           : html`<p class="muted">${t("devices.empty")}</p>`
