@@ -25,7 +25,13 @@ load:
           options:
             - prusa
             - bambu
+            - anycubic.3d_printer
             - anycubic_cloud.3d_printer
+            - bambu_lab.3d_printer
+            - prusalink.3d_printer
+            - octoprint.3d_printer
+            - ha_creality_ws.3d_printer
+            - elegoo_printer.3d_printer
             - moonraker.3d_printer
             - washer
             - ha_washdata.washing_machine

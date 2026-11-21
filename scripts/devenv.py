@@ -91,13 +91,11 @@ def start() -> None:
         CONFIG: "/config",
         ROOT / "dev" / "configuration.yaml": "/config/configuration.yaml:ro",
         ROOT / "custom_components" / "coinop": "/config/custom_components/coinop:ro",
-        ROOT / "dev" / "coinop_dev": "/config/custom_components/coinop_dev:ro",
-        ROOT / "dev" / "ha_washdata": "/config/custom_components/ha_washdata:ro",
-        ROOT / "dev" / "anycubic_cloud": "/config/custom_components/anycubic_cloud:ro",
-        ROOT / "dev" / "moonraker": "/config/custom_components/moonraker:ro",
-        ROOT
-        / "dev"
-        / "tesla_wall_connector": "/config/custom_components/tesla_wall_connector:ro",
+        # coinop_dev, and each stand-in under the domain it stands in for.
+        **{
+            manifest.parent: f"/config/custom_components/{manifest.parent.name}:ro"
+            for manifest in sorted((ROOT / "dev").glob("*/manifest.json"))
+        },
     }
     run(
         "docker",

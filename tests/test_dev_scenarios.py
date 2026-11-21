@@ -37,6 +37,59 @@ DISHWASHER_PLUG_ENERGY = "sensor.dishwasher_plug_energy"
 PLUG_POWER = "sensor.kobra_s1_plug_power"
 VORON_PLUG_POWER = "sensor.voron_2_4_plug_power"
 
+# The static stand-ins' Pieces: the HA device's label in Quick Start, its plug's power
+# helper and sensor, its Status entity, and a Status of a running and a finished print.
+STATIC = {
+    "anycubic.3d_printer": (
+        "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
+        "input_number.anycubic_kobra_power",
+        "sensor.anycubic_kobra_s1_plug_power",
+        "event.anycubic_kobra_s1_print_event",
+        "started",
+        "finished",
+    ),
+    "bambu_lab.3d_printer": (
+        "P1S · Bambu Lab",
+        "input_number.p1s_power",
+        "sensor.p1s_plug_power",
+        "sensor.p1s_print_status",
+        "running",
+        "finish",
+    ),
+    "prusalink.3d_printer": (
+        "Prusa Core One · PrusaLink",
+        "input_number.core_one_power",
+        "sensor.prusa_core_one_plug_power",
+        "sensor.prusa_core_one",
+        "printing",
+        "finished",
+    ),
+    "octoprint.3d_printer": (
+        "OctoPrint · OctoPrint",
+        "input_number.octoprint_power",
+        "sensor.octoprint_plug_power",
+        "sensor.octoprint_current_state",
+        "printing",
+        "finishing",
+    ),
+    "ha_creality_ws.3d_printer": (
+        "K1C · Creality",
+        "input_number.k1c_power",
+        "sensor.k1c_plug_power",
+        "sensor.k1c_print_status",
+        "printing",
+        "completed",
+    ),
+    "elegoo_printer.3d_printer": (
+        "Centauri Carbon · Elegoo",
+        "input_number.centauri_carbon_power",
+        "sensor.centauri_carbon_plug_power",
+        "sensor.centauri_carbon_print_status",
+        "printing",
+        "complete",
+    ),
+}
+
 
 @pytest.fixture
 async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -128,7 +181,16 @@ async def test_a_device_with_history_loads_alone(
 @pytest.mark.parametrize(
     ("piece", "label"),
     [
+        (
+            "anycubic.3d_printer",
+            "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
+        ),
         ("anycubic_cloud.3d_printer", "Kobra S1 · Anycubic Cloud & LAN"),
+        ("bambu_lab.3d_printer", "P1S · Bambu Lab"),
+        ("prusalink.3d_printer", "Prusa Core One · PrusaLink"),
+        ("octoprint.3d_printer", "OctoPrint · OctoPrint"),
+        ("ha_creality_ws.3d_printer", "K1C · Creality"),
+        ("elegoo_printer.3d_printer", "Centauri Carbon · Elegoo"),
         ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
         ("ha_washdata.washing_machine", "Washing machine · WashData"),
         ("ha_washdata.dishwasher", "Dishwasher · WashData"),
@@ -168,7 +230,9 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 6
+    assert len(offered(await open_add_device(hass, entry))) == 12
+    # Under its own id: a Status shared with another Piece's would have a suffix.
+    assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
 
 
 DEVICES_WITH_HISTORY = [
@@ -432,14 +496,25 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     ] == [
         (
             "3d_printer",
-            ["prusa", "bambu", "anycubic_cloud.3d_printer", "moonraker.3d_printer"],
+            [
+                "prusa",
+                "bambu",
+                "anycubic.3d_printer",
+                "anycubic_cloud.3d_printer",
+                "bambu_lab.3d_printer",
+                "prusalink.3d_printer",
+                "octoprint.3d_printer",
+                "ha_creality_ws.3d_printer",
+                "elegoo_printer.3d_printer",
+                "moonraker.3d_printer",
+            ],
         ),
         ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
         ("dishwasher", ["ha_washdata.dishwasher"]),
         ("ev_charger", ["tesla_wall_connector.ev_charger"]),
         ("other", ["irrigation"]),
     ]
-    prusa, _, kobra, _ = before["groups"][0]["pieces"]
+    prusa, _, _, kobra, *_ = before["groups"][0]["pieces"]
     assert (prusa["title"], prusa["section"]) == ("Prusa MK4", "device")
     assert (kobra["title"], kobra["section"]) == (
         "Kobra S1 · Anycubic Cloud & LAN",
@@ -467,7 +542,13 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     assert presets["long-history"]["selection"]["history"] == "long"
     assert presets["printing-now"]["selection"]["open_run"] is True
     assert presets["quick-start"]["selection"]["pieces"] == [
+        "anycubic.3d_printer",
         "anycubic_cloud.3d_printer",
+        "bambu_lab.3d_printer",
+        "prusalink.3d_printer",
+        "octoprint.3d_printer",
+        "ha_creality_ws.3d_printer",
+        "elegoo_printer.3d_printer",
         "moonraker.3d_printer",
         "ha_washdata.washing_machine",
         "ha_washdata.dishwasher",
@@ -650,24 +731,78 @@ async def test_quick_start_adds_the_wall_connector_with_its_own_meter(
     assert electricity["quantity"] == pytest.approx(11)
 
 
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "label", "power", "plug", "status", "running", "finished"),
+    [(piece, *row) for piece, row in STATIC.items()],
+)
+async def test_quick_start_adds_a_static_stand_ins_printer_run_through_its_status(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+    piece: str,
+    label: str,
+    power: str,
+    plug: str,
+    status: str,
+    running: str,
+    finished: str,
+) -> None:
+    """As a contributor sets the Status in the developer tools, keeping its attributes."""
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    [device_id] = [o["value"] for o in offered(result) if o["label"] == label]
+
+    result = await configure(hass, result, {"device": device_id})
+    result = await configure(hass, result, {"meter": plug, "price": 0.32})
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert device["type"] == "3d_printer"
+    await set_helper(hass, power, 100)
+    await set_state(hass, status, running)
+    await clock.advance(hours=1)
+    await set_state(hass, status, finished)
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert run["outcome"] == "completed"
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(0.1)
+
+
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     helpers: None,
     files: Path,
 ) -> None:
-    stand_ins = ("anycubic_cloud", "moonraker", "ha_washdata", "tesla_wall_connector")
+    stand_ins = {
+        "anycubic": 1,
+        "anycubic_cloud": 1,
+        "bambu_lab": 1,
+        "prusalink": 1,
+        "octoprint": 1,
+        "ha_creality_ws": 1,
+        "elegoo_printer": 1,
+        "moonraker": 1,
+        "ha_washdata": 2,
+        "tesla_wall_connector": 1,
+    }
     await async_load(hass, "quick-start", hass_admin_user)
-    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [
-        1,
-        1,
-        2,
-        1,
-    ]
+    assert {d: len(hass.config_entries.async_entries(d)) for d in stand_ins} == (
+        stand_ins
+    )
 
     await async_load(hass, "empty", hass_admin_user)
 
     assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
+    assert not any(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
 
 
 @pytest.mark.usefixtures("helpers")
@@ -682,6 +817,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.kobra_power": 120,
         "input_select.voron_status": "printing",
         "input_number.voron_filament": 3.2,
+        "input_number.p1s_power": 120,
         "input_select.washer_status": "running",
         "input_select.dishwasher_status": "running",
         "input_select.irrigation_status": "watering",
@@ -699,11 +835,24 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.kobra_power": "0.0",
         "input_select.voron_status": "standby",
         "input_number.voron_filament": "0.0",
+        "input_number.p1s_power": "0.0",
         "input_select.washer_status": "off",
         "input_select.dishwasher_status": "off",
         "input_select.irrigation_status": "off",
         "input_select.wall_connector_status": "not_connected",
     }
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_next_scenario_sets_a_static_stand_ins_status_back(
+    hass: HomeAssistant, hass_admin_user: MockUser, files: Path
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await set_state(hass, "sensor.p1s_print_status", "running")
+
+    await async_load(hass, "quick-start", hass_admin_user)
+
+    assert state(hass, "sensor.p1s_print_status") == "idle"
 
 
 async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
@@ -715,7 +864,13 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     assert result["step_id"] == "quick_start"
     devices = {option["label"]: option["value"] for option in offered(result)}
     assert list(devices) == [
+        "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
         "Kobra S1 · Anycubic Cloud & LAN",
+        "P1S · Bambu Lab",
+        "Prusa Core One · PrusaLink",
+        "OctoPrint · OctoPrint",
+        "K1C · Creality",
+        "Centauri Carbon · Elegoo",
         "Voron 2.4 · Moonraker",
         "Washing machine · WashData",
         "Dishwasher · WashData",
@@ -743,4 +898,16 @@ async def set_helper(hass: HomeAssistant, entity_id: str, value: str | float) ->
     await hass.services.async_call(
         domain, service, {"entity_id": entity_id, field: value}, blocking=True
     )
+    await hass.async_block_till_done()
+
+
+async def set_state(hass: HomeAssistant, entity_id: str, value: str) -> None:
+    """An event entity's state is when it fired; the event is its `event_type`."""
+    current = hass.states.get(entity_id)
+    assert current is not None
+    attributes = dict(current.attributes)
+    if entity_id.startswith("event."):
+        attributes["event_type"] = value
+        value = dt_util.utcnow().isoformat()
+    hass.states.async_set(entity_id, value, attributes)
     await hass.async_block_till_done()

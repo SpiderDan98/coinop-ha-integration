@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from io import BytesIO
 import json
 import logging
@@ -25,6 +26,8 @@ from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
 from custom_components.coinop.device_config import DEVICE_TYPES, stored_capabilities
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
+
+from .stand_ins import Registration, printers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -787,11 +790,44 @@ class QuickStartPiece(Piece):
         )
 
 
+# What a static stand-in's config entry is started with: the Device Type keys picked.
+KINDS = "kinds"
+
+
+@dataclass(frozen=True)
+class StaticPiece(Piece):
+    """An HA device of a static stand-in (`static.py`), registered from its
+    integration's description; a contributor sets its Status in the developer tools."""
+
+    section: ClassVar[str] = "quick_start"
+    registration: Callable[[], Registration]
+
+    @property
+    def domain(self) -> str:
+        return self.registration().domain
+
+    async def fill(self, seed: Seed) -> None:
+        """Adds its kind to the account's entry where the integration keeps one."""
+        hass = seed.hass
+        account = self.registration().account
+        if account and (entries := hass.config_entries.async_entries(self.domain)):
+            [entry] = entries
+            kinds = [*entry.data[KINDS], self.group]
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, KINDS: kinds}
+            )
+            await hass.config_entries.async_reload(entry.entry_id)
+            return
+        await hass.config_entries.flow.async_init(
+            self.domain, context={"source": SOURCE_USER}, data={KINDS: [self.group]}
+        )
+
+
 def _printer_helpers(key: str, idle: str = "idle") -> dict[str, str | float]:
     return {f"input_text.{key}_job": "", f"input_select.{key}_status": idle}
 
 
-PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
+PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
     "prusa": DeviceWithHistory(
         "3d_printer",
         "Prusa MK4",
@@ -816,12 +852,62 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         start=_bambu_start,
         needs=("filaments", "tags", "template"),
     ),
+    "anycubic.3d_printer": StaticPiece(
+        "3d_printer",
+        "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
+        "A printer with an ACE Pro and its plug sensor as meter; set its print "
+        "event's state and `event_type` in the developer tools to run it.",
+        {"input_number.anycubic_kobra_power": 0},
+        registration=printers.anycubic_local,
+    ),
     "anycubic_cloud.3d_printer": QuickStartPiece(
         "3d_printer",
         "Kobra S1 · Anycubic Cloud & LAN",
         "A printer with its plug sensor as meter; the Kobra's helpers run it.",
         _printer_helpers("kobra") | {"input_number.kobra_power": 0},
         domain="anycubic_cloud",
+    ),
+    "bambu_lab.3d_printer": StaticPiece(
+        "3d_printer",
+        "P1S · Bambu Lab",
+        "A printer with an AMS and its plug sensor as meter; set its print status "
+        "in the developer tools to run it.",
+        {"input_number.p1s_power": 0},
+        registration=printers.bambu_lab,
+    ),
+    "prusalink.3d_printer": StaticPiece(
+        "3d_printer",
+        "Prusa Core One · PrusaLink",
+        "A printer with its job preview and its plug sensor as meter; set its state "
+        "in the developer tools to run it.",
+        {"input_number.core_one_power": 0},
+        # Named apart from the Prusa MK4 Device with history.
+        registration=partial(printers.prusalink, title="Prusa Core One"),
+    ),
+    "octoprint.3d_printer": StaticPiece(
+        "3d_printer",
+        "OctoPrint · OctoPrint",
+        "A printer with a webcam and its plug sensor as meter; set its current "
+        "state in the developer tools to run it.",
+        {"input_number.octoprint_power": 0},
+        registration=printers.octoprint,
+    ),
+    "ha_creality_ws.3d_printer": StaticPiece(
+        "3d_printer",
+        "K1C · Creality",
+        "A printer with its print preview and its plug sensor as meter; set its "
+        "print status, with the job's `file` attribute, in the developer tools to "
+        "run it.",
+        {"input_number.k1c_power": 0},
+        registration=printers.creality,
+    ),
+    "elegoo_printer.3d_printer": StaticPiece(
+        "3d_printer",
+        "Centauri Carbon · Elegoo",
+        "A printer with its cover image and its plug sensor as meter; set its print "
+        "status in the developer tools to run it.",
+        {"input_number.centauri_carbon_power": 0},
+        registration=printers.elegoo,
     ),
     "moonraker.3d_printer": QuickStartPiece(
         "3d_printer",
@@ -909,7 +995,7 @@ PRESETS = {
         "Quick Start",
         "The hub without any Device, and every Quick Start Piece: Add Device offers "
         "each HA device in Quick Start as its Device Type.",
-        tuple(n for n, p in PIECES.items() if isinstance(p, QuickStartPiece)),
+        tuple(n for n, p in PIECES.items() if p.section == "quick_start"),
     ),
     "few-runs": Preset(
         "3D printer, a few Runs", "The Prusa with its 7 Runs.", ("prusa",)
@@ -962,7 +1048,11 @@ async def async_load(
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
-    stand_ins = {p.domain for p in PIECES.values() if isinstance(p, QuickStartPiece)}
+    stand_ins = {
+        p.domain
+        for p in PIECES.values()
+        if isinstance(p, (QuickStartPiece, StaticPiece))
+    }
     for domain in (COINOP, *stand_ins):
         for old in hass.config_entries.async_entries(domain):
             await hass.config_entries.async_remove(old.entry_id)
@@ -990,10 +1080,10 @@ async def async_load(
         if need in needs:
             await add(seed)
     for piece in (PIECES[name] for name in pieces):
-        if isinstance(piece, QuickStartPiece):
-            await piece.fill(seed)
-        else:
+        if isinstance(piece, DeviceWithHistory):
             await piece.fill(seed, history)
+        else:
+            await piece.fill(seed)
     for name in seed.retired:
         await seed.api.call(
             "coinop/materials/archive", material_id=seed.materials[name]["id"]
