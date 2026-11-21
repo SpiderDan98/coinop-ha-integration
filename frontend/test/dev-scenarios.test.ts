@@ -261,6 +261,20 @@ describe("Test data", () => {
     expect(assign).toHaveBeenCalledWith("/coinop");
   });
 
+  it("loads a Preset picked by its name, so that it is stored as loaded", async () => {
+    const backend = devBackend().reply("call_service", () => ({}));
+    vi.spyOn(window.location, "assign").mockImplementation(() => {});
+    const panel = await mountPanel(backend);
+    const dialog = await open(panel);
+    await click(panel, presetButton(dialog, "Quick Start"));
+
+    await click(panel, loadButton(dialog));
+
+    expect(backend.sent("call_service")).toMatchObject([
+      { service: "load", service_data: { preset: "quick-start" } },
+    ]);
+  });
+
   it("keeps the Pieces picked and says so when loading fails", async () => {
     const backend = devBackend().reply("call_service", () => {
       throw new WsError("home_assistant_error");

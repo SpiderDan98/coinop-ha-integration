@@ -139,7 +139,8 @@ export class DevScenariosDialog extends LitElement {
         type: "call_service",
         domain: DEV_INTEGRATION,
         service: "load",
-        service_data: { pieces } satisfies Selection,
+        // By name, a Preset is stored as loaded and keeps contents of its own.
+        service_data: this.preset ? { preset: this.preset } : ({ pieces } satisfies Selection),
       });
     } catch {
       this.loading = false;
