@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from dev.coinop_dev.stand_ins import (
-    HaDevice,
+    HaDevice as HaDevice,
     Registration,
     appliances,
     ev_chargers,
