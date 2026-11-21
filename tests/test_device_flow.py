@@ -180,14 +180,14 @@ async def test_a_value_mapped_to_two_targets_is_refused(hass: HomeAssistant) -> 
     assert result["errors"] == {"base": "value_mapped_twice"}
 
 
-async def test_the_consumption_source_is_energy_power_or_estimate(
+async def test_the_consumption_source_is_energy_power_estimate_or_none(
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
 
     result = await walk_to_consumption(hass, entry)
 
-    assert result["menu_options"] == ["energy", "power", "estimate"]
+    assert result["menu_options"] == ["energy", "power", "estimate", "none"]
     result = await configure(hass, result, {"next_step_id": "energy"})
     assert fields(result) == ["entity_id", "attribute"]
 

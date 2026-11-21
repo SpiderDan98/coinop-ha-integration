@@ -1,0 +1,101 @@
+{
+  "run": {
+    "id": "unpowered",
+    "device_id": "device-washer",
+    "device_name": "Washer",
+    "name": "Wool",
+    "job_name": null,
+    "program": "Wool",
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T10:40:00+00:00",
+    "ended": "2026-01-15T10:40:00+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": null,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "none"
+        },
+        "cost_source": null,
+        "prices": []
+      },
+      "water": {
+        "source": {
+          "source": "per_program"
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 4.0
+        },
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        null,
+        null
+      ]
+    ],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "unpowered-water",
+        "kind": "water",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 45.0,
+        "unit": "L",
+        "unit_price": 0.004,
+        "amount": 0.18,
+        "method": "program_default",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T10:40:00+00:00",
+            "kwh": 45.0,
+            "unit_price": 0.004
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "running_seconds": 2400,
+    "total": 0.18,
+    "cost_per_part": null,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.0,
+      "water": 0.18,
+      "material": 0.0,
+      "other": 0.0
+    }
+  }
+}

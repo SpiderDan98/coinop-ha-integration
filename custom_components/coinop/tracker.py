@@ -40,7 +40,7 @@ from .cost.material import (
 )
 from .cost.pricing import priced_line_item
 from .cost.slots import slot_material, slot_shares
-from .device_config import Capability, DeviceConfig, Target, WaterSource
+from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
@@ -58,7 +58,7 @@ from .device_settings import (
 )
 from .images import DeviceImages
 from .materials import Material, MaterialForm, SpoolmanPrice
-from .metering import LIVE_INTERVAL, Metering
+from .metering import LIVE_INTERVAL, Fallback, Metering
 from .models import (
     CONSUMED_KINDS,
     ConsumptionMethod,
@@ -149,21 +149,17 @@ class DeviceTracker:
     def _per_program(self) -> bool:
         return Capability.PROGRAM_CONSUMPTION in self._config.capabilities
 
-    def _electricity_fallback(
-        self, run: Run
-    ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
+    def _electricity_fallback(self, run: Run) -> Fallback:
         if self._per_program:
             kwh = self._program_row(run)[0].get(ELECTRICITY.default_key)
             return kwh, ConsumptionMethod.PROGRAM_DEFAULT
         return self._estimate(run), ConsumptionMethod.ESTIMATED
 
-    def _water_fallback(
-        self, run: Run
-    ) -> tuple[float | None, ConsumptionMethod] | None:
-        """The Program's litres, unless the Run has no water source."""
+    def _water_fallback(self, run: Run) -> Fallback | None:
+        """The Program's litres, unless the Run started before the Device had a
+        water source."""
         timeline = run.timelines.get(LineItemKind.WATER)
-        source = (timeline.source if timeline else None) or {}
-        if not self._per_program or source.get("source") in (None, WaterSource.NONE):
+        if not (self._per_program and timeline and timeline.source):
             return None
         litres = self._program_row(run)[0].get(WATER.default_key)
         return litres, ConsumptionMethod.PROGRAM_DEFAULT
@@ -754,10 +750,9 @@ class DeviceTracker:
         Defaults (electricity: the average running power), else left for the
         user to enter; None with neither a meter nor a fallback."""
         assert run.ended is not None
-        electricity = metering is self._electricity
-        per_program = self._per_program and metering.counts(run)
-        if not (electricity or per_program or metering.meter(run)):
+        if not metering.counts(run):
             return None
+        electricity = metering is self._electricity
         await metering.async_past_prices(run, covered)
         if await metering.async_past_readings(run, covered):
             if electricity:
@@ -765,7 +760,7 @@ class DeviceTracker:
             return metering.priced(
                 run, run.ended, metering.model(run), ConsumptionMethod.FROM_HISTORY
             )
-        if per_program:
+        if self._per_program:
             return metering.fallen_back(run, run.ended)
         if (
             electricity

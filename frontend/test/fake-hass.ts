@@ -27,6 +27,7 @@ import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.js
 import devicesList from "./fixtures/backend/devices-list.json";
 import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-machine.json";
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
+import devicesListElectricityNone from "./fixtures/backend/devices-list-electricity-none.json";
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
@@ -42,6 +43,7 @@ import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
 import imagesUpload from "./fixtures/backend/images-upload.json";
 import lineItemsAdd from "./fixtures/backend/line-items-add.json";
+import lineItemsAddElectricity from "./fixtures/backend/line-items-add-electricity.json";
 import lineItemsAddMaterial from "./fixtures/backend/line-items-add-material.json";
 import lineItemsMaterial from "./fixtures/backend/line-items-material.json";
 import lineItemsAddTemplate from "./fixtures/backend/line-items-add-template.json";
@@ -58,6 +60,7 @@ import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
+import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -197,6 +200,16 @@ export const recorded = {
   /** `coinop/line_items/add`: 60 L at 4.50 per m³ ("basement-wash-water") added by hand to
    * "basement-wash" of "device-basement", a washing machine without water source. */
   lineItemsAddWater: lineItemsAddWater as { run: RunDetail },
+  /** `coinop/devices/list` with only "device-washer", a washing machine with electricity
+   * source none and water per Program; its Program Defaults still hold the kWh of
+   * `perProgram`. */
+  unpowered: devicesListElectricityNone.devices[0] as Device,
+  /** `coinop/runs/get` of its "Wool" Run "unpowered": 45 L at 4.00 per m³
+   * ("unpowered-water") and no Electricity Line Item. */
+  unpoweredWash: runsGetElectricityNone.run as RunDetail,
+  /** `coinop/line_items/add`: 0.4 kWh at 0.30 ("unpowered-electricity") added to it by
+   * hand. */
+  lineItemsAddElectricity: lineItemsAddElectricity as { run: RunDetail },
   /**
    * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
@@ -371,7 +384,10 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
     .subscription("coinop/catalog/subscribe", () => [recorded.catalog.filled])
     .reply("coinop/materials/types", () => recorded.materialTypes)
     .reply("coinop/runs/get", (msg) => {
-      const run = recorded.runs.find((candidate) => candidate.id === msg.run_id);
+      // "unpowered" is the one recorded Run that still takes its electricity by hand.
+      const run = [...recorded.runs, recorded.unpoweredWash].find(
+        (candidate) => candidate.id === msg.run_id,
+      );
       if (!run) throw new WsError("not_found");
       return { run };
     })

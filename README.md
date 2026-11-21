@@ -18,7 +18,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Device Types
 
-The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source and price, and every Run takes Line Items you add by hand or from templates.
+The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source with its price, and every Run takes Line Items you add by hand or from templates. The electricity source of every Device Type can also be [None](#electricity-source-none), for a Device whose electricity you don't follow.
 
 | Device Type | A Run records | Pre-filled for |
 |---|---|---|
@@ -81,6 +81,20 @@ Choose **Set up manually** to walk every step yourself, for a device of any othe
 
 Without an energy meter or power sensor, CoinOp estimates electricity from the Device's average power while it runs. A desktop FDM printer with a heated bed typically averages 80–150 W over a whole print. Don't enter the rated power from the label or power supply: it is far higher than what the printer really draws on average. If you can, measure one print with a power-measuring plug and use that.
 
+## Electricity source "None"
+
+The electricity source menu of every Device ends with **None**, after the energy meter, the power sensor and, depending on the Device Type, the estimate from average power or "per Program". Pick it for a Device whose electricity you don't follow: one that only costs water, a Material or a flat amount per Run, or one you have no meter and no honest number for.
+
+- **Runs**: new Runs get no Electricity Line Item and no Flag about electricity, and a Run doesn't wait for an electricity meter when it ends. Water, Doses, Material, Tags and automatic Line Item Templates work as for every Device, so a flat cost per Run is an automatic template. A manual Run gets no Electricity Line Item either.
+- **Setup**: Add Device skips the electricity price, and the reconfigure menu offers the electricity source without the price. A Device with nothing else that is computed is a valid Device: its Runs cost nothing until Line Items are added by hand or by automatic templates.
+- **Switching**: change the source to or from None in the reconfigure menu at any time. The change applies from the next Run; the open Run keeps the source it started with, and ended Runs never change. Picking a source again asks for the electricity price if the Device has none. A price you entered before is kept while the source is None and used again afterwards; the other settings of the old source (average powers, the meter and its conversion factor) are entered anew.
+- **Program Defaults**: the kWh column and the measured kWh suggestions are hidden while the source is None. The kWh you entered are kept and shown again once the Device has a source. The litres and Dose columns stay as they are.
+- **Electricity by hand**: on a Run without an Electricity Line Item, the Run page offers **Add electricity**, also while the Run is open. It adds one in kWh with the quantity and unit price you enter, marked as entered by hand. A Run takes one Electricity Line Item, so the button is gone once it has one; an entered one can be edited and deleted.
+- **Panel, sensors and statements**: the Device's card shows "None" as its consumption source and no electricity price, and such a Run shows no Electricity card. The Device keeps its Electricity cost and Energy in Runs sensors, which count the electricity its Runs have, the Run event's `ended` reports an `energy_kwh` of 0, and a Cost Statement lists the Run without an electricity row.
+- [Quick Start](#quick-start) never picks None: choose it in manual setup, or afterwards in the reconfigure menu.
+
+None or an estimate? Estimate (or enter the kWh per Program) when electricity is a real part of what a Run costs and you know roughly how much, as for a printer without a meter. Pick None when it isn't a cost you want to see, as for a battery-driven or hand-operated Device or a negligible draw, or when any number would be made up. An average power of 0 W or a kWh default of 0 leaves a "0.00" Electricity Line Item on every Run; None leaves none.
+
 ## Monthly costs on a dashboard
 
 The cost sensors are running totals that work with long-term statistics, so a statistic card can show what printing cost this month (replace the entity with your Device's Total cost sensor):
@@ -133,7 +147,7 @@ Choose **Washing machine** as the Device Type when you add a Device. Like a prin
 
 A washing machine's Runs get these Line Items:
 
-- **Electricity**, from an energy meter or a power sensor exactly as for printers, or "per Program" from the kWh in the Program Defaults.
+- **Electricity**, from an energy meter or a power sensor exactly as for printers, or "per Program" from the kWh in the Program Defaults. With the electricity source ["None"](#electricity-source-none) there is no Electricity Line Item, but you can add one by hand on a Run.
 - **Water**, from a water meter or a flow sensor (any of Home Assistant's volume and flow units), or "per Program" from the litres in the Program Defaults. It is priced per m³ from a fixed value or a price entity (per m³ or per litre, sub-units such as ct/L included). Include the wastewater charge in the price. With the water source "None" there is no Water Line Item, but you can add one by hand on a Run.
 - **Doses**: one Material Line Item for each detergent, fabric softener or other product the load uses.
 
@@ -190,7 +204,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Manual Runs, entities and statements
 
-- A manual Run of a washing machine asks for its Program (a known one or free text). Electricity and water come from recorder history when a meter covers the period, else from the Program Defaults; Doses come from the Program Defaults.
+- A manual Run of a washing machine asks for its Program (a known one or free text). Electricity and water come from recorder history when a meter covers the period, else from the Program Defaults; Doses come from the Program Defaults. With a source "None" the manual Run has no Line Item of that kind.
 - A washing machine's sensors are those of a printer, with **Water in Runs** (litres) and **Water cost** instead of Material used. Its Run event's `ended` carries the Program and the litres; Last Run cost carries the Program. Neither has a Part Count.
 - The Overview and Analysis show Water as a cost kind, and the Analysis compares Programs by Run count and cost per Run. The Runs tab filters by Program.
 - A Cost Statement shows each load's Program, Water and Doses, without Part Count.
@@ -217,7 +231,7 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. No integration is pre-filled, so pick your charger's entities yourself.
 
 - **Status**: the charger's status sensor. Map charging to Running, a car that is plugged in without charging (waiting, paused by load management or a solar surplus control, fully charged) to Paused, and the unplugged charger to Finished. The Run then lasts from the first charging until the car is unplugged, a break in charging doesn't split it, and its running time is the time the car really charged. To end the Run as soon as the car is full instead, map that value to Finished too.
-- **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger.
+- **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger; [None](#electricity-source-none) follows its Runs without their electricity.
 - **Electricity price**: a fixed price per kWh or a price entity. With a dynamic tariff, pick its price entity: each kWh is priced at what it cost when it was charged, so a Run over the cheap hours of the night costs what you really paid.
 
 To tell cars apart, tag the Runs: set the usual car as the **Tags for new Runs** on the charger's card in the Devices tab and change the Tag on the Runs of another car. Automatic Line Item Templates work as for every Device. Filter the Runs tab by a Tag and select its Runs for a [Cost Statement](#cost-statement) of that car's Runs; it lists them without a Part Count.

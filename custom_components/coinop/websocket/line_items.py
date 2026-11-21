@@ -27,7 +27,7 @@ from custom_components.coinop.models import (
     LineItemKind,
     Run,
 )
-from custom_components.coinop.quantities import WATER
+from custom_components.coinop.quantities import QUANTITIES
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 from custom_components.coinop.templates import template_fields
@@ -163,10 +163,7 @@ async def _reset(
     {
         vol.Required("type"): "coinop/line_items/add",
         vol.Required("run_id"): str,
-        vol.Required("kind"): vol.All(
-            vol.Coerce(LineItemKind),
-            vol.In([LineItemKind.OTHER, LineItemKind.MATERIAL, LineItemKind.WATER]),
-        ),
+        vol.Required("kind"): vol.Coerce(LineItemKind),
         vol.Optional("label"): vol.Any(None, str),
         vol.Optional("unit"): str,
         vol.Optional("quantity"): _QUANTITY,
@@ -184,26 +181,30 @@ async def _add(
 
     A Material Line Item names its Material and counts g (the default) or ml,
     or pieces of a Material priced per piece, at the Material's current price;
-    a Water one counts litres, one per Run; an Other one defaults to 1 piece.
+    an Electricity one counts kWh and a Water one litres, one of each per Run;
+    an Other one defaults to 1 piece.
     """
     if (run := find_run(connection, msg, coinop)) is None:
         return
-    if msg["kind"] is LineItemKind.WATER:
-        if any(i.kind is LineItemKind.WATER for i in run.line_items):
+    kind: LineItemKind = msg["kind"]
+    if kind in CONSUMED_KINDS:
+        if any(i.kind is kind for i in run.line_items):
             connection.send_error(
-                msg["id"], websocket_api.ERR_NOT_ALLOWED, "The Run has its Water"
+                msg["id"],
+                websocket_api.ERR_NOT_ALLOWED,
+                f"The Run has its {kind.title()}",
             )
             return
         item = LineItem(
             id=ulid_now(),
-            kind=LineItemKind.WATER,
+            kind=kind,
             quantity=None,
-            unit=WATER.unit,
+            unit=QUANTITIES[kind].unit,
             unit_price=0.0,
             amount=0.0,
             method=ConsumptionMethod.ENTERED,
         )
-    elif msg["kind"] is LineItemKind.MATERIAL:
+    elif kind is LineItemKind.MATERIAL:
         if "material_id" not in msg:
             connection.send_error(
                 msg["id"],
@@ -226,7 +227,7 @@ async def _add(
     else:
         item = LineItem(
             id=ulid_now(),
-            kind=msg["kind"],
+            kind=kind,
             label=_text(msg.get("label")),
             quantity=1,
             unit=msg.get("unit", "").strip(),

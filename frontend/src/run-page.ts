@@ -28,6 +28,7 @@ import {
   updateLineItem,
   updateRun,
   type Device,
+  type Kind,
   type Totals,
   type LineItem,
   type Material,
@@ -240,8 +241,11 @@ const itemChanges = (item: LineItem, draft: ReturnType<typeof itemDraft>, format
   return { changes, invalid: edited.filter(([, change]) => !change).map(([name]) => name) };
 };
 
+/** The unit a consumed kind's Line Item counts in when added by hand. */
+const CONSUMED_UNITS = { electricity: "kWh", water: "L" } as const;
+
 /** A new Line Item as its dialog fills it in; what applies depends on the `kind`. */
-const newItem = (kind: "water" | "material" | "other" | "template") => ({
+const newItem = (kind: Kind | "template") => ({
   kind,
   label: "",
   material_id: "",
@@ -405,21 +409,30 @@ export class RunPage extends LitElement {
         ? add({ kind: "material", material_id: picked.id, quantity, unit: adding.unit || unit })
         : { invalid: ["quantity"] };
     }
-    const priceless = typeof price !== "number" || (adding.kind === "water" && price < 0);
-    const invalid = [
-      ...((adding.kind === "water" ? !amount : quantity !== null && !amount) ? ["quantity"] : []),
-      ...(priceless ? ["unit_price"] : []),
-    ];
-    if (invalid.length || typeof price !== "number" || quantity === undefined) return { invalid };
-    return adding.kind === "water"
-      ? add({ kind: "water", quantity, unit_price: price / priceUnit("L").factor })
-      : add({
-          kind: "other",
-          label: adding.label.trim() || null,
-          quantity,
-          unit: adding.unit.trim(),
-          unit_price: price,
-        });
+    const { kind } = adding;
+    const priced = typeof price === "number";
+    const { valid, item } =
+      kind === "other"
+        ? {
+            valid: { quantity: quantity === null || amount, unit_price: priced },
+            item: (unit_price: number) => ({
+              kind,
+              label: adding.label.trim() || null,
+              quantity,
+              unit: adding.unit.trim(),
+              unit_price,
+            }),
+          }
+        : {
+            valid: { quantity: amount, unit_price: priced && price >= 0 },
+            item: (unit_price: number) => ({
+              kind,
+              quantity,
+              unit_price: unit_price / priceUnit(CONSUMED_UNITS[kind]).factor,
+            }),
+          };
+    const invalid = Object.entries(valid).flatMap(([name, ok]) => (ok ? [] : [name]));
+    return invalid.length || typeof price !== "number" ? { invalid } : add(item(price));
   }
 
   private saveNew(adding: ReturnType<typeof newItem>) {
@@ -503,7 +516,10 @@ export class RunPage extends LitElement {
     const device = deviceName(run, this.devices, t);
     const devices = this.devices?.filter(({ id }) => id === run.device_id);
     const water = devices?.some(({ capabilities }) => capabilities.includes("water"));
-    const kinds = shownKinds(devices, run.line_items);
+    const electricity = run.line_items.some(({ kind }) => kind === "electricity");
+    const kinds = shownKinds(devices, run.line_items).filter(
+      (kind) => kind !== "electricity" || electricity,
+    );
     const add = (kind: Parameters<typeof newItem>[0], label: string) =>
       html`<ha-button
         class="small add-${kind}"
@@ -577,6 +593,11 @@ export class RunPage extends LitElement {
                   ${t("item.saved_as_template", { label: this.savedTemplate })}
                 </p>`
               : nothing
+          }
+          ${
+            electricity
+              ? nothing
+              : html`<div class="row">${add("electricity", t("item.add_electricity"))}</div>`
           }
           ${kinds.map((kind) => {
             const items = run.line_items.filter((item) => item.kind === kind);
@@ -1071,12 +1092,14 @@ export class RunPage extends LitElement {
       );
     const { materials, picked, units, unit } = this.materialOf(adding);
     const template = this.template(adding);
+    const consumed = (unit: string) =>
+      html`<div class="field-row">
+        ${field(t("item.quantity"), withUnit(quantity({ autofocus: true }), unit))}
+        ${price(this.per(unit, format))}
+      </div>`;
     const content = {
-      water: () =>
-        html`<div class="field-row">
-          ${field(t("item.quantity"), withUnit(quantity({ autofocus: true }), "L"))}
-          ${price(this.per("L", format))}
-        </div>`,
+      electricity: () => consumed(CONSUMED_UNITS.electricity),
+      water: () => consumed(CONSUMED_UNITS.water),
       material: () =>
         picked
           ? html`${field(

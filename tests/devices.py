@@ -161,7 +161,8 @@ async def add_device(
 ) -> ConfigSubentry:
     """Walk Add Device to the end; returns the new Device once the entry reloaded.
 
-    `source` picks the consumption source; Energy and Power take `meter` as input.
+    `source` picks the consumption source; Energy and Power take `meter` as input,
+    "none" nothing, and no price either.
     A fixed `price` is a number; a dict is the price entity step's input.
     `material` is the Material used entity; with `material_attribute`, `material_unit`
     answers the unit step. `slots` are the Slot entities in Slot order.
@@ -206,11 +207,12 @@ async def add_device(
         if paused_power is not None:
             estimate["paused_power"] = paused_power
         result = await configure(hass, result, estimate)
-    else:
+    elif source != "none":
         result = await configure(hass, result, meter)
-    assert result["step_id"] == "price", result.get("errors")
-    result = await configure(hass, result, price_choice(price))
-    result = await configure(hass, result, price_input(price))
+    if source != "none":
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -226,14 +228,15 @@ async def add_basic_device(
     name: str,
     status: str,
     mapping: dict[str, list[str]],
-    meter: dict[str, Any],
+    meter: dict[str, Any] | None = None,
     source: str = "energy",
     price: float | dict[str, Any] = 0.30,
 ) -> ConfigSubentry:
     """Walk Add Device to the end for a Device Type with only the sections every
     Device has: HA device and name, Status, mapping, electricity source and price.
 
-    `source` is "energy" or "power", the only ones offered, read from `meter`.
+    `source` is "energy" or "power", read from `meter`, or "none", which takes no
+    meter and no price: the only ones offered.
     """
     result = await walk_to_mapping(
         hass, entry, name=name, status=status, device_type=device_type
@@ -241,13 +244,14 @@ async def add_basic_device(
     result = await configure(hass, result, mapping)
     assert (result["step_id"], result["menu_options"]) == (
         "consumption",
-        ["energy", "power"],
+        ["energy", "power", "none"],
     ), result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
-    result = await configure(hass, result, meter)
-    assert result["step_id"] == "price", result.get("errors")
-    result = await configure(hass, result, price_choice(price))
-    result = await configure(hass, result, price_input(price))
+    if source != "none":
+        result = await configure(hass, result, meter)
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -313,10 +317,10 @@ async def add_washing_machine(
     energy meter, no Program input and no water source. `device_type` walks it for
     another Device Type with the washing machine's steps.
 
-    `source` "per_program" takes no `meter`. `water` is "meter" (on `WASHER_WATER`
-    unless `water_meter` gives the input), "flow", "per_program" or "none"; a fixed
-    `water_price` is per m³. `water=None` walks a Device Type without water, which
-    is done after the electricity price.
+    `source` "per_program" takes no `meter`, "none" no `meter` and no `price`.
+    `water` is "meter" (on `WASHER_WATER` unless `water_meter` gives the input),
+    "flow", "per_program" or "none"; a fixed `water_price` is per m³. `water=None`
+    walks a Device Type without water, which is done after its electricity.
     """
     result = await walk_to_mapping(
         hass,
@@ -331,11 +335,12 @@ async def add_washing_machine(
     result = await configure(hass, result, program or {})
     assert result["type"] is FlowResultType.MENU, result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
-    if source != "per_program":
+    if source not in ("per_program", "none"):
         result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
-    assert result["step_id"] == "price", result.get("errors")
-    result = await configure(hass, result, price_choice(price))
-    result = await configure(hass, result, price_input(price))
+    if source != "none":
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
     if water is not None:
         assert result["step_id"] == "water", result.get("errors")
         result = await configure(hass, result, {"next_step_id": f"water_{water}"})

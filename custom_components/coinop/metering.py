@@ -3,7 +3,8 @@
 Its meter or rate input and its price become the Run's timeline (missed
 reports filled from recorder history), and the timeline its priced Line Item.
 Only the fallback without measurement is the quantity's own; without a
-measurement or a fallback the Run gets no Line Item of the quantity.
+measurement or a fallback the Run gets no Line Item of the quantity, and a Run
+that started with source none has neither.
 """
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -20,7 +21,7 @@ from homeassistant.util.ulid import ulid_now
 from . import recorded
 from .cost.consumption import Model, spread
 from .cost.pricing import price_gap, priced_line_item
-from .device_config import Capability, DeviceConfig
+from .device_config import NO_SOURCE, Capability, DeviceConfig
 from .device_inputs import input_time, meter_reading, price_reading
 from .models import ConsumptionMethod, Flag, LineItem, Run, Timeline
 from .quantities import Quantity
@@ -39,6 +40,8 @@ LIVE_INTERVAL = timedelta(minutes=1)
 # silence means Coin-op wasn't watching the meter.
 OUTAGE = LIVE_INTERVAL + LIVE_SAVE_DELAY
 
+type Fallback = tuple[Model | float | None, ConsumptionMethod]
+
 
 class Metering:
     """One quantity of a Device's Runs.
@@ -46,9 +49,10 @@ class Metering:
     `gap_rates(run)` are the (since, rate) a rate input's gaps hold, None for its
     last value; `fallback(run)` is the method without measurement with a model,
     an amount for the whole Run (spread evenly over it) or None for no value (an
-    empty quantity), and is None for no Line Item at all. A meter without any
-    valid reading up to the Run's end flags the ended Run `consumption_gap`; with
-    `silent_meter_falls_back` it falls back too.
+    empty quantity), and is None for no Line Item at all; it isn't asked for a Run
+    that started with source none. A meter without any valid reading up to the
+    Run's end flags the ended Run `consumption_gap`; with `silent_meter_falls_back`
+    it falls back too.
     """
 
     def __init__(
@@ -57,9 +61,7 @@ class Metering:
         quantity: Quantity,
         config: DeviceConfig,
         gap_rates: Callable[[Run], Sequence[tuple[datetime, float | None]]],
-        fallback: Callable[
-            [Run], tuple[Model | float | None, ConsumptionMethod] | None
-        ],
+        fallback: Callable[[Run], Fallback | None],
         *,
         silent_meter_falls_back: bool = False,
     ) -> None:
@@ -71,7 +73,7 @@ class Metering:
         # Without a source there may be no price section.
         self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
         self._gap_rates = gap_rates
-        self._fallback = fallback
+        self._fallback_with_source = fallback
         # The price entity's last valid report, for a Run starting while it has none.
         self._last_price: tuple[datetime, float] | None = None
 
@@ -81,9 +83,16 @@ class Metering:
     def meter(self, run: Run) -> Mapping[str, Any] | None:
         return meter_of(self.quantity, self.timeline(run).source)
 
+    def _fallback_of(self, run: Run) -> Fallback | None:
+        """The Run's fallback; None for a Run that started with source none."""
+        source = self.timeline(run).source
+        if source is not None and source["source"] == NO_SOURCE:
+            return None
+        return self._fallback_with_source(run)
+
     def counts(self, run: Run) -> bool:
         """Whether the Run gets a Line Item of the quantity: measured or by its fallback."""
-        return self.meter(run) is not None or self._fallback(run) is not None
+        return self.meter(run) is not None or self._fallback_of(run) is not None
 
     def meter_entities(self, runs: Iterable[Run]) -> set[str]:
         """The meters of these Runs and of the Device's current source."""
@@ -316,7 +325,7 @@ class Metering:
     def refresh(self, run: Run, until: datetime) -> LineItem | None:
         """The Run's live Line Item up to `until`, flagging a price gap; None
         without measurement and fallback."""
-        fallback = self._fallback(run)
+        fallback = self._fallback_of(run)
         metered = self.meter(run) is not None
         silent = metered and self._silent(run)
         if silent and run.ended is not None:
@@ -334,15 +343,10 @@ class Metering:
 
     def fallen_back(self, run: Run, until: datetime) -> LineItem | None:
         """The Run's Line Item by the fallback alone; None without one."""
-        fallback = self._fallback(run)
+        fallback = self._fallback_of(run)
         return self._fallen_back(run, until, fallback) if fallback else None
 
-    def _fallen_back(
-        self,
-        run: Run,
-        until: datetime,
-        fallback: tuple[Model | float | None, ConsumptionMethod],
-    ) -> LineItem:
+    def _fallen_back(self, run: Run, until: datetime, fallback: Fallback) -> LineItem:
         value, method = fallback
         item = self.priced(
             run,
