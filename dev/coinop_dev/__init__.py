@@ -13,16 +13,16 @@ from homeassistant.helpers.typing import ConfigType
 from custom_components.coinop.device_config import DEVICE_TYPES
 from custom_components.coinop.schema import vol
 
-from .scenarios import HISTORIES, PIECES, PRESETS, async_load
+from .scenarios import HISTORIES, PIECES, PRESETS, SELECTION, async_load, preset_of
 
 DOMAIN = "coinop_dev"
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    # The selection loaded last, with the Preset's name if it came from one.
     store = Store[dict[str, Any]](hass, 1, DOMAIN)
-    loaded = await store.async_load() or {}
+    # The selection loaded last.
+    loaded = {"selection": (await store.async_load() or {}).get("selection")}
 
     @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/scenarios"})
     @websocket_api.require_admin
@@ -62,17 +62,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                     }
                     for name, preset in PRESETS.items()
                 ],
-                "preset": loaded.get("preset"),
-                "selection": loaded.get("selection"),
+                # A Preset's selection is loaded as that Preset, from the dialog too.
+                "preset": (selection := loaded["selection"]) and preset_of(selection),
+                "selection": selection or SELECTION({"pieces": []}),
             },
         )
 
     async def load(call: ServiceCall) -> None:
         user_id = call.context.user_id
         user = await hass.auth.async_get_user(user_id) if user_id else None
-        preset = call.data.get("preset")
-        selection = await async_load(hass, preset or call.data, user)
-        loaded.update(preset=preset, selection=selection)
+        choice = call.data.get("preset") or call.data
+        loaded["selection"] = await async_load(hass, choice, user)
         await store.async_save(loaded)
 
     websocket_api.async_register_command(hass, scenarios)
@@ -81,15 +81,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         DOMAIN,
         "load",
         load,
-        vol.Schema(
-            vol.Any(
-                {vol.Required("preset"): vol.In(list(PRESETS))},
-                {
-                    vol.Required("pieces"): [vol.In(list(PIECES))],
-                    vol.Optional("history", default="short"): vol.In(HISTORIES),
-                    vol.Optional("open_run", default=False): bool,
-                },
-            )
-        ),
+        vol.Schema(vol.Any({vol.Required("preset"): vol.In(list(PRESETS))}, SELECTION)),
     )
     return True

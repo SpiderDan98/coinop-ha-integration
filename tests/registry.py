@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from dev.coinop_dev.stand_ins import (
     HaDevice as HaDevice,
     Registration,
+    account_entry,
     appliances,
     ev_chargers,
     printers,
@@ -21,12 +22,9 @@ from dev.coinop_dev.stand_ins import (
 def add_ha_devices(hass: HomeAssistant, registration: Registration) -> list[HaDevice]:
     """The registration's config entry (the account's, if the domain has one already
     and its integration keeps an account on one), HA devices and entities."""
-    domain = registration.domain
-    shared = hass.config_entries.async_entries(domain) if registration.account else []
-    if shared:
-        entry = shared[0]
-    else:
-        entry = MockConfigEntry(domain=domain, **registration.entry)
+    entry = account_entry(hass, registration)
+    if entry is None:
+        entry = MockConfigEntry(domain=registration.domain, **registration.entry)
         entry.add_to_hass(hass)
     return register(hass, entry, registration)
 

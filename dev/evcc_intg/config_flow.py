@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class EvccStandInFlow(StaticStandInFlow, domain="evcc_intg"):
+class EvccStandInFlow(StandInFlow, domain="evcc_intg"):
     pass

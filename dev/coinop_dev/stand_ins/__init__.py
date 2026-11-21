@@ -89,6 +89,16 @@ class Registration:
         )
 
 
+def account_entry(
+    hass: HomeAssistant, registration: Registration
+) -> ConfigEntry | None:
+    """The domain's config entry that holds the account's HA devices, where the
+    integration keeps them on one and the domain has it already."""
+    if not registration.account:
+        return None
+    return next(iter(hass.config_entries.async_entries(registration.domain)), None)
+
+
 @dataclass
 class HaDevice:
     device: dr.DeviceEntry

@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class HomeConnectAltStandInFlow(StaticStandInFlow, domain="home_connect_alt"):
+class HomeConnectAltStandInFlow(StandInFlow, domain="home_connect_alt"):
     pass

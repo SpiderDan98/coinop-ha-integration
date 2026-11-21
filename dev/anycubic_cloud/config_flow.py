@@ -1,12 +1,5 @@
-from typing import Any
-
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-
-from . import DOMAIN
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class AnycubicStandInFlow(ConfigFlow, domain=DOMAIN):
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        return self.async_create_entry(title="Kobra S1", data={})
+class AnycubicCloudStandInFlow(StandInFlow, domain="anycubic_cloud"):
+    pass

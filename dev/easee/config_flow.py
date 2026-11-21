@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class EaseeStandInFlow(StaticStandInFlow, domain="easee"):
+class EaseeStandInFlow(StandInFlow, domain="easee"):
     pass

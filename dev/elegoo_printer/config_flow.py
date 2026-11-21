@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class ElegooStandInFlow(StaticStandInFlow, domain="elegoo_printer"):
+class ElegooStandInFlow(StandInFlow, domain="elegoo_printer"):
     pass

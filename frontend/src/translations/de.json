@@ -368,7 +368,7 @@
   "dev.hint": "Nur im Dev-Container: Ein Szenario zu laden ersetzt alle Daten von Coin-op.",
   "dev.load": "Laden",
   "dev.loading": "Wird geladen…",
-  "dev.failed": "Das Szenario konnte nicht geladen werden; siehe Home-Assistant-Log.",
+  "dev.failed": "Das Szenario konnte nicht geladen werden: {error}",
   "dev.count": "{count} von {total}",
   "dev.devices_with_history": "Geräte mit Verlauf",
   "dev.quick_start": "Schnellstart",

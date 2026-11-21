@@ -95,13 +95,18 @@ const open = async (panel: HTMLElement) => {
 
 const groups = (dialog: HTMLElement) => queryAll(dialog, "details.group") as HTMLDetailsElement[];
 
-const group = (dialog: HTMLElement, name: string) => {
-  const found = groups(dialog).find((candidate) =>
-    text(query(candidate, "summary")).includes(name),
-  );
-  if (!found) throw new Error(`no group "${name}"`);
+const one = <T>(candidates: T[], matches: (candidate: T) => boolean, what: string) => {
+  const found = candidates.find(matches);
+  if (!found) throw new Error(`no ${what}`);
   return found;
 };
+
+const group = (dialog: HTMLElement, name: string) =>
+  one(
+    groups(dialog),
+    (candidate) => text(query(candidate, "summary")).includes(name),
+    `group "${name}"`,
+  );
 
 const groupBox = (dialog: HTMLElement, name: string) =>
   query(query(group(dialog, name), "summary"), "input") as HTMLInputElement;
@@ -112,17 +117,15 @@ const pieces = (root: HTMLElement) =>
     box: query(piece, "input") as HTMLInputElement,
   }));
 
-const piece = (dialog: HTMLElement, title: string) => {
-  const found = pieces(dialog).find((candidate) => candidate.title === title);
-  if (!found) throw new Error(`no Piece "${title}"`);
-  return found.box;
-};
+const piece = (dialog: HTMLElement, title: string) =>
+  one(pieces(dialog), (candidate) => candidate.title === title, `Piece "${title}"`).box;
 
-const presetButton = (dialog: HTMLElement, title: string) => {
-  const found = queryAll(dialog, "ha-button.preset").find((button) => text(button) === title);
-  if (!found) throw new Error(`no Preset "${title}"`);
-  return found;
-};
+const presetButton = (dialog: HTMLElement, title: string) =>
+  one(
+    queryAll(dialog, "ha-button.preset"),
+    (button) => text(button) === title,
+    `Preset "${title}"`,
+  );
 
 const pickedPreset = (dialog: HTMLElement) => {
   const picked = queryAll(dialog, "ha-button.preset[appearance=filled]").map(text);
@@ -347,23 +350,26 @@ describe("Test data", () => {
     expect(assign).toHaveBeenCalledWith("/coinop");
   });
 
-  it("loads a Preset picked by its name, so that it is stored as loaded", async () => {
+  it("loads a Preset picked as its selection", async () => {
     const backend = devBackend().reply("call_service", () => ({}));
     vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
-    await click(panel, presetButton(dialog, "Quick Start"));
+    await click(panel, presetButton(dialog, "Long history"));
 
     await click(panel, loadButton(dialog));
 
     expect(backend.sent("call_service")).toMatchObject([
-      { service: "load", service_data: { preset: "quick-start" } },
+      {
+        service: "load",
+        service_data: { pieces: ["prusa", "bambu"], history: "long", open_run: false },
+      },
     ]);
   });
 
-  it("keeps the Pieces picked and says so when loading fails", async () => {
+  it("keeps the Pieces picked and shows the error when loading fails", async () => {
     const backend = devBackend().reply("call_service", () => {
-      throw new WsError("home_assistant_error");
+      throw new WsError("home_assistant_error", "No user to load the Scenario as");
     });
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
@@ -371,7 +377,9 @@ describe("Test data", () => {
 
     await click(panel, loadButton(dialog));
 
-    expect(text(dialog)).toContain("The Scenario could not be loaded");
+    expect(text(dialog)).toContain(
+      "The Scenario could not be loaded: No user to load the Scenario as",
+    );
     expect(selected(dialog)).toEqual(["Prusa MK4", "Garden valve"]);
     expect(loadButton(dialog)).toMatchObject({ loading: false, disabled: false });
   });
