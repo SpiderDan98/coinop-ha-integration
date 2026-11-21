@@ -1,5 +1,5 @@
 // Dev container only (the `coinop_dev` integration): switches Coin-op's data to a
-// Scenario of test data. Loading replaces the hub entry, so the page loads afresh after.
+// Preset of test data. Loading replaces the hub entry, so the page loads afresh after.
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "./hass";
@@ -11,8 +11,8 @@ export const DEV_INTEGRATION = "coinop_dev";
 
 const listScenarios = (hass: HomeAssistant) =>
   hass.callWS<{
-    scenarios: { name: string; title: string; description: string }[];
-    current: string | null;
+    presets: { name: string; title: string; description: string }[];
+    preset: string | null;
   }>({ type: `${DEV_INTEGRATION}/scenarios` });
 
 @customElement("coinop-dev-scenarios-dialog")
@@ -43,20 +43,20 @@ export class DevScenariosDialog extends LitElement {
       <p class="muted small">${t("dev.hint")}</p>
       ${this.failed ? html`<p class="error small">${t("dev.failed")}</p>` : nothing}
       <ul>
-        ${this.list?.scenarios.map(
+        ${this.list?.presets.map(
           ({ name, title, description }) =>
             html`<li>
               <div>
                 <strong>${title}</strong>
                 ${
-                  name === this.list?.current
+                  name === this.list?.preset
                     ? html`<span class="muted small">· ${t("dev.current")}</span>`
                     : nothing
                 }
                 <div class="muted small">${description}</div>
               </div>
               <ha-button
-                appearance=${name === this.list?.current ? "plain" : "filled"}
+                appearance=${name === this.list?.preset ? "plain" : "filled"}
                 ?disabled=${!!this.loading}
                 ?loading=${this.loading === name}
                 @click=${() => this.load(name)}
@@ -68,15 +68,15 @@ export class DevScenariosDialog extends LitElement {
     </coinop-dialog>`;
   }
 
-  private async load(scenario: string) {
-    this.loading = scenario;
+  private async load(preset: string) {
+    this.loading = preset;
     this.failed = false;
     try {
       await this.hass.callWS({
         type: "call_service",
         domain: DEV_INTEGRATION,
         service: "load",
-        service_data: { scenario },
+        service_data: { preset },
       });
     } catch {
       this.loading = undefined;
