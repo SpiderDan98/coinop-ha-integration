@@ -125,6 +125,48 @@
       "form": "laundry_additive",
       "density": null,
       "pack_unit": "pcs"
+    },
+    {
+      "type": "Dishwasher tabs",
+      "form": "dishwasher_product",
+      "density": null,
+      "pack_unit": "pcs"
+    },
+    {
+      "type": "Dishwasher powder",
+      "form": "dishwasher_product",
+      "density": 0.95,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Dishwasher salt",
+      "form": "dishwasher_product",
+      "density": 1.2,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Rinse aid",
+      "form": "dishwasher_product",
+      "density": 1.02,
+      "pack_unit": "ml"
+    },
+    {
+      "type": "Coffee beans",
+      "form": "beverage_ingredient",
+      "density": 0.4,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Ground coffee",
+      "form": "beverage_ingredient",
+      "density": 0.35,
+      "pack_unit": "g"
+    },
+    {
+      "type": "Milk",
+      "form": "beverage_ingredient",
+      "density": 1.03,
+      "pack_unit": "ml"
     }
   ]
 }

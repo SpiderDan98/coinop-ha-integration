@@ -41,6 +41,7 @@ import lineItemsAddWater from "./fixtures/backend/line-items-add-water.json";
 import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
+import materialsCreateDishwasherAndBeverage from "./fixtures/backend/materials-create-dishwasher-and-beverage.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
@@ -178,6 +179,9 @@ export const recorded = {
   /** `coinop/materials/create` of "material-detergent" (1,500 ml for 7.80) and
    * "material-pods" (40 pieces for 12.00), each answer's Material. */
   laundry: materialsCreateLaundry as Material[],
+  /** `coinop/materials/create` of "material-tabs" (60 pieces for 9.00) and
+   * "material-beans" (1,000 g for 16.00), each answer's Material. */
+  dishwasherAndBeverage: materialsCreateDishwasherAndBeverage as Material[],
   material: (id: string) =>
     found(
       recorded.catalog.filled.materials.find((material) => material.id === id),

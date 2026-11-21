@@ -216,6 +216,27 @@ describe("Spoolman in the Materials tab", () => {
     expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
   });
 
+  it("offers no link for a dishwasher product or a beverage ingredient", async () => {
+    const backend = spoolmanBackend().subscription(CATALOG, () => [
+      {
+        ...withLinked,
+        materials: [...recorded.catalog.filled.materials, ...recorded.dishwasherAndBeverage],
+      },
+    ]);
+    const panel = await mountPanel(backend, { path: "/materials" });
+
+    await click(panel, button(row(panel, "tr.material", "Espresso beans"), "Edit"));
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+    await change(panel, field(panel, "form"), "filament");
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
+    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
+    await change(panel, field(panel, "form"), "dishwasher_product");
+    await change(panel, field(panel, "pack_unit"), "g");
+    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+  });
+
   it("shows nothing of Spoolman while it isn't set up", async () => {
     const backend = spoolmanBackend(recorded.spoolman.notConfigured);
     const panel = await mountPanel(backend, { path: "/materials" });

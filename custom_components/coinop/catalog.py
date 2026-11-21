@@ -12,6 +12,7 @@ from homeassistant.util.ulid import ulid_now
 
 from .materials import (
     DEFAULT_DIAMETER,
+    USUAL_UNITS,
     Material,
     MaterialForm,
     PackUnit,
@@ -30,10 +31,9 @@ def _material(data: dict[str, Any]) -> Material:
     Raises ValueError for a Material by weight or volume without a density.
     """
     form = MaterialForm(data["form"])
-    usual_unit = PackUnit.MILLILITRE if form is MaterialForm.RESIN else PackUnit.GRAM
     price = data["price"]
     if price["source"] == "fixed":
-        price = {"pack_unit": usual_unit} | price
+        price = {"pack_unit": USUAL_UNITS.get(form, PackUnit.GRAM)} | price
     by_piece = price.get("pack_unit") == PackUnit.PIECE
     density = None if by_piece else data.get("density")
     if density is None and not by_piece:

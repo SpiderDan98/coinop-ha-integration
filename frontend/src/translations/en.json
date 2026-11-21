@@ -168,6 +168,8 @@
   "form.detergent": "Detergent",
   "form.fabric_softener": "Fabric softener",
   "form.laundry_additive": "Laundry additive",
+  "form.dishwasher_product": "Dishwasher product",
+  "form.beverage_ingredient": "Beverage ingredient",
   "run.tags": "Tags",
   "tags.add": "Add a Tag…",
   "tags.remove": "Remove {tag}",

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "material-tabs",
+    "name": "All-in-one tabs",
+    "form": "dishwasher_product",
+    "type": "Dishwasher tabs",
+    "density": null,
+    "vendor": null,
+    "colour": null,
+    "diameter": null,
+    "default_for_type": false,
+    "archived": false,
+    "price": {
+      "source": "fixed",
+      "pack_price": 9.0,
+      "pack_size": 60.0,
+      "pack_unit": "pcs"
+    },
+    "price_per_gram": null,
+    "price_per_piece": 0.15
+  },
+  {
+    "id": "material-beans",
+    "name": "Espresso beans",
+    "form": "beverage_ingredient",
+    "type": "Coffee beans",
+    "density": 0.4,
+    "vendor": null,
+    "colour": null,
+    "diameter": null,
+    "default_for_type": false,
+    "archived": false,
+    "price": {
+      "source": "fixed",
+      "pack_price": 16.0,
+      "pack_size": 1000.0,
+      "pack_unit": "g"
+    },
+    "price_per_gram": 0.016,
+    "price_per_piece": null
+  }
+]
