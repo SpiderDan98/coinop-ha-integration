@@ -143,13 +143,27 @@ async def test_the_entry_shows_the_type_name_and_what_the_device_has_now(
         has=["program", "doses", "water", "part_count"],
         source="per_program",
     )
+    laser = await add_other_device(
+        hass,
+        entry,
+        type_name="Kiln",
+        name="Laser",
+        status="sensor.laser_status",
+        has=["job", "images", "per_run_meters"],
+    )
 
     nothing = await open_other(hass, entry, kiln)
     much = await open_other(hass, entry, kettle)
+    rest = await open_other(hass, entry, laser)
 
     assert nothing["step_id"] == much["step_id"] == "other"
     assert fields(much) == ["type_name", *CHOICES]
     assert offered(much, "type_name") == ["Kiln", "Brew kettle"]
+    assert [choice for choice in CHOICES if suggested(rest, choice)] == [
+        "job",
+        "images",
+        "per_run_meters",
+    ]
     assert suggested(nothing, "type_name") == "Kiln"
     assert {choice: suggested(nothing, choice) for choice in CHOICES} == dict.fromkeys(
         CHOICES, False
