@@ -103,15 +103,19 @@ MIELE_MODELS = {
 
 
 def miele(
-    model: str = "Washing machine", *, serial: str = "000123456789"
+    model: str = "Washing machine",
+    *,
+    serial: str = "000123456789",
+    name: str | None = None,
 ) -> Registration:
-    """HA core `miele`: every appliance of an account on one config entry, named
-    after its kind, unique ids `<serial>-<key>`.
+    """HA core `miele`: every appliance of an account on one config entry, unique ids
+    `<serial>-<key>`.
 
     `model` is the appliance's kind as the integration writes it on the HA device; it
-    also decides which sensors the integration registers. A second appliance needs
-    its own `serial`.
+    also decides which sensors the integration registers. `name` is the HA device's,
+    its kind by default. A second appliance needs its own `serial`.
     """
+    name = name or model
     return Registration(
         "miele",
         (
@@ -119,7 +123,7 @@ def miele(
                 {
                     "identifiers": {("miele", serial)},
                     "manufacturer": "Miele",
-                    "name": model,
+                    "name": name,
                     "model": model,
                     "serial_number": serial,
                 },
@@ -129,7 +133,7 @@ def miele(
                         f"{serial}-{key}",
                         state=MIELE_SENSORS[key][2],
                         unit=MIELE_SENSORS[key][1],
-                        object_id=f"{model} {MIELE_SENSORS[key][0]}",
+                        object_id=f"{name} {MIELE_SENSORS[key][0]}",
                     )
                     for key in MIELE_MODELS[model]
                 },
@@ -342,7 +346,8 @@ def home_connect(
     that reports nothing, here as the locked Home Assistant does or, with
     `minimum_ha`, as Coin-op's minimum does. The operation state comes from what the
     appliance reports; every stand-in has one, so that it is its kind that decides
-    whether Quick Start offers it. Each one is a config entry and device of its own.
+    whether Quick Start offers it. Every appliance of an account is on one config
+    entry, a device of its own.
     """
     object_id = slugify(name)
     ha_id = f"SIEMENS-{object_id.upper()}-0123"
@@ -401,6 +406,7 @@ def home_connect(
                 event_sensors | program_sensors | status | programs,
             ),
         ),
+        account=True,
     )
 
 
@@ -442,12 +448,14 @@ def home_connect_local(appliance_type: str = "Dishwasher") -> Registration:
     )
 
 
-def home_connect_alt(*, active_program: bool = True) -> Registration:
+def home_connect_alt(
+    *, active_program: bool = True, name: str = "Washer"
+) -> Registration:
     """ekutner/home-connect-hass (domain `home_connect_alt`): every appliance of an
     account on one config entry, unique ids `<haId>_<BSH key in lower case, dots as
-    underscores>`, the haId in lower case with underscores; a washer here. Its active
-    program sensor is registered only once the appliance has run a program while the
-    integration was loaded. Its states are the API's own."""
+    underscores>`, the haId in lower case with underscores; a washer named `name`
+    here. Its active program sensor is registered only once the appliance has run a
+    program while the integration was loaded. Its states are the API's own."""
     ha_id = "BOSCH-WAT28400-68A40E000000"
     safe_ha_id = ha_id.lower().replace("-", "_")
     program = HOME_CONNECT_PROGRAMS["Washer"]
@@ -481,14 +489,14 @@ def home_connect_alt(*, active_program: bool = True) -> Registration:
                     "identifiers": {("home_connect_alt", safe_ha_id)},
                     "manufacturer": "Bosch",
                     "model": "WAT28400",
-                    "name": "Washer",
+                    "name": name,
                 },
                 {
                     key: EntityShape(
                         platform,
                         f"{safe_ha_id}_{key.lower().replace('.', '_')}",
                         state=state,
-                        object_id=f"Washer {suffix}",
+                        object_id=f"{name} {suffix}",
                     )
                     for key, (platform, suffix, state) in keys.items()
                 },

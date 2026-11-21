@@ -276,13 +276,26 @@ async def test_a_device_with_history_loads_alone(
         ("elegoo_printer.3d_printer", "Centauri Carbon · Elegoo"),
         ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
         ("ha_washdata.washing_machine", "Washing machine · WashData"),
+        ("miele.washing_machine", "Miele washing machine · Miele"),
+        ("home_connect.washing_machine", "Siemens washer · Home Connect"),
+        ("home_connect_alt.washing_machine", "Bosch washer · Home Connect Alt"),
         ("lg_thinq.washing_machine", "WashTower washer · LG ThinQ"),
         ("smartthings.washing_machine", "Samsung washer · SmartThings"),
         ("ha_washdata.dishwasher", "Dishwasher · WashData"),
+        ("miele.dishwasher", "Miele dishwasher · Miele"),
+        ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
+        ("homeconnect_ws.dishwasher", "Bosch Dishwasher · Home Connect Local"),
         ("lg_thinq.dishwasher", "LG dishwasher · LG ThinQ"),
         ("smartthings.dishwasher", "Samsung dishwasher · SmartThings"),
+        ("ha_washdata.tumble_dryer", "Tumble dryer · WashData"),
+        ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
+        ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
         ("lg_thinq.tumble_dryer", "WashTower dryer · LG ThinQ"),
         ("smartthings.tumble_dryer", "Samsung dryer · SmartThings"),
+        ("miele.coffee_machine", "Miele coffee system · Miele"),
+        ("home_connect.coffee_machine", "Siemens coffee maker · Home Connect"),
+        ("miele.oven", "Miele oven · Miele"),
+        ("home_connect.oven", "Siemens oven · Home Connect"),
         ("lg_thinq.oven", "LG oven · LG ThinQ"),
         ("smartthings.oven", "Samsung oven · SmartThings"),
         (
@@ -321,7 +334,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 28
+    assert len(offered(await open_add_device(hass, entry))) == 41
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
     assert all(hass.states.get(status) for *_, status, _, _ in APPLIANCES.values())
@@ -607,6 +620,9 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
             [
                 "washer",
                 "ha_washdata.washing_machine",
+                "miele.washing_machine",
+                "home_connect.washing_machine",
+                "home_connect_alt.washing_machine",
                 "lg_thinq.washing_machine",
                 "smartthings.washing_machine",
             ],
@@ -615,12 +631,28 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
             "dishwasher",
             [
                 "ha_washdata.dishwasher",
+                "miele.dishwasher",
+                "home_connect.dishwasher",
+                "homeconnect_ws.dishwasher",
                 "lg_thinq.dishwasher",
                 "smartthings.dishwasher",
             ],
         ),
-        ("tumble_dryer", ["lg_thinq.tumble_dryer", "smartthings.tumble_dryer"]),
-        ("oven", ["lg_thinq.oven", "smartthings.oven"]),
+        (
+            "tumble_dryer",
+            [
+                "ha_washdata.tumble_dryer",
+                "miele.tumble_dryer",
+                "home_connect.tumble_dryer",
+                "lg_thinq.tumble_dryer",
+                "smartthings.tumble_dryer",
+            ],
+        ),
+        ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
+        (
+            "oven",
+            ["miele.oven", "home_connect.oven", "lg_thinq.oven", "smartthings.oven"],
+        ),
         ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
@@ -661,13 +693,26 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "elegoo_printer.3d_printer",
         "moonraker.3d_printer",
         "ha_washdata.washing_machine",
+        "miele.washing_machine",
+        "home_connect.washing_machine",
+        "home_connect_alt.washing_machine",
         "lg_thinq.washing_machine",
         "smartthings.washing_machine",
         "ha_washdata.dishwasher",
+        "miele.dishwasher",
+        "home_connect.dishwasher",
+        "homeconnect_ws.dishwasher",
         "lg_thinq.dishwasher",
         "smartthings.dishwasher",
+        "ha_washdata.tumble_dryer",
+        "miele.tumble_dryer",
+        "home_connect.tumble_dryer",
         "lg_thinq.tumble_dryer",
         "smartthings.tumble_dryer",
+        "miele.coffee_machine",
+        "home_connect.coffee_machine",
+        "miele.oven",
+        "home_connect.oven",
         "lg_thinq.oven",
         "smartthings.oven",
         "tesla_wall_connector.ev_charger",
@@ -976,7 +1021,11 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "ha_creality_ws": 1,
         "elegoo_printer": 1,
         "moonraker": 1,
-        "ha_washdata": 2,
+        "ha_washdata": 3,
+        "miele": 1,
+        "home_connect": 1,
+        "homeconnect_ws": 1,
+        "home_connect_alt": 1,
         "lg_thinq": 1,
         "smartthings": 1,
         "tesla_wall_connector": 1,
@@ -1064,6 +1113,19 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Voron 2.4 · Moonraker",
         "Washing machine · WashData",
         "Dishwasher · WashData",
+        "Tumble dryer · WashData",
+        "Miele washing machine · Miele",
+        "Miele dishwasher · Miele",
+        "Miele tumble dryer · Miele",
+        "Miele coffee system · Miele",
+        "Miele oven · Miele",
+        "Siemens washer · Home Connect",
+        "Siemens dishwasher · Home Connect",
+        "Siemens dryer · Home Connect",
+        "Siemens coffee maker · Home Connect",
+        "Siemens oven · Home Connect",
+        "Bosch Dishwasher · Home Connect Local",
+        "Bosch washer · Home Connect Alt",
         "WashTower washer · LG ThinQ",
         "LG dishwasher · LG ThinQ",
         "WashTower dryer · LG ThinQ",
@@ -1117,6 +1179,114 @@ async def set_state(hass: HomeAssistant, entity_id: str, value: str) -> None:
 # integration brings no meter, the energy entity counting, its Status entity, and a
 # Status of a running and a finished cycle.
 APPLIANCES = {
+    "miele.washing_machine": (
+        "Miele washing machine · Miele",
+        "washing_machine",
+        None,
+        "sensor.miele_washing_machine_energy_consumption",
+        "sensor.miele_washing_machine_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.dishwasher": (
+        "Miele dishwasher · Miele",
+        "dishwasher",
+        None,
+        "sensor.miele_dishwasher_energy_consumption",
+        "sensor.miele_dishwasher_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.tumble_dryer": (
+        "Miele tumble dryer · Miele",
+        "tumble_dryer",
+        None,
+        "sensor.miele_tumble_dryer_energy_consumption",
+        "sensor.miele_tumble_dryer_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.coffee_machine": (
+        "Miele coffee system · Miele",
+        "coffee_machine",
+        "sensor.miele_coffee_system_plug_energy",
+        "input_number.miele_coffee_system_energy",
+        "sensor.miele_coffee_system_status",
+        "in_use",
+        "program_ended",
+    ),
+    "miele.oven": (
+        "Miele oven · Miele",
+        "oven",
+        "sensor.miele_oven_plug_energy",
+        "input_number.miele_oven_energy",
+        "sensor.miele_oven_status",
+        "in_use",
+        "program_ended",
+    ),
+    "home_connect.washing_machine": (
+        "Siemens washer · Home Connect",
+        "washing_machine",
+        "sensor.siemens_washer_plug_energy",
+        "input_number.siemens_washer_energy",
+        "sensor.siemens_washer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.dishwasher": (
+        "Siemens dishwasher · Home Connect",
+        "dishwasher",
+        "sensor.siemens_dishwasher_plug_energy",
+        "input_number.siemens_dishwasher_energy",
+        "sensor.siemens_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.tumble_dryer": (
+        "Siemens dryer · Home Connect",
+        "tumble_dryer",
+        "sensor.siemens_dryer_plug_energy",
+        "input_number.siemens_dryer_energy",
+        "sensor.siemens_dryer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.coffee_machine": (
+        "Siemens coffee maker · Home Connect",
+        "coffee_machine",
+        "sensor.siemens_coffee_maker_plug_energy",
+        "input_number.siemens_coffee_maker_energy",
+        "sensor.siemens_coffee_maker_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.oven": (
+        "Siemens oven · Home Connect",
+        "oven",
+        "sensor.siemens_oven_plug_energy",
+        "input_number.siemens_oven_energy",
+        "sensor.siemens_oven_operation_state",
+        "run",
+        "finished",
+    ),
+    "homeconnect_ws.dishwasher": (
+        "Bosch Dishwasher · Home Connect Local",
+        "dishwasher",
+        "sensor.bosch_dishwasher_plug_energy",
+        "input_number.bosch_dishwasher_energy",
+        "sensor.bosch_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect_alt.washing_machine": (
+        "Bosch washer · Home Connect Alt",
+        "washing_machine",
+        "sensor.bosch_washer_plug_energy",
+        "input_number.bosch_washer_energy",
+        "sensor.bosch_washer_operation_state",
+        "BSH.Common.EnumType.OperationState.Run",
+        "BSH.Common.EnumType.OperationState.Finished",
+    ),
     "lg_thinq.washing_machine": (
         "WashTower washer · LG ThinQ",
         "washing_machine",
@@ -1190,6 +1360,8 @@ APPLIANCES = {
         "ready",
     ),
 }
+# The appliance Pieces of an integration that can't tell the kind.
+ASKS_DEVICE_TYPE = {"homeconnect_ws.dishwasher", "home_connect_alt.washing_machine"}
 
 
 @pytest.mark.usefixtures("helpers")
@@ -1212,7 +1384,8 @@ async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_sta
     running: str,
     end: str,
 ) -> None:
-    """Quick Start asks for a meter only where the integration brings none."""
+    """Quick Start asks for a meter only where the integration brings none, and for
+    the Device Type only where it can't tell the kind."""
     await async_load(hass, {"pieces": [piece]}, hass_admin_user)
     await hass.async_block_till_done()
     [entry] = hass.config_entries.async_entries("coinop")
@@ -1221,6 +1394,10 @@ async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_sta
     [device_id, _] = [option["value"] for option in offered(result)]
 
     result = await configure(hass, result, {"device": device_id})
+    if piece in ASKS_DEVICE_TYPE:
+        assert result["step_id"] == "quick_start_device_type"
+        result = await configure(hass, result, {"device_type": device_type})
+    assert result["step_id"] == "quick_start_confirm"
     assert ("optional_meter" in fields(result)) is (meter is not None)
     answers = {"price": 0.32} | ({"optional_meter": meter} if meter else {})
     result = await configure(hass, result, answers)
@@ -1251,7 +1428,48 @@ async def set_energy(hass: HomeAssistant, entity_id: str, value: float) -> None:
 
 
 @pytest.mark.usefixtures("helpers")
-@pytest.mark.parametrize("domain", ["lg_thinq", "smartthings"])
+async def test_quick_start_adds_the_dryer_washdata_follows_as_a_tumble_dryer(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, {"pieces": ["ha_washdata.tumble_dryer"]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    [device_id] = [
+        o["value"] for o in offered(result) if o["label"] == "Tumble dryer · WashData"
+    ]
+
+    result = await configure(hass, result, {"device": device_id})
+    result = await configure(
+        hass,
+        result,
+        {"optional_meter": "sensor.washdata_dryer_plug_energy", "price": 0.32},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert (device["name"], device["type"]) == ("Tumble dryer", "tumble_dryer")
+    await set_helper(hass, "input_number.washdata_dryer_energy", 20)
+    await set_helper(hass, "input_select.washdata_dryer_program", "Cotton dry")
+    await set_helper(hass, "input_select.washdata_dryer_status", "running")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.washdata_dryer_energy", 21.5)
+    await set_helper(hass, "input_select.washdata_dryer_status", "finished")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["program"], run["outcome"]) == ("Cotton dry", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(1.5)
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("domain", ["miele", "home_connect", "lg_thinq", "smartthings"])
 async def test_an_accounts_pieces_load_together_on_its_one_config_entry(
     hass: HomeAssistant,
     hass_admin_user: MockUser,

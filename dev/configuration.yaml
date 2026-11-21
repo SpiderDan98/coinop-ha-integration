@@ -51,6 +51,13 @@ input_select:
   dishwasher_program:
     name: Dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  # The tumble dryer WashData follows, for the stand-in in dev/ha_washdata.
+  washdata_dryer_status:
+    name: WashData dryer status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_dryer_program:
+    name: WashData dryer program
+    options: [Cotton dry, Easy care, Wool finish]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -119,6 +126,13 @@ input_number:
     step: 0.001
     mode: box
     unit_of_measurement: kWh
+  washdata_dryer_energy:
+    name: WashData dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
   irrigation_water:
     name: Garden valve water
     min: 0
@@ -176,7 +190,70 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
-  # The plugs of the static stand-ins' appliances that bring no meter.
+  # The plugs of the static stand-ins' appliances whose integration brings no meter.
+  miele_coffee_system_energy:
+    name: Miele coffee system energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  miele_oven_energy:
+    name: Miele oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_washer_energy:
+    name: Siemens washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_dishwasher_energy:
+    name: Siemens dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_dryer_energy:
+    name: Siemens dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_coffee_maker_energy:
+    name: Siemens coffee maker energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_oven_energy:
+    name: Siemens oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  bosch_dishwasher_energy:
+    name: Bosch Dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  bosch_washer_energy:
+    name: Bosch washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
   washtower_washer_energy:
     name: WashTower washer energy
     min: 0
@@ -233,6 +310,12 @@ template:
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
+      - name: WashData dryer plug energy
+        unique_id: washdata_dryer_plug_energy
+        state: "{{ states('input_number.washdata_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
       - name: Anycubic Kobra S1 plug power
         unique_id: anycubic_kobra_plug_power
         state: "{{ states('input_number.anycubic_kobra_power') }}"
@@ -269,6 +352,60 @@ template:
         unit_of_measurement: W
         device_class: power
         state_class: measurement
+      - name: Miele coffee system plug energy
+        unique_id: miele_coffee_system_plug_energy
+        state: "{{ states('input_number.miele_coffee_system_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Miele oven plug energy
+        unique_id: miele_oven_plug_energy
+        state: "{{ states('input_number.miele_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens washer plug energy
+        unique_id: siemens_washer_plug_energy
+        state: "{{ states('input_number.siemens_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dishwasher plug energy
+        unique_id: siemens_dishwasher_plug_energy
+        state: "{{ states('input_number.siemens_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dryer plug energy
+        unique_id: siemens_dryer_plug_energy
+        state: "{{ states('input_number.siemens_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens coffee maker plug energy
+        unique_id: siemens_coffee_maker_plug_energy
+        state: "{{ states('input_number.siemens_coffee_maker_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens oven plug energy
+        unique_id: siemens_oven_plug_energy
+        state: "{{ states('input_number.siemens_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch Dishwasher plug energy
+        unique_id: bosch_dishwasher_plug_energy
+        state: "{{ states('input_number.bosch_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch washer plug energy
+        unique_id: bosch_washer_plug_energy
+        state: "{{ states('input_number.bosch_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
       - name: WashTower washer plug energy
         unique_id: washtower_washer_plug_energy
         state: "{{ states('input_number.washtower_washer_energy') }}"

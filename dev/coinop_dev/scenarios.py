@@ -949,6 +949,33 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_select.washer_status": "off"},
         domain="ha_washdata",
     ),
+    "miele.washing_machine": StaticPiece(
+        "washing_machine",
+        "Miele washing machine · Miele",
+        "A washing machine with its own energy and water meters for the cycle; set "
+        "its status in the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele, serial="000111000001", name="Miele washing machine"
+        ),
+    ),
+    "home_connect.washing_machine": StaticPiece(
+        "washing_machine",
+        "Siemens washer · Home Connect",
+        "A washer with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_washer_energy": 0},
+        registration=partial(appliances.home_connect, "Washer", name="Siemens washer"),
+    ),
+    "home_connect_alt.washing_machine": StaticPiece(
+        "washing_machine",
+        "Bosch washer · Home Connect Alt",
+        "A washer whose kind its integration doesn't tell, so Quick Start asks for "
+        "the Device Type, with its plug sensor as meter; set its operation state "
+        "(`BSH.Common.EnumType.OperationState.Run`) in the developer tools to run it.",
+        {"input_number.bosch_washer_energy": 0},
+        registration=partial(appliances.home_connect_alt, name="Bosch washer"),
+    ),
     "lg_thinq.washing_machine": StaticPiece(
         "washing_machine",
         "WashTower washer · LG ThinQ",
@@ -980,6 +1007,38 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         domain="ha_washdata",
         data={"name": "Dishwasher", "device_type": "dishwasher"},
     ),
+    "miele.dishwasher": StaticPiece(
+        "dishwasher",
+        "Miele dishwasher · Miele",
+        "A dishwasher with its own energy and water meters for the cycle; set its "
+        "status in the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele,
+            "Dishwasher",
+            serial="000111000002",
+            name="Miele dishwasher",
+        ),
+    ),
+    "home_connect.dishwasher": StaticPiece(
+        "dishwasher",
+        "Siemens dishwasher · Home Connect",
+        "A dishwasher with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_dishwasher_energy": 0},
+        registration=partial(
+            appliances.home_connect, "Dishwasher", name="Siemens dishwasher"
+        ),
+    ),
+    "homeconnect_ws.dishwasher": StaticPiece(
+        "dishwasher",
+        "Bosch Dishwasher · Home Connect Local",
+        "A dishwasher whose kind its integration doesn't tell, so Quick Start asks "
+        "for the Device Type, with its plug sensor as meter; set its operation state "
+        "in the developer tools to run it.",
+        {"input_number.bosch_dishwasher_energy": 0},
+        registration=appliances.home_connect_local,
+    ),
     "lg_thinq.dishwasher": StaticPiece(
         "dishwasher",
         "LG dishwasher · LG ThinQ",
@@ -1006,6 +1065,36 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             device_id="8c1f4e2d-6a93-4b07-b5d2-9e3a7c1f6d58",
         ),
     ),
+    "ha_washdata.tumble_dryer": QuickStartPiece(
+        "tumble_dryer",
+        "Tumble dryer · WashData",
+        "A tumble dryer WashData follows, with its plug sensor as meter; the "
+        "WashData dryer's helpers run it.",
+        {"input_select.washdata_dryer_status": "off"},
+        domain="ha_washdata",
+        data={"name": "Tumble dryer", "device_type": "dryer"},
+    ),
+    "miele.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "Miele tumble dryer · Miele",
+        "A tumble dryer with its own energy meter for the cycle; set its status in "
+        "the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele,
+            "Tumble dryer",
+            serial="000111000003",
+            name="Miele tumble dryer",
+        ),
+    ),
+    "home_connect.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "Siemens dryer · Home Connect",
+        "A dryer with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_dryer_energy": 0},
+        registration=partial(appliances.home_connect, "Dryer", name="Siemens dryer"),
+    ),
     "lg_thinq.tumble_dryer": StaticPiece(
         "tumble_dryer",
         "WashTower dryer · LG ThinQ",
@@ -1027,6 +1116,47 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             name="Samsung dryer",
             device_id="5e9a2c7b-1d84-4f3e-a6c0-2b8d4f7e1a93",
         ),
+    ),
+    "miele.coffee_machine": StaticPiece(
+        "coffee_machine",
+        "Miele coffee system · Miele",
+        "A coffee machine with its plug sensor as meter; set its status in the "
+        "developer tools to run it.",
+        {"input_number.miele_coffee_system_energy": 0},
+        registration=partial(
+            appliances.miele,
+            "Coffee system",
+            serial="000111000004",
+            name="Miele coffee system",
+        ),
+    ),
+    "home_connect.coffee_machine": StaticPiece(
+        "coffee_machine",
+        "Siemens coffee maker · Home Connect",
+        "A coffee maker with its plug sensor as meter; set its operation state in "
+        "the developer tools to run it.",
+        {"input_number.siemens_coffee_maker_energy": 0},
+        registration=partial(
+            appliances.home_connect, "CoffeeMaker", name="Siemens coffee maker"
+        ),
+    ),
+    "miele.oven": StaticPiece(
+        "oven",
+        "Miele oven · Miele",
+        "An oven with its plug sensor as meter; set its status in the developer "
+        "tools to run it.",
+        {"input_number.miele_oven_energy": 0},
+        registration=partial(
+            appliances.miele, "Oven", serial="000111000005", name="Miele oven"
+        ),
+    ),
+    "home_connect.oven": StaticPiece(
+        "oven",
+        "Siemens oven · Home Connect",
+        "An oven with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_oven_energy": 0},
+        registration=partial(appliances.home_connect, "Oven", name="Siemens oven"),
     ),
     "lg_thinq.oven": StaticPiece(
         "oven",
