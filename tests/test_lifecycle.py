@@ -305,6 +305,28 @@ async def test_a_job_name_reported_just_after_the_start_names_the_run(
     assert cube["outcome"] == "completed"
 
 
+async def test_a_job_change_later_in_the_run_still_closes_it_at_the_next_running_status(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100)
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+
+    hass.states.async_set(JOB, "cube.gcode")
+    await clock.advance(minutes=30)
+    await set_status(hass, "paused")
+    await clock.advance(minutes=30)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    benchy, cube = stored_runs(hass_storage)
+    assert (benchy["job_name"], benchy["outcome"]) == ("benchy.gcode", "unknown")
+    assert benchy["ended"] == at(minutes=90)
+    assert (cube["job_name"], cube["started"]) == ("cube.gcode", at(hours=2))
+
+
 async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:

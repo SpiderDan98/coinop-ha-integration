@@ -81,6 +81,8 @@ from .templates import add_templates, count_running_hours
 from .timelines import add_flag
 
 FINAL_REPORT_WAIT = timedelta(minutes=5)
+# How soon after the Status that opened a Run its new job's name may still follow.
+JOB_NAME_GRACE = timedelta(minutes=1)
 OUTCOMES = {
     Target.FINISHED: Outcome.COMPLETED,
     Target.CANCELLED: Outcome.CANCELLED,
@@ -121,6 +123,8 @@ class DeviceTracker:
         self._unsubscribe_stocks: list[CALLBACK_TYPE] = []
         # Until Coin-op has seen the Status input, it may have missed the end.
         self._status_lost = True
+        # The Run just opened whose job's name may still follow its Status.
+        self._job_may_follow: str | None = None
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
         self._finishing: set[str] = set()
@@ -604,6 +608,7 @@ class DeviceTracker:
         attribute = self._config.status_attribute
         value = input_value(state, attribute)
         run = self._book.open_run(self._config.device_id)
+        self._job_may_follow = None
         if state is None or value is None:
             if run is not None and not self._status_lost and not run.paused:
                 run.last_seen = (
@@ -664,13 +669,14 @@ class DeviceTracker:
 
     @callback
     def _on_job(self, event: Event[EventStateChangedData]) -> None:
-        """While the Run runs, the job's name is its own: some integrations write
-        the Status that opens the Run before the new job's name."""
+        """Some integrations write the Status that opens a Run before the new job's
+        name: the first job change right after it is the Run's own."""
         run = self._book.open_run(self._config.device_id)
         job_name = self._job_name()
-        if run is None or run.paused or self._status_lost or job_name is None:
+        if run is None or run.id != self._job_may_follow or job_name is None:
             return
-        if job_name == run.job_name:
+        self._job_may_follow = None
+        if dt_util.utcnow() - run.started > JOB_NAME_GRACE or job_name == run.job_name:
             return
         if run.name == job_title(run.job_name):
             run.name = job_title(job_name)
@@ -709,6 +715,7 @@ class DeviceTracker:
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
         )
         self._book.async_start(run)
+        self._job_may_follow = run.id
         self._images.async_copy_thumbnail(run)
 
     @property
