@@ -779,6 +779,42 @@ async def test_quick_start_adds_a_static_ev_charger_with_the_counter_it_brings(
         assert data["consumption"]["entity_id"] == counter
 
 
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("piece", EV_CHARGERS)
+async def test_a_static_ev_chargers_charge_is_run_through_its_status(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+    piece: str,
+) -> None:
+    """As a contributor sets the Status and the counter in the developer tools."""
+    [(label, status, counter), *_], charging, unplugged = EV_CHARGERS[piece]
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    [device_id] = [o["value"] for o in offered(result) if o["label"] == label]
+    result = await configure(hass, result, {"device": device_id})
+    await configure(hass, result, {"price": 0.32})
+
+    reading = hass.states.get(counter)
+    assert reading is not None
+    per_kwh = 1000 if reading.attributes["unit_of_measurement"] == "Wh" else 1
+    await set_state(hass, status, charging)
+    await clock.advance(hours=1)
+    await set_state(hass, counter, str(float(reading.state) + 7 * per_kwh))
+    await set_state(hass, status, unplugged)
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert run["outcome"] == "completed"
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(7)
+
+
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
