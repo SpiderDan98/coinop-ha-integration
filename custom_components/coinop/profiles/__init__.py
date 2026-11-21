@@ -40,6 +40,9 @@ INTEGRATIONS = {
     "bambu_lab": Integration(
         "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
     ),
+    "prusalink": Integration(
+        "PrusaLink", printers.prusalink, printers.DEVICE_TYPES, printers.KIND
+    ),
     # Appliances
     "ha_washdata": Integration(
         "WashData",
