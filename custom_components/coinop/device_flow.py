@@ -1,6 +1,7 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping
+from enum import StrEnum
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -89,6 +90,14 @@ NEEDS = {
     "program": Capability.PROGRAM,
     "water": Capability.WATER,
     "water_price": Capability.WATER,
+}
+# The sources only a Device with the Capability is offered, by the quantity's section.
+SOURCE_NEEDS: dict[str, dict[StrEnum, Capability]] = {
+    ELECTRICITY.source_key: {
+        ConsumptionSource.ESTIMATE: Capability.AVERAGE_POWER,
+        ConsumptionSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION,
+    },
+    WATER.source_key: {WaterSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION},
 }
 
 
@@ -907,19 +916,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     def _sources(self, quantity: Quantity) -> list[str]:
         """Where the Device can take the quantity from, as its source menu offers it."""
         capabilities = self._capabilities()
-        per_program = Capability.PROGRAM_CONSUMPTION in capabilities
-        if quantity is WATER:
-            return [
-                source.value
-                for source in WaterSource
-                if source is not WaterSource.PER_PROGRAM or per_program
-            ]
-        sources = [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
-        if Capability.AVERAGE_POWER in capabilities:
-            sources.append(ConsumptionSource.ESTIMATE)
-        if per_program:
-            sources.append(ConsumptionSource.PER_PROGRAM)
-        return [source.value for source in (*sources, ConsumptionSource.NONE)]
+        needs = SOURCE_NEEDS[quantity.source_key]
+        return [
+            source.value
+            for source in quantity.sources
+            if source not in needs or needs[source] in capabilities
+        ]
 
     async def async_step_energy(
         self, user_input: dict[str, Any] | None = None

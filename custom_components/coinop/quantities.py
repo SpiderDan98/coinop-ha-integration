@@ -1,6 +1,7 @@
 """The quantities a Run consumes and Coin-op prices by its timelines, such as electricity."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from homeassistant.const import (
     UnitOfEnergy,
@@ -29,6 +30,7 @@ class Quantity:
     Readings are kept in `unit` and `rate_unit`, prices per `unit`; the user
     enters and reads prices per `price_unit`, and a price entity's unit is one of
     `price_units` (`{currency}` stands for the currency) or converted by a factor.
+    `sources` are all it can come from, in the order its source menu lists them.
     The Device keeps its sections under `source_key` and `price_key`; a Program
     Defaults row its amount per Run under `default_key`. Amounts are shown to
     `decimals`, those under 1 `unit` to `small_decimals`, so that a coffee's
@@ -43,6 +45,7 @@ class Quantity:
     rate_unit: str
     rate_converter: type[BaseUnitConverter]
     unit_seconds: float
+    sources: type[StrEnum]
     source_key: str
     price_key: str
     price_unit: str
@@ -75,6 +78,7 @@ ELECTRICITY = Quantity(
     rate_unit=UnitOfPower.WATT,
     rate_converter=PowerConverter,
     unit_seconds=3_600_000,
+    sources=ConsumptionSource,
     source_key="consumption",
     price_key="price",
     price_unit=UnitOfEnergy.KILO_WATT_HOUR,
@@ -93,6 +97,7 @@ WATER = Quantity(
     rate_unit=UnitOfVolumeFlowRate.LITERS_PER_MINUTE,
     rate_converter=VolumeFlowRateConverter,
     unit_seconds=60,
+    sources=WaterSource,
     source_key="water",
     price_key="water_price",
     price_unit=UnitOfVolume.CUBIC_METERS,
