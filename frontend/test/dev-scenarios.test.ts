@@ -3,11 +3,28 @@ import { WsError, recordedBackend } from "./fake-hass";
 import { click, iconButton, mountPanel, query, queryAll, text } from "./render";
 
 const SCENARIOS = {
-  scenarios: [
-    { name: "empty", title: "Empty", description: "The hub without any Device." },
-    { name: "few-runs", title: "3D printer, a few Runs", description: "7 Runs." },
+  groups: [
+    {
+      device_type: "3d_printer",
+      pieces: [{ name: "prusa", title: "Prusa MK4", description: "7 Runs.", section: "device" }],
+    },
   ],
-  current: "few-runs",
+  presets: [
+    {
+      name: "empty",
+      title: "Empty",
+      description: "The hub without any Device.",
+      selection: { pieces: [] },
+    },
+    {
+      name: "few-runs",
+      title: "3D printer, a few Runs",
+      description: "The Prusa with its 7 Runs.",
+      selection: { pieces: ["prusa"] },
+    },
+  ],
+  preset: "few-runs",
+  selection: { pieces: ["prusa"] },
 };
 
 const devBackend = () => {
@@ -30,7 +47,7 @@ describe("Test data", () => {
     expect(queryAll(panel, "ha-icon-button.dev")).toHaveLength(0);
   });
 
-  it("lists the Scenarios with the loaded one marked", async () => {
+  it("lists the Presets with the loaded one marked", async () => {
     const panel = await mountPanel(devBackend());
 
     const dialog = await open(panel);
@@ -41,7 +58,7 @@ describe("Test data", () => {
     expect(rows[1]).toContain("3D printer, a few Runs · loaded");
   });
 
-  it("loads a Scenario and opens the panel afresh", async () => {
+  it("loads a Preset and opens the panel afresh", async () => {
     const backend = devBackend().reply("call_service", () => ({}));
     const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const panel = await mountPanel(backend);
@@ -53,7 +70,7 @@ describe("Test data", () => {
       type: "call_service",
       domain: "coinop_dev",
       service: "load",
-      service_data: { scenario: "empty" },
+      service_data: { preset: "empty" },
     });
     expect(assign).toHaveBeenCalledWith("/coinop");
   });

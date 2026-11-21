@@ -1,10 +1,11 @@
 load:
   name: Load Scenario
-  description: Replaces everything Coin-op holds by a Scenario of test data.
+  description: >-
+    Replaces everything Coin-op holds by a Scenario of test data: a Preset, or the
+    Pieces picked.
   fields:
-    scenario:
-      name: Scenario
-      required: true
+    preset:
+      name: Preset
       selector:
         select:
           options:
@@ -15,4 +16,19 @@ load:
             - two-printers
             - long-history
             - washing-machine
+            - irrigation
+    pieces:
+      name: Pieces
+      selector:
+        select:
+          multiple: true
+          options:
+            - prusa
+            - bambu
+            - anycubic_cloud.3d_printer
+            - moonraker.3d_printer
+            - washer
+            - ha_washdata.washing_machine
+            - ha_washdata.dishwasher
+            - tesla_wall_connector.ev_charger
             - irrigation

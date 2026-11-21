@@ -12,7 +12,7 @@ build: frontend/node_modules/.package-lock.json
 frontend/node_modules/.package-lock.json: frontend/package-lock.json
 	cd frontend && npm ci
 
-# Build the panel, (re)start the container, load $(SCENARIO) and show the log;
+# Build the panel, (re)start the container, load the Preset $(SCENARIO) and show the log;
 # Ctrl+C stops Home Assistant and removes the container.
 dev:
 	uv run scripts/devenv.py up $(SCENARIO)
@@ -25,7 +25,7 @@ dev-build:
 dev-restart:
 	uv run scripts/devenv.py restart
 
-# Load $(SCENARIO) into the running container.
+# Load the Preset $(SCENARIO) into the running container.
 dev-scenario:
 	uv run scripts/devenv.py scenario $(SCENARIO)
 
