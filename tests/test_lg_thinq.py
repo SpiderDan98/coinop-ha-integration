@@ -143,9 +143,6 @@ async def test_lg_appliances_that_are_no_device_type_are_not_offered(
     add_lg_thinq(hass, "DEVICE_AIR_CONDITIONER", name="AC", device_id="ac")
     add_lg_thinq(hass, "DEVICE_REFRIGERATOR", name="Fridge", device_id="fridge")
     add_lg_thinq(hass, "DEVICE_STYLER", name="Styler", device_id="styler")
-    # One HA device with two Status sensors, which one Device can't follow.
-    add_lg_thinq(hass, "TWINWASH", name="TWINWash", device_id="twinwash")
-    add_lg_thinq(hass, "DOUBLE_OVEN", name="Double oven", device_id="double_oven")
     washer = add_lg_thinq(hass)
     entry = await add_hub(hass)
 
@@ -155,6 +152,27 @@ async def test_lg_appliances_that_are_no_device_type_are_not_offered(
         {"value": washer.device.id, "label": "Washer · LG ThinQ"},
         {"value": "manual", "label": "manual"},
     ]
+
+
+@pytest.mark.parametrize(
+    ("appliance", "status", "device_type"),
+    [
+        ("TWINWASH", "main_current_state", "washing_machine"),
+        ("DOUBLE_OVEN", "upper_current_state", "oven"),
+    ],
+)
+async def test_an_lg_unit_with_two_statuses_is_added_with_its_main_half(
+    hass: HomeAssistant, appliance: str, status: str, device_type: str
+) -> None:
+    """The mini washer or the lower cavity is a Device of its own, set up by hand."""
+    lg = add_lg_thinq(hass, appliance, name="Appliance")
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, lg.device.id, price=0.3)
+
+    assert data["device_type"] == device_type
+    assert data["status"] == {"entity_id": lg[status], "attribute": None}
+    assert data["mapping"] == LG_THINQ_MAPPING
 
 
 async def test_each_half_of_an_lg_washtower_is_offered_as_what_it_is(
@@ -269,9 +287,10 @@ async def test_an_lg_dishwasher_run_is_named_after_its_washing_course(
         ),
         ("DEVICE_OVEN", "oven", "oven_current_state", None),
         # The kind in the model isn't asked: a dryer as a washing machine, and a
-        # Styler or a double oven, which Quick Start doesn't offer.
+        # Styler, which Quick Start doesn't offer.
         ("DEVICE_DRYER", "washing_machine", "current_state", None),
         ("DEVICE_STYLER", "tumble_dryer", "current_state", None),
+        ("TWINWASH", "washing_machine", "main_current_state", None),
         ("DOUBLE_OVEN", "oven", "upper_current_state", None),
     ],
 )

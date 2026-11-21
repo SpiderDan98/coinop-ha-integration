@@ -29,11 +29,12 @@ LG_THINQ_SENSORS = {
     "DEVICE_STYLER": ("current_state", "remain_time"),
     "DEVICE_AIR_CONDITIONER": ("pm1", "pm2", "humidity"),
     "DEVICE_REFRIGERATOR": ("fridge_water_filter_info_used_time",),
-    # Two Status sensors on one HA device: a TWINWash's mini washer, a double oven.
-    "TWINWASH": ("main_current_state", "mini_current_state", "main_remain_time"),
+    # Two Status sensors on one HA device, the second half first: a TWINWash's mini
+    # washer, a double oven's lower cavity.
+    "TWINWASH": ("mini_current_state", "main_current_state", "main_remain_time"),
     "DOUBLE_OVEN": (
-        "upper_current_state",
         "lower_current_state",
+        "upper_current_state",
         "upper_target_temperature",
         "lower_target_temperature",
     ),

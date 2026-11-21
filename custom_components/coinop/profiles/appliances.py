@@ -289,9 +289,13 @@ def lg_thinq(find: Find) -> dict[str, Any]:
     """HA core `lg_thinq`: unique ids `<device id>_<property>`, a property with a
     location as `<location>_<key>` (a washer's `main`, an oven's `oven`).
 
-    Its energy sensors count per day and month, so no meter is pre-filled.
+    Its energy sensors count per day and month, so no meter is pre-filled. Of a
+    TWINWash or a double oven, whose halves share an HA device, the main washer or
+    the upper cavity is read.
     """
-    status = find("sensor", "_current_state")
+    status = find(
+        "sensor", "_main_current_state", "_upper_current_state", "_current_state"
+    )
     program = find("sensor", "_current_dish_washing_course")
     return {
         "status": found(status, entity_id=status, attribute=None),
@@ -391,17 +395,12 @@ LG_THINQ_WASHTOWER_HALVES = {
     "_washer_current_state": DEVICE_TYPE_WASHING_MACHINE,
     "_dryer_current_state": DEVICE_TYPE_TUMBLE_DRYER,
 }
-# The second Status of a TWINWash (`main` and `mini`) or a double oven (`upper`).
-LG_THINQ_SECOND_STATUS = ("_mini_current_state", "_lower_current_state")
 
 
 def lg_thinq_kind(
     find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
 ) -> str | NoDeviceType:
-    """The device type the integration writes into the model, `<model> (<type>)`:
-    a unit with two Status sensors on one HA device is set up by hand."""
-    if any(find("sensor", suffix) for suffix in LG_THINQ_SECOND_STATUS):
-        return NoDeviceType.NOT_A_DEVICE
+    """The device type the integration writes into the model, `<model> (<type>)`."""
     device_type = (device.model or "").rpartition("(")[2].removesuffix(")")
     if device_type == "DEVICE_WASHTOWER":
         return next(
