@@ -1,7 +1,7 @@
 {
   "domain": "moonraker",
   "name": "Moonraker (Coin-op dev stand-in)",
-  "after_dependencies": ["input_number", "input_select", "input_text"],
+  "after_dependencies": ["input_number", "input_select", "input_text", "coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

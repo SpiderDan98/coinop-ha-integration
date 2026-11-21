@@ -1,6 +1,7 @@
 {
   "domain": "anycubic",
   "name": "Anycubic 3D Printer - Local Control (Coin-op dev stand-in)",
+  "after_dependencies": ["coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

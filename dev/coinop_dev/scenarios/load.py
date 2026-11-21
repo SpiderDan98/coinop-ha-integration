@@ -1,6 +1,7 @@
 """Loading a Scenario: Coin-op set up from scratch with the picked Pieces."""
 
 from collections.abc import Mapping
+import logging
 from types import MappingProxyType
 from typing import Any
 
@@ -9,10 +10,14 @@ from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigSubentr
 from homeassistant.core import HomeAssistant
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
+from custom_components.coinop.spoolman import CONF_SPOOLMAN_URL
 
+from . import spoolman
 from .pieces import PIECES, DeviceWithHistory
 from .presets import PRESETS, SELECTION
 from .seed import SHARED, Api, ScenarioError, Seed, async_set
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_load(
@@ -29,6 +34,13 @@ async def async_load(
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
+    try:
+        filaments = await spoolman.async_fill(hass)
+    except ScenarioError as err:
+        if selection["spoolman"]:
+            raise
+        _LOGGER.warning("Left Spoolman as it was: %s", err)
+        filaments = {}
     for domain in dict.fromkeys([COINOP, *(p.domain for p in PIECES.values())]):
         for old in hass.config_entries.async_entries(domain):
             await hass.config_entries.async_remove(old.entry_id)
@@ -38,6 +50,10 @@ async def async_load(
                 await async_set(hass, entity_id, value)
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
+    if selection["spoolman"]:
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SPOOLMAN_URL: spoolman.URL}
+        )
     with_history = {
         name: piece
         for name in pieces
@@ -54,7 +70,14 @@ async def async_load(
         hass.config_entries.async_add_subentry(entry, subentry)
         devices[name] = subentry.subentry_id
     await hass.config_entries.async_setup(entry.entry_id)
-    seed = Seed(hass, Api(hass, user), entry, devices, history)
+    seed = Seed(
+        hass,
+        Api(hass, user),
+        entry,
+        devices,
+        history,
+        filaments if selection["spoolman"] else {},
+    )
     needs = {need for piece in with_history.values() for need in piece.needs}
     for need, add in SHARED.items():
         if need in needs:

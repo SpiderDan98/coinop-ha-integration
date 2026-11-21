@@ -1,6 +1,7 @@
 {
   "domain": "bambu_lab",
   "name": "Bambu Lab (Coin-op dev stand-in)",
+  "after_dependencies": ["coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

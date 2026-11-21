@@ -16,6 +16,43 @@ MATERIALS = [
     ("Sunlu TPU Clear", "TPU", "#d8e6ea", "Sunlu", 27.00),
 ]
 DENSITY = {"PLA": 1.24, "PETG": 1.27, "ASA": 1.07, "PC": 1.20, "TPU": 1.21}
+# Spoolman's Filaments besides the Materials', for Create from Spoolman to offer: the
+# rainbow has three colours, the natural PLA no price.
+SPOOLMAN_ONLY = [
+    ("Prusament PETG Jet Black", "PETG", "#16161a", "Prusa", 29.99),
+    ("PolyTerra PLA Forest Green", "PLA", "#2f6b3a", "Polymaker", 21.99),
+    ("Silk PLA Rainbow", "PLA", "#e53935,#fdd835,#1e88e5", "Eryone", 26.99),
+    ("PLA Natural", "PLA", "#f5f1e6", None, None),
+]
+
+
+class Spool(NamedTuple):
+    remaining: float
+    location: str
+    # A Filament with a priced spool has no price of its own: Spoolman's is the spool's.
+    price: float | None = None
+    archived: bool = False
+
+
+SPOOLS = {
+    "Prusament PLA Galaxy Black": [Spool(640, "Dry box"), Spool(1000, "Shelf")],
+    "Extrudr PETG White": [Spool(215, "Dry box")],
+    "Polymaker ASA Red": [Spool(880, "Shelf")],
+    "eSun PLA+ Blue": [
+        Spool(90, "Dry box"),
+        Spool(1000, "Shelf"),
+        Spool(1000, "Shelf"),
+    ],
+    "Bambu PLA Matte Ivory": [Spool(530, "AMS")],
+    "Prusament PETG Orange": [Spool(760, "AMS")],
+    "Polymaker PC Grey": [Spool(1000, "Shelf")],
+    "Sunlu TPU Clear": [
+        Spool(0, "Shelf", price=24.50, archived=True),
+        Spool(905, "Dry box", price=27.00),
+    ],
+    "Prusament PETG Jet Black": [Spool(1000, "Shelf")],
+    "Silk PLA Rainbow": [Spool(470, "Dry box")],
+}
 
 PARTS = [
     "Desk cable holder",

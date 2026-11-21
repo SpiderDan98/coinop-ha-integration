@@ -1,6 +1,7 @@
 {
   "domain": "lg_thinq",
   "name": "LG ThinQ (Coin-op dev stand-in)",
+  "after_dependencies": ["coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

@@ -47,25 +47,25 @@ const SCENARIOS = {
       name: "empty",
       title: "Empty",
       description: "The hub without any Device.",
-      selection: { pieces: [], history: "short", open_run: false },
+      selection: { pieces: [], history: "short", open_run: false, spoolman: false },
     },
     {
       name: "few-runs",
       title: "3D printer, a few Runs",
       description: "The Prusa with its 7 Runs.",
-      selection: { pieces: ["prusa"], history: "short", open_run: false },
+      selection: { pieces: ["prusa"], history: "short", open_run: false, spoolman: false },
     },
     {
       name: "printing-now",
       title: "3D printer, printing now",
       description: "Like a few Runs, with an open Run.",
-      selection: { pieces: ["prusa"], history: "short", open_run: true },
+      selection: { pieces: ["prusa"], history: "short", open_run: true, spoolman: false },
     },
     {
       name: "long-history",
       title: "Long history",
       description: "Two years of Runs on two printers.",
-      selection: { pieces: ["prusa", "bambu"], history: "long", open_run: false },
+      selection: { pieces: ["prusa", "bambu"], history: "long", open_run: false, spoolman: false },
     },
     {
       name: "quick-start",
@@ -75,11 +75,18 @@ const SCENARIOS = {
         pieces: ["anycubic_cloud.3d_printer", "ha_washdata.washing_machine"],
         history: "short",
         open_run: false,
+        spoolman: false,
       },
+    },
+    {
+      name: "spoolman",
+      title: "3D printer on Spoolman",
+      description: "Like a few Runs, with the filaments linked to Spoolman.",
+      selection: { pieces: ["prusa"], history: "short", open_run: false, spoolman: true },
     },
   ],
   preset: "few-runs",
-  selection: { pieces: ["prusa"], history: "short", open_run: false },
+  selection: { pieces: ["prusa"], history: "short", open_run: false, spoolman: false },
 };
 
 const devBackend = (scenarios: object = SCENARIOS) => {
@@ -141,9 +148,13 @@ const historySelect = (dialog: HTMLElement) =>
 const openRunBox = (dialog: HTMLElement) =>
   query(dialog, 'input[name="open_run"]') as HTMLInputElement;
 
+const spoolmanBox = (dialog: HTMLElement) =>
+  query(dialog, 'input[name="spoolman"]') as HTMLInputElement;
+
 const options = (dialog: HTMLElement) => ({
   history: historySelect(dialog).value,
   openRun: openRunBox(dialog).checked,
+  spoolman: spoolmanBox(dialog).checked,
 });
 
 const selected = (dialog: HTMLElement) =>
@@ -182,20 +193,21 @@ describe("Test data", () => {
       ...SCENARIOS,
       preset: null,
       // happy-dom shows the wrong option when the third or a later one is rendered picked.
-      selection: { pieces: ["prusa"], history: "none", open_run: true },
+      selection: { pieces: ["prusa"], history: "none", open_run: true, spoolman: true },
     }).reply("call_service", () => ({}));
     vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const panel = await mountPanel(backend);
 
     const dialog = await open(panel);
 
-    expect(options(dialog)).toEqual({ history: "none", openRun: true });
+    expect(options(dialog)).toEqual({ history: "none", openRun: true, spoolman: true });
     expect([...historySelect(dialog).options].map(text)).toEqual([
       "None",
       "A few weeks",
       "Two years",
     ]);
     expect(text(query(dialog, ".options"))).toContain("An open Run on each Device with history");
+    expect(text(query(dialog, ".options"))).toContain("The filaments linked to the dev Spoolman");
     expect(
       historySelect(dialog).compareDocumentPosition(groups(dialog)[0]) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -204,7 +216,7 @@ describe("Test data", () => {
     await click(panel, loadButton(dialog));
 
     expect(backend.sent("call_service")).toMatchObject([
-      { service_data: { pieces: ["prusa"], history: "none", open_run: true } },
+      { service_data: { pieces: ["prusa"], history: "none", open_run: true, spoolman: true } },
     ]);
   });
 
@@ -286,21 +298,29 @@ describe("Test data", () => {
 
     await click(panel, presetButton(dialog, "Long history"));
 
-    expect(options(dialog)).toEqual({ history: "long", openRun: false });
+    expect(options(dialog)).toEqual({ history: "long", openRun: false, spoolman: false });
     expect(selected(dialog)).toEqual(["Prusa MK4", "Bambu Lab X1C"]);
 
     await click(panel, presetButton(dialog, "3D printer, printing now"));
 
-    expect(options(dialog)).toEqual({ history: "short", openRun: true });
+    expect(options(dialog)).toEqual({ history: "short", openRun: true, spoolman: false });
 
     await click(panel, openRunBox(dialog));
+
+    expect(pickedPreset(dialog)).toBeUndefined();
+
+    await click(panel, presetButton(dialog, "3D printer on Spoolman"));
+
+    expect(options(dialog)).toEqual({ history: "short", openRun: false, spoolman: true });
+
+    await click(panel, spoolmanBox(dialog));
 
     expect(pickedPreset(dialog)).toBeUndefined();
 
     await click(panel, presetButton(dialog, "3D printer, a few Runs"));
     await change(panel, historySelect(dialog), "none");
 
-    expect(options(dialog)).toEqual({ history: "none", openRun: false });
+    expect(options(dialog)).toEqual({ history: "none", openRun: false, spoolman: false });
     expect(pickedPreset(dialog)).toBeUndefined();
     expect(selected(dialog)).toEqual(["Prusa MK4"]);
   });
@@ -331,6 +351,7 @@ describe("Test data", () => {
     await click(panel, piece(dialog, "Bambu Lab X1C"));
     await change(panel, historySelect(dialog), "long");
     await click(panel, openRunBox(dialog));
+    await click(panel, spoolmanBox(dialog));
 
     await click(panel, loadButton(dialog));
 
@@ -338,7 +359,12 @@ describe("Test data", () => {
       type: "call_service",
       domain: "coinop_dev",
       service: "load",
-      service_data: { pieces: ["prusa", "bambu", "washer"], history: "long", open_run: true },
+      service_data: {
+        pieces: ["prusa", "bambu", "washer"],
+        history: "long",
+        open_run: true,
+        spoolman: true,
+      },
     });
     expect(loadButton(dialog)).toMatchObject({ loading: true });
     expect(text(loadButton(dialog))).toBe("Loading…");
@@ -362,7 +388,12 @@ describe("Test data", () => {
     expect(backend.sent("call_service")).toMatchObject([
       {
         service: "load",
-        service_data: { pieces: ["prusa", "bambu"], history: "long", open_run: false },
+        service_data: {
+          pieces: ["prusa", "bambu"],
+          history: "long",
+          open_run: false,
+          spoolman: false,
+        },
       },
     ]);
   });

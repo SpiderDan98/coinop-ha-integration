@@ -379,6 +379,7 @@
   "dev.history_short": "A few weeks",
   "dev.history_long": "Two years",
   "dev.open_run": "An open Run on each Device with history; its helpers end it",
+  "dev.spoolman": "The filaments linked to the dev Spoolman, which prices them",
   "dev.all": "All",
   "dev.none": "None",
   "tab.overview": "Overview",

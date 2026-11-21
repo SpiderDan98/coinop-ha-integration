@@ -17,6 +17,9 @@ from homeassistant.util import dt as dt_util, slugify
 from homeassistant.util.yaml import load_yaml_dict
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
+from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    AiohttpClientMocker,
+)
 
 import custom_components
 from custom_components.coinop.profiles import INTEGRATIONS
@@ -27,11 +30,14 @@ from dev.coinop_dev.scenarios import (
     PRESETS,
     DeviceWithHistory,
     QuickStartPiece,
+    ScenarioError,
     async_load,
 )
+from dev.coinop_dev.scenarios.spoolman import URL as SPOOLMAN_URL
 
 from .clock import Clock
 from .devices import configure
+from .fake_spoolman import FakeSpoolman
 from .test_device_flow import fields
 from .test_quick_start import offered, open_add_device, pick
 from .websocket import PanelClient
@@ -195,10 +201,17 @@ EV_CHARGER_DEVICES = [
 
 
 @pytest.fixture
-async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The Devices' helpers from the dev configuration.yaml, and the dev container's
-    integrations where Home Assistant finds them. Its camera stays in the container:
-    the platform needs the ffmpeg binary."""
+def spoolman(aioclient_mock: AiohttpClientMocker) -> FakeSpoolman:
+    return FakeSpoolman(aioclient_mock, SPOOLMAN_URL)
+
+
+@pytest.fixture
+async def helpers(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, spoolman: FakeSpoolman
+) -> None:
+    """The Devices' helpers from the dev configuration.yaml, the dev container's
+    integrations where Home Assistant finds them, and its Spoolman. Its camera stays
+    in the container: the platform needs the ffmpeg binary."""
     monkeypatch.setattr(
         custom_components, "__path__", [*custom_components.__path__, str(DEV)]
     )
@@ -215,6 +228,7 @@ def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
     assert fields["history"]["selector"]["select"]["options"] == list(HISTORIES)
     assert "boolean" in fields["open_run"]["selector"]
+    assert "boolean" in fields["spoolman"]["selector"]
 
 
 def test_every_piece_and_preset_has_a_one_line_description() -> None:
@@ -267,6 +281,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
         ("few-runs", (1, 8, 7, 0)),
         ("printing-now", (1, 8, 8, 1)),
         ("two-printers", (2, 8, 17, 0)),
+        ("spoolman", (1, 8, 7, 0)),
         ("washing-machine", (1, 4, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
@@ -641,6 +656,82 @@ async def test_the_long_history_spans_two_years_and_goes_with_the_next_scenario(
 
 
 @pytest.mark.usefixtures("helpers")
+async def test_every_load_fills_spoolman_afresh_whatever_the_option(
+    hass: HomeAssistant, hass_admin_user: MockUser, spoolman: FakeSpoolman
+) -> None:
+    await async_load(hass, "spoolman", hass_admin_user)
+    await async_load(hass, "empty", hass_admin_user)
+
+    filaments = {filament["name"]: filament for filament in spoolman.filaments()}
+    assert len(spoolman.records["vendor"]) == 7
+    assert len(filaments) == 12
+    assert (len(spoolman.spools()), len(spoolman.spools(archived=True))) == (13, 14)
+    assert filaments["Polymaker PC Grey"]["price"] == 39.0
+    # Priced by its spool.
+    assert filaments["Sunlu TPU Clear"]["price"] is None
+    assert filaments["Silk PLA Rainbow"]["multi_color_hexes"] == "e53935,fdd835,1e88e5"
+    assert (filaments["PLA Natural"]["vendor"], filaments["PLA Natural"]["price"]) == (
+        None,
+        None,
+    )
+    assert hass.config_entries.async_entries("coinop")[0].options == {}
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_spoolman_option_links_the_filaments_to_spoolman_which_prices_them(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, "spoolman", hass_admin_user)
+    await hass.async_block_till_done()
+
+    [entry] = hass.config_entries.async_entries("coinop")
+    materials = {
+        material["name"]: material
+        for material in (await panel.call("coinop/materials/list"))["materials"]
+    }
+    spoolman = await panel.call("coinop/spoolman/filaments")
+    linked = {material["price"]["filament_id"] for material in materials.values()}
+    assert entry.options == {"spoolman_url": SPOOLMAN_URL}
+    assert len(materials) == 8
+    assert {material["price"]["source"] for material in materials.values()} == {
+        "spoolman"
+    }
+    assert materials["Polymaker PC Grey"]["price_per_gram"] == pytest.approx(0.039)
+    assert materials["Sunlu TPU Clear"]["price_per_gram"] == pytest.approx(0.027)
+    assert spoolman["status"] == "ok"
+    assert sorted(
+        f["name"] for f in spoolman["filaments"] if f["id"] not in linked
+    ) == [
+        "PLA Natural",
+        "PolyTerra PLA Forest Green",
+        "Prusament PETG Jet Black",
+        "Silk PLA Rainbow",
+    ]
+    assert await counts(panel) == (1, 8, 7, 0)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_only_the_spoolman_option_needs_spoolman_to_answer(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    spoolman: FakeSpoolman,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    spoolman.down = True
+
+    await async_load(hass, "few-runs", hass_admin_user)
+    with pytest.raises(ScenarioError):
+        await async_load(hass, "spoolman", hass_admin_user)
+
+    assert "Left Spoolman as it was" in caplog.text
+    # What the failed load would have replaced.
+    assert hass.config_entries.async_entries("coinop")[0].options == {}
+    assert await counts(panel) == (1, 8, 7, 0)
+
+
+@pytest.mark.usefixtures("helpers")
 async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
     hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
 ) -> None:
@@ -847,7 +938,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
 
     assert (before["preset"], before["selection"]) == (
         None,
-        {"pieces": [], "history": "short", "open_run": False},
+        {"pieces": [], "history": "short", "open_run": False, "spoolman": False},
     )
     assert [
         (group["device_type"], [piece["name"] for piece in group["pieces"]])
@@ -936,6 +1027,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "printing-now",
         "two-printers",
         "long-history",
+        "spoolman",
         "washing-machine",
         "irrigation",
     ]
@@ -945,9 +1037,11 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "pieces": ["prusa", "bambu"],
         "history": "short",
         "open_run": False,
+        "spoolman": False,
     }
     assert presets["long-history"]["selection"]["history"] == "long"
     assert presets["printing-now"]["selection"]["open_run"] is True
+    assert presets["spoolman"]["selection"]["spoolman"] is True
     assert presets["quick-start"]["selection"]["pieces"] == [
         "anycubic.3d_printer",
         "anycubic_cloud.3d_printer",
@@ -985,11 +1079,21 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     ]
     assert (from_preset["preset"], from_preset["selection"]) == (
         "two-printers",
-        {"pieces": ["prusa", "bambu"], "history": "short", "open_run": False},
+        {
+            "pieces": ["prusa", "bambu"],
+            "history": "short",
+            "open_run": False,
+            "spoolman": False,
+        },
     )
     assert (picked["preset"], picked["selection"]) == (
         None,
-        {"pieces": ["washer", "irrigation"], "history": "none", "open_run": True},
+        {
+            "pieces": ["washer", "irrigation"],
+            "history": "none",
+            "open_run": True,
+            "spoolman": False,
+        },
     )
 
 
@@ -1010,7 +1114,12 @@ async def test_a_selection_a_preset_has_is_stored_as_loaded_from_that_preset(
     answer = await panel.call("coinop_dev/scenarios")
     assert (answer["preset"], answer["selection"]) == (
         "two-printers",
-        {"pieces": ["prusa", "bambu"], "history": "short", "open_run": False},
+        {
+            "pieces": ["prusa", "bambu"],
+            "history": "short",
+            "open_run": False,
+            "spoolman": False,
+        },
     )
 
 

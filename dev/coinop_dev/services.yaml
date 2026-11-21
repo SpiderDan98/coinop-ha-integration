@@ -15,6 +15,7 @@ load:
             - printing-now
             - two-printers
             - long-history
+            - spoolman
             - washing-machine
             - irrigation
     pieces:
@@ -85,6 +86,13 @@ load:
     open_run:
       name: Open Run
       description: Whether each Device with history gets an open Run, which its helpers end.
+      default: false
+      selector:
+        boolean:
+    spoolman:
+      name: Spoolman
+      description: >-
+        Whether the hub reads the dev Spoolman, to which the filaments are linked.
       default: false
       selector:
         boolean:

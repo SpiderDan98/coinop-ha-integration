@@ -1,6 +1,7 @@
 {
   "domain": "evcc_intg",
   "name": "evcc (Coin-op dev stand-in)",
+  "after_dependencies": ["coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],
