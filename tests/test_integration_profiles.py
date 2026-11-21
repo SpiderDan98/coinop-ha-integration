@@ -8,7 +8,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .anycubic import Printer, add_anycubic_cloud, add_anycubic_local
+from .anycubic import add_anycubic_cloud, add_anycubic_local
 from .clock import Clock
 from .devices import (
     ENERGY,
@@ -20,6 +20,7 @@ from .devices import (
     start_add_device,
     start_reconfigure,
 )
+from .registry import HaDevice
 from .test_device_flow import suggested
 from .test_runs import stored_runs
 
@@ -34,7 +35,7 @@ def accepted(result: Any) -> dict[str, Any]:
 
 
 async def walk_pre_filled(
-    hass: HomeAssistant, entry: ConfigEntry, printer: Printer
+    hass: HomeAssistant, entry: ConfigEntry, printer: HaDevice
 ) -> tuple[list[str], ConfigSubentry]:
     """Add Device accepting every pre-filled step; returns the steps shown and the Device."""
     result = await configure(

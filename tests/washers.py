@@ -5,62 +5,13 @@ Unique ids, units, options and what tells the appliance's kind follow each
 integration's source.
 """
 
-from dataclasses import dataclass, field
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-
-@dataclass
-class Appliance:
-    device: dr.DeviceEntry
-    # Entity ids by the integration's entity key.
-    entities: dict[str, str] = field(default_factory=dict)
-
-    def __getitem__(self, key: str) -> str:
-        return self.entities[key]
-
-
-def _appliance(
-    hass: HomeAssistant, domain: str, identifier: str, name: str
-) -> tuple[MockConfigEntry, Appliance]:
-    config_entry = MockConfigEntry(domain=domain)
-    config_entry.add_to_hass(hass)
-    device = dr.async_get(hass).async_get_or_create(
-        config_entry_id=config_entry.entry_id,
-        identifiers={(domain, identifier)},
-        name=name,
-    )
-    return config_entry, Appliance(device)
-
-
-def _add(
-    hass: HomeAssistant,
-    appliance: Appliance,
-    config_entry: ConfigEntry,
-    platform: str,
-    key: str,
-    unique_id: str,
-    object_id: str,
-    **kwargs: Any,
-) -> None:
-    appliance.entities[key] = (
-        er.async_get(hass)
-        .async_get_or_create(
-            platform,
-            config_entry.domain,
-            unique_id,
-            config_entry=config_entry,
-            device_id=appliance.device.id,
-            suggested_object_id=object_id,
-            **kwargs,
-        )
-        .entity_id
-    )
+from .registry import HaDevice, add_ha_device, entity
 
 
 def add_washdata(
@@ -69,7 +20,7 @@ def add_washdata(
     *,
     name: str = "Washer",
     changed_to: str | None = None,
-) -> Appliance:
+) -> HaDevice:
     """3dg1luk43/ha_washdata: one HA device per config entry, named after it, unique
     ids `<entry id>_<key>`.
 
@@ -89,44 +40,33 @@ def add_washdata(
         options={"device_type": changed_to} | settings if changed_to else {},
     )
     config_entry.add_to_hass(hass)
-    appliance = Appliance(
-        dr.async_get(hass).async_get_or_create(
-            config_entry_id=config_entry.entry_id,
-            identifiers={("ha_washdata", config_entry.entry_id)},
-            manufacturer="WashData",
-            name=name,
-        )
+    units = {"current_power": "W", "energy_total": "kWh", "last_cycle_energy": "kWh"}
+    keys = ("washer_state", "washer_program", *units, "last_cycle_cost")
+    return add_ha_device(
+        hass,
+        config_entry,
+        {
+            key: entity(
+                "sensor",
+                f"{config_entry.entry_id}_{key}",
+                unit=units.get(key),
+                object_id=key,
+            )
+            for key in keys
+        },
+        identifiers={("ha_washdata", config_entry.entry_id)},
+        manufacturer="WashData",
+        name=name,
     )
 
-    def add(key: str, **kwargs: Any) -> None:
-        _add(
-            hass,
-            appliance,
-            config_entry,
-            "sensor",
-            key,
-            f"{config_entry.entry_id}_{key}",
-            key,
-            translation_key=key,
-            **kwargs,
-        )
 
-    add("washer_state")
-    add("washer_program")
-    add("current_power", unit_of_measurement="W")
-    add("energy_total", unit_of_measurement="kWh")
-    add("last_cycle_energy", unit_of_measurement="kWh")
-    add("last_cycle_cost")
-    return appliance
-
-
-# HA core `miele`'s sensors by key: object id, translation key and unit.
+# HA core `miele`'s sensors by key: object id and unit.
 MIELE_SENSORS = {
-    "state_status": ("status", "status", None),
-    "state_program_id": ("program", "program_id", None),
-    "state_program_phase": ("program_phase", "program_phase", None),
-    "current_energy_consumption": ("energy_consumption", "energy_consumption", "kWh"),
-    "current_water_consumption": ("water_consumption", "water_consumption", "L"),
+    "state_status": ("status", None),
+    "state_program_id": ("program", None),
+    "state_program_phase": ("program_phase", None),
+    "current_energy_consumption": ("energy_consumption", "kWh"),
+    "current_water_consumption": ("water_consumption", "L"),
 }
 _STATUS = ("state_status",)
 _PROGRAM = (*_STATUS, "state_program_id", "state_program_phase")
@@ -158,7 +98,7 @@ def add_miele(
     model: str = "Washing machine",
     *,
     serial: str = "000123456789",
-) -> Appliance:
+) -> HaDevice:
     """HA core `miele`: every appliance of an account on one config entry, named
     after its kind, unique ids `<serial>-<key>`.
 
@@ -166,34 +106,25 @@ def add_miele(
     also decides which sensors the integration registers. A second appliance needs
     its own `serial`.
     """
-    config_entry = next(iter(hass.config_entries.async_entries("miele")), None)
-    if config_entry is None:
-        config_entry = MockConfigEntry(domain="miele")
-        config_entry.add_to_hass(hass)
-    appliance = Appliance(
-        dr.async_get(hass).async_get_or_create(
-            config_entry_id=config_entry.entry_id,
-            identifiers={("miele", serial)},
-            manufacturer="Miele",
-            name=model,
-            model=model,
-            serial_number=serial,
-        )
+    config_entry = next(iter(hass.config_entries.async_entries("miele")), "miele")
+    return add_ha_device(
+        hass,
+        config_entry,
+        {
+            key: entity(
+                "sensor",
+                f"{serial}-{key}",
+                unit=MIELE_SENSORS[key][1],
+                object_id=f"{model} {MIELE_SENSORS[key][0]}",
+            )
+            for key in MIELE_MODELS[model]
+        },
+        identifiers={("miele", serial)},
+        manufacturer="Miele",
+        name=model,
+        model=model,
+        serial_number=serial,
     )
-    for key in MIELE_MODELS[model]:
-        object_id, translation_key, unit = MIELE_SENSORS[key]
-        _add(
-            hass,
-            appliance,
-            config_entry,
-            "sensor",
-            key,
-            f"{serial}-{key}",
-            f"{slugify(model)}_{object_id}",
-            translation_key=translation_key,
-            unit_of_measurement=unit,
-        )
-    return appliance
 
 
 # `APPLIANCES_WITH_PROGRAMS` in HA core `home_connect`'s const.py.
@@ -379,7 +310,7 @@ def add_home_connect(
     *,
     name: str = "Washer",
     minimum_ha: bool = False,
-) -> Appliance:
+) -> HaDevice:
     """HA core `home_connect`: unique ids `<haId>-<BSH key>`.
 
     `appliance_type` is the API's type of the appliance, which is on no registry
@@ -392,37 +323,47 @@ def add_home_connect(
     """
     object_id = slugify(name)
     ha_id = f"SIEMENS-{object_id.upper()}-0123"
-    config_entry, appliance = _appliance(hass, "home_connect", ha_id, name)
 
-    def add(platform: str, key: str, translation_key: str, **kwargs: Any) -> None:
-        _add(
-            hass,
-            appliance,
-            config_entry,
-            platform,
-            key,
-            f"{ha_id}-{key}",
-            f"{object_id}_{translation_key}",
-            translation_key=translation_key,
-            **kwargs,
+    def add(platform: str, key: str, suffix: str, **kwargs: Any) -> dict[str, Any]:
+        return entity(
+            platform, f"{ha_id}-{key}", object_id=f"{object_id}_{suffix}", **kwargs
         )
 
-    for key, (translation_key, types) in HOME_CONNECT_EVENT_SENSORS.items():
-        if appliance_type in (
-            HOME_CONNECT_MINIMUM_HA.get(key, types) if minimum_ha else types
-        ):
-            add(
-                "sensor",
-                key,
-                translation_key,
-                disabled_by=er.RegistryEntryDisabler.INTEGRATION,
-            )
-    for key, (translation_key, types) in HOME_CONNECT_PROGRAM_SENSORS.items():
-        if appliance_type in types:
-            add("sensor", key, translation_key)
-    add("sensor", "BSH.Common.Status.OperationState", "operation_state")
-    if appliance_type in HOME_CONNECT_WITH_PROGRAMS:
-        add("sensor", "BSH.Common.Status.DoorState", "door")
-        add("select", "BSH.Common.Root.SelectedProgram", "selected_program")
-        add("select", "BSH.Common.Root.ActiveProgram", "active_program")
-    return appliance
+    event_sensors = {
+        key: add("sensor", key, suffix, disabled=True)
+        for key, (suffix, types) in HOME_CONNECT_EVENT_SENSORS.items()
+        if appliance_type
+        in (HOME_CONNECT_MINIMUM_HA.get(key, types) if minimum_ha else types)
+    }
+    program_sensors = {
+        key: add("sensor", key, suffix)
+        for key, (suffix, types) in HOME_CONNECT_PROGRAM_SENSORS.items()
+        if appliance_type in types
+    }
+    status = {
+        "BSH.Common.Status.OperationState": add(
+            "sensor", "BSH.Common.Status.OperationState", "operation_state"
+        )
+    }
+    programs = (
+        {
+            "BSH.Common.Status.DoorState": add(
+                "sensor", "BSH.Common.Status.DoorState", "door"
+            ),
+            "BSH.Common.Root.SelectedProgram": add(
+                "select", "BSH.Common.Root.SelectedProgram", "selected_program"
+            ),
+            "BSH.Common.Root.ActiveProgram": add(
+                "select", "BSH.Common.Root.ActiveProgram", "active_program"
+            ),
+        }
+        if appliance_type in HOME_CONNECT_WITH_PROGRAMS
+        else {}
+    )
+    return add_ha_device(
+        hass,
+        "home_connect",
+        event_sensors | program_sensors | status | programs,
+        identifiers={("home_connect", ha_id)},
+        name=name,
+    )
