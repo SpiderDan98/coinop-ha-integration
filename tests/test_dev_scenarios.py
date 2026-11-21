@@ -20,7 +20,8 @@ from dev.coinop_dev.scenarios import PIECES, PRESETS, async_load
 
 from .clock import Clock
 from .devices import configure
-from .test_quick_start import offered, open_add_device
+from .test_device_flow import fields
+from .test_quick_start import offered, open_add_device, pick
 from .websocket import PanelClient
 
 DEV = Path(__file__).parents[1] / "dev"
@@ -82,6 +83,88 @@ STATIC = {
         "complete",
     ),
 }
+
+# The static EV chargers' Pieces: each HA device Quick Start offers, as its label, its
+# Status entity and the counter it meters with, then a Status of a charging and of an
+# unplugged car.
+EV_CHARGERS = {
+    "evcc_intg.ev_charger": (
+        [
+            (
+                "evcc ☀️🚘 Solar Charging [evcc] · evcc",
+                "binary_sensor.evcc_garage_charging",
+                "sensor.evcc_garage_charged_energy",
+            )
+        ],
+        "on",
+        "off",
+    ),
+    "ocpp.ev_charger": (
+        [
+            (
+                f"charger Connector {n} · OCPP",
+                f"sensor.charger_conn{n}_status_connector",
+                f"sensor.charger_conn{n}_energy_active_import_register",
+            )
+            for n in (1, 2)
+        ],
+        "Charging",
+        "Available",
+    ),
+    "easee.ev_charger": (
+        [("Garage · Easee", "sensor.garage_status", "sensor.garage_lifetime_energy")],
+        "charging",
+        "disconnected",
+    ),
+    "zaptec.ev_charger": (
+        [
+            (
+                "Driveway · Zaptec",
+                "sensor.driveway_charger_operation_mode",
+                "sensor.driveway_total_charge_power_session",
+            )
+        ],
+        "connected_charging",
+        "disconnected",
+    ),
+    "goecharger_mqtt.ev_charger": (
+        [
+            (
+                "go-eCharger · go-e Charger MQTT",
+                "sensor.go_echarger_car",
+                "sensor.go_echarger_eto",
+            )
+        ],
+        "charging",
+        "idle",
+    ),
+    "goecharger_api2.ev_charger": (
+        [
+            (
+                "go-e Charger · go-e Charger API v2",
+                "sensor.go_e_charger_car_value",
+                "sensor.go_e_charger_eto",
+            )
+        ],
+        "Charging",
+        "Idle",
+    ),
+    "wallbox.ev_charger": (
+        [
+            (
+                "Wallbox Garage · Wallbox",
+                "sensor.wallbox_garage_status_description",
+                "sensor.wallbox_garage_added_energy",
+            )
+        ],
+        "Charging",
+        "Ready",
+    ),
+}
+
+EV_CHARGER_DEVICES = [
+    device for devices, _, _ in EV_CHARGERS.values() for device in devices
+]
 
 
 @pytest.fixture
@@ -221,9 +304,10 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 12
+    assert len(offered(await open_add_device(hass, entry))) == 20
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
+    assert all(hass.states.get(status) for _, status, _ in EV_CHARGER_DEVICES)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -406,7 +490,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         ),
         ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
         ("dishwasher", ["ha_washdata.dishwasher"]),
-        ("ev_charger", ["tesla_wall_connector.ev_charger"]),
+        ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
     prusa, _, _, kobra, *_ = before["groups"][0]["pieces"]
@@ -441,6 +525,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "ha_washdata.washing_machine",
         "ha_washdata.dishwasher",
         "tesla_wall_connector.ev_charger",
+        *EV_CHARGERS,
     ]
     assert (from_preset["preset"], from_preset["selection"]) == (
         "two-printers",
@@ -664,6 +749,36 @@ async def test_quick_start_adds_a_static_stand_ins_printer_run_through_its_statu
     assert electricity["quantity"] == pytest.approx(0.1)
 
 
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("piece", EV_CHARGERS)
+async def test_quick_start_adds_a_static_ev_charger_with_the_counter_it_brings(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+) -> None:
+    chargers, _, _ = EV_CHARGERS[piece]
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (0, 0, 0, 0)
+    [entry] = hass.config_entries.async_entries("coinop")
+    devices = {
+        o["label"]: o["value"] for o in offered(await open_add_device(hass, entry))
+    }
+    assert list(devices) == [label for label, _, _ in chargers] + ["manual"]
+    for label, status, counter in chargers:
+        result = await pick(hass, entry, devices[label])
+        assert fields(result) == ["price", "price_entity"]
+        result = await configure(hass, result, {"price": 0.32})
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+        data = list(entry.subentries.values())[-1].data
+        assert data["device_type"] == "ev_charger"
+        assert data["status"]["entity_id"] == status
+        assert data["consumption"]["entity_id"] == counter
+
+
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
@@ -681,6 +796,7 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "moonraker": 1,
         "ha_washdata": 2,
         "tesla_wall_connector": 1,
+        **{piece.split(".")[0]: 1 for piece in EV_CHARGERS},
     }
     await async_load(hass, "quick-start", hass_admin_user)
     assert {d: len(hass.config_entries.async_entries(d)) for d in stand_ins} == (
@@ -691,6 +807,7 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
 
     assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
     assert not any(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
+    assert not any(hass.states.get(status) for _, status, _ in EV_CHARGER_DEVICES)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -763,6 +880,7 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Washing machine · WashData",
         "Dishwasher · WashData",
         "Tesla Wall Connector · Tesla Wall Connector",
+        *(label for label, _, _ in EV_CHARGER_DEVICES),
         "manual",
     ]
     result = await configure(hass, result, {"device": devices[label]})
