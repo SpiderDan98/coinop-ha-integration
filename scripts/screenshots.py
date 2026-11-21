@@ -4,8 +4,8 @@ Usage: uv run scripts/screenshots.py [name ...]
 
 Starts the dev container if it isn't running (and stops it again afterwards), loads
 each Preset a screenshot needs and saves the screenshots, in the dark theme at a
-fixed size, to docs/images/screenshots. The statement image is instead the first
-page of the Cost Statement PDF the panel downloads. Names limit it to those
+fixed size, to docs/images/screenshots. The statement image is instead the top of
+the Cost Statement PDF the panel downloads. Names limit it to those
 screenshots. Drives the installed Google Chrome, so Playwright needs no browser of
 its own.
 """
@@ -29,6 +29,9 @@ SETTLE_MS = 2500
 STATEMENT_RUNS = 4
 # PDF points to pixels: an A4 page comes out 1190 pixels wide.
 PDF_SCALE = 2
+# The page is cut to the other screenshots' 16:10 from this many points down, above
+# the letterhead.
+PDF_TOP = 30
 
 
 def settle(page: Page, selector: str) -> None:
@@ -65,9 +68,12 @@ def statement(page: Page) -> bytes:
     with page.expect_download(timeout=60_000) as download:
         page.locator("ha-button.download").click()
     pdf = pdfium.PdfDocument(download.value.path())
-    image = io.BytesIO()
-    pdf[0].render(scale=PDF_SCALE).to_pil().save(image, "PNG")
+    page_image = pdf[0].render(scale=PDF_SCALE).to_pil()
     pdf.close()
+    top = PDF_TOP * PDF_SCALE
+    width = page_image.width
+    image = io.BytesIO()
+    page_image.crop((0, top, width, top + width * 10 // 16)).save(image, "PNG")
     return image.getvalue()
 
 
