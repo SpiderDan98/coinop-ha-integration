@@ -215,14 +215,14 @@ async def test_miele_fills_status_program_and_both_meters(
 async def test_a_miele_without_consumption_sensors_leaves_the_meters_empty(
     hass: HomeAssistant,
 ) -> None:
-    washer = add_miele(hass, consumption=False)
+    coffee_system = add_miele(hass, "Coffee system")
     entry = await add_hub(hass)
     result = await configure(
         hass,
         await start_add_device(
-            hass, entry, printer=washer.device.id, device_type="washing_machine"
+            hass, entry, printer=coffee_system.device.id, device_type="coffee_machine"
         ),
-        {"name": "Washer"},
+        {"name": "Coffee"},
     )
     while result["step_id"] != "consumption":
         result = await configure(hass, result, accepted(result))
@@ -444,6 +444,101 @@ async def test_manual_setup_pre_fills_the_chosen_device_type_whatever_kind_is_to
     }
 
 
+@pytest.mark.parametrize(
+    ("model", "device_type", "steps"),
+    [
+        (
+            "Dishwasher",
+            "dishwasher",
+            [
+                "consumption",
+                "energy",
+                "price",
+                "fixed_price",
+                "water",
+                "water_meter",
+                "water_price",
+                "water_fixed_price",
+            ],
+        ),
+        (
+            "Tumble dryer",
+            "tumble_dryer",
+            ["consumption", "energy", "price", "fixed_price"],
+        ),
+        # Miele tells a warming drawer is no Device Type; the user's choice counts.
+        ("Warming drawer", "oven", ["consumption", "price", "fixed_price"]),
+    ],
+)
+async def test_manual_setup_pre_fills_from_a_miele_appliance_of_any_kind(
+    hass: HomeAssistant, model: str, device_type: str, steps: list[str]
+) -> None:
+    appliance = add_miele(hass, model)
+    entry = await add_hub(hass)
+    energy = appliance.entities.get("current_energy_consumption")
+    water = appliance.entities.get("current_water_consumption")
+
+    shown, subentry = await walk_pre_filled(
+        hass,
+        entry,
+        appliance,
+        device_type,
+        consumption={"next_step_id": "energy" if energy else "per_program"},
+        water={"next_step_id": "water_meter"},
+    )
+
+    assert shown == ["status", "mapping", "program", *steps]
+    data = subentry.data
+    assert data["device_type"] == device_type
+    assert data["status"] == {"entity_id": appliance["state_status"], "attribute": None}
+    assert data["mapping"]["finished"] == ["program_ended"]
+    assert data["program"] == {
+        "entity_id": appliance["state_program_id"],
+        "attribute": None,
+    }
+    assert data["consumption"].get("entity_id") == energy
+    assert data.get("water", {}).get("entity_id") == water
+
+
+async def test_detect_again_works_on_a_tumble_dryer_added_from_miele(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    dryer = add_miele(hass, "Tumble dryer")
+    entry = await add_hub(hass)
+    before = await quick_start(hass, entry, dryer.device.id, price=0.3)
+    [subentry] = entry.subentries.values()
+    # An update of the integration renamed its entities.
+    renamed = {
+        key: entity_registry.async_update_entity(
+            dryer[key], new_entity_id=dryer[key].replace("tumble_dryer", "td")
+        ).entity_id
+        for key in (
+            "state_status",
+            "state_program_id",
+            "current_energy_consumption",
+        )
+    }
+
+    result = await configure(
+        hass, await start_reconfigure(hass, entry, subentry), {"next_step_id": "detect"}
+    )
+    shown = []
+    while result["type"] is FlowResultType.FORM:
+        shown.append(result["step_id"])
+        result = await configure(hass, result, accepted(result))
+    assert shown == ["status", "mapping", "program"]
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["device_type"] == "tumble_dryer"
+    assert data["status"]["entity_id"] == renamed["state_status"]
+    assert data["program"]["entity_id"] == renamed["state_program_id"]
+    # The meter Quick Start took from the profile is the user's from then on.
+    assert data["consumption"] == before["consumption"]
+    assert data["price"] == before["price"]
+
+
 async def test_a_device_type_washdata_doesnt_serve_pre_fills_nothing(
     hass: HomeAssistant,
 ) -> None:
@@ -510,10 +605,10 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
     [
         ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
         ("washing_machine", "WashData, Miele, Home Connect"),
-        ("dishwasher", "WashData, Home Connect"),
-        ("tumble_dryer", "WashData, Home Connect"),
-        ("coffee_machine", "WashData, Home Connect"),
-        ("oven", "WashData, Home Connect"),
+        ("dishwasher", "WashData, Miele, Home Connect"),
+        ("tumble_dryer", "WashData, Miele, Home Connect"),
+        ("coffee_machine", "WashData, Miele, Home Connect"),
+        ("oven", "WashData, Miele, Home Connect"),
     ],
 )
 async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(

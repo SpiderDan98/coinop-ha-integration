@@ -8,6 +8,7 @@ integration's source.
 from dataclasses import dataclass, field
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
@@ -40,7 +41,7 @@ def _washer(
 def _add(
     hass: HomeAssistant,
     washer: Washer,
-    config_entry: MockConfigEntry,
+    config_entry: ConfigEntry,
     platform: str,
     key: str,
     unique_id: str,
@@ -119,38 +120,80 @@ def add_washdata(
     return washer
 
 
-def add_miele(hass: HomeAssistant, *, consumption: bool = True) -> Washer:
-    """HA core `miele`: unique ids `<serial>-<key>`. Older washers report no
-    consumption, so `consumption` may leave those sensors out."""
-    config_entry, washer = _washer(hass, "miele", "000123456789", "Washing machine")
+# HA core `miele`'s sensors by key: object id, translation key and unit.
+MIELE_SENSORS = {
+    "state_status": ("status", "status", None),
+    "state_program_id": ("program", "program_id", None),
+    "state_program_phase": ("program_phase", "program_phase", None),
+    "current_energy_consumption": ("energy_consumption", "energy_consumption", "kWh"),
+    "current_water_consumption": ("water_consumption", "water_consumption", "L"),
+}
+_STATUS = ("state_status",)
+_PROGRAM = (*_STATUS, "state_program_id", "state_program_phase")
+_ENERGY = (*_PROGRAM, "current_energy_consumption")
+_WATER = (*_ENERGY, "current_water_consumption")
+# The sensors it registers for an appliance, by the model it gives the HA device: the
+# appliance type's tag (`DEVICE_TYPE_TAGS` in its const.py), capitalised, and the
+# `types` of each sensor description in its sensor.py.
+MIELE_MODELS = {
+    "Washing machine": _WATER,
+    "Washer dryer": _WATER,
+    "Dishwasher": _WATER,
+    "Tumble dryer": _ENERGY,
+    "Coffee system": _PROGRAM,
+    "Oven": _PROGRAM,
+    "Oven microwave": _PROGRAM,
+    "Steam oven": _PROGRAM,
+    "Steam oven combi": _PROGRAM,
+    "Steam oven micro": _PROGRAM,
+    "Dialog oven": _PROGRAM,
+    "Microwave": _PROGRAM,
+    "Warming drawer": _PROGRAM,
+    "Hob": _STATUS,
+    "Hood": _STATUS,
+    "Refrigerator": _STATUS,
+}
 
-    def add(key: str, object_id: str, **kwargs: Any) -> None:
+
+def add_miele(
+    hass: HomeAssistant,
+    model: str = "Washing machine",
+    *,
+    serial: str = "000123456789",
+) -> Washer:
+    """HA core `miele`: every appliance of an account on one config entry, named
+    after its kind, unique ids `<serial>-<key>`.
+
+    `model` is the appliance's kind as the integration writes it on the HA device; it
+    also decides which sensors the integration registers. A second appliance needs
+    its own `serial`.
+    """
+    config_entry = next(iter(hass.config_entries.async_entries("miele")), None)
+    if config_entry is None:
+        config_entry = MockConfigEntry(domain="miele")
+        config_entry.add_to_hass(hass)
+    washer = Washer(
+        dr.async_get(hass).async_get_or_create(
+            config_entry_id=config_entry.entry_id,
+            identifiers={("miele", serial)},
+            manufacturer="Miele",
+            name=model,
+            model=model,
+            serial_number=serial,
+        )
+    )
+    for key in MIELE_MODELS[model]:
+        object_id, translation_key, unit = MIELE_SENSORS[key]
         _add(
             hass,
             washer,
             config_entry,
             "sensor",
             key,
-            f"000123456789-{key}",
-            f"washing_machine_{object_id}",
-            **kwargs,
-        )
-
-    add("state_status", "status", translation_key="status")
-    add("state_program_id", "program", translation_key="program_id")
-    add("state_program_phase", "program_phase", translation_key="program_phase")
-    if consumption:
-        add(
-            "current_energy_consumption",
-            "energy_consumption",
-            translation_key="energy_consumption",
-            unit_of_measurement="kWh",
-        )
-        add(
-            "current_water_consumption",
-            "water_consumption",
-            translation_key="water_consumption",
-            unit_of_measurement="L",
+            f"{serial}-{key}",
+            f"{slugify(model)}_{object_id}",
+            translation_key=translation_key,
+            unit_of_measurement=unit,
         )
     return washer
 

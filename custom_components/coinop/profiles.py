@@ -273,6 +273,32 @@ def _washdata_kind(
     return WASHDATA_KINDS.get(kind, NoDeviceType.CANT_TELL)
 
 
+# The models HA core's `miele` gives an HA device that are a Device Type: an appliance
+# type's tag (`DEVICE_TYPE_TAGS` in its const.py), capitalised, underscores as spaces.
+MIELE_KINDS = {
+    "Washing machine": DEVICE_TYPE_WASHING_MACHINE,
+    "Washer dryer": DEVICE_TYPE_WASHING_MACHINE,
+    "Tumble dryer": DEVICE_TYPE_TUMBLE_DRYER,
+    "Dishwasher": DEVICE_TYPE_DISHWASHER,
+    "Coffee system": DEVICE_TYPE_COFFEE_MACHINE,
+    "Oven": DEVICE_TYPE_OVEN,
+    "Oven microwave": DEVICE_TYPE_OVEN,
+    "Steam oven": DEVICE_TYPE_OVEN,
+    "Steam oven combi": DEVICE_TYPE_OVEN,
+    "Steam oven micro": DEVICE_TYPE_OVEN,
+    "Dialog oven": DEVICE_TYPE_OVEN,
+    "Microwave": DEVICE_TYPE_OVEN,
+}
+
+
+def _miele_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """The appliance type Miele reports, which every appliance has: any other model
+    is a fridge, a hob, a hood or another appliance that is no Device Type."""
+    return MIELE_KINDS.get(device.model or "", NoDeviceType.NOT_A_DEVICE)
+
+
 # Event sensors `home_connect` registers for an appliance's type alone (`EVENT_SENSORS`
 # in its sensor.py), by unique id suffix; the first one found tells the kind. Each
 # is registered since Home Assistant 2026.5, the minimum.
@@ -360,8 +386,14 @@ INTEGRATIONS = {
     "miele": Integration(
         "Miele",
         _miele,
-        (DEVICE_TYPE_WASHING_MACHINE,),
-        _always(DEVICE_TYPE_WASHING_MACHINE),
+        (
+            DEVICE_TYPE_WASHING_MACHINE,
+            DEVICE_TYPE_DISHWASHER,
+            DEVICE_TYPE_TUMBLE_DRYER,
+            DEVICE_TYPE_COFFEE_MACHINE,
+            DEVICE_TYPE_OVEN,
+        ),
+        _miele_kind,
     ),
     "home_connect": Integration(
         "Home Connect",

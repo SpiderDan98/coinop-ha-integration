@@ -1,16 +1,22 @@
 """Quick Start adds an HA device as the Device Type its integration says it is, asks
 where the integration doesn't say, and leaves out what is no Device Type."""
 
+from typing import Any
+
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
+from .clock import Clock
 from .devices import WASHER_ENERGY, add_hub, configure
 from .test_device_flow import fields
+from .test_measured import electricity
 from .test_quick_start import offered, open_add_device, pick, quick_start
+from .test_runs import stored_runs
 from .test_washer_profiles import WASHDATA_PLACEHOLDERS, walk_pre_filled
-from .washers import add_home_connect, add_washdata
+from .test_water import water
+from .washers import add_home_connect, add_miele, add_washdata
 
 WASHDATA_MAPPING = {
     "running": ["running", "ending"],
@@ -212,6 +218,187 @@ async def test_the_second_form_asks_for_a_water_price_only_for_a_device_type_wit
         bool(asked),
         bool(asked),
     )
+
+
+MIELE_MAPPING = {
+    "running": ["in_use"],
+    "paused": ["pause", "rinse_hold"],
+    "finished": ["program_ended"],
+    "cancelled": ["program_interrupted"],
+    "ended": [],
+    "fault": ["failure"],
+    "ignored": [
+        "off",
+        "on",
+        "programmed",
+        "waiting_to_start",
+        "idle",
+        "service",
+        "not_connected",
+    ],
+}
+
+
+@pytest.mark.parametrize(
+    ("model", "device_type"),
+    [
+        ("Washing machine", "washing_machine"),
+        ("Washer dryer", "washing_machine"),
+        ("Tumble dryer", "tumble_dryer"),
+        ("Dishwasher", "dishwasher"),
+        ("Coffee system", "coffee_machine"),
+        ("Oven", "oven"),
+        ("Oven microwave", "oven"),
+        ("Steam oven", "oven"),
+        ("Steam oven combi", "oven"),
+        ("Steam oven micro", "oven"),
+        ("Dialog oven", "oven"),
+        ("Microwave", "oven"),
+    ],
+)
+async def test_a_miele_appliance_is_added_as_the_kind_miele_registers_it_as(
+    hass: HomeAssistant, model: str, device_type: str
+) -> None:
+    appliance = add_miele(hass, model)
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, appliance.device.id, price=0.3)
+
+    assert data["device_type"] == device_type
+    assert data["status"] == {"entity_id": appliance["state_status"], "attribute": None}
+    assert data["mapping"] == MIELE_MAPPING
+    assert data["program"] == {
+        "entity_id": appliance["state_program_id"],
+        "attribute": None,
+    }
+
+
+async def test_miele_appliances_that_are_no_device_type_are_not_offered(
+    hass: HomeAssistant,
+) -> None:
+    add_miele(hass, "Refrigerator", serial="000111111111")
+    add_miele(hass, "Hob", serial="000122222222")
+    add_miele(hass, "Hood", serial="000133333333")
+    dishwasher = add_miele(hass, "Dishwasher")
+    entry = await add_hub(hass)
+
+    result = await open_add_device(hass, entry)
+
+    assert offered(result) == [
+        {"value": dishwasher.device.id, "label": "Dishwasher · Miele"},
+        {"value": "manual", "label": "manual"},
+    ]
+
+
+def meter(entity_id: str, source: str, unit: str) -> dict[str, Any]:
+    return {
+        "source": source,
+        "entity_id": entity_id,
+        "attribute": None,
+        "unit": unit,
+        "factor": None,
+    }
+
+
+@pytest.mark.parametrize(
+    ("model", "asked", "has_energy_meter", "has_water_meter"),
+    [
+        ("Dishwasher", ["price", "price_entity", "water_price"], True, True),
+        ("Washer dryer", ["price", "price_entity", "water_price"], True, True),
+        ("Tumble dryer", ["price", "price_entity"], True, False),
+        (
+            "Coffee system",
+            ["optional_meter", "price", "price_entity", "water_price"],
+            False,
+            False,
+        ),
+        ("Oven", ["optional_meter", "price", "price_entity"], False, False),
+    ],
+)
+async def test_a_miele_appliance_brings_the_meters_it_has_and_is_asked_for_the_rest(
+    hass: HomeAssistant,
+    model: str,
+    asked: list[str],
+    has_energy_meter: bool,
+    has_water_meter: bool,
+) -> None:
+    appliance = add_miele(hass, model)
+    entry = await add_hub(hass)
+
+    result = await pick(hass, entry, appliance.device.id)
+    assert fields(result) == asked
+    prices = {"price": 0.3} | ({"water_price": 4.0} if "water_price" in asked else {})
+    result = await configure(hass, result, prices)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    [subentry] = entry.subentries.values()
+    assert subentry.data["consumption"] == (
+        meter(appliance["current_energy_consumption"], "energy", "kWh")
+        if has_energy_meter
+        else {"source": "per_program"}
+    )
+    assert subentry.data.get("water") == (
+        meter(appliance["current_water_consumption"], "meter", "L")
+        if has_water_meter
+        else {"source": "per_program"}
+        if "water_price" in asked
+        else None
+    )
+    assert ("water_price" in subentry.data) == ("water_price" in asked)
+
+
+@pytest.mark.parametrize("between_cycles", ["unknown", "0"])
+async def test_a_miele_dishwashers_per_cycle_counters_count_each_run_once(
+    hass: HomeAssistant,
+    clock: Clock,
+    hass_storage: dict[str, Any],
+    between_cycles: str,
+) -> None:
+    """Miele's counters keep a cycle's total while the program has ended, read
+    unknown once the appliance is off, or the 0 it reports by then, and start the
+    next cycle from 0."""
+    dishwasher = add_miele(hass, "Dishwasher")
+
+    async def report(status: str, kwh: float | str, litres: float | str) -> None:
+        hass.states.async_set(dishwasher["state_status"], status)
+        hass.states.async_set(
+            dishwasher["current_energy_consumption"],
+            str(kwh),
+            {"unit_of_measurement": "kWh"},
+        )
+        hass.states.async_set(
+            dishwasher["current_water_consumption"],
+            str(litres),
+            {"unit_of_measurement": "L"},
+        )
+        await hass.async_block_till_done()
+
+    await report("off", between_cycles, between_cycles)
+    hass.states.async_set(dishwasher["state_program_id"], "eco")
+    entry = await add_hub(hass)
+    await quick_start(hass, entry, dishwasher.device.id, price=0.3, water_price=4.0)
+    await clock.advance(hours=1)
+
+    for kwh, litres in ((0.9, 12.0), (0.7, 9.5)):
+        await report("in_use", 0, 0)
+        await clock.advance(hours=1)
+        await report("in_use", kwh / 2, litres / 2)
+        await clock.advance(hours=1)
+        await report("in_use", kwh, litres)
+        await clock.advance(minutes=1)
+        await report("program_ended", kwh, litres)
+        await clock.advance(minutes=2)
+        await report("off", between_cycles, between_cycles)
+        await clock.advance(hours=5)
+
+    first, second = stored_runs(hass_storage)
+    assert (first["outcome"], first["program"]) == ("completed", "eco")
+    assert electricity(first)["quantity"] == pytest.approx(0.9)
+    assert water(first)["quantity"] == pytest.approx(12)
+    assert electricity(second)["quantity"] == pytest.approx(0.7)
+    assert water(second)["quantity"] == pytest.approx(9.5)
+    # A counter still unknown as its Run opens flags a gap, as any meter's would.
+    assert "meter_reset" not in first["flags"] + second["flags"]
 
 
 HOME_CONNECT_MAPPING = {

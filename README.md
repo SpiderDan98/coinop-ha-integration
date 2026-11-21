@@ -24,10 +24,10 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 |---|---|---|
 | 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
 | Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
-| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Home Connect](#washing-machine-integration-profiles) |
-| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Home Connect](#washing-machine-integration-profiles) |
-| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Home Connect](#washing-machine-integration-profiles) |
-| Oven | Its Program and electricity (measured or per Program) | [WashData, Home Connect](#washing-machine-integration-profiles) |
+| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
 | EV charger | The electricity of a charging session, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | no integration: set up manually |
 | Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
 
@@ -61,7 +61,7 @@ If the device you want to add already belongs to an integration Coin-op has an I
 
 1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
 2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
-   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine brings its own meters and isn't asked.
+   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine, washer-dryer, dishwasher or tumble dryer brings its own meter and isn't asked.
    - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
    - for a Device Type with water (washing machine, dishwasher, coffee machine), optionally the **water price** per m³. With it, water comes from the Device's own meter or per Program from the Program Defaults; without it, no water is recorded.
 
@@ -70,8 +70,8 @@ The Device Type can't be changed once the Device is added. If the second form na
 Which Device Type a device becomes:
 
 - **WashData** knows the device type you picked when you set the device up there (or changed it to later): a washing machine or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher. For its generic types ("Other (Advanced)" and "Threshold Device"), such as a plug on a coffee machine or an oven, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven. A pump is no Device Type and isn't offered.
+- **Miele** reports what each appliance is: a washing machine or a washer-dryer becomes a Washing machine, a tumble dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee system a Coffee machine, and an oven, steam oven, combination oven, dialog oven or microwave an Oven. Its other appliances (fridges, freezers, hobs, hoods, wine cabinets, warming drawers, robot vacuums) are no Device Type and aren't offered.
 - **Home Connect** doesn't say what kind an appliance is, so Coin-op tells it from the sensors Home Connect creates for each kind (they needn't be enabled): a washer or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee machine a Coffee machine, an oven or a microwave an Oven. Fridges, freezers, hobs, hoods and other appliances that are no Device Type aren't offered. For an appliance whose kind those sensors don't tell, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven.
-- **Miele** lists all its appliances, each as a Washing machine: pick only the ones you want to follow as a washing machine.
 
 Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; the Doses and Program Defaults of a Device that has them are set on its card in the panel's Devices tab.
 
@@ -197,18 +197,19 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Washing machine Integration Profiles
 
-[Quick Start](#quick-start) offers the washing machines of these integrations. When you set one up manually and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
+[Quick Start](#quick-start) offers the washing machines, dishwashers, tumble dryers, coffee machines and ovens of these integrations, each as the Device Type it is. When you set one up manually, as the Device Type you choose, and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
 
 | Integration | Status | Program | Electricity | Water |
 |---|---|---|---|---|
 | [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`) | State sensor | Program sensor | your plug's energy meter, chosen by you | chosen by you |
-| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle | Water consumption sensor of the current cycle |
+| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle, where the appliance has one | Water consumption sensor of the current cycle, where the appliance has one |
 | [Home Connect](https://www.home-assistant.io/integrations/home_connect/) (`home_connect`) | Operation state sensor | Active program select | chosen by you | chosen by you |
 
 - WashData's profile also serves dishwashers, tumble dryers, coffee machines and ovens: its State and Program sensors are the same for every device it follows, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
-- Home Connect's profile serves dishwashers, tumble dryers, coffee machines and ovens too: each of them has the same Operation state sensor and Active program select, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
 - WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor reports placeholders such as `detecting...`; the profile fills them in as values to ignore (Program step), so they never become a Run's Program or a suggested Program row.
-- Miele's consumption sensors count the current cycle and drop to 0 afterwards. Coin-op keeps the reading at the load's end, so that drop is neither lost nor counted twice.
+- Miele's profile also serves dishwashers, tumble dryers, coffee systems (as Coffee machines) and ovens, steam, combination and dialog ovens and microwaves included: the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup. The consumption sensors are pre-filled wherever the appliance has them: energy and water on a washing machine, washer-dryer and dishwasher, energy alone on a tumble dryer. A coffee system and an oven have neither, so pick a plug's meter or take the kWh per Program. A Miele microwave or dialog oven has a Program sensor that never reports a program, so its Runs have no Program unless you enter one.
+- Miele's consumption sensors count the current cycle: they keep its total once the program has ended, have no value or read 0 while the appliance is off, and start the next cycle from 0. Coin-op keeps the reading at the Run's end, so that drop is neither lost nor counted twice, and it is never taken for a meter reset, whatever the Device Type.
+- Home Connect's profile also serves dishwashers, tumble dryers, coffee machines and ovens: each of them has the same Operation state sensor and Active program select, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
 - **Detect again** in the reconfigure menu re-applies the Status, the mapping and the Program, and leaves electricity, water and prices as they are.
 
 ## EV chargers
