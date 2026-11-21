@@ -19,7 +19,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
-from custom_components.coinop.profiles import INTEGRATIONS, appliances
+from custom_components.coinop.profiles import INTEGRATIONS
 from dev.coinop_dev import async_setup
 from dev.coinop_dev.scenarios import (
     HISTORIES,
@@ -301,22 +301,14 @@ async def test_a_device_with_history_loads_alone(
     assert await counts(panel) == expected
 
 
-def told(domain: str) -> tuple[str | None, ...]:
-    """The Device Types the integration's kind check tells, or None alone where it
-    can't tell any. WashData serves some for manual setup that no kind it keeps is."""
-    integration = INTEGRATIONS[domain]
-    if integration.kind is appliances.cant_tell:
-        return (None,)
-    if integration.kind is appliances.washdata_kind:
-        kinds = set(appliances.WASHDATA_KINDS.values())
-        return tuple(t for t in integration.device_types if t in kinds)
-    return integration.device_types
-
-
+QUICK_START = {n: p for n, p in PIECES.items() if isinstance(p, QuickStartPiece)}
+# WashData serves these for manual setup, but no kind it keeps says so.
+UNTOLD = {("ha_washdata", "coffee_machine"), ("ha_washdata", "oven")}
 PROFILED_KINDS = [
-    pytest.param(domain, device_type, id=f"{domain}.{device_type or 'asked'}")
-    for domain in INTEGRATIONS
-    for device_type in told(domain)
+    pytest.param(domain, device_type, id=f"{domain}.{device_type}")
+    for domain, integration in INTEGRATIONS.items()
+    for device_type in integration.device_types
+    if (domain, device_type) not in UNTOLD
 ]
 
 
@@ -328,17 +320,14 @@ async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_i
     panel: PanelClient,
     files: Path,
     domain: str,
-    device_type: str | None,
+    device_type: str,
 ) -> None:
-    """Where the integration can't tell the kind, Quick Start asks for it instead."""
+    """The kind's own Piece, or where the integration can't tell the kind, any of its
+    Pieces, for which Quick Start asks the Device Type instead."""
     integration = INTEGRATIONS[domain]
-    pieces = [
-        (name, piece)
-        for name, piece in PIECES.items()
-        if piece.domain == domain and device_type in (None, piece.group)
-    ]
-    assert pieces, f"no Quick Start Piece of {domain} for {device_type or 'any kind'}"
-    [(name, piece), *_] = pieces
+    pieces = [name for name, piece in QUICK_START.items() if piece.domain == domain]
+    assert pieces, f"no Quick Start Piece of {domain}"
+    name = next((n for n in pieces if PIECES[n].group == device_type), pieces[0])
     await async_load(hass, {"pieces": [name]}, hass_admin_user)
     await hass.async_block_till_done()
 
@@ -348,18 +337,20 @@ async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_i
     assert devices
     for device in devices:
         assert device["label"].endswith(f" · {integration.name}")
-        result = await pick(
-            hass, entry, device["value"], None if device_type else piece.group
-        )
+        result = await open_add_device(hass, entry)
+        result = await configure(hass, result, {"device": device["value"]})
+        if result["step_id"] == "quick_start_device_type":
+            result = await configure(hass, result, {"device_type": device_type})
+        else:
+            assert PIECES[name].group == device_type, (
+                f"no Quick Start Piece of {domain} for {device_type}"
+            )
         answers = {"price": 0.32} | (
             {"meter": PLUG_POWER} if "meter" in fields(result) else {}
         )
         result = await configure(hass, result, answers)
         assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
-        assert list(entry.subentries.values())[-1].data["device_type"] == piece.group
-
-
-QUICK_START = {n: p for n, p in PIECES.items() if isinstance(p, QuickStartPiece)}
+        assert list(entry.subentries.values())[-1].data["device_type"] == device_type
 
 
 @pytest.mark.usefixtures("helpers")
