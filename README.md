@@ -10,7 +10,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What it does
 
-- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the two Anycubic integrations that support the Kobra S1, the entities are filled in automatically.
+- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the [printer integrations Coin-op has a profile for](#3d-printer-integration-profiles), the entities are filled in automatically.
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
@@ -22,7 +22,7 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 
 | Device Type | A Run records | Pre-filled for |
 |---|---|---|
-| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
+| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab](#3d-printer-integration-profiles) |
 | Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ](#washing-machine-integration-profiles) |
 | Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ](#washing-machine-integration-profiles) |
 | Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ](#washing-machine-integration-profiles) |
@@ -60,7 +60,7 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 
 ## Quick Start
 
-If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [WashData, Miele, Home Connect, Home Connect Local and Home Connect Alt](#washing-machine-integration-profiles), [EV chargers](#ev-charger-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
+If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([3D printers](#3d-printer-integration-profiles), [WashData, Miele, Home Connect, Home Connect Local and Home Connect Alt](#washing-machine-integration-profiles), [EV chargers](#ev-charger-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
 
 1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
 2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
@@ -129,16 +129,18 @@ days_to_show: 365
 
 Corrections and deleted Runs change the totals at the moment you make them, so they show up in that month rather than rewriting earlier ones.
 
-## Anycubic printers
+## 3D printer Integration Profiles
 
-[Quick Start](#quick-start) offers the printers of these integrations. When you set a Device up manually and pick a printer's Home Assistant device from one of them, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration.
+[Quick Start](#quick-start) offers the printers of these integrations. When you set a Device up manually and pick a printer's Home Assistant device from one of them, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration. Every profile also fills in the job name and the mapping of its Status.
 
-| Integration | Status | Material used | Thumbnail | Slots |
-|---|---|---|---|---|
-| [Anycubic 3D Printer - Local Control](https://github.com/chrisfore/anycubic_ha_local) (`anycubic`) | Print event | Filament used, its `length_mm` attribute (mm) | Object top view (or Object thumbnail) | ACE Slot 1–4, colour attribute `color`, Loaded slot |
-| [Anycubic Cloud & LAN](https://github.com/Nino6689/hass-anycubic) (`anycubic_cloud`, 3.0 and 2.x) | Job state | Job filament used (mm) | Job preview (cloud mode only) | ACE Slot 1–4, colour attribute `color_hex`, ACE loaded slot |
+| Integration | Status | Material used | Thumbnail | Camera | Slots |
+|---|---|---|---|---|---|
+| [Anycubic 3D Printer - Local Control](https://github.com/chrisfore/anycubic_ha_local) (`anycubic`) | Print event | Filament used, its `length_mm` attribute (mm) | Object top view (or Object thumbnail) | Camera, with Snapshot | ACE Slot 1–4, colour attribute `color`, Loaded slot |
+| [Anycubic Cloud & LAN](https://github.com/Nino6689/hass-anycubic) (`anycubic_cloud`, 3.0 and 2.x) | Job state | Job filament used (mm) | Job preview (cloud mode only) | The local camera, with Snapshot | ACE Slot 1–4, colour attribute `color_hex`, ACE loaded slot |
+| [Bambu Lab](https://github.com/greghesp/ha-bambulab) (`bambu_lab`) | Print status | Print weight (g) | Cover image | Camera, with Snapshot, where the printer has one | none |
 
-Both also fill in the job name and the printer's local camera. With Anycubic Cloud & LAN 2.x in LAN mode a finished print goes straight to idle, so its Runs end with Outcome Unknown.
+- **Anycubic Cloud & LAN** 2.x in LAN mode goes from printing straight to idle, so its Runs end with Outcome Unknown.
+- **Bambu Lab**: the preparation (heating, levelling) is part of the Run, a print stopped on the printer or one that failed ends as Cancelled, and the printer going offline during a print doesn't end the Run. The print weight is the slicer's planned figure for the whole print, not a measurement: a cancelled print is charged its full planned weight until you correct the Run's Material. Coin-op only takes a weight reported during the Run; with the integration connected through the cloud only, a print that is sliced in the cloud before it starts may report its weight before that, and its Run then asks you for the quantity. The AMS isn't read, so the weight is one Material Line Item of the Device's Default Material, and the AMS isn't offered as a Device of its own. Without the camera entity (the integration's camera turned off, or its chamber picture shown as an image) the Device has no camera and no Snapshot.
 
 If an update of the integration renames or replaces its entities, open the Device's reconfigure menu and choose **Detect again**. It walks the status, job and image steps pre-filled from the integration again and leaves the consumption source and price as they are.
 
