@@ -16,6 +16,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
+from custom_components.coinop.profiles import INTEGRATIONS, appliances
 from dev.coinop_dev import async_setup
 from dev.coinop_dev.scenarios import (
     HISTORIES,
@@ -322,6 +323,66 @@ async def test_a_quick_start_piece_loads_alone(
     [entry] = hass.config_entries.async_entries("coinop")
     result = await open_add_device(hass, entry)
     assert [option["label"] for option in offered(result)] == [label, "manual"]
+
+
+def told(domain: str) -> tuple[str | None, ...]:
+    """The Device Types the integration's kind check tells, or None alone where it
+    can't tell any. WashData serves some for manual setup that no kind it keeps is."""
+    integration = INTEGRATIONS[domain]
+    if integration.kind is appliances.cant_tell:
+        return (None,)
+    if integration.kind is appliances.washdata_kind:
+        kinds = set(appliances.WASHDATA_KINDS.values())
+        return tuple(t for t in integration.device_types if t in kinds)
+    return integration.device_types
+
+
+PROFILED_KINDS = [
+    pytest.param(domain, device_type, id=f"{domain}.{device_type or 'asked'}")
+    for domain in INTEGRATIONS
+    for device_type in told(domain)
+]
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(("domain", "device_type"), PROFILED_KINDS)
+async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_it_tells(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    domain: str,
+    device_type: str | None,
+) -> None:
+    """Where the integration can't tell the kind, Quick Start asks for it instead."""
+    integration = INTEGRATIONS[domain]
+    pieces = [
+        (name, piece)
+        for name, piece in PIECES.items()
+        if not isinstance(piece, DeviceWithHistory)
+        and piece.domain == domain
+        and device_type in (None, piece.group)
+    ]
+    assert pieces, f"no Quick Start Piece of {domain} for {device_type or 'any kind'}"
+    [(name, piece), *_] = pieces
+    await async_load(hass, {"pieces": [name]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (0, 0, 0, 0)
+    [entry] = hass.config_entries.async_entries("coinop")
+    *devices, _ = offered(await open_add_device(hass, entry))
+    assert devices
+    for device in devices:
+        assert device["label"].endswith(f" · {integration.name}")
+        result = await pick(
+            hass, entry, device["value"], None if device_type else piece.group
+        )
+        answers = {"price": 0.32} | (
+            {"meter": PLUG_POWER} if "meter" in fields(result) else {}
+        )
+        result = await configure(hass, result, answers)
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+        assert list(entry.subentries.values())[-1].data["device_type"] == piece.group
 
 
 @pytest.mark.usefixtures("helpers")
