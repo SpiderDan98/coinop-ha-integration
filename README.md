@@ -25,10 +25,15 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 | 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
 | Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
 | Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | no integration yet: set up manually |
+| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | no integration yet: set up manually |
 
 "Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), and manual setup comes pre-filled for them. A device of any other integration is set up manually, by picking its entities yourself.
 
 A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
+
+So does a coffee machine. Each drink is a Run named after its Program, such as "Cappuccino", and beans and milk are Doses with an amount per drink in the Program Defaults, so a cappuccino costs more than an espresso. A Program's litres take amounts down to the millilitre: enter an espresso's 40 ml as 0.04.
+
+Very short Runs, such as a coffee, are better priced "per Program" than from a meter. A metering plug counts in steps and reports at intervals that are coarse against a Run of under a minute, so what it measures for one drink is mostly chance. Choose "per Program" as the electricity source and give each drink its kWh in the Program Defaults.
 
 ## Installation
 
@@ -133,7 +138,7 @@ Each washing machine's card in the panel's Devices tab has a Dose list and a Pro
 
 - **Materials**: detergents, fabric softeners and laundry additives are Materials in the Materials tab, like filament. Built-in types (liquid and powder detergent, pods, fabric softener, whitener, stain remover, colour catcher sheets) pre-fill a typical density. Pods and sheets are priced per piece: 40 pods for €12 cost €0.30 each. Dishwasher products and beverage ingredients are Material forms of their own, with built-in types for dishwasher tabs (priced per piece), dishwasher powder, dishwasher salt, rinse aid, coffee beans, ground coffee and milk; Materials of these two forms are never linked to Spoolman.
 - **Doses**: one entry per product that goes into the machine, each pointing to a Material. Each Dose a Run uses becomes its own Material Line Item.
-- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them.
+- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them. Every amount is stored as entered; water of under a litre reads to the millilitre everywhere (0.04 L), larger amounts to a tenth of a litre as before.
 - Rows are suggested from the values the Program input offers and from Programs seen on past Runs; a suggested row is stored once you enter a value.
 - With a meter, a row suggests the average measured kWh and litres of that Program's completed Runs, with the number of Runs. One click applies it; it is never applied automatically.
 

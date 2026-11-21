@@ -3,6 +3,8 @@ import type { HomeAssistant } from "./hass";
 import { localize } from "./localize";
 
 const QUANTITY_DECIMALS: Record<string, number> = { kWh: 3, L: 1, g: 1, ml: 1, h: 2, pcs: 0 };
+/** Decimals of an amount under 1 of a unit, so that a coffee's 0.04 L doesn't read as 0. */
+const SMALL_QUANTITY_DECIMALS: Record<string, number> = { L: 3 };
 /** Units priced per a larger one, as bills are: a litre's price is shown per m³. */
 const PRICE_UNITS: Record<string, { unit: string; factor: number }> = {
   L: { unit: "m³", factor: 1000 },
@@ -88,8 +90,11 @@ export function formatter(hass: HomeAssistant) {
     toAmountInput: (amount: number) =>
       amount.toFixed(currency.resolvedOptions().maximumFractionDigits ?? 2),
     unitPrice: (price: number) => unitPrice.format(price),
-    quantity: (quantity: number, unit: string) =>
-      `${quantity.toLocaleString(locale, { maximumFractionDigits: QUANTITY_DECIMALS[unit] ?? 2 })} ${unit}`,
+    quantity: (quantity: number, unit: string) => {
+      const small = Math.abs(quantity) < 1 ? SMALL_QUANTITY_DECIMALS[unit] : undefined;
+      const maximumFractionDigits = small ?? QUANTITY_DECIMALS[unit] ?? 2;
+      return `${quantity.toLocaleString(locale, { maximumFractionDigits })} ${unit}`;
+    },
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
     timeRange: (start: string, end: string) =>
