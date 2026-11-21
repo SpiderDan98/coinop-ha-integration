@@ -124,3 +124,9 @@ template:
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
+
+# A camera without hardware, for a Device's Snapshot: ffmpeg's test picture.
+camera:
+  - platform: ffmpeg
+    name: Workshop camera
+    input: -f lavfi -i testsrc=size=640x360:rate=1

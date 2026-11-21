@@ -32,7 +32,8 @@ PLUG_POWER = "sensor.kobra_s1_plug_power"
 @pytest.fixture
 async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
     """The Devices' helpers from the dev configuration.yaml, and the dev container's
-    integrations where Home Assistant finds them."""
+    integrations where Home Assistant finds them. Its camera stays in the container:
+    the platform needs the ffmpeg binary."""
     monkeypatch.setattr(
         custom_components, "__path__", [*custom_components.__path__, str(DEV)]
     )
