@@ -10,6 +10,7 @@ from homeassistant.helpers import device_registry as dr
 
 from custom_components.coinop.device_config import Target
 
+# Matches the end of a unique id, or its start with `start=True`.
 # `disabled=True` also finds a disabled entity: a kind check reads what is registered.
 Find = Callable[..., str | None]
 
