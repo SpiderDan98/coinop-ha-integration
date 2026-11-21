@@ -584,6 +584,7 @@ export class DevicesPage extends LitElement {
     const { id, capabilities, known_programs } = device;
     const { programs } = program_defaults;
     const dosed = capabilities.includes("doses");
+    // As with water: a Dose list stored without the Capability adds no columns.
     const doses = dosed ? doseList : [];
     const perProgram = capabilities.includes("program_consumption");
     const water = waterSource(device);
