@@ -53,6 +53,12 @@ async def settle_reload(hass: HomeAssistant) -> Any:
     await hass.async_block_till_done()
 
 
+async def mow_an_hour(hass: HomeAssistant, clock: Clock) -> None:
+    await set_mower(hass, "mowing")
+    await clock.advance(minutes=60)
+    await set_mower(hass, "parked")
+
+
 async def test_electricity_source_none_skips_the_electricity_price(
     hass: HomeAssistant,
 ) -> None:
@@ -214,9 +220,7 @@ async def test_a_run_has_no_electricity_line_item_and_is_final_at_its_end(
     """A Device without any computed cost is a valid Device."""
     await add_mower(hass, source="none")
 
-    await set_mower(hass, "mowing")
-    await clock.advance(minutes=60)
-    await set_mower(hass, "parked")
+    await mow_an_hour(hass, clock)
 
     [run] = stored_runs(hass_storage)
     assert run["finalised"] is True
@@ -431,9 +435,7 @@ async def test_the_sensors_stay_and_the_ended_event_reports_no_electricity(
     )
     fired = record_events(hass, "event.mower_run")
 
-    await set_mower(hass, "mowing")
-    await clock.advance(minutes=60)
-    await set_mower(hass, "parked")
+    await mow_an_hour(hass, clock)
     await hass.async_block_till_done()
 
     assert coinop_entities(entity_registry) == basic_entities("mower")
@@ -470,9 +472,7 @@ async def test_the_totals_by_kind_and_a_cost_statement_have_no_electricity(
 async def mowed(hass: HomeAssistant, clock: Clock, panel: PanelClient) -> str:
     """An hour's Run of a robotic mower with electricity source none; its id."""
     await add_mower(hass, source="none")
-    await set_mower(hass, "mowing")
-    await clock.advance(minutes=60)
-    await set_mower(hass, "parked")
+    await mow_an_hour(hass, clock)
     [summary] = (await panel.call("coinop/runs/list"))["runs"]
     run_id: str = summary["id"]
     return run_id
