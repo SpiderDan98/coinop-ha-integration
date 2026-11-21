@@ -121,6 +121,53 @@ WATERINGS = [
     (2, 6, 25, 224.0),
     (1, 20, 15, 133.5),
 ]
+# Days ago, hour it starts at, Program (None: never recognised), minutes, Outcome.
+COOKINGS = [
+    (27, 18, "Fan plus 180°", 55, "finished"),
+    (24, 12, "Pizza 220°", 25, "finished"),
+    (21, 18, "Top/bottom heat 200°", 70, "finished"),
+    (18, 19, None, 40, "finished"),
+    (15, 17, "Fan plus 180°", 90, "finished"),
+    (12, 18, "Grill", 20, "cancelled"),
+    (9, 13, "Fan plus 180°", 45, "finished"),
+    (6, 19, "Pizza 220°", 22, "finished"),
+    (4, 18, "Top/bottom heat 200°", 65, "finished"),
+    (1, 18, "Grill", 30, "finished"),
+]
+OVEN_PROGRAMS = {
+    "Fan plus 180°": 1.1,
+    "Top/bottom heat 200°": 1.4,
+    "Grill": 0.9,
+    "Pizza 220°": 0.8,
+}
+# Days ago, hour the car is plugged in, minutes charging, minutes it stays plugged in
+# once full, kWh.
+SESSIONS = [
+    (25, 19, 240, 600, 38.5),
+    (22, 18, 95, 0, 14.2),
+    (19, 20, 180, 540, 29.0),
+    (16, 19, 60, 0, 9.8),
+    (13, 18, 300, 480, 47.6),
+    (11, 21, 120, 420, 19.3),
+    (8, 19, 75, 0, 11.9),
+    (6, 18, 210, 600, 33.4),
+    (3, 20, 140, 300, 22.7),
+    (1, 19, 90, 0, 14.6),
+]
+# Days ago, hour it leaves the station at, minutes mowing, minutes charging after it,
+# kWh the station counts, minutes it was stuck (0: never).
+MOWS = [
+    (20, 9, 90, 70, 0.25, 0),
+    (18, 10, 110, 80, 0.3, 0),
+    (16, 9, 75, 60, 0.2, 0),
+    (14, 14, 100, 75, 0.28, 0),
+    (12, 9, 85, 65, 0.24, 25),
+    (10, 10, 115, 85, 0.31, 0),
+    (8, 15, 80, 60, 0.22, 0),
+    (6, 9, 95, 70, 0.27, 0),
+    (4, 10, 90, 70, 0.26, 0),
+    (2, 9, 95, 75, 0.27, 0),
+]
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -582,6 +629,170 @@ async def _washer_start(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.washer_status", "running")
 
 
+async def _oven_settings(seed: Seed) -> None:
+    await seed.api.call(
+        "coinop/devices/update_settings",
+        device_id=seed.devices["oven"],
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}, "kwh": 1.0},
+                "programs": {
+                    program: {"doses": {}, "kwh": kwh}
+                    for program, kwh in OVEN_PROGRAMS.items()
+                },
+            }
+        },
+    )
+
+
+async def _oven_short(seed: Seed) -> None:
+    await _cook(seed, COOKINGS)
+
+
+async def _oven_long(seed: Seed) -> None:
+    """A meal every few days for two years, then the short level's."""
+    rng = seed.random
+    cookings, day = [], 730
+    while day > 30:
+        outcome = rng.choices(["finished", "cancelled"], [96, 4])[0]
+        cookings.append(
+            (
+                day,
+                rng.choice([12, 13, 17, 18, 19]),
+                rng.choice([*OVEN_PROGRAMS, None]),
+                rng.randrange(20, 95, 5),
+                outcome,
+            )
+        )
+        day -= rng.randrange(3, 10)
+    await _cook(seed, [*cookings, *COOKINGS])
+
+
+async def _cook(seed: Seed, cookings: list[tuple[Any, ...]]) -> None:
+    for days, hour, program, minutes, outcome in cookings:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay(
+            seed.hass, "input_select.kitchen_oven_program", program or "", start
+        )
+        await _replay(seed.hass, "input_select.kitchen_oven_status", "running", start)
+        end = start + timedelta(minutes=minutes)
+        await _replay(seed.hass, "input_select.kitchen_oven_status", outcome, end)
+    await _async_set(seed.hass, "input_select.kitchen_oven_program", "Fan plus 180°")
+    await _async_set(seed.hass, "input_select.kitchen_oven_status", "off")
+
+
+async def _oven_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.kitchen_oven_program", "Pizza 220°")
+    await _async_set(seed.hass, "input_select.kitchen_oven_status", "running")
+
+
+async def _charger_short(seed: Seed) -> None:
+    await _charge(seed, SESSIONS)
+
+
+async def _charger_long(seed: Seed) -> None:
+    """A charge every few days for two years, then the short level's."""
+    rng = seed.random
+    sessions, day = [], 730
+    while day > 30:
+        kwh = round(rng.uniform(8, 48), 1)
+        # 11 kW, a little less at the end.
+        charging = round(kwh / 10 * 60)
+        full = rng.choice([0, 0, 240, 480, 600])
+        sessions.append((day, rng.choice([18, 19, 20, 21]), charging, full, kwh))
+        day -= rng.randrange(2, 7)
+    await _charge(seed, [*sessions, *SESSIONS])
+
+
+async def _charge(seed: Seed, sessions: list[tuple[int, int, int, int, float]]) -> None:
+    """Each session counted from 0, as a session energy sensor counts it; the
+    sensor drops back to 0 five minutes after the car is unplugged."""
+    hass = seed.hass
+    status, session = (
+        "input_select.carport_charger_status",
+        "input_number.carport_charger_session",
+    )
+    for days, hour, charging, full, kwh in sessions:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay(hass, session, 0, start)
+        await _replay(hass, status, "charging", start)
+        halfway = start + timedelta(minutes=charging // 2)
+        await _replay(hass, session, round(kwh / 2, 1), halfway)
+        charged = start + timedelta(minutes=charging)
+        await _replay(hass, session, kwh, charged)
+        if full:
+            await _replay(hass, status, "connected", charged)
+        end = charged + timedelta(minutes=full)
+        await _replay(hass, status, "disconnected", end)
+        # A report after the end spares the wait for it.
+        await _replay(hass, session, kwh, end + timedelta(minutes=1))
+        await _replay(hass, session, 0, end + timedelta(minutes=5))
+    await _async_set(hass, session, 0)
+    await _async_set(hass, status, "disconnected")
+
+
+async def _charger_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.carport_charger_status", "charging")
+
+
+async def _mower_short(seed: Seed) -> None:
+    await _mow(seed, MOWS)
+
+
+async def _mower_long(seed: Seed) -> None:
+    """Every few days through two summers, then the short level's mows."""
+    rng = seed.random
+    mows = []
+    for summer in (1, 0):
+        day = 365 * summer + 300
+        while day > 365 * summer + 120:
+            minutes = rng.randrange(70, 120, 5)
+            kwh = round(minutes / 360 * rng.uniform(0.9, 1.1), 2)
+            stuck = rng.choice([20, 35]) if rng.random() < 0.05 else 0
+            mows.append((day, rng.choice([9, 10, 14, 15]), minutes, 70, kwh, stuck))
+            day -= rng.randrange(1, 4)
+    await _mow(seed, [*mows, *MOWS])
+
+
+async def _mow(seed: Seed, mows: list[tuple[int, int, int, int, float, int]]) -> None:
+    """Charging after mowing is Paused, so what the station draws lands in the Run."""
+    hass = seed.hass
+    status, meter = (
+        "input_select.robotic_mower_status",
+        {"robotic_mower_station_energy": 85.0},
+    )
+    for days, hour, minutes, charging, kwh, stuck in mows:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay_meters(hass, meter, start)
+        await _replay(hass, status, "mowing", start)
+        if stuck:
+            at = start + timedelta(minutes=minutes // 2)
+            await _replay(hass, status, "error", at)
+            await _replay(hass, status, "mowing", at + timedelta(minutes=stuck))
+        back = start + timedelta(minutes=minutes + stuck)
+        await _replay(hass, status, "returning", back)
+        docked = back + timedelta(minutes=5)
+        await _replay(hass, status, "charging", docked)
+        end = docked + timedelta(minutes=charging)
+        meter["robotic_mower_station_energy"] = round(
+            meter["robotic_mower_station_energy"] + kwh, 3
+        )
+        await _replay_meters(hass, meter, end - timedelta(minutes=1))
+        await _replay(hass, status, "parked", end)
+        # A report after the end spares the wait for it.
+        await _replay_meters(hass, meter, end + timedelta(minutes=1))
+    await _async_set(
+        hass,
+        "input_number.robotic_mower_station_energy",
+        meter["robotic_mower_station_energy"],
+    )
+    await _async_set(hass, status, "parked")
+
+
+async def _mower_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.robotic_mower_status", "mowing")
+
+
 async def _irrigation_short(seed: Seed) -> None:
     await _water(seed, WATERINGS)
 
@@ -711,6 +922,89 @@ def _washer() -> dict[str, Any]:
         },
         # Per m³, wastewater included.
         "water_price": {"source": "fixed", "value": 4.2},
+    }
+
+
+def _oven() -> dict[str, Any]:
+    """An oven without a meter: its electricity comes from its Program Defaults."""
+    return {
+        "device_type": "oven",
+        "printer_device_id": None,
+        "status": {"entity_id": "input_select.kitchen_oven_status", "attribute": None},
+        "mapping": {
+            "running": ["running"],
+            "paused": ["paused"],
+            "finished": ["finished"],
+            "cancelled": ["cancelled"],
+            "ended": [],
+            "fault": [],
+            "ignored": ["off"],
+        },
+        "program": {
+            "entity_id": "input_select.kitchen_oven_program",
+            "attribute": None,
+        },
+        "consumption": {"source": "per_program"},
+        "price": {"source": "fixed", "value": 0.32},
+    }
+
+
+def _charger() -> dict[str, Any]:
+    """A charger on its session energy sensor, which counts each session from 0;
+    a car left plugged in once full is Paused."""
+    return {
+        "device_type": "ev_charger",
+        "printer_device_id": None,
+        "status": {
+            "entity_id": "input_select.carport_charger_status",
+            "attribute": None,
+        },
+        "mapping": {
+            "running": ["charging"],
+            "paused": ["connected"],
+            "finished": ["disconnected"],
+            "cancelled": [],
+            "ended": [],
+            "fault": ["error"],
+            "ignored": [],
+        },
+        "consumption": {
+            "source": "energy",
+            "entity_id": "input_number.carport_charger_session",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        },
+        "price": {"source": "fixed", "value": 0.32},
+    }
+
+
+def _mower() -> dict[str, Any]:
+    """A mower on its charging station's plug: charging after mowing is Paused."""
+    return {
+        "device_type": "robotic_mower",
+        "printer_device_id": None,
+        "status": {
+            "entity_id": "input_select.robotic_mower_status",
+            "attribute": None,
+        },
+        "mapping": {
+            "running": ["mowing", "returning"],
+            "paused": ["charging"],
+            "finished": ["parked"],
+            "cancelled": [],
+            "ended": [],
+            "fault": ["error"],
+            "ignored": [],
+        },
+        "consumption": {
+            "source": "energy",
+            "entity_id": "input_number.robotic_mower_station_energy",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        },
+        "price": {"source": "fixed", "value": 0.32},
     }
 
 
@@ -1140,6 +1434,19 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             appliances.home_connect, "CoffeeMaker", name="Siemens coffee maker"
         ),
     ),
+    "oven": DeviceWithHistory(
+        "oven",
+        "Kitchen oven",
+        "A Program input and electricity from Program Defaults, without a meter. "
+        "Short history: 10 meals over four weeks; long: a meal every few days for "
+        "two years.",
+        {"input_select.kitchen_oven_status": "off"},
+        device=_oven(),
+        short=_oven_short,
+        long=_oven_long,
+        start=_oven_start,
+        setup=_oven_settings,
+    ),
     "miele.oven": StaticPiece(
         "oven",
         "Miele oven · Miele",
@@ -1183,6 +1490,21 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             name="Samsung oven",
             device_id="a4d81f6e-7c25-4e9b-8f13-6d2b9a5c3e70",
         ),
+    ),
+    "charger": DeviceWithHistory(
+        "ev_charger",
+        "Carport charger",
+        "A session energy sensor that counts each charge from 0; a car left plugged "
+        "in once full is Paused. Short history: 10 charges over four weeks; long: a "
+        "charge every few days for two years.",
+        {
+            "input_select.carport_charger_status": "disconnected",
+            "input_number.carport_charger_session": 0,
+        },
+        device=_charger(),
+        short=_charger_short,
+        long=_charger_long,
+        start=_charger_start,
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
@@ -1248,6 +1570,18 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "to `Charging` in the developer tools to run it.",
         {},
         registration=ev_chargers.wallbox,
+    ),
+    "mower": DeviceWithHistory(
+        "robotic_mower",
+        "Robotic mower",
+        "Its charging station's energy meter, charging after mowing as Paused, and "
+        "a mow it got stuck on as a Fault. Short history: 10 mows over three weeks; "
+        "long: two summers of them.",
+        {"input_select.robotic_mower_status": "parked"},
+        device=_mower(),
+        short=_mower_short,
+        long=_mower_long,
+        start=_mower_start,
     ),
     "irrigation": DeviceWithHistory(
         "other",

@@ -53,10 +53,12 @@ load:
             - smartthings.tumble_dryer
             - miele.coffee_machine
             - home_connect.coffee_machine
+            - oven
             - miele.oven
             - home_connect.oven
             - lg_thinq.oven
             - smartthings.oven
+            - charger
             - tesla_wall_connector.ev_charger
             - evcc_intg.ev_charger
             - ocpp.ev_charger
@@ -65,6 +67,7 @@ load:
             - goecharger_mqtt.ev_charger
             - goecharger_api2.ev_charger
             - wallbox.ev_charger
+            - mower
             - irrigation
     history:
       name: History
