@@ -409,3 +409,154 @@ async def test_the_totals_by_kind_and_a_cost_statement_have_no_electricity(
     ]
     assert "Water 40 L × €4.00/m³ €0.16" in statement.lines  # noqa: RUF001
     assert [line for line in statement.lines if "Electricity" in line] == []
+
+
+async def mowed(hass: HomeAssistant, clock: Clock, panel: PanelClient) -> str:
+    """An hour's Run of a robotic mower with electricity source none; its id."""
+    await add_mower(hass, source="none")
+    await set_mower(hass, "mowing")
+    await clock.advance(minutes=60)
+    await set_mower(hass, "parked")
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run_id: str = summary["id"]
+    return run_id
+
+
+async def test_electricity_is_added_by_hand_once_in_kwh_and_marked_as_entered(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    run_id = await mowed(hass, clock, panel)
+
+    run = (
+        await panel.call(
+            "coinop/line_items/add",
+            run_id=run_id,
+            kind="electricity",
+            quantity=1.5,
+            unit_price=0.32,
+        )
+    )["run"]
+
+    [item] = run["line_items"]
+    assert (item["kind"], item["quantity"], item["unit"], item["method"]) == (
+        "electricity",
+        1.5,
+        "kWh",
+        "entered",
+    )
+    assert item["amount"] == pytest.approx(0.48)
+    assert (item["locked"], item["deletable"], item["computed"]) == (False, True, None)
+    assert run["subtotals"]["electricity"] == 0.48
+    assert value(hass, "sensor.mower_energy_in_runs") == 1.5
+    assert value(hass, "sensor.mower_electricity_cost") == pytest.approx(0.48)
+    error = await panel.error(
+        "coinop/line_items/add", run_id=run_id, kind="electricity", quantity=1
+    )
+    assert error["code"] == "not_allowed"
+
+
+async def test_electricity_added_by_hand_starts_empty_and_is_edited_and_deleted(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    run_id = await mowed(hass, clock, panel)
+    item = {"run_id": run_id}
+
+    run = (await panel.call("coinop/line_items/add", **item, kind="electricity"))["run"]
+    [added] = run["line_items"]
+    item["line_item_id"] = added["id"]
+    assert (added["quantity"], added["unit_price"], added["amount"]) == (None, 0, 0)
+
+    run = (
+        await panel.call(
+            "coinop/line_items/update", **item, quantity=2, unit_price=0.25
+        )
+    )["run"]
+    [edited] = run["line_items"]
+    assert (edited["amount"], edited["computed"]) == (0.5, None)
+    error = await panel.error("coinop/line_items/update", **item, unit="Wh")
+    assert error["code"] == "not_allowed"
+    error = await panel.error("coinop/line_items/update", **item, unit_price=-1)
+    assert error["code"] == "invalid_format"
+    run = (await panel.call("coinop/line_items/reset", **item))["run"]
+    assert run["line_items"] == [edited]
+
+    run = (await panel.call("coinop/line_items/delete", **item))["run"]
+    assert run["line_items"] == []
+    assert value(hass, "sensor.mower_energy_in_runs") == 0
+
+
+async def test_electricity_is_added_by_hand_to_an_open_run_and_stays(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await add_mower(hass, source="none")
+    await set_mower(hass, "mowing")
+    await clock.advance(minutes=30)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+
+    await panel.call(
+        "coinop/line_items/add",
+        run_id=summary["id"],
+        kind="electricity",
+        quantity=0.2,
+        unit_price=0.30,
+    )
+    await clock.advance(minutes=30)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    [item] = run["line_items"]
+    assert (run["ended"], item["locked"], item["quantity"]) == (None, False, 0.2)
+    await panel.call(
+        "coinop/line_items/update",
+        run_id=summary["id"],
+        line_item_id=item["id"],
+        quantity=0.25,
+    )
+    await set_mower(hass, "parked")
+
+    [stored] = stored_runs(hass_storage)
+    assert electricity(stored)["quantity"] == 0.25
+    assert electricity(stored)["method"] == "entered"
+
+
+async def test_a_run_that_has_its_electricity_takes_no_second_one(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_device(hass, await add_hub(hass), running_power=100)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+
+    open_error = await panel.error(
+        "coinop/line_items/add", run_id=summary["id"], kind="electricity", quantity=1
+    )
+    await set_status(hass, "finished")
+    ended_error = await panel.error(
+        "coinop/line_items/add", run_id=summary["id"], kind="electricity", quantity=1
+    )
+
+    assert (open_error["code"], ended_error["code"]) == ("not_allowed", "not_allowed")
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert electricity(run)["deletable"] is False
+
+
+async def test_a_manual_runs_empty_electricity_is_one_entered_by_hand_too(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A Device with a source but nothing to compute a past Run from."""
+    mower = await add_mower(hass)
+    await clock.advance(hours=5)
+    run = await create(panel, mower.subentry_id)
+    [item] = run["line_items"]
+    assert (item["kind"], item["method"], item["deletable"]) == (
+        "electricity",
+        "entered",
+        True,
+    )
+
+    await panel.call(
+        "coinop/line_items/delete", run_id=run["id"], line_item_id=item["id"]
+    )
+    run = (
+        await panel.call("coinop/line_items/add", run_id=run["id"], kind="electricity")
+    )["run"]
+
+    assert kinds(run) == ["electricity"]

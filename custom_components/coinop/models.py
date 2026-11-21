@@ -576,11 +576,9 @@ class Run:
         return not self.finalised and item.is_computed
 
     def deletable(self, item: LineItem) -> bool:
-        """Every Run keeps its one Electricity Line Item and a computed Water one,
-        overridden down to 0 at most."""
-        kept = item.kind is LineItemKind.ELECTRICITY or (
-            item.kind is LineItemKind.WATER and item.is_computed
-        )
+        """A Run keeps the Electricity and Water Line Items Coin-op computed,
+        overridden down to 0 at most; one entered by hand can go."""
+        kept = item.kind in CONSUMED_KINDS and item.is_computed
         return not kept and not self.locked(item)
 
     def drop_fixed_flags(self) -> None:

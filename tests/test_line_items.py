@@ -344,9 +344,7 @@ async def test_line_items_that_dont_exist_are_not_found(
             assert error["code"] == "not_found", (command, run_id)
     error = await panel.error("coinop/line_items/add", run_id="nope", kind="other")
     assert error["code"] == "not_found"
-    error = await panel.error(
-        "coinop/line_items/add", run_id=run["id"], kind="electricity"
-    )
+    error = await panel.error("coinop/line_items/add", run_id=run["id"], kind="gas")
     assert error["code"] == "invalid_format"
 
 
