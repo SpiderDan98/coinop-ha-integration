@@ -21,6 +21,7 @@
           "title": "Gerät neu konfigurieren",
           "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch die Geräteeingänge, die das Integrationsprofil der Integration des Geräts kennt, vorausgefüllt aus ihren Entitäten, z. B. wenn ein Update sie umbenannt hat; Verbrauchsquellen und Preise bleiben unverändert.",
           "menu_options": {
+            "other": "Typbezeichnung & was es hat",
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
             "images": "Bilder",
@@ -74,7 +75,7 @@
         },
         "other": {
           "title": "Typbezeichnung & was das Gerät hat",
-          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.\n\n„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Jede andere Kombination funktioniert.\n\nEinen Material-Posten kannst du an jedem Lauf von Hand hinzufügen, egal was das Gerät hat. „Auftrag und Material“ brauchst du also nicht, nur um ab und zu ein Material zu erfassen.",
+          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.\n\n„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Jede andere Kombination funktioniert.\n\nEinen Material-Posten kannst du an jedem Lauf von Hand hinzufügen, egal was das Gerät hat. „Auftrag und Material“ brauchst du also nicht, nur um ab und zu ein Material zu erfassen.\n\nDie Typbezeichnung und was das Gerät hat, kannst du später unter „Gerät neu konfigurieren“ ändern, solange das Gerät keinen offenen Lauf hat. Was du dann einschaltest, wird gleich abgefragt, ebenso eine Strom- oder Wasserquelle, die das Gerät nicht mehr nutzen kann: die Schätzung aus der Durchschnittsleistung, sobald es ein Programm hat, „je Programm“, sobald es keines hat. Was du ausschaltest, verliert seine Geräteeingänge, seine Quelle und seinen Preis; seine Dosierungen, Programmvorgaben und sein Standardmaterial bleiben erhalten, falls du es wieder einschaltest.",
           "data": {
             "type_name": "Typbezeichnung",
             "program": "Programm",
@@ -432,7 +433,8 @@
         "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen."
       },
       "abort": {
-        "reconfigure_successful": "Das Gerät wurde gespeichert."
+        "reconfigure_successful": "Das Gerät wurde gespeichert.",
+        "run_open": "Dieses Gerät hat einen Lauf, der noch offen ist oder gerade beendet wurde und auf die letzten Meldungen seiner Zähler wartet. Was ein Gerät hat, lässt sich bis dahin nicht ändern, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn der Lauf beendet ist; auf seine Zähler wartet er höchstens fünf Minuten."
       }
     }
   },

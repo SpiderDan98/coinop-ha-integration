@@ -15,5 +15,6 @@ What a Device has (its Capabilities) is answered in one place, `capabilities_of`
 - Nothing existing is migrated and no Store changes shape: Devices of shipped Device Types store what they stored before.
 - The two must not be unified by accident. A Capability set in the subentry of a shipped Device Type is ignored, and Other must not get an entry in `CAPABILITIES`.
 - A change to what a choice brings (`CHOICES`) applies to Other Devices added afterwards. Existing ones keep the Capabilities they stored, so removing or renaming a `Capability` needs a migration of the subentries that store it.
+- Changing what an Other Device has later reads the choices back from the stored Capabilities: a choice counts as picked when everything it brings is stored (`picked_choices`). No choice may therefore bring only Capabilities another choice brings too.
 - Without a Program, an Other Device stores the average power Capability too: it is what makes the electricity estimate available, and it is decided when the choices are saved (`chosen_capabilities`), not when they are read.
 - The Type Name is stored the same way and for the same reason; `coinop/devices/list` sends it only for a Device that has one, and the panel groups by it instead of the Device Type's heading.

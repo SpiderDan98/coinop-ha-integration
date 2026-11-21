@@ -146,6 +146,7 @@ async def test_a_device_with_images_stores_them_and_can_reconfigure_them(
     assert "job" not in kiln.data
     result = await start_reconfigure(hass, entry, kiln)
     assert result["menu_options"] == [
+        "other",
         "status",
         "images",
         "consumption",
@@ -167,7 +168,7 @@ async def test_a_part_count_alone_brings_no_step_and_no_section(
 
     assert {"job", "images"}.isdisjoint(kiln.data)
     result = await start_reconfigure(hass, entry, kiln)
-    assert result["menu_options"] == ["status", "consumption", "price", "save"]
+    assert result["menu_options"] == ["other", "status", "consumption", "price", "save"]
 
 
 async def test_a_run_gets_its_thumbnail_and_at_its_end_its_snapshot_without_a_job(

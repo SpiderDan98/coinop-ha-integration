@@ -179,6 +179,12 @@ def chosen_capabilities(choices: Iterable[str]) -> frozenset[Capability]:
     return capabilities | {Capability.AVERAGE_POWER}
 
 
+def picked_choices(capabilities: frozenset[Capability]) -> list[str]:
+    """Those of `CHOICES` an Other Device with these Capabilities has: it stores what
+    its choices brought, not the choices."""
+    return [choice for choice, brings in CHOICES.items() if brings <= capabilities]
+
+
 def capabilities_of(data: Mapping[str, Any]) -> frozenset[Capability]:
     """What the Device with this subentry data has: its Device Type's shipped set, or
     the one stored with an Other Device."""
