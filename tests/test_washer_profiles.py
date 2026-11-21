@@ -637,11 +637,30 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
     ("device_type", "integrations"),
     [
         ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
-        ("washing_machine", "WashData, Miele, Home Connect, LG ThinQ"),
-        ("dishwasher", "WashData, Miele, Home Connect, LG ThinQ"),
-        ("tumble_dryer", "WashData, Miele, Home Connect, LG ThinQ"),
-        ("coffee_machine", "WashData, Miele, Home Connect"),
-        ("oven", "WashData, Miele, Home Connect, LG ThinQ"),
+        (
+            "washing_machine",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ",
+        ),
+        (
+            "dishwasher",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ",
+        ),
+        (
+            "tumble_dryer",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ",
+        ),
+        (
+            "coffee_machine",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+        ),
+        (
+            "oven",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ",
+        ),
     ],
 )
 async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(
