@@ -15,11 +15,11 @@ from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
 from dev.coinop_dev import async_setup
-from dev.coinop_dev.scenarios import async_load
+from dev.coinop_dev.scenarios import PIECES, PRESETS, async_load
 
 from .clock import Clock
 from .devices import configure
-from .test_quick_start import offered
+from .test_quick_start import offered, open_add_device
 from .websocket import PanelClient
 
 DEV = Path(__file__).parents[1] / "dev"
@@ -44,6 +44,13 @@ async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
         assert await async_setup_component(hass, domain, {domain: config[domain]})
 
 
+def test_the_load_service_offers_every_preset_and_piece() -> None:
+    fields = load_yaml_dict(DEV / "coinop_dev" / "services.yaml")["load"]["fields"]
+
+    assert fields["preset"]["selector"]["select"]["options"] == list(PRESETS)
+    assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
+
+
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     """Devices, Materials, Runs and open Runs."""
     runs = (await panel.call("coinop/runs/list"))["runs"]
@@ -61,14 +68,14 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     [
         ("empty", (0, 0, 0, 0)),
         ("quick-start", (0, 0, 0, 0)),
-        ("few-runs", (1, 3, 7, 0)),
-        ("printing-now", (1, 3, 8, 1)),
-        ("two-printers", (2, 5, 60, 0)),
+        ("few-runs", (1, 8, 7, 0)),
+        ("printing-now", (1, 8, 8, 1)),
+        ("two-printers", (2, 8, 17, 0)),
         ("washing-machine", (1, 4, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
 )
-async def test_a_scenario_fills_coinop_from_scratch(
+async def test_a_preset_fills_coinop_from_scratch(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
@@ -81,6 +88,77 @@ async def test_a_scenario_fills_coinop_from_scratch(
 
     assert await counts(panel) == expected
     assert len(hass.config_entries.async_entries("coinop")) == 1
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "expected"),
+    [
+        ("prusa", (1, 8, 7, 0)),
+        ("bambu", (1, 8, 10, 0)),
+        ("washer", (1, 4, 10, 0)),
+        ("irrigation", (1, 0, 6, 0)),
+    ],
+)
+async def test_a_device_with_history_loads_alone(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    expected: tuple[int, int, int, int],
+) -> None:
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == expected
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "label"),
+    [
+        ("anycubic_cloud.3d_printer", "Kobra S1 · Anycubic Cloud & LAN"),
+        ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
+        ("ha_washdata.washing_machine", "Washing machine · WashData"),
+        ("ha_washdata.dishwasher", "Dishwasher · WashData"),
+        (
+            "tesla_wall_connector.ev_charger",
+            "Tesla Wall Connector · Tesla Wall Connector",
+        ),
+    ],
+)
+async def test_a_quick_start_piece_loads_alone(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    label: str,
+) -> None:
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (0, 0, 0, 0)
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    assert [option["label"] for option in offered(result)] == [label, "manual"]
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_all_pieces_load_together_with_their_shared_data_once(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (4, 12, 33, 0)
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalog = await panel.event()
+    assert len(catalog["tags"]) == 6
+    assert len(catalog["templates"]) == 1
+    [entry] = hass.config_entries.async_entries("coinop")
+    assert len(offered(await open_add_device(hass, entry))) == 6
 
 
 @pytest.mark.usefixtures("helpers")
@@ -165,15 +243,22 @@ async def test_the_irrigation_is_listed_under_its_type_name_and_costs_only_its_w
 
 
 @pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    "data", [{"preset": "washing-machine"}, {"pieces": ["washer"]}], ids=str
+)
 async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
-    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    data: dict[str, Any],
 ) -> None:
     """As over REST (`make dev`), whose view awaits the service call in a task."""
     assert await async_setup(hass, {})
     call = hass.services.async_call(
         "coinop_dev",
         "load",
-        {"scenario": "washing-machine"},
+        data,
         blocking=True,
         context=Context(user_id=hass_admin_user.id),
     )
@@ -185,12 +270,16 @@ async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
 
 
 @pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    "data", [{"preset": "washing-machine"}, {"pieces": ["washer"]}], ids=str
+)
 async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_once(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
     files: Path,
     monkeypatch: pytest.MonkeyPatch,
+    data: dict[str, Any],
 ) -> None:
     """Awaiting an executor job that is done already doesn't suspend, so the load can
     reach its first report before Home Assistant tracks the tasks running it."""
@@ -205,7 +294,7 @@ async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_
     call = hass.services.async_call(
         "coinop_dev",
         "load",
-        {"scenario": "washing-machine"},
+        data,
         blocking=True,
         context=Context(user_id=hass_admin_user.id),
     )
@@ -214,6 +303,78 @@ async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_
         await hass.async_create_task(call)
 
     assert await counts(panel) == (1, 4, 10, 0)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_selection(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    # Coin-op set up before the panel connects, without storing a selection.
+    await async_load(hass, "empty", hass_admin_user)
+    assert await async_setup(hass, {})
+    before = await panel.call("coinop_dev/scenarios")
+
+    await load(hass, hass_admin_user, {"preset": "two-printers"})
+    from_preset = await panel.call("coinop_dev/scenarios")
+    await load(hass, hass_admin_user, {"pieces": ["irrigation", "washer"]})
+    picked = await panel.call("coinop_dev/scenarios")
+
+    assert (before["preset"], before["selection"]) == (None, None)
+    assert [
+        (group["device_type"], [piece["name"] for piece in group["pieces"]])
+        for group in before["groups"]
+    ] == [
+        (
+            "3d_printer",
+            ["prusa", "bambu", "anycubic_cloud.3d_printer", "moonraker.3d_printer"],
+        ),
+        ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
+        ("dishwasher", ["ha_washdata.dishwasher"]),
+        ("ev_charger", ["tesla_wall_connector.ev_charger"]),
+        ("other", ["irrigation"]),
+    ]
+    prusa, _, kobra, _ = before["groups"][0]["pieces"]
+    assert (prusa["title"], prusa["section"]) == ("Prusa MK4", "device")
+    assert (kobra["title"], kobra["section"]) == (
+        "Kobra S1 · Anycubic Cloud & LAN",
+        "quick_start",
+    )
+    assert all(piece["description"] for g in before["groups"] for piece in g["pieces"])
+    presets = {preset["name"]: preset for preset in before["presets"]}
+    assert list(presets) == [
+        "empty",
+        "quick-start",
+        "few-runs",
+        "printing-now",
+        "two-printers",
+        "long-history",
+        "washing-machine",
+        "irrigation",
+    ]
+    assert presets["two-printers"]["title"] == "Two printers"
+    assert presets["two-printers"]["selection"] == {"pieces": ["prusa", "bambu"]}
+    assert presets["quick-start"]["selection"]["pieces"] == [
+        "anycubic_cloud.3d_printer",
+        "moonraker.3d_printer",
+        "ha_washdata.washing_machine",
+        "ha_washdata.dishwasher",
+        "tesla_wall_connector.ev_charger",
+    ]
+    assert (from_preset["preset"], from_preset["selection"]) == (
+        "two-printers",
+        {"pieces": ["prusa", "bambu"]},
+    )
+    assert (picked["preset"], picked["selection"]) == (
+        None,
+        {"pieces": ["washer", "irrigation"]},
+    )
+
+
+async def load(hass: HomeAssistant, user: MockUser, data: dict[str, Any]) -> None:
+    await hass.services.async_call(
+        "coinop_dev", "load", data, blocking=True, context=Context(user_id=user.id)
+    )
+    await hass.async_block_till_done()
 
 
 @pytest.mark.usefixtures("helpers")
@@ -396,6 +557,42 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
 
 
+@pytest.mark.usefixtures("helpers")
+async def test_the_next_scenario_resets_the_helpers_left_running(
+    hass: HomeAssistant, hass_admin_user: MockUser, files: Path
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    running: dict[str, str | float] = {
+        "input_select.prusa_status": "printing",
+        "input_text.prusa_job": "Benchy.gcode",
+        "input_select.kobra_status": "printing",
+        "input_number.kobra_power": 120,
+        "input_select.voron_status": "printing",
+        "input_number.voron_filament": 3.2,
+        "input_select.washer_status": "running",
+        "input_select.dishwasher_status": "running",
+        "input_select.irrigation_status": "watering",
+        "input_select.wall_connector_status": "charging",
+    }
+    for entity_id, value in running.items():
+        await set_helper(hass, entity_id, value)
+
+    await async_load(hass, "empty", hass_admin_user)
+
+    assert {entity_id: state(hass, entity_id) for entity_id in running} == {
+        "input_select.prusa_status": "idle",
+        "input_text.prusa_job": "",
+        "input_select.kobra_status": "idle",
+        "input_number.kobra_power": "0.0",
+        "input_select.voron_status": "standby",
+        "input_number.voron_filament": "0.0",
+        "input_select.washer_status": "off",
+        "input_select.dishwasher_status": "off",
+        "input_select.irrigation_status": "off",
+        "input_select.wall_connector_status": "not_connected",
+    }
+
+
 async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     """Add the HA device Quick Start offers as `label`."""
     [entry] = hass.config_entries.async_entries("coinop")
@@ -415,6 +612,12 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     result = await configure(hass, result, {"device": devices[label]})
     result = await configure(hass, result, answers)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+
+def state(hass: HomeAssistant, entity_id: str) -> str:
+    current = hass.states.get(entity_id)
+    assert current is not None
+    return current.state
 
 
 async def set_helper(hass: HomeAssistant, entity_id: str, value: str | float) -> None:

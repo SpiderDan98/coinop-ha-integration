@@ -2,12 +2,12 @@
 
 Usage: uv run scripts/devenv.py <command>
 
-  up [scenario]     build the panel, (re)start the container, load a Scenario and
-                    show Home Assistant's log until Ctrl+C stops it (--detach: keep
-                    it running in the background instead)
+  up [preset]       build the panel, (re)start the container, load a Preset of test
+                    data and show Home Assistant's log until Ctrl+C stops it
+                    (--detach: keep it running in the background instead)
   build             build the panel and reload Coin-op
   restart           restart Home Assistant, e.g. after a change to the Python code
-  scenario <name>   load a Scenario (also in the panel: the flask button at the bottom left)
+  scenario <preset> load a Preset (also in the panel: the flask button at the bottom left)
   logs              follow Home Assistant's log
   down              stop and remove the container
 
@@ -36,18 +36,18 @@ AUTH = ROOT / ".dev" / "auth.json"
 CONTAINER = "coinop-dev"
 URL = "http://127.0.0.1:8124"
 CLIENT_ID = f"{URL}/"
-DEFAULT_SCENARIO = "few-runs"
+DEFAULT_PRESET = "few-runs"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     up = commands.add_parser("up")
-    up.add_argument("scenario", nargs="?", default=DEFAULT_SCENARIO)
+    up.add_argument("preset", nargs="?", default=DEFAULT_PRESET)
     up.add_argument("--detach", action="store_true")
     commands.add_parser("build")
     commands.add_parser("restart")
-    commands.add_parser("scenario").add_argument("name")
+    commands.add_parser("scenario").add_argument("preset")
     commands.add_parser("logs")
     commands.add_parser("down")
     args = parser.parse_args()
@@ -56,9 +56,9 @@ def main() -> None:
             build_panel()
             start()
             if args.detach:
-                prepare(args.scenario)
+                prepare(args.preset)
             else:
-                attached(lambda: prepare(args.scenario, quiet=True))
+                attached(lambda: prepare(args.preset, quiet=True))
         case "build":
             build_panel()
             reload_coinop()
@@ -66,7 +66,7 @@ def main() -> None:
             run("docker", "restart", CONTAINER)
             wait_until_up()
         case "scenario":
-            load(args.name)
+            load(args.preset)
         case "logs":
             os.execvp("docker", ["docker", "logs", "-f", "--tail", "100", CONTAINER])
         case "down":
@@ -118,10 +118,10 @@ def start() -> None:
     )
 
 
-def prepare(scenario: str, *, quiet: bool = False) -> None:
+def prepare(preset: str, *, quiet: bool = False) -> None:
     wait_until_up(quiet=quiet)
     onboard()
-    load(scenario)
+    load(preset)
     print(f"Ready: {URL.replace('127.0.0.1', 'localhost')}/coinop", flush=True)
 
 
@@ -243,12 +243,12 @@ def wait_for_service(domain: str, access: str) -> None:
     sys.exit(f"{domain} did not load; see: uv run scripts/devenv.py logs")
 
 
-def load(scenario: str) -> None:
-    print(f"Loading the Scenario {scenario}", flush=True)
+def load(preset: str) -> None:
+    print(f"Loading the Preset {preset}", flush=True)
     request(
         "POST",
         "/api/services/coinop_dev/load",
-        {"scenario": scenario},
+        {"preset": preset},
         access_token(),
     )
 

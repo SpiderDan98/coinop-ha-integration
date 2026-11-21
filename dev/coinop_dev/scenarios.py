@@ -1,8 +1,9 @@
-"""The Scenarios: Coin-op set up from scratch, then filled through its own websocket
-API the way the panel fills it, so the data goes through the same code as a user's."""
+"""The Scenarios: Coin-op set up from scratch with the picked Pieces, then filled
+through its own websocket API the way the panel fills it, so the data goes through
+the same code as a user's."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -10,7 +11,7 @@ import json
 import logging
 import random
 from types import MappingProxyType
-from typing import Any
+from typing import Any, ClassVar
 
 from homeassistant.auth.models import User
 from homeassistant.components.websocket_api import ActiveConnection
@@ -21,31 +22,14 @@ from homeassistant.util import dt as dt_util
 from PIL import Image, ImageDraw
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
-from custom_components.coinop.device_config import stored_capabilities
+from custom_components.coinop.device_config import DEVICE_TYPES, stored_capabilities
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 # Each Device's inputs are helpers from the dev configuration.yaml.
-PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
-WASHER = "washer"
-DISHWASHER = "dishwasher"
-IRRIGATION = "irrigation"
-# What each stand-in's config flow in dev/ is started with, per device it registers.
-STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
-    "anycubic_cloud": (None,),
-    "moonraker": (None,),
-    "ha_washdata": (None, {"name": "Dishwasher", "device_type": "dishwasher"}),
-    "tesla_wall_connector": (None,),
-}
-KOBRA = "kobra"
-# The Moonraker stand-in's printer, whose idle print state is `standby`.
-VORON = "voron"
-TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
-    WASHER: "Washing machine",
-    IRRIGATION: "Garden valve",
-}
+PRINTERS = {"prusa": 120.0, "bambu": 150.0}
 
 MATERIALS = [
     ("Prusament PLA Galaxy Black", "PLA", "#1d1d24", "Prusa", 29.99),
@@ -176,17 +160,18 @@ class Seed:
         self.api = api
         self.entry = entry
         self.devices = {
-            key: subentry.subentry_id
-            for key, name in TITLES.items()
+            name: subentry.subentry_id
+            for name, piece in PIECES.items()
             for subentry in entry.subentries.values()
-            if subentry.title == name
+            if isinstance(piece, DeviceWithHistory) and subentry.title == piece.title
         }
         self.random = random.Random(42)
         self.now = dt_util.now().replace(second=0, microsecond=0)
         self.materials: dict[str, dict[str, Any]] = {}
+        self.templates: dict[str, dict[str, Any]] = {}
 
-    async def add_materials(self, count: int) -> None:
-        for name, type_, colour, vendor, pack_price in MATERIALS[:count]:
+    async def add_filaments(self) -> None:
+        for name, type_, colour, vendor, pack_price in MATERIALS:
             material = {
                 "name": name,
                 "form": "filament",
@@ -203,6 +188,32 @@ class Seed:
             }
             created = await self.api.call("coinop/materials/create", material=material)
             self.materials[name] = created["material"]
+
+    async def add_laundry(self) -> None:
+        for name, type_, form, density, pack_unit, pack_price, pack_size in LAUNDRY:
+            material = {
+                "name": name,
+                "form": form,
+                "type": type_,
+                "density": density,
+                "price": {
+                    "source": "fixed",
+                    "pack_price": pack_price,
+                    "pack_size": pack_size,
+                    "pack_unit": pack_unit,
+                },
+            }
+            created = await self.api.call("coinop/materials/create", material=material)
+            self.materials[name] = created["material"]
+
+    async def add_tags(self) -> None:
+        for tag in TAGS:
+            await self.api.call("coinop/tags/create", name=tag)
+
+    async def add_template(self) -> None:
+        template = {"label": "Shipping box", "unit_price": 1.5, "basis": "entered"}
+        created = await self.api.call("coinop/templates/create", template=template)
+        self.templates["Shipping box"] = created["template"]
 
     async def add_run(
         self,
@@ -262,28 +273,29 @@ class Seed:
             await runtime.images.async_add(run, ImageKind.THUMBNAIL, data)
 
     async def set_printer(self, printer: str, status: str, job: str = "") -> None:
-        await _async_set_printer(self.hass, printer, status, job)
+        """Set a printer's helpers, as its integration would report a job."""
+        await _async_set(self.hass, f"input_text.{printer}_job", job)
+        await _async_set(self.hass, f"input_select.{printer}_status", status)
 
 
-async def _async_set_printer(
-    hass: HomeAssistant, printer: str, status: str, job: str = ""
-) -> None:
-    """Set a printer's helpers, as its integration would report a job."""
-    await hass.services.async_call(
-        "input_text",
-        "set_value",
-        {"entity_id": f"input_text.{printer}_job", "value": job},
-        blocking=True,
+# The shared data a Piece can need, each created once per load, in this order.
+SHARED: dict[str, Callable[[Seed], Awaitable[None]]] = {
+    "filaments": Seed.add_filaments,
+    "laundry": Seed.add_laundry,
+    "tags": Seed.add_tags,
+    "template": Seed.add_template,
+}
+
+
+async def _async_set(hass: HomeAssistant, entity_id: str, value: str | float) -> None:
+    domain = entity_id.split(".")[0]
+    service, key = (
+        ("select_option", "option")
+        if domain == "input_select"
+        else ("set_value", "value")
     )
-    await _async_select(hass, f"input_select.{printer}_status", status)
-
-
-async def _async_select(hass: HomeAssistant, entity_id: str, option: str) -> None:
     await hass.services.async_call(
-        "input_select",
-        "select_option",
-        {"entity_id": entity_id, "option": option},
-        blocking=True,
+        domain, service, {"entity_id": entity_id, key: value}, blocking=True
     )
 
 
@@ -308,8 +320,7 @@ def _picture(colour: str, shape: int) -> bytes:
     return buffer.getvalue()
 
 
-async def _few_runs(seed: Seed) -> None:
-    await seed.add_materials(3)
+async def _prusa(seed: Seed) -> None:
     black, white, red = (name for name, *_ in MATERIALS[:3])
 
     def ago(days: int) -> datetime:
@@ -374,14 +385,25 @@ async def _few_runs(seed: Seed) -> None:
     )
 
 
-async def _long_history(seed: Seed) -> None:
-    await seed.add_materials(len(MATERIALS))
-    box = (
-        await seed.api.call(
-            "coinop/templates/create",
-            template={"label": "Shipping box", "unit_price": 1.5, "basis": "entered"},
+async def _bambu(seed: Seed) -> None:
+    rng = seed.random
+    names = [name for name, *_ in MATERIALS[:5]]
+    for day in sorted(rng.sample(range(1, 42), 10), reverse=True):
+        hours = round(rng.uniform(0.5, 9), 1)
+        await seed.add_run(
+            "bambu",
+            rng.choice(PARTS),
+            seed.now - timedelta(days=day, hours=rng.randrange(12)),
+            hours,
+            rng.choices(["completed", "failed", "cancelled"], [90, 6, 4])[0],
+            tags=rng.sample(TAGS, rng.choice([0, 1, 2])),
+            material=rng.choice(names),
+            grams=round(hours * rng.uniform(8, 18), 1),
         )
-    )["template"]
+
+
+async def _long_history(seed: Seed) -> None:
+    box = seed.templates["Shipping box"]
     rng = seed.random
     names = [name for name, *_ in MATERIALS]
     day = 730
@@ -422,46 +444,18 @@ async def _long_history(seed: Seed) -> None:
     )
 
 
-async def _two_printers(seed: Seed) -> None:
-    await seed.add_materials(5)
-    rng = seed.random
-    names = [name for name, *_ in MATERIALS[:5]]
-    for printer in ("prusa", "bambu"):
-        for day in sorted(rng.sample(range(1, 120), 30), reverse=True):
-            hours = round(rng.uniform(0.5, 9), 1)
-            await seed.add_run(
-                printer,
-                rng.choice(PARTS),
-                seed.now - timedelta(days=day, hours=rng.randrange(12)),
-                hours,
-                rng.choices(["completed", "failed", "cancelled"], [90, 6, 4])[0],
-                tags=rng.sample(TAGS, rng.choice([0, 1, 2])),
-                material=rng.choice(names),
-                grams=round(hours * rng.uniform(8, 18), 1),
-            )
+async def _printing_now(seed: Seed) -> None:
+    await _prusa(seed)
+    await seed.set_printer("prusa", "printing", "Gridfinity bins 3x2.gcode")
 
 
 async def _washing(seed: Seed) -> None:
-    materials = []
-    for name, type_, form, density, pack_unit, pack_price, pack_size in LAUNDRY:
-        material = {
-            "name": name,
-            "form": form,
-            "type": type_,
-            "density": density,
-            "price": {
-                "source": "fixed",
-                "pack_price": pack_price,
-                "pack_size": pack_size,
-                "pack_unit": pack_unit,
-            },
-        }
-        created = await seed.api.call("coinop/materials/create", material=material)
-        materials.append(created["material"]["id"])
-    detergent, softener, whitener, sheets = materials
+    detergent, softener, whitener, sheets = (
+        seed.materials[name]["id"] for name, *_ in LAUNDRY
+    )
     await seed.api.call(
         "coinop/devices/update_settings",
-        device_id=seed.devices[WASHER],
+        device_id=seed.devices["washer"],
         settings={
             "doses": [
                 {
@@ -523,13 +517,9 @@ async def _washing(seed: Seed) -> None:
         # Reports after the end spare the wait for them.
         await _replay_meters(seed.hass, meters, end + timedelta(minutes=1))
     for key, value in meters.items():
-        await seed.hass.services.async_call(
-            "input_number",
-            "set_value",
-            {"entity_id": f"input_number.{key}", "value": value},
-            blocking=True,
-        )
-    await _async_set_appliance(seed.hass, WASHER, "off", "Wool")
+        await _async_set(seed.hass, f"input_number.{key}", value)
+    await _async_set(seed.hass, "input_select.washer_program", "Wool")
+    await _async_set(seed.hass, "input_select.washer_status", "off")
 
 
 async def _irrigation(seed: Seed) -> None:
@@ -544,16 +534,10 @@ async def _irrigation(seed: Seed) -> None:
         await _replay(seed.hass, "input_select.irrigation_status", "off", end)
         # A report after the end spares the wait for it.
         await _replay_meters(seed.hass, meter, end + timedelta(minutes=1))
-    await seed.hass.services.async_call(
-        "input_number",
-        "set_value",
-        {
-            "entity_id": "input_number.irrigation_water",
-            "value": meter["irrigation_water"],
-        },
-        blocking=True,
+    await _async_set(
+        seed.hass, "input_number.irrigation_water", meter["irrigation_water"]
     )
-    await _async_select(seed.hass, "input_select.irrigation_status", "off")
+    await _async_set(seed.hass, "input_select.irrigation_status", "off")
 
 
 async def _replay_meters(
@@ -580,102 +564,8 @@ async def _replay(
         await asyncio.wait(started)
 
 
-async def _async_set_appliance(
-    hass: HomeAssistant, key: str, status: str, program: str
-) -> None:
-    await _async_select(hass, f"input_select.{key}_program", program)
-    await _async_select(hass, f"input_select.{key}_status", status)
-
-
-async def _printing_now(seed: Seed) -> None:
-    await _few_runs(seed)
-    await seed.set_printer("prusa", "printing", "Gridfinity bins 3x2.gcode")
-
-
-async def _nothing(seed: Seed) -> None:
-    pass
-
-
-async def _quick_start(seed: Seed) -> None:
-    """Two printers, a washing machine, a dishwasher and an EV charger of known
-    integrations, for Add Device's Quick Start to offer."""
-    for domain, devices in STAND_INS.items():
-        for device in devices:
-            await seed.hass.config_entries.flow.async_init(
-                domain, context={"source": SOURCE_USER}, data=device
-            )
-
-
-@dataclass(frozen=True)
-class Scenario:
-    title: str
-    description: str
-    devices: tuple[str, ...]
-    fill: Callable[[Seed], Awaitable[None]]
-
-
-SCENARIOS = {
-    "empty": Scenario("Empty", "The hub without any Device.", (), _nothing),
-    "quick-start": Scenario(
-        "Quick Start",
-        "The hub without any Device, an Anycubic printer, a Moonraker printer "
-        "with its preview camera and a webcam, a washing machine and a dishwasher "
-        "WashData follows, and a Tesla Wall Connector: Add Device offers all five "
-        "in Quick Start, each as its Device Type, with their plug sensors as "
-        "meters and the Wall Connector with its own. The Kobra's, the Voron's, "
-        "the washing machine's, the dishwasher's and the Wall Connector's helpers "
-        "run them.",
-        (),
-        _quick_start,
-    ),
-    "few-runs": Scenario(
-        "3D printer, a few Runs",
-        "One printer, 3 Materials and 7 Runs.",
-        ("prusa",),
-        _few_runs,
-    ),
-    "printing-now": Scenario(
-        "3D printer, printing now",
-        "Like a few Runs, with an open Run; the printer's helpers end it.",
-        ("prusa",),
-        _printing_now,
-    ),
-    "two-printers": Scenario(
-        "Two printers",
-        "Two printers with 30 Runs each over four months.",
-        ("prusa", "bambu"),
-        _two_printers,
-    ),
-    "long-history": Scenario(
-        "Long history",
-        "Two years of Runs on two printers, 8 Materials (one archived), a Line Item Template.",
-        ("prusa", "bambu"),
-        _long_history,
-    ),
-    "washing-machine": Scenario(
-        "Washing machine",
-        "A washer with energy and water meters, a detergent scale and Program "
-        "Defaults; 10 loads over four weeks. Its helpers start the next one.",
-        (WASHER,),
-        _washing,
-    ),
-    "irrigation": Scenario(
-        "Irrigation (Other Device)",
-        'A garden valve under the Type Name "Irrigation": an Other Device with '
-        "water on a water meter and the electricity source None; 6 waterings over "
-        "two weeks, each costing only its water. Its helpers start the next one.",
-        (IRRIGATION,),
-        _irrigation,
-    ),
-}
-
-
-def _device(key: str) -> dict[str, Any]:
-    """The Device's subentry data, as Add Device writes it."""
-    if key == WASHER:
-        return _washer()
-    if key == IRRIGATION:
-        return _garden_valve()
+def _printer(key: str) -> dict[str, Any]:
+    """The printer's subentry data, as Add Device writes it."""
     return {
         "device_type": "3d_printer",
         "printer_device_id": None,
@@ -700,7 +590,7 @@ def _device(key: str) -> dict[str, Any]:
         "images": {"thumbnail": None, "camera": None, "snapshot": False},
         "consumption": {
             "source": "estimate",
-            "running_power": PRINTERS[key][1],
+            "running_power": PRINTERS[key],
             "paused_power": 15.0,
         },
         "price": {"source": "fixed", "value": 0.32},
@@ -772,45 +662,230 @@ def _garden_valve() -> dict[str, Any]:
     }
 
 
-async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
-    """Replace whatever Coin-op holds by the Scenario `name`."""
-    scenario = SCENARIOS[name]
+@dataclass(frozen=True)
+class Piece:
+    group: str
+    title: str
+    description: str
+    # Each helper it uses, with the value loading resets it to, in this order.
+    helpers: Mapping[str, str | float]
+
+
+@dataclass(frozen=True)
+class DeviceWithHistory(Piece):
+    """A Device set up as Add Device sets one up, named as the Piece, with Runs."""
+
+    section: ClassVar[str] = "device"
+    device: Mapping[str, Any]
+    fill: Callable[[Seed], Awaitable[None]]
+    needs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class QuickStartPiece(Piece):
+    """An HA device of a stand-in's config entry, for Quick Start to offer."""
+
+    section: ClassVar[str] = "quick_start"
+    domain: str
+    # What the stand-in's config flow is started with.
+    data: Mapping[str, str] | None = None
+
+    async def fill(self, seed: Seed) -> None:
+        await seed.hass.config_entries.flow.async_init(
+            self.domain, context={"source": SOURCE_USER}, data=self.data
+        )
+
+
+def _printer_helpers(key: str, idle: str = "idle") -> dict[str, str | float]:
+    return {f"input_text.{key}_job": "", f"input_select.{key}_status": idle}
+
+
+PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
+    "prusa": DeviceWithHistory(
+        "3d_printer",
+        "Prusa MK4",
+        "7 Runs over seven weeks on 3 of the 8 filaments, with Tags and Thumbnails.",
+        _printer_helpers("prusa"),
+        device=_printer("prusa"),
+        fill=_prusa,
+        needs=("filaments", "tags", "template"),
+    ),
+    "bambu": DeviceWithHistory(
+        "3d_printer",
+        "Bambu Lab X1C",
+        "10 Runs over six weeks on 5 of the 8 filaments, with Tags and Thumbnails.",
+        _printer_helpers("bambu"),
+        device=_printer("bambu"),
+        fill=_bambu,
+        needs=("filaments", "tags", "template"),
+    ),
+    "anycubic_cloud.3d_printer": QuickStartPiece(
+        "3d_printer",
+        "Kobra S1 · Anycubic Cloud & LAN",
+        "A printer with its plug sensor as meter; the Kobra's helpers run it.",
+        _printer_helpers("kobra") | {"input_number.kobra_power": 0},
+        domain="anycubic_cloud",
+    ),
+    "moonraker.3d_printer": QuickStartPiece(
+        "3d_printer",
+        "Voron 2.4 · Moonraker",
+        "A printer with its preview camera, a webcam and its plug sensor as meter; "
+        "the Voron's helpers run it.",
+        _printer_helpers("voron", "standby")
+        | {"input_number.voron_filament": 0, "input_number.voron_power": 0},
+        domain="moonraker",
+    ),
+    "washer": DeviceWithHistory(
+        "washing_machine",
+        "Washing machine",
+        "Energy and water meters, a detergent scale, 4 laundry products as Doses "
+        "and Program Defaults; 10 loads over four weeks. Its helpers start the next.",
+        {"input_select.washer_status": "off"},
+        device=_washer(),
+        fill=_washing,
+        needs=("laundry",),
+    ),
+    "ha_washdata.washing_machine": QuickStartPiece(
+        "washing_machine",
+        "Washing machine · WashData",
+        "A washing machine WashData follows, with its plug sensor as meter; the "
+        "washing machine's helpers run it.",
+        {"input_select.washer_status": "off"},
+        domain="ha_washdata",
+    ),
+    "ha_washdata.dishwasher": QuickStartPiece(
+        "dishwasher",
+        "Dishwasher · WashData",
+        "A dishwasher WashData follows, with its plug sensor as meter; the "
+        "dishwasher's helpers run it.",
+        {"input_select.dishwasher_status": "off"},
+        domain="ha_washdata",
+        data={"name": "Dishwasher", "device_type": "dishwasher"},
+    ),
+    "tesla_wall_connector.ev_charger": QuickStartPiece(
+        "ev_charger",
+        "Tesla Wall Connector · Tesla Wall Connector",
+        "A charger with its own lifetime energy meter; the Wall Connector's helpers "
+        "run it.",
+        {"input_select.wall_connector_status": "not_connected"},
+        domain="tesla_wall_connector",
+    ),
+    "irrigation": DeviceWithHistory(
+        "other",
+        "Garden valve",
+        'An Other Device under the Type Name "Irrigation" with water on a water '
+        "meter and the electricity source None; 6 waterings over two weeks, each "
+        "costing only its water. Its helpers start the next one.",
+        {"input_select.irrigation_status": "off"},
+        device=_garden_valve(),
+        fill=_irrigation,
+    ),
+}
+
+
+@dataclass(frozen=True)
+class Preset:
+    title: str
+    description: str
+    pieces: tuple[str, ...]
+    # Contents of its own in place of its Devices with history's.
+    fill: Callable[[Seed], Awaitable[None]] | None = None
+
+
+PRESETS = {
+    "empty": Preset("Empty", "The hub without any Device.", ()),
+    "quick-start": Preset(
+        "Quick Start",
+        "The hub without any Device, and every Quick Start Piece: Add Device offers "
+        "each HA device in Quick Start as its Device Type.",
+        tuple(n for n, p in PIECES.items() if isinstance(p, QuickStartPiece)),
+    ),
+    "few-runs": Preset(
+        "3D printer, a few Runs", "The Prusa with its 7 Runs.", ("prusa",)
+    ),
+    "printing-now": Preset(
+        "3D printer, printing now",
+        "Like a few Runs, with an open Run; the printer's helpers end it.",
+        ("prusa",),
+        _printing_now,
+    ),
+    "two-printers": Preset(
+        "Two printers", "The Prusa and the Bambu with their Runs.", ("prusa", "bambu")
+    ),
+    "long-history": Preset(
+        "Long history",
+        "Two years of Runs on two printers, 8 Materials (one archived), a Line Item "
+        "Template.",
+        ("prusa", "bambu"),
+        _long_history,
+    ),
+    "washing-machine": Preset(
+        "Washing machine", "The washing machine with its 10 loads.", ("washer",)
+    ),
+    "irrigation": Preset(
+        "Irrigation (Other Device)",
+        "The garden valve with its 6 waterings.",
+        ("irrigation",),
+    ),
+}
+
+
+def ordered(names: Iterable[str]) -> list[str]:
+    """The Pieces `names` in group, then Piece order."""
+    picked = set(names)
+    return sorted(
+        (name for name in PIECES if name in picked),
+        key=lambda name: DEVICE_TYPES.index(PIECES[name].group),
+    )
+
+
+async def async_load(
+    hass: HomeAssistant, choice: str | Mapping[str, Any], user: User | None
+) -> dict[str, Any]:
+    """Replace whatever Coin-op holds by a Preset or a selection of Pieces; returns
+    the selection loaded."""
+    preset: Preset | None = None
+    if isinstance(choice, str):
+        preset = PRESETS[choice]
+        pieces = ordered(preset.pieces)
+    else:
+        pieces = ordered(choice["pieces"])
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
-    for domain in (COINOP, *STAND_INS):
+    stand_ins = {p.domain for p in PIECES.values() if isinstance(p, QuickStartPiece)}
+    for domain in (COINOP, *stand_ins):
         for old in hass.config_entries.async_entries(domain):
             await hass.config_entries.async_remove(old.entry_id)
-    for key in (*PRINTERS, KOBRA):
-        if hass.states.get(f"input_select.{key}_status"):
-            await _async_set_printer(hass, key, "idle")
-    for key in (WASHER, DISHWASHER):
-        if program := hass.states.get(f"input_select.{key}_program"):
-            await _async_set_appliance(hass, key, "off", program.state)
-    if hass.states.get("input_select.irrigation_status"):
-        await _async_select(hass, "input_select.irrigation_status", "off")
-    if hass.states.get(f"input_select.{VORON}_status"):
-        await _async_set_printer(hass, VORON, "standby")
-        await hass.services.async_call(
-            "input_number",
-            "set_value",
-            {"entity_id": f"input_number.{VORON}_filament", "value": 0},
-            blocking=True,
-        )
+    for piece in PIECES.values():
+        for entity_id, value in piece.helpers.items():
+            if hass.states.get(entity_id):
+                await _async_set(hass, entity_id, value)
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
-    for key in scenario.devices:
+    with_history = [p for n in pieces if isinstance(p := PIECES[n], DeviceWithHistory)]
+    for piece in with_history:
         hass.config_entries.async_add_subentry(
             entry,
             ConfigSubentry(
-                data=MappingProxyType(_device(key)),
+                data=MappingProxyType(dict(piece.device)),
                 subentry_type=SUBENTRY_DEVICE,
-                title=TITLES[key],
+                title=piece.title,
                 unique_id=None,
             ),
         )
     await hass.config_entries.async_setup(entry.entry_id)
-    await scenario.fill(Seed(hass, Api(hass, user), entry))
+    seed = Seed(hass, Api(hass, user), entry)
+    needs = {need for piece in with_history for need in piece.needs}
+    for need, add in SHARED.items():
+        if need in needs:
+            await add(seed)
+    for piece in (PIECES[name] for name in pieces):
+        if not (preset and preset.fill and isinstance(piece, DeviceWithHistory)):
+            await piece.fill(seed)
+    if preset and preset.fill:
+        await preset.fill(seed)
+    return {"pieces": pieces}
 
 
 async def _async_add_hub(hass: HomeAssistant) -> ConfigEntry:
