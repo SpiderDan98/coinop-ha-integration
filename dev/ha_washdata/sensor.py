@@ -12,7 +12,11 @@ from homeassistant.helpers.event import async_track_state_change_event
 from . import DOMAIN
 
 # The helpers' prefix in the dev configuration.yaml, by WashData's device type.
-HELPERS = {"washing_machine": "washdata_washer", "dishwasher": "washdata_dishwasher"}
+HELPERS = {
+    "washing_machine": "washdata_washer",
+    "dishwasher": "washdata_dishwasher",
+    "dryer": "washdata_dryer",
+}
 # The Status helper's words that WashData says differently.
 STATES = {"cancelled": "interrupted"}
 

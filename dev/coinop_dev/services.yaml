@@ -35,10 +35,31 @@ load:
             - moonraker.3d_printer
             - washer
             - ha_washdata.washing_machine
+            - miele.washing_machine
+            - home_connect.washing_machine
+            - home_connect_alt.washing_machine
+            - lg_thinq.washing_machine
+            - smartthings.washing_machine
             - dishwasher
             - ha_washdata.dishwasher
+            - miele.dishwasher
+            - home_connect.dishwasher
+            - homeconnect_ws.dishwasher
+            - lg_thinq.dishwasher
+            - smartthings.dishwasher
             - dryer
+            - ha_washdata.tumble_dryer
+            - miele.tumble_dryer
+            - home_connect.tumble_dryer
+            - lg_thinq.tumble_dryer
+            - smartthings.tumble_dryer
             - coffee
+            - miele.coffee_machine
+            - home_connect.coffee_machine
+            - miele.oven
+            - home_connect.oven
+            - lg_thinq.oven
+            - smartthings.oven
             - tesla_wall_connector.ev_charger
             - evcc_intg.ev_charger
             - ocpp.ev_charger
