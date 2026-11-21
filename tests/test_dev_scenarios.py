@@ -18,6 +18,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
+from custom_components.coinop.profiles import INTEGRATIONS, appliances
 from dev.coinop_dev import async_setup
 from dev.coinop_dev.scenarios import (
     HISTORIES,
@@ -284,65 +285,64 @@ async def test_a_device_with_history_loads_alone(
     assert await counts(panel) == expected
 
 
+def told(domain: str) -> tuple[str | None, ...]:
+    """The Device Types the integration's kind check tells, or None alone where it
+    can't tell any. WashData serves some for manual setup that no kind it keeps is."""
+    integration = INTEGRATIONS[domain]
+    if integration.kind is appliances.cant_tell:
+        return (None,)
+    if integration.kind is appliances.washdata_kind:
+        kinds = set(appliances.WASHDATA_KINDS.values())
+        return tuple(t for t in integration.device_types if t in kinds)
+    return integration.device_types
+
+
+PROFILED_KINDS = [
+    pytest.param(domain, device_type, id=f"{domain}.{device_type or 'asked'}")
+    for domain in INTEGRATIONS
+    for device_type in told(domain)
+]
+
+
 @pytest.mark.usefixtures("helpers")
-@pytest.mark.parametrize(
-    ("piece", "label"),
-    [
-        (
-            "anycubic.3d_printer",
-            "Anycubic Kobra S1 · Anycubic 3D Printer - Local Control",
-        ),
-        ("anycubic_cloud.3d_printer", "Kobra S1 · Anycubic Cloud & LAN"),
-        ("bambu_lab.3d_printer", "P1S · Bambu Lab"),
-        ("prusalink.3d_printer", "Prusa Core One · PrusaLink"),
-        ("octoprint.3d_printer", "OctoPrint · OctoPrint"),
-        ("ha_creality_ws.3d_printer", "K1C · Creality"),
-        ("elegoo_printer.3d_printer", "Centauri Carbon · Elegoo"),
-        ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
-        ("ha_washdata.washing_machine", "Washing machine · WashData"),
-        ("miele.washing_machine", "Miele washing machine · Miele"),
-        ("home_connect.washing_machine", "Siemens washer · Home Connect"),
-        ("home_connect_alt.washing_machine", "Bosch washer · Home Connect Alt"),
-        ("lg_thinq.washing_machine", "WashTower washer · LG ThinQ"),
-        ("smartthings.washing_machine", "Samsung washer · SmartThings"),
-        ("ha_washdata.dishwasher", "Dishwasher · WashData"),
-        ("miele.dishwasher", "Miele dishwasher · Miele"),
-        ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
-        ("homeconnect_ws.dishwasher", "Bosch Dishwasher · Home Connect Local"),
-        ("lg_thinq.dishwasher", "LG dishwasher · LG ThinQ"),
-        ("smartthings.dishwasher", "Samsung dishwasher · SmartThings"),
-        ("ha_washdata.tumble_dryer", "Tumble dryer · WashData"),
-        ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
-        ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
-        ("lg_thinq.tumble_dryer", "WashTower dryer · LG ThinQ"),
-        ("smartthings.tumble_dryer", "Samsung dryer · SmartThings"),
-        ("miele.coffee_machine", "Miele coffee system · Miele"),
-        ("home_connect.coffee_machine", "Siemens coffee maker · Home Connect"),
-        ("miele.oven", "Miele oven · Miele"),
-        ("home_connect.oven", "Siemens oven · Home Connect"),
-        ("lg_thinq.oven", "LG oven · LG ThinQ"),
-        ("smartthings.oven", "Samsung oven · SmartThings"),
-        (
-            "tesla_wall_connector.ev_charger",
-            "Tesla Wall Connector · Tesla Wall Connector",
-        ),
-    ],
-)
-async def test_a_quick_start_piece_loads_alone(
+@pytest.mark.parametrize(("domain", "device_type"), PROFILED_KINDS)
+async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_it_tells(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
     files: Path,
-    piece: str,
-    label: str,
+    domain: str,
+    device_type: str | None,
 ) -> None:
-    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    """Where the integration can't tell the kind, Quick Start asks for it instead."""
+    integration = INTEGRATIONS[domain]
+    pieces = [
+        (name, piece)
+        for name, piece in PIECES.items()
+        if not isinstance(piece, DeviceWithHistory)
+        and piece.domain == domain
+        and device_type in (None, piece.group)
+    ]
+    assert pieces, f"no Quick Start Piece of {domain} for {device_type or 'any kind'}"
+    [(name, piece), *_] = pieces
+    await async_load(hass, {"pieces": [name]}, hass_admin_user)
     await hass.async_block_till_done()
 
     assert await counts(panel) == (0, 0, 0, 0)
     [entry] = hass.config_entries.async_entries("coinop")
-    result = await open_add_device(hass, entry)
-    assert [option["label"] for option in offered(result)] == [label, "manual"]
+    *devices, _ = offered(await open_add_device(hass, entry))
+    assert devices
+    for device in devices:
+        assert device["label"].endswith(f" · {integration.name}")
+        result = await pick(
+            hass, entry, device["value"], None if device_type else piece.group
+        )
+        answers = {"price": 0.32} | (
+            {"meter": PLUG_POWER} if "meter" in fields(result) else {}
+        )
+        result = await configure(hass, result, answers)
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+        assert list(entry.subentries.values())[-1].data["device_type"] == piece.group
 
 
 @pytest.mark.usefixtures("helpers")
