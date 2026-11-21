@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
 from dev.coinop_dev import async_setup
-from dev.coinop_dev.scenarios import PIECES, async_load
+from dev.coinop_dev.scenarios import PIECES, PRESETS, async_load
 
 from .clock import Clock
 from .devices import configure
@@ -42,6 +42,13 @@ async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
     config = await hass.async_add_executor_job(load_yaml_dict, CONFIG)
     for domain in ("input_select", "input_text", "input_number", "template"):
         assert await async_setup_component(hass, domain, {domain: config[domain]})
+
+
+def test_the_load_service_offers_every_preset_and_piece() -> None:
+    fields = load_yaml_dict(DEV / "coinop_dev" / "services.yaml")["load"]["fields"]
+
+    assert fields["preset"]["selector"]["select"]["options"] == list(PRESETS)
+    assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
 
 
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
