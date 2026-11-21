@@ -93,7 +93,7 @@ async def test_add_device_texts_load_in_home_assistant(
 
 
 # The steps only a 3D printer has; every other step is shared between Device Types.
-PRINTER_STEPS = {"job", "material_unit", "images", "estimate"}
+PRINTER_STEPS = {"job", "material_unit", "estimate"}
 
 
 @pytest.mark.parametrize(

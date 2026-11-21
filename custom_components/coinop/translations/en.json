@@ -77,10 +77,14 @@
           "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.",
           "data": {
             "type_name": "Type Name",
+            "images": "Images",
+            "part_count": "Part Count",
             "per_run_meters": "Meters count each Run from 0"
           },
           "data_description": {
             "type_name": "What kind of Device it is, such as “Kiln” or “Pool pump”: the heading the panel lists it under. Devices with the same Type Name share a heading.",
+            "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
+            "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",
             "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset."
           }
         },
@@ -176,7 +180,7 @@
             "snapshot": "Take a Snapshot when a Run ends"
           },
           "data_description": {
-            "thumbnail": "The image entity of the printer integration that shows the model being printed.",
+            "thumbnail": "An image entity that shows what the Run makes, e.g. the preview of the 3D model from the Device's integration.",
             "snapshot": "Only with a camera. Up to three attempts; none when the end of a Run is only noticed later, e.g. after an outage."
           }
         },

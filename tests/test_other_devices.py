@@ -133,7 +133,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
 
     result = await choose_other(hass, entry)
     assert result["step_id"] == "other"
-    assert fields(result) == ["type_name", "per_run_meters"]
+    assert fields(result) == ["type_name", "images", "part_count", "per_run_meters"]
     steps = []
     for user_input in (
         other_input("Kiln"),
