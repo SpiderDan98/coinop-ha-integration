@@ -40,6 +40,9 @@ INTEGRATIONS = {
     "bambu_lab": Integration(
         "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
     ),
+    "octoprint": Integration(
+        "OctoPrint", printers.octoprint, printers.DEVICE_TYPES, printers.KIND
+    ),
     # Appliances
     "ha_washdata": Integration(
         "WashData",
@@ -123,14 +126,20 @@ def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> F
         if entity.platform == config_entry.domain
     ]
 
-    def find(platform: str, *suffixes: str, disabled: bool = False) -> str | None:
+    def find(
+        platform: str, *keys: str, start: bool = False, disabled: bool = False
+    ) -> str | None:
         return next(
             (
                 entity.entity_id
-                for suffix in suffixes
+                for key in keys
                 for entity in candidates
                 if entity.domain == platform
-                and entity.unique_id.endswith(suffix)
+                and (
+                    entity.unique_id.startswith(key)
+                    if start
+                    else entity.unique_id.endswith(key)
+                )
                 and (disabled or not entity.disabled)
             ),
             None,
