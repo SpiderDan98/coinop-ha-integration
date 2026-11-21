@@ -133,16 +133,13 @@ CAPABILITIES = {
     DEVICE_TYPE_ROBOTIC_MOWER: frozenset[Capability](),
 }
 
-# Every Device Type, in the order Add Device lists them. Other has no set here: each
-# of its Devices stores its own (ADR 0009).
+# In Add Device's order. Other has no set: each such Device stores its own (ADR 0009).
 DEVICE_TYPES = (*CAPABILITIES, DEVICE_TYPE_OTHER)
 
-# The subentry keys that say what kind of Device it is; the others are its sections.
-# Only an Other Device stores the last two.
+# The subentry keys that are no section; only an Other Device stores the last two.
 TYPE_KEYS = frozenset({"device_type", "type_name", "capabilities"})
 
-# What an Other Device can have, in the order its step offers the choices, and the
-# Capabilities each choice brings.
+# What an Other Device can have, in its step's order, with what each choice brings.
 CHOICES = {
     "program": frozenset({Capability.PROGRAM, Capability.PROGRAM_CONSUMPTION}),
     "doses": frozenset({Capability.DOSES}),
@@ -163,8 +160,7 @@ def refused_combination(choices: Iterable[str]) -> str | None:
     """Why an Other Device can't have these of `CHOICES` together, as the key of the
     flow's error that explains it; None when it can."""
     picked = frozenset(choices)
-    # A Dose's Material Line Item would stand in for the Run's own one and its Flags,
-    # and the job and the Program would both name the Run.
+    # Job and Program would both name the Run, a Dose replace its own Material Line Item.
     if "job" in picked and picked & {"program", "doses"}:
         return "job_with_program_or_doses"
     return None
