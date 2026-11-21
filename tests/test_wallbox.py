@@ -6,10 +6,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 
-from .chargers import add_wallbox
 from .clock import Clock
 from .devices import ENERGY, add_hub, configure, report_status
-from .registry import HaDevice
+from .registry import HaDevice, add_wallbox
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
 from .test_measured import electricity

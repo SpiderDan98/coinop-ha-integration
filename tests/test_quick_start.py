@@ -8,7 +8,6 @@ from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
-from .anycubic import add_anycubic_local
 from .clock import Clock
 from .devices import (
     ENERGY,
@@ -20,9 +19,9 @@ from .devices import (
     configure,
     walk_to_price,
 )
+from .registry import add_anycubic_local, add_home_connect, add_miele, add_washdata
 from .test_device_flow import fields, suggested
 from .test_runs import stored_runs
-from .washers import add_home_connect, add_miele, add_washdata
 
 WATER_METER = "sensor.washing_machine_water_consumption"
 

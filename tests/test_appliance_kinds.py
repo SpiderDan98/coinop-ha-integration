@@ -10,13 +10,13 @@ import pytest
 
 from .clock import Clock
 from .devices import WASHER_ENERGY, add_hub, configure
+from .registry import add_home_connect, add_miele, add_washdata
 from .test_device_flow import fields
 from .test_measured import electricity
 from .test_quick_start import offered, open_add_device, pick, quick_start
 from .test_runs import stored_runs
 from .test_washer_profiles import WASHDATA_PLACEHOLDERS, walk_pre_filled
 from .test_water import water
-from .washers import add_home_connect, add_miele, add_washdata
 
 WASHDATA_MAPPING = {
     "running": ["running", "ending"],

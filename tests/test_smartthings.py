@@ -9,7 +9,7 @@ import pytest
 
 from .clock import Clock
 from .devices import add_hub, configure, start_add_device, start_reconfigure
-from .smartthings import add_smartthings
+from .registry import add_smartthings
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
 from .test_measured import electricity

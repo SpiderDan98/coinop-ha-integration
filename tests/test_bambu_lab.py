@@ -6,7 +6,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 
-from .bambu_lab import add_bambu_lab
 from .clock import Clock
 from .devices import (
     ENERGY,
@@ -18,7 +17,7 @@ from .devices import (
     report_status,
     start_reconfigure,
 )
-from .registry import HaDevice
+from .registry import HaDevice, add_bambu_lab
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register

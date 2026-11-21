@@ -27,6 +27,7 @@ from .devices import (
     walk_to_consumption,
 )
 from .http import HttpClient
+from .registry import add_miele
 from .test_cost_statement import export
 from .test_device_flow import suggested
 from .test_doses import doses
@@ -41,7 +42,6 @@ from .test_runs import NO_MATERIAL, set_status, stored_runs, value
 from .test_templates import create as create_template
 from .test_washer_profiles import walk_pre_filled
 from .test_water import set_water
-from .washers import add_miele
 from .washing import DOSES, add_washer, set_washer, washed
 from .websocket import PanelClient
 
