@@ -11,6 +11,7 @@ from homeassistant.helpers import device_registry as dr
 from custom_components.coinop.device_config import Target
 
 # `disabled=True` also finds a disabled entity: a kind check reads what is registered.
+# `exclude` passes over unique ids that end in it, such as a longer key ending alike.
 Find = Callable[..., str | None]
 
 

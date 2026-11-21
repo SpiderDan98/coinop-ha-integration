@@ -121,3 +121,36 @@ def bambu_lab(find: Find) -> dict[str, Any]:
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
     }
+
+
+def moonraker(find: Find) -> dict[str, Any]:
+    """marcolivierarsenault/moonraker-home-assistant: unique ids `<entry id>_<key>`."""
+    # The print's state, not the printer's own `state` (ready, shutdown and so on).
+    status = find("sensor", "_print_state")
+    job = find("sensor", "_filename")
+    # This print's measured extrusion; the lifetime total ends in the same key.
+    filament = find("sensor", "_filament_used", exclude="_total_filament_used")
+    # The print's preview, shown only while it prints.
+    thumbnail = find("camera", "_thumbnail")
+    # A webcam is `<entry id>_<webcam name>_<index>`: any camera but the preview.
+    camera = find("camera", "", exclude="_thumbnail")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["printing"],
+                paused=["paused"],
+                finished=["complete"],
+                cancelled=["cancelled"],
+                fault=["error"],
+                ignored=["standby"],
+            ),
+        ),
+        "job": found(job, entity_id=job, attribute=None)
+        | found(
+            filament, material={"entity_id": filament, "attribute": None, "unit": "m"}
+        ),
+        "images": found(thumbnail, thumbnail=thumbnail)
+        | found(camera, camera=camera, snapshot=True),
+    }
