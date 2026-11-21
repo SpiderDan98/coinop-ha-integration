@@ -24,16 +24,18 @@ def energy_meter(
     lifetime: str | None,
     session: str | None,
     session_first: bool = False,
+    start: bool = False,
 ) -> dict[str, Any]:
     """The electricity source: the first of the charger's energy counters that is
     registered and enabled, the lifetime one before the session one.
 
     A lifetime counter avoids the meter reset Flag a session counter gets when it only
     drops once the next session charges. `session_first` is for an integration whose
-    lifetime counter can't be trusted for a Run (one that lags or may never report).
+    lifetime counter can't be trusted for a Run (one that lags or may never report);
+    `start` for one whose unique ids start with the key.
     """
     counters = (session, lifetime) if session_first else (lifetime, session)
-    meter = find("sensor", *(counter for counter in counters if counter))
+    meter = find("sensor", *(counter for counter in counters if counter), start=start)
     return found(
         meter, source=ConsumptionSource.ENERGY.value, entity_id=meter, attribute=None
     )
@@ -240,6 +242,46 @@ def goe_api2(find: Find) -> dict[str, Any]:
             ),
         ),
         "consumption": energy_meter(find, lifetime="_eto", session="_wh"),
+    }
+
+
+def wallbox(find: Find) -> dict[str, Any]:
+    """HA core `wallbox`: unique ids `<key>-<serial>`.
+
+    Its states are `ChargerStatus` in its const.py, English texts that aren't
+    translated. `Disconnected` is both the charger being offline and the car being
+    unplugged, so it is ignored: ending the Run there would split a session at a cloud
+    dropout, and an unplugged charger reports `Ready` next. Its energy counters are
+    all the session's.
+    """
+    status = find("sensor", "status_description-", start=True)
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["Charging"],
+                paused=[
+                    "Discharging",
+                    "Paused",
+                    "Scheduled",
+                    "Waiting for car demand",
+                    "Waiting",
+                    "Waiting in queue by Power Sharing",
+                    "Waiting in queue by Power Boost",
+                    "Waiting in queue by Eco-Smart",
+                    "Waiting MID failed",
+                    "Waiting MID safety margin exceeded",
+                    "Locked, car connected",
+                ],
+                finished=["Ready", "Locked"],
+                fault=["Error"],
+                ignored=["Disconnected", "Updating", "Unknown"],
+            ),
+        ),
+        "consumption": energy_meter(
+            find, lifetime=None, session="added_energy-", start=True
+        ),
     }
 
 
