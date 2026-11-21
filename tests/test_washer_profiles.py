@@ -363,13 +363,13 @@ async def test_a_device_type_no_integration_serves_names_none_and_pre_fills_noth
     )
     result = await configure(hass, result, {"device": "manual"})
 
-    result = await configure(hass, result, {"device_type": "dishwasher"})
+    result = await configure(hass, result, {"device_type": "robotic_mower"})
 
     assert result["step_id"] == "device_without_profile"
     assert not result["description_placeholders"]
     result = await configure(hass, result, {"device": washer.device.id})
     assert result["step_id"] == "name"
-    result = await configure(hass, result, {"name": "Dishwasher"})
+    result = await configure(hass, result, {"name": "Mower"})
     assert result["step_id"] == "status"
     assert suggested(result, "entity_id") is None
 

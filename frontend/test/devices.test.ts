@@ -427,6 +427,72 @@ describe("Devices tab", () => {
     ]);
   });
 
+  it.each([
+    ["en", ["EV chargers", "Robotic mowers"]],
+    ["de", ["Wallboxen", "Mähroboter"]],
+  ])(
+    "lists an EV charger and a robotic mower under their own headings (%s)",
+    async (language, headings) => {
+      const backend = recordedBackend({ language }).reply(LIST, () => ({
+        devices: [recorded.wallbox, recorded.mower],
+      }));
+
+      const panel = await mountPanel(backend, { path: "/devices" });
+
+      expect(
+        queryAll(panel, ".device-type").map((section) => [
+          text(query(section, "h2")),
+          ...queryAll(section, ".device h3").map(text),
+        ]),
+      ).toEqual([
+        [headings[0], "Wallbox"],
+        [headings[1], "Mower"],
+      ]);
+    },
+  );
+
+  it("shows a robotic mower, a Device without Capabilities, with what every Device has", async () => {
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [recorded.mower] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Mower " +
+        "Status sensor.mower_status " +
+        "Consumption source Energy meter sensor.mower_station_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+    await click(panel, iconButton(panel, "Edit settings of Mower"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(queryAll(dialog, ".field .label").map(text)).toEqual([
+      "Tags for new Runs",
+      "Automatic templates",
+    ]);
+    expect(queryAll(dialog, "table")).toEqual([]);
+    expect(backend.calls.map((call) => call.type)).not.toContain(
+      "coinop/devices/measured_suggestions",
+    );
+  });
+
+  it("shows an EV charger without Dose list, Program rows or water", async () => {
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [recorded.wallbox] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Wallbox " +
+        "Status sensor.wallbox_status " +
+        "Consumption source Energy meter sensor.wallbox_session_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+  });
+
   it("names a washing machine's water source and water price, or its unused Program input", async () => {
     const { perProgram } = recorded;
     const water = { attribute: "total", unit: "L", factor: null };

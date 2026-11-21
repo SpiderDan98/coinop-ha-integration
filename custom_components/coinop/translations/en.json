@@ -528,7 +528,9 @@
         "dishwasher": "Dishwasher",
         "tumble_dryer": "Tumble dryer",
         "coffee_machine": "Coffee machine",
-        "oven": "Oven"
+        "oven": "Oven",
+        "ev_charger": "EV charger",
+        "robotic_mower": "Robotic mower"
       }
     }
   }

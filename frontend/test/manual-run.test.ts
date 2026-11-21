@@ -155,6 +155,25 @@ describe("A manual Run", () => {
     ]);
   });
 
+  it.each([
+    ["an EV charger", recorded.wallbox],
+    ["a robotic mower", recorded.mower],
+  ])("asks %s for no Program", async (_, device) => {
+    const backend = creating().reply("coinop/devices/list", () => ({ devices: [device] }));
+    const panel = await mountPanel(backend, RUNS);
+    const dialog = await open(panel);
+    expect(
+      queryAll(dialog, "input[name], select[name]").map((field) => field.getAttribute("name")),
+    ).toEqual(["name", "started", "ended", "outcome"]);
+    await enter(panel, dialog);
+
+    await click(panel, query(dialog, "ha-button.create"));
+
+    const created = backend.calls.find((call) => call.type === CREATE);
+    expect(created).toMatchObject({ device_id: device.id, name: "Bracket" });
+    expect(created).not.toHaveProperty("program");
+  });
+
   it("sends a washing machine's Program, known or typed, which names an unnamed Run", async () => {
     const backend = creating().reply("coinop/devices/list", () => ({
       devices: [recorded.washer],

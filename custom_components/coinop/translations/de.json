@@ -528,7 +528,9 @@
         "dishwasher": "Spülmaschine",
         "tumble_dryer": "Trockner",
         "coffee_machine": "Kaffeemaschine",
-        "oven": "Backofen"
+        "oven": "Backofen",
+        "ev_charger": "Wallbox",
+        "robotic_mower": "Mähroboter"
       }
     }
   }

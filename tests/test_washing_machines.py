@@ -50,6 +50,8 @@ async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> No
         "tumble_dryer",
         "coffee_machine",
         "oven",
+        "ev_charger",
+        "robotic_mower",
     ]
 
 

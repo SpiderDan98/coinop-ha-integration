@@ -218,6 +218,40 @@ async def add_device(
     return subentry
 
 
+async def add_basic_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    device_type: str,
+    name: str,
+    status: str,
+    mapping: dict[str, list[str]],
+    meter: dict[str, Any],
+    source: str = "energy",
+    price: float | dict[str, Any] = 0.30,
+) -> ConfigSubentry:
+    """Walk Add Device to the end for a Device Type with only the sections every
+    Device has: HA device and name, Status, mapping, electricity source and price.
+
+    `source` is "energy" or "power", read from `meter`.
+    """
+    result = await walk_to_mapping(
+        hass, entry, name=name, status=status, device_type=device_type
+    )
+    result = await configure(hass, result, mapping)
+    assert result["step_id"] == "consumption", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    result = await configure(hass, result, meter)
+    assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, price_choice(price))
+    result = await configure(hass, result, price_input(price))
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await hass.async_block_till_done()
+    subentry = list(entry.subentries.values())[-1]
+    assert subentry.title == name
+    return subentry
+
+
 async def add_washing_machine(
     hass: HomeAssistant,
     entry: ConfigEntry,
