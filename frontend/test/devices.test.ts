@@ -419,6 +419,32 @@ describe("Devices tab", () => {
     ]);
   });
 
+  it("lists an Other Device under its new Type Name once it was renamed in Home Assistant", async () => {
+    const [kiln, pool, pond] = recorded.others;
+    let devices = [kiln, pool, pond];
+    const backend = recordedBackend().reply(LIST, () => ({ devices }));
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const groups = () =>
+      queryAll(panel, ".device-type").map((section) => [
+        text(query(section, "h2")),
+        ...queryAll(section, ".device h3").map(text),
+      ]);
+    expect(groups()).toEqual([
+      ["Kiln", "Kiln"],
+      ["Pump", "Pool pump", "Pond pump"],
+    ]);
+
+    devices = [kiln, pool, { ...pond, type_name: "Fountain" }];
+    await click(panel, query(panel, `a.tab[href$="/runs"]`));
+    await click(panel, query(panel, `a.tab[href$="/devices"]`));
+
+    expect(groups()).toEqual([
+      ["Kiln", "Kiln"],
+      ["Pump", "Pool pump"],
+      ["Fountain", "Pond pump"],
+    ]);
+  });
+
   it("shows an Other Device that has nothing with what every Device has", async () => {
     const [kiln] = recorded.others;
     const backend = recordedBackend().reply(LIST, () => ({ devices: [kiln] }));
