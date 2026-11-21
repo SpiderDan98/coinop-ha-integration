@@ -446,10 +446,11 @@ async def test_with_an_open_run_the_entry_is_refused_and_works_once_the_run_ende
     [run] = stored_runs(hass_storage)
     assert line_items(run) == [("electricity", "estimated", 3, "kWh", 0.90)]
     await change_other_device(hass, entry, kiln, type_name="Oven", has=["part_count"])
-    assert entry.subentries[kiln.subentry_id].data == stored | {
-        "type_name": "Oven",
-        "capabilities": ["average_power", "part_count"],
-    }
+    changed = await open_other(hass, entry, kiln)
+    assert suggested(changed, "type_name") == "Oven"
+    assert [choice for choice in CHOICES if suggested(changed, choice)] == [
+        "part_count"
+    ]
 
 
 async def test_a_run_waiting_for_its_meters_last_report_refuses_the_entry_too(
