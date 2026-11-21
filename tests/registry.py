@@ -51,13 +51,15 @@ def add_ha_device(
     entities: dict[str, dict[str, Any]],
     *,
     linked: dict[str, Any] | None = None,
+    via: dr.DeviceEntry | None = None,
     **device: Any,
 ) -> HaDevice:
     """An HA device of `config_entry` (a domain gets a config entry of its own, an
     entry is used as it is) with `entities` by key, made with `entity`.
 
     `device` and `linked` are the HA devices' registry fields; their identifiers
-    default to the domain and the name.
+    default to the domain and the name. `via` is an HA device the new one is linked
+    to, such as a charge point's for one of its connectors.
     """
     if isinstance(config_entry, str):
         mock_entry = MockConfigEntry(domain=config_entry)
@@ -66,18 +68,20 @@ def add_ha_device(
     domain = entry.domain
     devices = dr.async_get(hass)
 
-    def create(fields: dict[str, Any]) -> dr.DeviceEntry:
-        return devices.async_get_or_create(
+    def create(fields: dict[str, Any], parent: dr.DeviceEntry | None) -> dr.DeviceEntry:
+        created = devices.async_get_or_create(
             config_entry_id=entry.entry_id,
             **{"identifiers": {(domain, fields["name"])}} | fields,
         )
-
-    ha_device = create(device)
-    second = None
-    if linked is not None:
-        second = create(linked)
+        if parent is None:
+            return created
         # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
-        devices.async_update_device(second.id, via_device_id=ha_device.id)
+        updated = devices.async_update_device(created.id, via_device_id=parent.id)
+        assert updated is not None
+        return updated
+
+    ha_device = create(device, via)
+    second = None if linked is None else create(linked, ha_device)
 
     def owner(spec: dict[str, Any]) -> dr.DeviceEntry:
         if not spec["linked"]:

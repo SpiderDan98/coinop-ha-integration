@@ -188,25 +188,20 @@ def add_charge_point(
     )
     if connectors == 1:
         return [charger]
-    connector_devices = [
-        add_ha_device(
-            hass,
-            entry,
-            sensors(OCPP_CONNECTOR_METRICS, f"{cpid}.conn{n}"),
-            identifiers={("ocpp", f"{cpid}-conn{n}")},
-            name=f"{cpid} Connector {n}",
-        )
-        for n in range(1, connectors + 1)
+    return [
+        charger,
+        *(
+            add_ha_device(
+                hass,
+                entry,
+                sensors(OCPP_CONNECTOR_METRICS, f"{cpid}.conn{n}"),
+                via=charger.device,
+                identifiers={("ocpp", f"{cpid}-conn{n}")},
+                name=f"{cpid} Connector {n}",
+            )
+            for n in range(1, connectors + 1)
+        ),
     ]
-    devices = dr.async_get(hass)
-    for connector in connector_devices:
-        # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
-        updated = devices.async_update_device(
-            connector.device.id, via_device_id=charger.device.id
-        )
-        assert updated is not None
-        connector.device = updated
-    return [charger, *connector_devices]
 
 
 def _charger(
