@@ -1062,10 +1062,10 @@ async def test_record_other_devices_and_a_firing(
     estimates its electricity, and a pool pump and a pond pump (both "Pump") whose
     meters count each Run from 0; and a firing of the kiln."""
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
-    pool = await add_pump(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
+    pool = await add_pump(hass, entry=entry)
     pond = await add_pump(
-        hass, entry, name="Pond pump", status="sensor.pond_pump_status"
+        hass, entry=entry, name="Pond pump", status="sensor.pond_pump_status"
     )
     await fire(hass, clock)
 

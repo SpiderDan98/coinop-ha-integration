@@ -15,6 +15,7 @@ import pytest
 from .clock import Clock
 from .devices import (
     BASIC_DATA,
+    CHOICES,
     OTHER_MAPPING,
     POWER,
     add_hub,
@@ -23,6 +24,7 @@ from .devices import (
     configure,
     open_other,
     other_input,
+    save,
     start_reconfigure,
     walk_to_mapping,
 )
@@ -52,10 +54,8 @@ from .test_other_images_and_parts import (
     KILN_THUMBNAIL,
     add_kiln_camera,
     add_kiln_thumbnail,
-    add_kiln_with,
 )
 from .test_other_jobs import (
-    CHOICES,
     MDF,
     PLYWOOD,
     ROUTER_JOB,
@@ -65,25 +65,26 @@ from .test_other_jobs import (
 )
 from .test_other_programs import (
     BREAD_MAKER_PROGRAM,
-    ROWS,
+    BREAD_ROWS,
     add_bread_maker,
     bake,
-    line_items,
 )
 from .test_other_water import (
+    ON_ITS_METER,
     VALVE_WATER,
     add_irrigation,
     irrigate,
     set_valve,
     set_valve_water,
 )
+from .test_ovens import line_items
 from .test_program_consumption import approx
 from .test_program_correction import costs
 from .test_runs import stored_runs
 from .test_water import water
 from .websocket import PanelClient
 
-TWIN_STATUS = "sensor.twin_status"
+SECOND_KILN_STATUS = "sensor.second_kiln_status"
 
 
 async def add_shipped(
@@ -110,15 +111,20 @@ async def add_shipped(
     return list(entry.subentries.values())[-1]
 
 
+async def shipped_device_types(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
+    """The Device Types Add Device offers besides Other."""
+    add_device = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": "user"}
+    )
+    return [t for t in offered(add_device, "device_type") if t != "other"]
+
+
 async def test_only_an_other_devices_reconfigure_menu_offers_its_type_name_and_what_it_has(
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
-    add_device = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
-    shipped = [t for t in offered(add_device, "device_type") if t != "other"]
+    kiln = await add_kiln(hass, entry=entry)
+    shipped = await shipped_device_types(hass, entry)
     assert len(shipped) == 8
 
     result = await start_reconfigure(hass, entry, kiln)
@@ -133,7 +139,7 @@ async def test_the_entry_shows_the_type_name_and_what_the_device_has_now(
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     kettle = await add_other_device(
         hass,
         entry,
@@ -184,7 +190,7 @@ async def test_renaming_the_type_name_alone_moves_the_device_under_the_new_headi
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln_with(hass, "images", "part_count", entry=entry)
+    kiln = await add_kiln(hass, entry=entry, has=["images", "part_count"])
     [before] = (await panel.call("coinop/devices/list"))["devices"]
     assert before["type_name"] == "Kiln"
 
@@ -199,8 +205,7 @@ async def test_renaming_the_type_name_alone_moves_the_device_under_the_new_headi
         "reconfigure",
         ["other", "status", "images", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
 
     [after] = (await panel.call("coinop/devices/list"))["devices"]
     assert after == before | {"type_name": "Pottery kiln"}
@@ -212,19 +217,13 @@ async def test_adding_water_walks_its_source_and_price_and_the_next_run_gets_wat
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
     valve = await add_irrigation(
-        hass, entry, has=[], source="estimate", running_power=10
+        hass, entry=entry, has=[], source="estimate", running_power=10
     )
     await irrigate(hass, clock, start=1000, litres=120)
 
     result = await open_other(hass, entry, valve)
     steps = []
-    for user_input in (
-        other_input("Irrigation", ["water"]),
-        {"next_step_id": "water_meter"},
-        {"entity_id": VALVE_WATER},
-        {"next_step_id": "water_fixed_price"},
-        {"price": 4.0},
-    ):
+    for user_input in (other_input("Irrigation", ["water"]), *ON_ITS_METER):
         result = await configure(hass, result, user_input)
         steps.append(result["step_id"])
     assert steps == [
@@ -243,8 +242,7 @@ async def test_adding_water_walks_its_source_and_price_and_the_next_run_gets_wat
         "water_price",
         "save",
     ]
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await irrigate(hass, clock, start=1120, litres=80)
 
     before, after = stored_runs(hass_storage)
@@ -259,7 +257,7 @@ async def test_removing_water_drops_its_sections_and_the_next_run_records_no_wat
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, source="estimate", running_power=10)
+    valve = await add_irrigation(hass, entry=entry, source="estimate", running_power=10)
     await irrigate(hass, clock, start=1000, litres=120)
 
     result = await open_other(hass, entry, valve)
@@ -268,8 +266,7 @@ async def test_removing_water_drops_its_sections_and_the_next_run_records_no_wat
         "reconfigure",
         ["other", "status", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await irrigate(hass, clock, start=1120, litres=80)
 
     assert sorted(entry.subentries[valve.subentry_id].data) == sorted(
@@ -285,7 +282,7 @@ async def test_adding_a_program_asks_a_device_on_the_estimate_for_its_electricit
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
 
     result = await open_other(hass, entry, kiln)
     result = await configure(hass, result, other_input("Kiln", ["program"]))
@@ -300,8 +297,7 @@ async def test_adding_a_program_asks_a_device_on_the_estimate_for_its_electricit
         "reconfigure",
         ["other", "status", "program", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await panel.call(
         "coinop/devices/update_settings",
         device_id=kiln.subentry_id,
@@ -352,8 +348,7 @@ async def test_removing_the_program_asks_for_every_source_that_was_per_program_a
         "reconfigure",
         ["other", "status", "consumption", "price", "water", "water_price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await set_kiln(hass, "on")
     await clock.advance(minutes=90)
     await set_valve_water(hass, 1025)
@@ -379,16 +374,19 @@ async def test_a_power_sensors_gaps_are_filled_from_the_average_power_only_witho
 ) -> None:
     """A kiln that got its Program later and one added with it, on one power sensor."""
     await set_power(hass, 0)
-    hass.states.async_set(TWIN_STATUS, "off")
+    hass.states.async_set(SECOND_KILN_STATUS, "off")
     entry = await add_hub(hass)
     kiln = await add_kiln(
-        hass, entry, source="power", meter={"entity_id": POWER, "running_power": 1800}
+        hass,
+        entry=entry,
+        source="power",
+        meter={"entity_id": POWER, "running_power": 1800},
     )
     twin = await add_kiln(
         hass,
-        entry,
+        entry=entry,
         name="Twin",
-        status=TWIN_STATUS,
+        status=SECOND_KILN_STATUS,
         has=["program"],
         source="power",
         meter={"entity_id": POWER},
@@ -400,14 +398,14 @@ async def test_a_power_sensors_gaps_are_filled_from_the_average_power_only_witho
     result = await configure(hass, result, {"next_step_id": "power"})
     assert fields(result) == ["entity_id", "attribute"]
     await set_power(hass, 1000)
-    for status in (KILN_STATUS, TWIN_STATUS):
+    for status in (KILN_STATUS, SECOND_KILN_STATUS):
         hass.states.async_set(status, "on")
     await clock.advance(minutes=30)
     await set_power(hass, STATE_UNAVAILABLE)
     await clock.advance(minutes=30)
     await set_power(hass, 1000)
     await clock.advance(minutes=30)
-    for status in (KILN_STATUS, TWIN_STATUS):
+    for status in (KILN_STATUS, SECOND_KILN_STATUS):
         hass.states.async_set(status, "off")
     await set_power(hass, 0)
 
@@ -432,7 +430,7 @@ async def test_with_an_open_run_the_entry_is_refused_and_works_once_the_run_ende
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     stored = dict(kiln.data)
     await set_kiln(hass, "on")
     await clock.advance(minutes=30)
@@ -460,7 +458,7 @@ async def test_a_run_waiting_for_its_meters_last_report_refuses_the_entry_too(
     Water Line Item."""
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     await set_valve(hass, "on")
     await clock.advance(minutes=20)
     await set_valve_water(hass, 1120)
@@ -482,7 +480,7 @@ async def test_a_run_that_starts_while_the_choices_are_changed_refuses_them(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     stored = dict(valve.data)
     form = await open_other(hass, entry, valve)
     menu = await configure(
@@ -492,8 +490,7 @@ async def test_a_run_that_starts_while_the_choices_are_changed_refuses_them(
     await set_valve(hass, "on")
 
     submitted = await configure(hass, form, other_input("Irrigation"))
-    saved = await configure(hass, menu, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    saved = await save(hass, menu)
 
     for refused in (submitted, saved):
         assert (refused["type"], refused["reason"]) == (
@@ -515,7 +512,7 @@ async def test_an_open_run_refuses_the_change_while_coinop_is_not_loaded_too(
     """The Run goes on when Coin-op loads again, so it must find its water."""
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     stored = dict(valve.data)
     menu = await configure(
         hass, await open_other(hass, entry, valve), other_input("Irrigation")
@@ -525,8 +522,7 @@ async def test_an_open_run_refuses_the_change_while_coinop_is_not_loaded_too(
     await hass.config_entries.async_unload(entry.entry_id)
 
     opened = await open_other(hass, entry, valve)
-    saved = await configure(hass, menu, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    saved = await save(hass, menu)
 
     for refused in (opened, saved):
         assert (refused["type"], refused["reason"]) == (
@@ -548,7 +544,7 @@ async def test_without_readable_runs_an_unloaded_coinop_refuses_the_change_in_it
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     await hass.config_entries.async_unload(entry.entry_id)
     hass_storage["coinop.live"]["version"] += 1
 
@@ -565,7 +561,7 @@ async def test_leaving_halfway_through_the_sections_a_change_brings_changes_noth
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, has=[])
+    valve = await add_irrigation(hass, entry=entry, has=[])
     stored = dict(valve.data)
 
     result = await open_other(hass, entry, valve)
@@ -594,8 +590,7 @@ async def test_job_and_material_goes_and_comes_back_with_its_default_material(
         "reconfigure",
         ["other", "status", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     assert "job" not in entry.subentries[router.subentry_id].data
     [without] = (await panel.call("coinop/devices/list"))["devices"]
     await cut(hass, clock, "Tray.gcode", grams=300)
@@ -611,8 +606,7 @@ async def test_job_and_material_goes_and_comes_back_with_its_default_material(
         "reconfigure",
         ["other", "status", "job", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await cut(hass, clock, "Shelf.gcode", grams=500)
 
     [again] = (await panel.call("coinop/devices/list"))["devices"]
@@ -647,7 +641,7 @@ async def test_images_added_later_give_a_run_its_thumbnail_and_snapshot_until_re
     await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     await fire(hass, clock)
 
     result = await open_other(hass, entry, kiln)
@@ -660,8 +654,7 @@ async def test_images_added_later_give_a_run_its_thumbnail_and_snapshot_until_re
         "reconfigure",
         ["other", "status", "images", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await fire(hass, clock)
     await change_other_device(hass, entry, kiln, has=[])
     await fire(hass, clock)
@@ -683,7 +676,7 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    bread_maker = await add_bread_maker(hass, panel, entry, source="energy")
+    bread_maker = await add_bread_maker(hass, panel, entry=entry, source="energy")
     await bake(hass, clock, "Whole wheat", kwh=0.6)
 
     result = await open_other(hass, entry, bread_maker)
@@ -693,8 +686,7 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
         "reconfigure",
         ["other", "status", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     assert "program" not in entry.subentries[bread_maker.subentry_id].data
     [without] = (await panel.call("coinop/devices/list"))["devices"]
     await bake(hass, clock, kwh=0.6)
@@ -707,13 +699,12 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
         "reconfigure",
         ["other", "status", "program", "consumption", "price", "save"],
     )
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     await bake(hass, clock, kwh=0.6)
 
     [again] = (await panel.call("coinop/devices/list"))["devices"]
-    assert without["settings"]["program_defaults"] == ROWS
-    assert again["settings"]["program_defaults"] == ROWS
+    assert without["settings"]["program_defaults"] == BREAD_ROWS
+    assert again["settings"]["program_defaults"] == BREAD_ROWS
     assert [(run.get("program"), run["name"]) for run in stored_runs(hass_storage)] == [
         ("Whole wheat", "Whole wheat"),
         (None, None),
@@ -780,7 +771,7 @@ async def test_a_part_count_is_given_to_the_runs_started_while_the_device_has_on
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
 
     await fire(hass, clock)
     await change_other_device(hass, entry, kiln, has=["part_count"])
@@ -795,7 +786,7 @@ async def test_meters_count_each_run_from_0_only_while_the_device_says_so(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     entry = await add_hub(hass)
-    pool_pump = await add_pump(hass, entry)
+    pool_pump = await add_pump(hass, entry=entry)
 
     await pump(hass, clock, 1.6)
     await clock.advance(hours=20)
@@ -844,8 +835,7 @@ async def test_a_change_that_removes_and_adds_walks_what_is_new_and_asked_again_
         "water",
         "save",
     ]
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     hass.states.async_set(ROUTER_JOB, "Mash_Paddle.gcode")
     await brew(hass, clock, "Stout")
 
@@ -884,7 +874,7 @@ async def test_job_and_material_is_refused_with_a_program_or_doses_as_in_add_dev
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     mixes = [
         mix
         for size in range(len(CHOICES) + 1)

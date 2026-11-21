@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
 import { click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
+import { headers, input, openDialog } from "./settings-dialog";
 
 const LIST = "coinop/devices/list";
 const SETTINGS = "coinop/devices/update_settings";
@@ -19,13 +20,6 @@ const backendWith = (washer = recorded.perProgram) =>
       settings: { ...washer.settings, ...(msg.settings as object) },
     }));
 const washerCard = (panel: Element) => queryAll(panel, ".device")[1] as HTMLElement;
-const openDialog = async (panel: Element) => {
-  await click(panel, iconButton(panel, "Edit settings of Washer"));
-  return query(panel, ".settings-dialog");
-};
-const headers = (dialog: Element) => queryAll(dialog, ".program-defaults th").map(text);
-const input = (root: Element, label: string) =>
-  query(root, `input[aria-label="${label}"]`) as HTMLInputElement;
 
 describe("Electricity and water per Program", () => {
   it("name the source on the card", async () => {
@@ -38,7 +32,7 @@ describe("Electricity and water per Program", () => {
 
   it("have kWh and litres columns in the Program Defaults, Default row included", async () => {
     const panel = await mountPanel(backendWith(), { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.perProgram);
 
     expect(headers(dialog)).toEqual(["Program", "Electricity (kWh)", "Water (L)"]);
     expect(input(dialog, "Default kWh").value).toBe("0.9");
@@ -55,7 +49,7 @@ describe("Electricity and water per Program", () => {
   it("store a value entered and drop one cleared", async () => {
     const backend = backendWith();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.perProgram);
 
     await fill(panel, input(dialog, "kWh for Wool"), "0.5");
     await fill(panel, input(dialog, "Default litres"), "");
@@ -73,7 +67,7 @@ describe("Electricity and water per Program", () => {
   it("leave out litres for a washing machine without water, keeping kWh beside the Doses", async () => {
     const backend = backendWith(recorded.washer);
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.perProgram);
     expect(headers(dialog)).toEqual([
       "Program",
       "Electricity (kWh)",

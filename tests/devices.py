@@ -16,6 +16,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.coinop.const import DOMAIN
 
+from .clock import Clock
+
 STATUS = "sensor.kobra_status"
 ENERGY = "sensor.kobra_plug_energy"
 POWER = "sensor.kobra_plug_power"
@@ -200,19 +202,12 @@ async def add_device(
         result = await configure(hass, result, {"unit": material_unit})
     assert result["step_id"] == "images", result.get("errors")
     result = await configure(hass, result, images_input(thumbnail, camera, snapshot))
-    assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source == "estimate":
-        estimate = {"running_power": running_power}
-        if paused_power is not None:
-            estimate["paused_power"] = paused_power
-        result = await configure(hass, result, estimate)
-    elif source != "none":
-        result = await configure(hass, result, meter)
-    if source != "none":
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    estimate = {"running_power": running_power} | (
+        {} if paused_power is None else {"paused_power": paused_power}
+    )
+    result = await answer_electricity(
+        hass, result, source, estimate if source == "estimate" else meter, price
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -246,12 +241,7 @@ async def add_basic_device(
         "consumption",
         ["energy", "power", "none"],
     ), result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source != "none":
-        result = await configure(hass, result, meter)
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    result = await answer_electricity(hass, result, source, meter, price)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -297,6 +287,44 @@ def coinop_entities(entity_registry: er.EntityRegistry) -> list[str]:
 
 
 OTHER_MAPPING = {"running": ["on"], "ended": ["off"]}
+# Every choice the `other` step offers, in its order.
+CHOICES = (
+    "program",
+    "doses",
+    "water",
+    "job",
+    "images",
+    "part_count",
+    "per_run_meters",
+)
+
+
+async def report_status(hass: HomeAssistant, entity_id: str, status: str) -> None:
+    """Report `status` on a Device's Status entity and let Coin-op follow it."""
+    hass.states.async_set(entity_id, status)
+    await hass.async_block_till_done()
+
+
+async def settle(hass: HomeAssistant) -> None:
+    """Wait once more after a Run's end: older Home Assistant needs a second pass
+    for the Run event's listeners."""
+    await hass.async_block_till_done()
+
+
+async def run_once(
+    hass: HomeAssistant,
+    clock: Clock,
+    status: str,
+    *,
+    minutes: float,
+    running: str = "on",
+    ended: str = "off",
+) -> None:
+    """A Run on the Status entity `status`: `running` for `minutes`, then `ended`."""
+    await report_status(hass, status, running)
+    await clock.advance(minutes=minutes)
+    await report_status(hass, status, ended)
+    await settle(hass)
 
 
 def other_input(type_name: str, has: Iterable[str] = ()) -> dict[str, Any]:
@@ -370,16 +398,10 @@ async def add_other_device(
     if "program" in has:
         assert result["step_id"] == "program", result.get("errors")
         result = await configure(hass, result, program or {})
-    assert result["step_id"] == "consumption", result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source == "estimate":
-        result = await configure(hass, result, {"running_power": running_power})
-    elif source not in ("per_program", "none"):
-        result = await configure(hass, result, meter)
-    if source != "none":
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    estimate = {"running_power": running_power}
+    result = await answer_electricity(
+        hass, result, source, estimate if source == "estimate" else meter, price
+    )
     if "water" in has:
         result = await answer_water(hass, result, water, water_meter, water_price)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
@@ -387,6 +409,27 @@ async def add_other_device(
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+async def answer_electricity(
+    hass: HomeAssistant,
+    result: Any,
+    source: str,
+    meter: dict[str, Any] | None,
+    price: float | dict[str, Any],
+) -> Any:
+    """Answer Add Device's electricity steps from the source menu `result`: the
+    `source`, its step's input `meter` unless it is "per_program" or "none" (for
+    "estimate" the average powers), and the `price` unless it is "none"."""
+    assert result["step_id"] == "consumption", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    if source not in ("per_program", "none"):
+        result = await configure(hass, result, meter)
+    if source != "none":
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
+    return result
 
 
 async def answer_water(
@@ -450,14 +493,9 @@ async def add_washing_machine(
     result = await configure(hass, result, mapping)
     assert result["step_id"] == "program", result.get("errors")
     result = await configure(hass, result, program or {})
-    assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source not in ("per_program", "none"):
-        result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
-    if source != "none":
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    result = await answer_electricity(
+        hass, result, source, meter or {"entity_id": WASHER_ENERGY}, price
+    )
     if water is not None:
         result = await answer_water(
             hass, result, water, water_meter or {"entity_id": WASHER_WATER}, water_price
@@ -526,7 +564,13 @@ async def reconfigure(
     for user_input in inputs:
         result = await configure(hass, result, user_input)
     assert result["step_id"] == "reconfigure", result.get("errors")
-    result = await configure(hass, result, {"next_step_id": "save"})
+    return await save(hass, result)
+
+
+async def save(hass: HomeAssistant, menu: Any) -> Any:
+    """Choose Save in the reconfigure menu; returns what answers, a refusal included,
+    once the hub entry reloaded."""
+    result = await configure(hass, menu, {"next_step_id": "save"})
     await hass.async_block_till_done()
     return result
 

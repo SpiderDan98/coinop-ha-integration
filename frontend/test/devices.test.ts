@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Material } from "../src/api";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
+import { openDialog, rows } from "./settings-dialog";
 
 const SUBSCRIBE = "coinop/runs/subscribe";
 const LIST = "coinop/devices/list";
@@ -862,18 +863,13 @@ describe("A washing machine's Program rows", () => {
       .reply(SETTINGS, (msg) => ({
         settings: { ...recorded.washer.settings, ...(msg.settings as object) },
       }));
-  const openDialog = async (panel: Element) => {
-    await click(panel, iconButton(panel, "Edit settings of Washer"));
-    return query(panel, ".settings-dialog");
-  };
-  const rows = (dialog: Element) => queryAll(dialog, ".program-defaults tbody tr").map(text);
   const amount = (root: Element, dose: string, program: string) =>
     query(root, `input[aria-label="${dose} for ${program}"]`) as HTMLInputElement;
 
   it("are suggested from the known Programs and stored once a value is entered", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
     expect(rows(dialog)).toEqual([
       "Default",
       "Cotton 60° Suggested",
@@ -901,7 +897,7 @@ describe("A washing machine's Program rows", () => {
   it("store nothing for a suggestion that stays empty", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await fill(panel, amount(dialog, "Colour pods", "Cotton 60°"), "");
     await click(panel, query(dialog, "ha-button.save"));
@@ -912,7 +908,7 @@ describe("A washing machine's Program rows", () => {
   it("are added and removed by hand", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await fill(panel, query(dialog, ".program-defaults > input"), " Rinse ");
     await click(panel, iconButton(dialog, "Remove the row of Wool"));
@@ -941,7 +937,7 @@ describe("A washing machine's Program rows", () => {
   it("lose a removed Dose's amounts", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await click(panel, iconButton(dialog, "Remove Liquid detergent"));
     await click(panel, query(dialog, "ha-button.save"));
@@ -970,7 +966,7 @@ describe("A washing machine's Program rows", () => {
   it("show the mean kWh of measured Runs beside the cells that have one", async () => {
     const backend = suggesting();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     expect(backend.sent(SUGGESTIONS)).toEqual([{ type: SUGGESTIONS, device_id: "device-washer" }]);
     expect(text(query(cell(dialog, "Default kWh"), ".suggestion"))).toBe("Ø 1.2 kWh · 1 Run");
@@ -986,7 +982,7 @@ describe("A washing machine's Program rows", () => {
   it("apply a measured suggestion with a click, stored on save", async () => {
     const backend = suggesting();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await click(panel, query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"));
     expect(
@@ -1011,7 +1007,7 @@ describe("A washing machine's Program rows", () => {
       throw new WsError("not_found");
     });
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     expect(queryAll(dialog, ".suggestion")).toEqual([]);
     expect(rows(dialog)[0]).toBe("Default");

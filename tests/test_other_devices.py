@@ -23,6 +23,8 @@ from .devices import (
     price_choice,
     price_input,
     reconfigure,
+    report_status,
+    run_once,
     start_reconfigure,
     walk_to_mapping,
 )
@@ -43,12 +45,11 @@ CYCLE_ENERGY = "sensor.pool_pump_cycle_energy"
 
 
 async def set_kiln(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(KILN_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, KILN_STATUS, status)
 
 
 async def add_kiln(
-    hass: HomeAssistant, entry: ConfigEntry | None = None, **options: Any
+    hass: HomeAssistant, *, entry: ConfigEntry | None = None, **options: Any
 ) -> ConfigSubentry:
     """A kiln, off, in EUR at 0.30 per kWh: an Other Device with the Type Name "Kiln"
     that has nothing, estimating its electricity from 2 kW unless `options` say
@@ -64,18 +65,16 @@ async def add_kiln(
     return await add_other_device(hass, entry or await add_hub(hass), **kiln | options)
 
 
-async def fire(hass: HomeAssistant, clock: Clock, *, minutes: float = 90) -> None:
-    """A firing of `minutes`, after which the kiln is off again."""
-    await set_kiln(hass, "on")
-    await clock.advance(minutes=minutes)
-    await set_kiln(hass, "off")
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+async def fire(
+    hass: HomeAssistant, clock: Clock, kiln: str = KILN_STATUS, *, minutes: float = 90
+) -> None:
+    """A firing of `minutes`, after which the kiln (by its Status entity) is off
+    again."""
+    await run_once(hass, clock, kiln, minutes=minutes)
 
 
 async def set_pump(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(PUMP_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, PUMP_STATUS, status)
 
 
 async def set_cycle(hass: HomeAssistant, kwh: float) -> None:
@@ -84,7 +83,7 @@ async def set_cycle(hass: HomeAssistant, kwh: float) -> None:
 
 
 async def add_pump(
-    hass: HomeAssistant, entry: ConfigEntry | None = None, **options: Any
+    hass: HomeAssistant, *, entry: ConfigEntry | None = None, **options: Any
 ) -> ConfigSubentry:
     """A pool pump, off, in EUR at 0.30 per kWh: an Other Device with the Type Name
     "Pump" on its cycle energy sensor at 0, whose meters count each Run from 0 unless
@@ -184,7 +183,7 @@ async def test_the_type_name_is_required_and_stored_trimmed(
         "other",
         {"type_name": "type_name_required"},
     )
-    kiln = await add_kiln(hass, entry, type_name="  Kiln ")
+    kiln = await add_kiln(hass, entry=entry, type_name="  Kiln ")
     assert kiln.data["type_name"] == "Kiln"
 
 
@@ -195,9 +194,13 @@ async def test_the_type_names_of_other_devices_are_suggested_and_a_new_one_accep
     result = await choose_other(hass, entry)
     # With nothing to suggest, the Type Name is a plain text field.
     assert "options" not in result["data_schema"].schema["type_name"].config
-    await add_kiln(hass, entry)
-    await add_kiln(hass, entry, name="Small kiln", status="sensor.small_kiln_status")
-    await add_kiln(hass, entry, type_name="Pump", name="Pool pump", status=PUMP_STATUS)
+    await add_kiln(hass, entry=entry)
+    await add_kiln(
+        hass, entry=entry, name="Small kiln", status="sensor.small_kiln_status"
+    )
+    await add_kiln(
+        hass, entry=entry, type_name="Pump", name="Pool pump", status=PUMP_STATUS
+    )
 
     result = await choose_other(hass, entry)
 
@@ -260,7 +263,7 @@ async def test_reconfiguring_an_other_device_offers_its_sections_and_no_detect_a
 ) -> None:
     washer = add_miele(hass)
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry, device=washer.device.id)
+    kiln = await add_kiln(hass, entry=entry, device=washer.device.id)
 
     result = await start_reconfigure(hass, entry, kiln)
 
@@ -271,7 +274,7 @@ async def test_reconfiguring_a_section_leaves_the_type_name_and_what_it_has_alon
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    pump = await add_pump(hass, entry)
+    pump = await add_pump(hass, entry=entry)
     result = await start_reconfigure(hass, entry, pump)
     result = await configure(hass, result, {"next_step_id": "consumption"})
     assert result["menu_options"] == ["energy", "power", "estimate", "none"]
@@ -406,8 +409,8 @@ async def test_the_devices_command_sends_an_other_devices_type_name_and_what_it_
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    await add_kiln(hass, entry)
-    await add_pump(hass, entry)
+    await add_kiln(hass, entry=entry)
+    await add_pump(hass, entry=entry)
     await add_basic_device(
         hass,
         entry,

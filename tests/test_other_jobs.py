@@ -12,6 +12,7 @@ import pytest
 
 from .clock import Clock
 from .devices import (
+    CHOICES,
     MAPPING,
     add_hub,
     add_other_device,
@@ -21,6 +22,8 @@ from .devices import (
     other_input,
     price_choice,
     price_input,
+    report_status,
+    settle,
     start_reconfigure,
     walk_to_mapping,
 )
@@ -30,7 +33,7 @@ from .test_manual_runs import create
 from .test_material_usage import material_items
 from .test_other_devices import choose_other
 from .test_other_images_and_parts import KILN_CAMERA, KILN_THUMBNAIL
-from .test_other_programs import line_items
+from .test_ovens import line_items
 from .test_run_event import record_events
 from .test_runs import stored_runs, value
 from .websocket import PanelClient
@@ -66,21 +69,10 @@ PLYWOOD = stored_material(
     diameter=None,
     price={"source": "fixed", "pack_price": 40, "pack_size": 10, "pack_unit": "pcs"},
 )
-# Every choice the `other` step offers, in its order.
-CHOICES = (
-    "program",
-    "doses",
-    "water",
-    "job",
-    "images",
-    "part_count",
-    "per_run_meters",
-)
 
 
 async def set_router(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(ROUTER_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, ROUTER_STATUS, status)
 
 
 async def set_router_job(hass: HomeAssistant, job: str) -> None:
@@ -330,8 +322,7 @@ async def cut(
     # A Run with a Material used input waits for that input's next report.
     await clock.advance(minutes=5)
     await set_router(hass, "idle")
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)
 
 
 async def test_a_run_is_named_after_its_job_and_charges_the_material_it_used(

@@ -19,6 +19,8 @@ from .devices import (
     coinop_entities,
     configure,
     other_input,
+    report_status,
+    run_once,
     start_reconfigure,
 )
 from .stored import place_materials, stored_material
@@ -70,8 +72,7 @@ SODA_DOSES = [
 
 
 async def set_soda_maker(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(SODA_MAKER_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, SODA_MAKER_STATUS, status)
 
 
 async def set_co2_scale(hass: HomeAssistant, grams: float | str) -> None:
@@ -144,11 +145,7 @@ async def weigh_the_co2(panel: PanelClient, soda_maker: ConfigSubentry) -> None:
 
 async def carbonate(hass: HomeAssistant, clock: Clock, *, ended: str = "off") -> None:
     """A bottle carbonated in a minute, after which the soda maker is `ended`."""
-    await set_soda_maker(hass, "on")
-    await clock.advance(minutes=1)
-    await set_soda_maker(hass, ended)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await run_once(hass, clock, SODA_MAKER_STATUS, ended=ended, minutes=1)
 
 
 async def test_doses_without_a_program_bring_no_step_and_no_section(
@@ -474,8 +471,7 @@ BREW_ROWS = {
 
 
 async def set_brew_kettle(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(BREW_KETTLE_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, BREW_KETTLE_STATUS, status)
 
 
 async def set_brew_program(hass: HomeAssistant, program: str) -> None:
@@ -533,11 +529,9 @@ async def brew(
     """A brew of four hours ended as `outcome`, on `program` if given."""
     if program is not None:
         await set_brew_program(hass, program)
-    await set_brew_kettle(hass, "brewing")
-    await clock.advance(hours=4)
-    await set_brew_kettle(hass, outcome)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await run_once(
+        hass, clock, BREW_KETTLE_STATUS, running="brewing", ended=outcome, minutes=240
+    )
 
 
 async def test_program_doses_and_water_bring_the_program_step_and_water_per_program(

@@ -26,6 +26,7 @@ from .devices import (
     add_hub,
     add_other_device,
     add_washing_machine,
+    settle,
 )
 from .images import CAMERA, THUMBNAIL, add_camera, add_thumbnail, picture
 from .stored import place_materials, stored_material
@@ -208,8 +209,7 @@ async def a_measured_load(
         await set_water(hass, 1050)
         await set_scale(hass, 480)
         await set_twins(hass, status)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)
 
 
 async def a_cancelled_load_nothing_measured(
@@ -478,8 +478,7 @@ async def a_job_of_one_metre(
     await set_usage(hass, 1000)
     await set_printers(hass, "finished")
     await clock.advance(minutes=5)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)
 
 
 async def a_job_of_four_parts(

@@ -6,7 +6,13 @@ from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 
 from .clock import Clock
-from .devices import WASHER_ENERGY, WASHER_STATUS, add_hub, add_washing_machine
+from .devices import (
+    WASHER_ENERGY,
+    WASHER_STATUS,
+    add_hub,
+    add_washing_machine,
+    settle,
+)
 from .stored import place_materials, stored_material
 
 WASHER_PROGRAM = "sensor.washer_program"
@@ -116,5 +122,4 @@ async def washed(
     await set_washer(hass, outcome)
     if kwh is not None:
         await set_energy(hass, start + kwh)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)

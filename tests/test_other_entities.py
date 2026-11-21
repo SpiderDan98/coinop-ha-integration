@@ -21,9 +21,10 @@ from .devices import (
     open_other,
     other_input,
     reconfigure,
+    save,
 )
 from .stored import place_materials
-from .test_other_changes import add_shipped
+from .test_other_changes import add_shipped, shipped_device_types
 from .test_other_jobs import (
     MDF,
     PLYWOOD,
@@ -33,7 +34,7 @@ from .test_other_jobs import (
     cut,
 )
 from .test_other_water import (
-    VALVE_WATER,
+    ON_ITS_METER,
     add_irrigation,
     irrigate,
     set_valve,
@@ -46,23 +47,6 @@ from .websocket import PanelClient
 
 WATER_SENSORS = ["sensor.garden_valve_water_cost", "sensor.garden_valve_water_in_runs"]
 MATERIAL_USED = "sensor.cnc_router_material_used"
-# What the water steps are answered with when an irrigation gets its water back.
-ON_ITS_METER = (
-    {"next_step_id": "water_meter"},
-    {"entity_id": VALVE_WATER},
-    {"next_step_id": "water_fixed_price"},
-    {"price": 4.0},
-)
-SHIPPED = (
-    "3d_printer",
-    "washing_machine",
-    "dishwasher",
-    "tumble_dryer",
-    "coffee_machine",
-    "oven",
-    "ev_charger",
-    "robotic_mower",
-)
 
 
 def registered(
@@ -82,7 +66,7 @@ async def test_removing_water_removes_the_water_sensors_from_the_entity_registry
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     await irrigate(hass, clock, start=1000, litres=120)
     assert coinop_entities(entity_registry) == sorted(
         [*basic_entities("garden_valve"), *WATER_SENSORS]
@@ -99,7 +83,7 @@ async def test_adding_water_creates_the_water_sensors(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, has=[])
+    valve = await add_irrigation(hass, entry=entry, has=[])
     await irrigate(hass, clock, start=1000, litres=120)
     assert coinop_entities(entity_registry) == basic_entities("garden_valve")
 
@@ -122,7 +106,7 @@ async def test_a_water_sensor_the_user_renamed_or_disabled_is_removed_all_the_sa
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     entity_registry.async_update_entity(
         "sensor.garden_valve_water_in_runs", new_entity_id="sensor.lawn_litres"
     )
@@ -149,7 +133,7 @@ async def test_water_sensors_that_come_back_count_the_runs_that_ended_before(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     await irrigate(hass, clock, start=1000, litres=120)
 
     await change_other_device(hass, entry, valve, has=[])
@@ -222,7 +206,7 @@ async def test_one_change_can_remove_the_sensors_of_one_choice_and_create_anothe
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
 
     await change_other_device(hass, entry, valve, {}, has=["job", "part_count"])
 
@@ -236,7 +220,7 @@ async def test_the_entities_every_device_has_stay_as_they_are_whatever_is_change
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, has=["water", "job"])
+    valve = await add_irrigation(hass, entry=entry, has=["water", "job"])
     await irrigate(hass, clock, start=1000, litres=120)
     entity_registry.async_update_entity(
         "sensor.garden_valve_total_cost", new_entity_id="sensor.watering_money"
@@ -278,7 +262,7 @@ async def test_renaming_the_type_name_alone_removes_and_creates_no_entity(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, has=["water", "job"])
+    valve = await add_irrigation(hass, entry=entry, has=["water", "job"])
     before = registered(entity_registry, valve)
 
     await change_other_device(
@@ -295,10 +279,10 @@ async def test_changing_another_section_or_reloading_the_hub_removes_and_creates
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    with_water = await add_irrigation(hass, entry)
+    with_water = await add_irrigation(hass, entry=entry)
     hass.states.async_set("sensor.drip_line_status", "off")
     without = await add_irrigation(
-        hass, entry, name="Drip line", status="sensor.drip_line_status", has=[]
+        hass, entry=entry, name="Drip line", status="sensor.drip_line_status", has=[]
     )
     before = registered(entity_registry, with_water, without)
 
@@ -325,7 +309,7 @@ async def test_a_change_that_is_refused_or_never_saved_removes_no_entity(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     before = registered(entity_registry, valve)
     left = await configure(
         hass, await open_other(hass, entry, valve), other_input("Irrigation")
@@ -335,8 +319,7 @@ async def test_a_change_that_is_refused_or_never_saved_removes_no_entity(
     )
     await set_valve(hass, "on")
 
-    refused = await configure(hass, menu, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    refused = await save(hass, menu)
 
     assert left["step_id"] == "reconfigure"
     assert (refused["type"], refused["reason"]) == (FlowResultType.ABORT, "run_open")
@@ -349,7 +332,7 @@ async def test_a_change_saved_while_the_hub_is_not_loaded_removes_the_sensors_to
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     await hass.config_entries.async_unload(entry.entry_id)
 
     await change_other_device(hass, entry, valve, has=[])
@@ -364,10 +347,10 @@ async def test_only_the_device_that_was_changed_loses_entities(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    garden = await add_irrigation(hass, entry)
+    garden = await add_irrigation(hass, entry=entry)
     hass.states.async_set("sensor.lawn_valve_status", "off")
     lawn = await add_irrigation(
-        hass, entry, name="Lawn valve", status="sensor.lawn_valve_status"
+        hass, entry=entry, name="Lawn valve", status="sensor.lawn_valve_status"
     )
     await set_energy(hass, 100)
     await set_water(hass, 1000)
@@ -398,7 +381,7 @@ async def test_only_the_sensors_coinop_registered_for_the_choice_are_removed(
     another kind, whatever they are registered as."""
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry)
+    valve = await add_irrigation(hass, entry=entry)
     litres = entity_registry.async_get("sensor.garden_valve_water_in_runs")
     assert litres is not None
     other_integration = MockConfigEntry(domain="other_integration")
@@ -437,7 +420,10 @@ async def test_no_entity_of_a_shipped_device_type_is_removed_by_reconfiguring_or
     """Not even a sensor for something its Device Type doesn't have, as a release
     that took it from the Device Type would leave one behind."""
     entry = await add_hub(hass)
-    devices = [await add_shipped(hass, entry, device_type) for device_type in SHIPPED]
+    devices = [
+        await add_shipped(hass, entry, device_type)
+        for device_type in await shipped_device_types(hass, entry)
+    ]
     for device in devices:
         for key in ("water_cost", "water_litres", "material_grams"):
             entity_registry.async_get_or_create(
@@ -461,7 +447,7 @@ async def test_no_entity_of_a_shipped_device_type_is_removed_by_reconfiguring_or
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert len(before) == len(SHIPPED) * 14
+    assert len(before) == len(devices) * 14
     assert {
         "sensor.washing_machine_water_in_runs",
         "sensor.3d_printer_material_used",

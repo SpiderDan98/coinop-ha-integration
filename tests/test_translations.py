@@ -222,7 +222,7 @@ async def test_changing_what_an_other_device_has_is_named_announced_and_refused_
     hass: HomeAssistant, language: str, quoted: str, unseen: str
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     menu = await start_reconfigure(hass, entry, kiln)
     await set_kiln(hass, "on")
     refused = await configure(hass, menu, {"next_step_id": "other"})
@@ -250,7 +250,7 @@ async def test_a_change_refused_while_coinop_is_not_loaded_says_why_in_its_own_w
     hass: HomeAssistant, hass_storage: dict[str, Any], language: str, unseen: str
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
     await set_kiln(hass, "on")
     loaded = await open_other(hass, entry, kiln)
     await hass.config_entries.async_unload(entry.entry_id)

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Device } from "../src/api";
 import { recorded, recordedBackend } from "./fake-hass";
-import { click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
+import { click, fill, mountPanel, query, queryAll, text } from "./render";
+import { headers, input, openDialog, rows } from "./settings-dialog";
 
 const LIST = "coinop/devices/list";
 const SETTINGS = "coinop/devices/update_settings";
@@ -17,14 +18,6 @@ const backendWith = (device: Device, language = "en") =>
     .reply(SETTINGS, (msg) => ({
       settings: { ...device.settings, ...(msg.settings as object) },
     }));
-const openDialog = async (panel: Element, device: Device) => {
-  await click(panel, iconButton(panel, `Edit settings of ${device.name}`));
-  return query(panel, ".settings-dialog");
-};
-const headers = (dialog: Element) => queryAll(dialog, ".program-defaults th").map(text);
-const rows = (dialog: Element) => queryAll(dialog, ".program-defaults tbody tr").map(text);
-const input = (root: Element, label: string) =>
-  query(root, `input[aria-label="${label}"]`) as HTMLInputElement;
 
 describe("An Other Device with Doses and no Program", () => {
   it.each([
