@@ -40,6 +40,12 @@ INTEGRATIONS = {
     "bambu_lab": Integration(
         "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
     ),
+    "ha_creality_ws": Integration(
+        "Creality", printers.creality, printers.DEVICE_TYPES, printers.KIND
+    ),
+    "elegoo_printer": Integration(
+        "Elegoo", printers.elegoo, printers.DEVICE_TYPES, printers.KIND
+    ),
     # Appliances
     "ha_washdata": Integration(
         "WashData",
