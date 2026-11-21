@@ -1,6 +1,6 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -198,6 +198,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             return await self._sections()[following[0]]()
         return self.async_create_entry(title=self._name, data=self._data)
 
+    async def _walk_before_menu(self, sections: Iterable[str]) -> SubentryFlowResult:
+        """Reconfigure walks those of `sections` the Device has, in Add Device's
+        order, before it shows its menu again."""
+        self._walking = frozenset(sections)
+        return await self._walk(list(self._sections()))
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
@@ -228,8 +234,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
         for section, values in detected.items():
             self._data[section] = (self._data.get(section) or {}) | values
-        self._walking = frozenset(detected)
-        return await self.async_step_status()
+        return await self._walk_before_menu(detected)
 
     async def async_step_save(
         self, user_input: dict[str, Any] | None = None
@@ -344,9 +349,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             self._data[ELECTRICITY.source_key] = {
                 key: value for key, value in power.items() if key != "running_power"
             }
-        sections = list(self._sections())
-        self._walking = frozenset(sections) - self._data.keys()
-        return await self._walk(sections)
+        return await self._walk_before_menu(self._sections().keys() - self._data.keys())
 
     async def _async_refusal(self) -> str | None:
         """Why what the Device being reconfigured has can't change now, as the abort
@@ -1085,10 +1088,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     async def _meter_done(self, quantity: Quantity) -> SubentryFlowResult:
         self._data[quantity.source_key] = self._meter
-        sections = self._sections()
-        if quantity.price_key in sections and quantity.price_key not in self._data:
+        if quantity.price_key not in self._data:
             # A source picked in reconfigure after none needs its price too.
-            return await sections[quantity.price_key]()
+            self._walking |= {quantity.price_key}
         return await self._section_done(quantity.source_key)
 
     async def async_step_estimate(
