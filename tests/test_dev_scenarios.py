@@ -983,3 +983,34 @@ async def set_energy(hass: HomeAssistant, entity_id: str, value: float) -> None:
         await set_helper(hass, entity_id, value)
     else:
         await set_state(hass, entity_id, str(value))
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("domain", ["lg_thinq", "smartthings"])
+async def test_an_accounts_pieces_load_together_on_its_one_config_entry(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    domain: str,
+) -> None:
+    """Of LG ThinQ, a WashTower's two halves, each added as what it is."""
+    pieces = {p: row for p, row in APPLIANCES.items() if p.startswith(f"{domain}.")}
+    await async_load(hass, {"pieces": list(pieces)}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert len(hass.config_entries.async_entries(domain)) == 1
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    labels = [label for label, *_ in pieces.values()]
+    assert [option["label"] for option in offered(result)] == [*labels, "manual"]
+    for label, _, meter, *_ in pieces.values():
+        result = await open_add_device(hass, entry)
+        [device_id] = [o["value"] for o in offered(result) if o["label"] == label]
+        result = await configure(hass, result, {"device": device_id})
+        answers = {"price": 0.32} | ({"optional_meter": meter} if meter else {})
+        result = await configure(hass, result, answers)
+        assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    devices = (await panel.call("coinop/devices/list"))["devices"]
+    assert sorted(device["type"] for device in devices) == sorted(
+        device_type for _, device_type, *_ in pieces.values()
+    )
