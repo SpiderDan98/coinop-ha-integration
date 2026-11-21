@@ -35,7 +35,15 @@ load:
             - moonraker.3d_printer
             - washer
             - ha_washdata.washing_machine
+            - lg_thinq.washing_machine
+            - smartthings.washing_machine
             - ha_washdata.dishwasher
+            - lg_thinq.dishwasher
+            - smartthings.dishwasher
+            - lg_thinq.tumble_dryer
+            - smartthings.tumble_dryer
+            - lg_thinq.oven
+            - smartthings.oven
             - tesla_wall_connector.ev_charger
             - evcc_intg.ev_charger
             - ocpp.ev_charger

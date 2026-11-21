@@ -176,6 +176,35 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
+  # The plugs of the static stand-ins' appliances that bring no meter.
+  washtower_washer_energy:
+    name: WashTower washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_dishwasher_energy:
+    name: LG dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washtower_dryer_energy:
+    name: WashTower dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_oven_energy:
+    name: LG oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -240,6 +269,30 @@ template:
         unit_of_measurement: W
         device_class: power
         state_class: measurement
+      - name: WashTower washer plug energy
+        unique_id: washtower_washer_plug_energy
+        state: "{{ states('input_number.washtower_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG dishwasher plug energy
+        unique_id: lg_dishwasher_plug_energy
+        state: "{{ states('input_number.lg_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashTower dryer plug energy
+        unique_id: washtower_dryer_plug_energy
+        state: "{{ states('input_number.washtower_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG oven plug energy
+        unique_id: lg_oven_plug_energy
+        state: "{{ states('input_number.lg_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
 
 # A camera without hardware, for a Device's Snapshot: ffmpeg's test picture.
 camera:
