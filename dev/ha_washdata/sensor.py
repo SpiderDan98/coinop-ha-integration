@@ -13,8 +13,8 @@ from . import DOMAIN
 
 # The helpers' prefix in the dev configuration.yaml, by WashData's device type.
 HELPERS = {
-    "washing_machine": "washer",
-    "dishwasher": "dishwasher",
+    "washing_machine": "washdata_washer",
+    "dishwasher": "washdata_dishwasher",
     "dryer": "washdata_dryer",
 }
 # The Status helper's words that WashData says differently.

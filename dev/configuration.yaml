@@ -46,10 +46,35 @@ input_select:
     name: Washing machine program
     options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
   dishwasher_status:
-    name: Dishwasher status
+    name: Kitchen dishwasher status
     options: ["off", running, paused, finished, cancelled]
   dishwasher_program:
-    name: Dishwasher program
+    name: Kitchen dishwasher program
+    options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  dryer_status:
+    name: Heat pump dryer status
+    options: ["off", running, paused, finished, cancelled]
+  dryer_program:
+    name: Heat pump dryer program
+    options: [Cotton cupboard dry, Cotton iron dry, Synthetics, Wool finish]
+  coffee_status:
+    name: Espresso machine status
+    options: ["off", running, finished, cancelled]
+  coffee_program:
+    name: Espresso machine program
+    options: [Espresso, Lungo, Cappuccino, Latte macchiato]
+  # The devices of the WashData stand-in in dev/ha_washdata.
+  washdata_washer_status:
+    name: WashData washing machine status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_washer_program:
+    name: WashData washing machine program
+    options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
+  washdata_dishwasher_status:
+    name: WashData dishwasher status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_dishwasher_program:
+    name: WashData dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
   # The tumble dryer WashData follows, for the stand-in in dev/ha_washdata.
   washdata_dryer_status:
@@ -132,7 +157,35 @@ input_number:
     mode: box
     unit_of_measurement: g
   dishwasher_energy:
-    name: Dishwasher energy
+    name: Kitchen dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  dishwasher_water:
+    name: Kitchen dishwasher water
+    min: 0
+    max: 1000000
+    step: 0.1
+    mode: box
+    unit_of_measurement: L
+  dryer_energy:
+    name: Heat pump dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_washer_energy:
+    name: WashData washing machine energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_dishwasher_energy:
+    name: WashData dishwasher energy
     min: 0
     max: 100000
     step: 0.001
@@ -328,13 +381,13 @@ template:
         state_class: measurement
       - name: Washing machine plug energy
         unique_id: washer_plug_energy
-        state: "{{ states('input_number.washer_energy') }}"
+        state: "{{ states('input_number.washdata_washer_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
       - name: Dishwasher plug energy
         unique_id: dishwasher_plug_energy
-        state: "{{ states('input_number.dishwasher_energy') }}"
+        state: "{{ states('input_number.washdata_dishwasher_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
