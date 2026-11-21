@@ -28,6 +28,7 @@ from .devices import (
     start_reconfigure,
     walk_to_mapping,
 )
+from .registry import add_miele, add_washdata
 from .test_device_flow import fields, offered, suggested
 from .test_lifecycle import at
 from .test_manual_runs import create
@@ -35,7 +36,6 @@ from .test_measured import electricity
 from .test_quick_start import open_add_device
 from .test_run_event import record_events
 from .test_runs import stored_runs
-from .washers import add_miele, add_washdata
 from .websocket import PanelClient
 
 KILN_STATUS = "sensor.kiln_status"

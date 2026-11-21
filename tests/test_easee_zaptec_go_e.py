@@ -8,10 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 
-from .chargers import add_easee, add_goe_api2, add_goe_mqtt, add_zaptec
 from .clock import Clock
 from .devices import ENERGY, add_hub, configure
-from .registry import HaDevice
+from .registry import HaDevice, add_easee, add_goe_api2, add_goe_mqtt, add_zaptec
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
 from .test_measured import electricity

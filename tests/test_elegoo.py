@@ -17,7 +17,7 @@ from .devices import (
     report_status,
     start_reconfigure,
 )
-from .elegoo import add_elegoo
+from .registry import add_elegoo
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register

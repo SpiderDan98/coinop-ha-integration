@@ -9,7 +9,7 @@ import pytest
 
 from .clock import Clock
 from .devices import WASHER_ENERGY, add_hub, configure, start_reconfigure
-from .lg_thinq import add_lg_thinq
+from .registry import add_lg_thinq
 from .test_device_flow import fields
 from .test_integration_profiles import accepted
 from .test_quick_start import offered, open_add_device, pick, quick_start, register
