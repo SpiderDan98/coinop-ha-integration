@@ -29,9 +29,15 @@ _LOGGER = logging.getLogger(__name__)
 # Each Device's inputs are helpers from the dev configuration.yaml.
 PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
 WASHER = "washer"
-# The stand-ins in dev/ for integrations with an Integration Profile: WashData and
-# Anycubic Cloud & LAN, whose printer follows the Kobra's helpers.
-STAND_INS = ("anycubic_cloud", "ha_washdata")
+DISHWASHER = "dishwasher"
+# The stand-ins in dev/ for integrations with an Integration Profile, each with what
+# its config flow is started with per device: Anycubic Cloud & LAN, whose printer
+# follows the Kobra's helpers, and WashData, which follows a washing machine and a
+# dishwasher, so Quick Start offers two Device Types from one integration.
+STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
+    "anycubic_cloud": (None,),
+    "ha_washdata": (None, {"name": "Dishwasher", "device_type": "dishwasher"}),
+}
 KOBRA = "kobra"
 TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
     WASHER: "Washing machine"
@@ -506,7 +512,7 @@ async def _washing(seed: Seed) -> None:
             {"entity_id": f"input_number.{key}", "value": value},
             blocking=True,
         )
-    await _async_set_washer(seed.hass, "off", "Wool")
+    await _async_set_appliance(seed.hass, WASHER, "off", "Wool")
 
 
 async def _replay_meters(
@@ -529,10 +535,12 @@ async def _replay(
         await asyncio.wait(started)
 
 
-async def _async_set_washer(hass: HomeAssistant, status: str, program: str) -> None:
+async def _async_set_appliance(
+    hass: HomeAssistant, key: str, status: str, program: str
+) -> None:
     for entity_id, option in (
-        ("input_select.washer_program", program),
-        ("input_select.washer_status", status),
+        (f"input_select.{key}_program", program),
+        (f"input_select.{key}_status", status),
     ):
         await hass.services.async_call(
             "input_select",
@@ -552,12 +560,13 @@ async def _nothing(seed: Seed) -> None:
 
 
 async def _quick_start(seed: Seed) -> None:
-    """A printer and a washing machine of known integrations, for Add Device's
-    Quick Start to offer."""
-    for domain in STAND_INS:
-        await seed.hass.config_entries.flow.async_init(
-            domain, context={"source": SOURCE_USER}
-        )
+    """A printer, a washing machine and a dishwasher of known integrations, for Add
+    Device's Quick Start to offer."""
+    for domain, devices in STAND_INS.items():
+        for device in devices:
+            await seed.hass.config_entries.flow.async_init(
+                domain, context={"source": SOURCE_USER}, data=device
+            )
 
 
 @dataclass(frozen=True)
@@ -572,9 +581,10 @@ SCENARIOS = {
     "empty": Scenario("Empty", "The hub without any Device.", (), _nothing),
     "quick-start": Scenario(
         "Quick Start",
-        "The hub without any Device, an Anycubic printer and a washing machine "
-        "WashData follows: Add Device offers both in Quick Start, with their plug "
-        "sensors as meters. The Kobra's and the washing machine's helpers run them.",
+        "The hub without any Device, an Anycubic printer, and a washing machine and "
+        "a dishwasher WashData follows: Add Device offers all three in Quick Start, "
+        "each as its Device Type, with their plug sensors as meters. The Kobra's, "
+        "the washing machine's and the dishwasher's helpers run them.",
         (),
         _quick_start,
     ),
@@ -694,8 +704,9 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
     for key in (*PRINTERS, KOBRA):
         if hass.states.get(f"input_select.{key}_status"):
             await _async_set_printer(hass, key, "idle")
-    if program := hass.states.get("input_select.washer_program"):
-        await _async_set_washer(hass, "off", program.state)
+    for key in (WASHER, DISHWASHER):
+        if program := hass.states.get(f"input_select.{key}_program"):
+            await _async_set_appliance(hass, key, "off", program.state)
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
     for key in scenario.devices:

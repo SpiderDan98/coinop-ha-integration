@@ -1,4 +1,4 @@
-"""WashData's state and program sensors, read from the washing machine's helpers."""
+"""WashData's state and program sensors, read from the helpers of the entry's device."""
 
 from collections.abc import Callable
 
@@ -11,23 +11,23 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from . import DOMAIN
 
-STATUS = "input_select.washer_status"
-PROGRAM = "input_select.washer_program"
+# The helpers' prefix in the dev configuration.yaml, by WashData's device type.
+HELPERS = {"washing_machine": "washer", "dishwasher": "dishwasher"}
 # The Status helper's words that WashData says differently.
 STATES = {"cancelled": "interrupted"}
 
 
-def _state(hass: HomeAssistant) -> str | None:
-    status = hass.states.get(STATUS)
-    return STATES.get(status.state, status.state) if status else None
+def _state(hass: HomeAssistant, status: str, program: str) -> str | None:
+    state = hass.states.get(status)
+    return STATES.get(state.state, state.state) if state else None
 
 
-def _program(hass: HomeAssistant) -> str | None:
-    """WashData knows no program while the machine is off."""
-    status, program = hass.states.get(STATUS), hass.states.get(PROGRAM)
-    if status is None or program is None:
+def _program(hass: HomeAssistant, status: str, program: str) -> str | None:
+    """WashData knows no program while the device is off."""
+    state, running = hass.states.get(status), hass.states.get(program)
+    if state is None or running is None:
         return None
-    return "off" if status.state == "off" else program.state
+    return "off" if state.state == "off" else running.state
 
 
 async def async_setup_entry(
@@ -52,7 +52,7 @@ class HelperSensor(SensorEntity):
         entry: ConfigEntry,
         key: str,
         name: str,
-        read: Callable[[HomeAssistant], str | None],
+        read: Callable[[HomeAssistant, str, str], str | None],
     ) -> None:
         # WashData's unique ids, which the Integration Profile looks for.
         self._attr_unique_id = f"{entry.entry_id}_{key}"
@@ -62,15 +62,20 @@ class HelperSensor(SensorEntity):
             name=entry.title,
             manufacturer="WashData",
         )
+        helper = HELPERS[entry.data["device_type"]]
+        self._helpers = [
+            f"input_select.{helper}_status",
+            f"input_select.{helper}_program",
+        ]
         self._read = read
 
     async def async_added_to_hass(self) -> None:
-        self._attr_native_value = self._read(self.hass)
+        self._attr_native_value = self._read(self.hass, *self._helpers)
         self.async_on_remove(
-            async_track_state_change_event(self.hass, [STATUS, PROGRAM], self._changed)
+            async_track_state_change_event(self.hass, self._helpers, self._changed)
         )
 
     @callback
     def _changed(self, event: Event[EventStateChangedData]) -> None:
-        self._attr_native_value = self._read(self.hass)
+        self._attr_native_value = self._read(self.hass, *self._helpers)
         self.async_write_ha_state()

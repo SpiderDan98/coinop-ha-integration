@@ -25,6 +25,7 @@ from .websocket import PanelClient
 DEV = Path(__file__).parents[1] / "dev"
 CONFIG = DEV / "configuration.yaml"
 PLUG_ENERGY = "sensor.washing_machine_plug_energy"
+DISHWASHER_PLUG_ENERGY = "sensor.dishwasher_plug_energy"
 PLUG_POWER = "sensor.kobra_s1_plug_power"
 
 
@@ -184,6 +185,42 @@ async def test_quick_start_adds_the_washing_machine_washdata_follows(
 
 
 @pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_dishwasher_washdata_follows_as_a_dishwasher(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await hass.async_block_till_done()
+
+    await quick_start(
+        hass,
+        "Dishwasher · WashData",
+        optional_meter=DISHWASHER_PLUG_ENERGY,
+        price=0.32,
+        water_price=4.2,
+    )
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert (device["name"], device["type"]) == ("Dishwasher", "dishwasher")
+    await set_helper(hass, "input_number.dishwasher_energy", 50)
+    await set_helper(hass, "input_select.dishwasher_program", "Eco 50°")
+    await set_helper(hass, "input_select.dishwasher_status", "running")
+    await clock.advance(hours=2)
+    await set_helper(hass, "input_number.dishwasher_energy", 50.9)
+    await set_helper(hass, "input_select.dishwasher_status", "finished")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["program"], run["outcome"]) == ("Eco 50°", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(0.9)
+
+
+@pytest.mark.usefixtures("helpers")
 async def test_quick_start_adds_the_printer_of_the_anycubic_stand_in(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
@@ -220,7 +257,7 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
 ) -> None:
     stand_ins = ("anycubic_cloud", "ha_washdata")
     await async_load(hass, "quick-start", hass_admin_user)
-    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [1, 1]
+    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [1, 2]
 
     await async_load(hass, "empty", hass_admin_user)
 
@@ -238,6 +275,7 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     assert list(devices) == [
         "Kobra S1 · Anycubic Cloud & LAN",
         "Washing machine · WashData",
+        "Dishwasher · WashData",
         "manual",
     ]
     result = await configure(hass, result, {"device": devices[label]})
