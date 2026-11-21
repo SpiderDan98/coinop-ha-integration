@@ -45,6 +45,8 @@ from .test_spoolman import (
     spool,
     spoolman_down,
 )
+from .test_washer_profiles import walk_pre_filled
+from .washers import add_miele
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
@@ -653,6 +655,31 @@ async def test_record_a_tumble_dryer(
     assert_recorded(
         "devices-list-tumble-dryer",
         stable_ids(devices, {subentry.subentry_id: "device-dryer"}),
+    )
+
+
+async def test_record_a_tumble_dryer_added_from_a_miele_washing_machine(
+    hass: HomeAssistant, panel: PanelClient
+) -> None:
+    """A Tumble dryer set up manually from a Miele washing machine's HA device,
+    whose profile finds a water meter too."""
+    washer = add_miele(hass)
+    entry = await add_hub(hass)
+    _, subentry = await walk_pre_filled(
+        hass, entry, washer, "tumble_dryer", name={"name": "Dryer"}
+    )
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-tumble-dryer-from-miele",
+        stable_ids(
+            devices,
+            {
+                subentry.subentry_id: "device-dryer",
+                washer.device.id: "ha-device-washer",
+            },
+        ),
     )
 
 

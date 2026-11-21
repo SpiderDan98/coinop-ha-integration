@@ -1,6 +1,6 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -70,6 +70,14 @@ UNUSED: dict[str, dict[str, Any]] = {
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
+}
+# The sections only a Device Type with the Capability has.
+NEEDS = {
+    "job": Capability.JOB,
+    "images": Capability.IMAGES,
+    "program": Capability.PROGRAM,
+    "water": Capability.WATER,
+    "water_price": Capability.WATER,
 }
 
 
@@ -146,19 +154,18 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "water": self.async_step_water,
             "water_price": self.async_step_water_price,
         }
-        needs = {
-            "job": Capability.JOB,
-            "images": Capability.IMAGES,
-            "program": Capability.PROGRAM,
-            "water": Capability.WATER,
-            "water_price": Capability.WATER,
-        }
         if (self._data.get("water") or {}).get("source") == WaterSource.NONE:
-            del needs["water_price"], sections["water_price"]
+            del sections["water_price"]
+        return self._fitting(sections)
+
+    def _fitting[T](self, sections: Mapping[str, T]) -> dict[str, T]:
+        """Those of the sections the Device Type has: a profile also finds a washing
+        machine's water meter for a Device added as a tumble dryer."""
+        capabilities = self._capabilities()
         return {
-            name: step
-            for name, step in sections.items()
-            if name not in needs or needs[name] in self._capabilities()
+            name: section
+            for name, section in sections.items()
+            if name not in NEEDS or NEEDS[name] in capabilities
         }
 
     async def _section_done(self, section: str) -> SubentryFlowResult:
@@ -186,9 +193,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
 
     def _detected(self) -> dict[str, Any] | None:
-        return detect(
+        found = detect(
             self.hass, self._data["device_type"], self._data.get("printer_device_id")
         )
+        return found and self._fitting(found)
 
     async def async_step_detect(
         self, user_input: dict[str, Any] | None = None
@@ -322,7 +330,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._data["device_type"] = (
             user_input["device_type"] if user_input else device_types[0]
         )
-        sections = candidate.sections
+        sections = self._fitting(candidate.sections)
         self._data |= {
             name: values
             for name, values in sections.items()
@@ -330,8 +338,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
         self._data |= {
             name: unused | sections.get(name, {})
-            for name, unused in UNUSED.items()
-            if name in self._sections()
+            for name, unused in self._fitting(UNUSED).items()
         }
         for quantity in (ELECTRICITY, WATER):
             found = sections.get(quantity.source_key)

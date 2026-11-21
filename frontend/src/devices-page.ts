@@ -76,14 +76,15 @@ const priceOf = (
         t("price.entity", { entity: name }),
       );
 
+/** A water section stored for a Device without the water Capability is no water source. */
+const waterSource = ({ capabilities, ha_settings }: Device) =>
+  capabilities.includes("water") ? ha_settings.water : undefined;
+
 /** The water source with its entity, and the water price unless there's no water. */
-const waterOf = (
-  hass: HomeAssistant,
-  { water, water_price }: Device["ha_settings"],
-  t: Localize,
-  format: Format,
-) =>
-  water
+const waterOf = (hass: HomeAssistant, device: Device, t: Localize, format: Format) => {
+  const water = waterSource(device);
+  const { water_price } = device.ha_settings;
+  return water
     ? html`<dt>${t("device.water")}</dt>
         <dd class="water">
           <div>${t(`water.${water.source}`)}</div>
@@ -100,6 +101,7 @@ const waterOf = (
             : nothing
         }`
     : nothing;
+};
 
 type Settings = Device["settings"];
 
@@ -243,7 +245,7 @@ export class DevicesPage extends LitElement {
         </dd>
         <dt>${t("device.price")}</dt>
         <dd class="price">${priceOf(this.hass, ha.price, "kWh", t, format)}</dd>
-        ${waterOf(this.hass, ha, t, format)}
+        ${waterOf(this.hass, device, t, format)}
       </dl>
       <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
         >${t("device.reconfigure")}</a
@@ -574,20 +576,20 @@ export class DevicesPage extends LitElement {
    * column where they can come per Program, and a column per Dose of a Device with Doses.
    * Known Programs without a row are suggested; a value stores their row. */
   private renderProgramDefaults(
-    { id, capabilities, known_programs, ha_settings }: Device,
+    device: Device,
     { doses: doseList, program_defaults }: Settings,
     change: (changes: Partial<Settings>) => void,
     t: Localize,
   ) {
+    const { id, capabilities, known_programs } = device;
     const { programs } = program_defaults;
     const dosed = capabilities.includes("doses");
     const doses = dosed ? doseList : [];
     const perProgram = capabilities.includes("program_consumption");
+    const water = waterSource(device);
     const consumed = [
       ...(perProgram ? (["kwh"] as const) : []),
-      ...(perProgram && ha_settings.water && ha_settings.water.source !== "none"
-        ? (["litres"] as const)
-        : []),
+      ...(perProgram && water && water.source !== "none" ? (["litres"] as const) : []),
     ];
     if (!doses.length && !consumed.length) return nothing;
     /** `program` null is the Default row. */

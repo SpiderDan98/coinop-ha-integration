@@ -32,6 +32,7 @@ import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
 import devicesListTumbleDryer from "./fixtures/backend/devices-list-tumble-dryer.json";
+import devicesListTumbleDryerFromMiele from "./fixtures/backend/devices-list-tumble-dryer-from-miele.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
 import devicesMeasuredSuggestionsOven from "./fixtures/backend/devices-measured-suggestions-oven.json";
@@ -143,6 +144,9 @@ export const recorded = {
    * dosing "material-sheets" (not in a recorded catalogue): 1 in the Default row, 2 for
    * "Cupboard dry". */
   tumbleDryer: devicesListTumbleDryer.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dryer", a Tumble dryer set up manually from a
+   * Miele washing machine's HA device, whose profile finds a water meter too; no Doses. */
+  dryerFromWasher: devicesListTumbleDryerFromMiele.devices[0] as Device,
   /** `coinop/devices/list` with only "device-coffee-machine", a Coffee machine whose
    * electricity and water come per Program, dosing "material-beans" (see
    * `dishwasherAndBeverage`): the Default row 0.02 kWh and 0.125 L, "Espresso" 0.012 kWh

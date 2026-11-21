@@ -36,6 +36,7 @@ WASHDATA_PLACEHOLDERS = [
 ]
 
 ANSWERS = {
+    "name": {"name": "Washer"},
     "consumption": {"next_step_id": "energy"},
     "price": {"next_step_id": "fixed_price"},
     "fixed_price": {"price": 0.30},
@@ -61,7 +62,7 @@ async def walk_pre_filled(
         await start_add_device(
             hass, entry, printer=washer.device.id, device_type=device_type
         ),
-        {"name": "Washer"},
+        answers["name"],
     )
     shown = []
     while result["type"] is not FlowResultType.CREATE_ENTRY:
@@ -498,6 +499,37 @@ async def test_manual_setup_pre_fills_from_a_miele_appliance_of_any_kind(
     }
     assert data["consumption"].get("entity_id") == energy
     assert data.get("water", {}).get("entity_id") == water
+
+
+async def test_a_tumble_dryer_added_from_a_miele_washing_machine_takes_no_water(
+    hass: HomeAssistant,
+) -> None:
+    washer = add_miele(hass)
+    entry = await add_hub(hass)
+
+    shown, subentry = await walk_pre_filled(hass, entry, washer, "tumble_dryer")
+
+    assert shown == [
+        "status",
+        "mapping",
+        "program",
+        "consumption",
+        "energy",
+        "price",
+        "fixed_price",
+    ]
+    data = subentry.data
+    assert sorted(data) == [
+        "consumption",
+        "device_type",
+        "mapping",
+        "price",
+        "printer_device_id",
+        "program",
+        "status",
+    ]
+    assert data["consumption"]["entity_id"] == washer["current_energy_consumption"]
+    assert washer["current_water_consumption"] not in str(dict(data))
 
 
 async def test_detect_again_works_on_a_tumble_dryer_added_from_miele(
