@@ -60,6 +60,9 @@ input_select:
   carport_charger_status:
     name: Carport charger status
     options: [disconnected, connected, charging, error]
+  robotic_mower_status:
+    name: Robotic mower status
+    options: [parked, mowing, returning, charging, error]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -133,6 +136,14 @@ input_number:
     name: Carport charger session energy
     min: 0
     max: 200
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # The plug of the mower's charging station.
+  robotic_mower_station_energy:
+    name: Robotic mower station energy
+    min: 0
+    max: 100000
     step: 0.001
     mode: box
     unit_of_measurement: kWh

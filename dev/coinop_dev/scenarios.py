@@ -154,6 +154,20 @@ SESSIONS = [
     (3, 20, 140, 300, 22.7),
     (1, 19, 90, 0, 14.6),
 ]
+# Days ago, hour it leaves the station at, minutes mowing, minutes charging after it,
+# kWh the station counts, minutes it was stuck (0: never).
+MOWS = [
+    (20, 9, 90, 70, 0.25, 0),
+    (18, 10, 110, 80, 0.3, 0),
+    (16, 9, 75, 60, 0.2, 0),
+    (14, 14, 100, 75, 0.28, 0),
+    (12, 9, 85, 65, 0.24, 25),
+    (10, 10, 115, 85, 0.31, 0),
+    (8, 15, 80, 60, 0.22, 0),
+    (6, 9, 95, 70, 0.27, 0),
+    (4, 10, 90, 70, 0.26, 0),
+    (2, 9, 95, 75, 0.27, 0),
+]
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -721,6 +735,64 @@ async def _charger_start(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.carport_charger_status", "charging")
 
 
+async def _mower_short(seed: Seed) -> None:
+    await _mow(seed, MOWS)
+
+
+async def _mower_long(seed: Seed) -> None:
+    """Every few days through two summers, then the short level's mows."""
+    rng = seed.random
+    mows = []
+    for summer in (1, 0):
+        day = 365 * summer + 300
+        while day > 365 * summer + 120:
+            minutes = rng.randrange(70, 120, 5)
+            kwh = round(minutes / 360 * rng.uniform(0.9, 1.1), 2)
+            stuck = rng.choice([20, 35]) if rng.random() < 0.05 else 0
+            mows.append((day, rng.choice([9, 10, 14, 15]), minutes, 70, kwh, stuck))
+            day -= rng.randrange(1, 4)
+    await _mow(seed, [*mows, *MOWS])
+
+
+async def _mow(seed: Seed, mows: list[tuple[int, int, int, int, float, int]]) -> None:
+    """Charging after mowing is Paused, so what the station draws lands in the Run."""
+    hass = seed.hass
+    status, meter = (
+        "input_select.robotic_mower_status",
+        {"robotic_mower_station_energy": 85.0},
+    )
+    for days, hour, minutes, charging, kwh, stuck in mows:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay_meters(hass, meter, start)
+        await _replay(hass, status, "mowing", start)
+        if stuck:
+            at = start + timedelta(minutes=minutes // 2)
+            await _replay(hass, status, "error", at)
+            await _replay(hass, status, "mowing", at + timedelta(minutes=stuck))
+        back = start + timedelta(minutes=minutes + stuck)
+        await _replay(hass, status, "returning", back)
+        docked = back + timedelta(minutes=5)
+        await _replay(hass, status, "charging", docked)
+        end = docked + timedelta(minutes=charging)
+        meter["robotic_mower_station_energy"] = round(
+            meter["robotic_mower_station_energy"] + kwh, 3
+        )
+        await _replay_meters(hass, meter, end - timedelta(minutes=1))
+        await _replay(hass, status, "parked", end)
+        # A report after the end spares the wait for it.
+        await _replay_meters(hass, meter, end + timedelta(minutes=1))
+    await _async_set(
+        hass,
+        "input_number.robotic_mower_station_energy",
+        meter["robotic_mower_station_energy"],
+    )
+    await _async_set(hass, status, "parked")
+
+
+async def _mower_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.robotic_mower_status", "mowing")
+
+
 async def _irrigation_short(seed: Seed) -> None:
     await _water(seed, WATERINGS)
 
@@ -899,6 +971,35 @@ def _charger() -> dict[str, Any]:
         "consumption": {
             "source": "energy",
             "entity_id": "input_number.carport_charger_session",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        },
+        "price": {"source": "fixed", "value": 0.32},
+    }
+
+
+def _mower() -> dict[str, Any]:
+    """A mower on its charging station's plug: charging after mowing is Paused."""
+    return {
+        "device_type": "robotic_mower",
+        "printer_device_id": None,
+        "status": {
+            "entity_id": "input_select.robotic_mower_status",
+            "attribute": None,
+        },
+        "mapping": {
+            "running": ["mowing", "returning"],
+            "paused": ["charging"],
+            "finished": ["parked"],
+            "cancelled": [],
+            "ended": [],
+            "fault": ["error"],
+            "ignored": [],
+        },
+        "consumption": {
+            "source": "energy",
+            "entity_id": "input_number.robotic_mower_station_energy",
             "attribute": None,
             "unit": "kWh",
             "factor": None,
@@ -1234,6 +1335,18 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "to `Charging` in the developer tools to run it.",
         {},
         registration=ev_chargers.wallbox,
+    ),
+    "mower": DeviceWithHistory(
+        "robotic_mower",
+        "Robotic mower",
+        "Its charging station's energy meter, charging after mowing as Paused, and "
+        "a mow it got stuck on as a Fault. Short history: 10 mows over three weeks; "
+        "long: two summers of them.",
+        {"input_select.robotic_mower_status": "parked"},
+        device=_mower(),
+        short=_mower_short,
+        long=_mower_long,
+        start=_mower_start,
     ),
     "irrigation": DeviceWithHistory(
         "other",

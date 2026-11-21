@@ -46,6 +46,7 @@ load:
             - goecharger_mqtt.ev_charger
             - goecharger_api2.ev_charger
             - wallbox.ev_charger
+            - mower
             - irrigation
     history:
       name: History
