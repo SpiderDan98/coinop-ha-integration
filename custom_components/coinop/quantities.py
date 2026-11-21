@@ -30,8 +30,9 @@ class Quantity:
     enters and reads prices per `price_unit`, and a price entity's unit is one of
     `price_units` (`{currency}` stands for the currency) or converted by a factor.
     The Device keeps its sections under `source_key` and `price_key`; a Program
-    Defaults row its amount per Run under `default_key`. Means are shown to
-    `decimals`.
+    Defaults row its amount per Run under `default_key`. Amounts are shown to
+    `decimals`, those under 1 `unit` to `small_decimals`, so that a coffee's
+    0.04 L doesn't read as 0.
     """
 
     kind: LineItemKind
@@ -48,6 +49,11 @@ class Quantity:
     price_units: tuple[str, ...]
     default_key: str
     decimals: int
+    small_decimals: int
+
+    def shown_decimals(self, amount: float) -> int:
+        """The decimals `amount` is shown to."""
+        return self.small_decimals if abs(amount) < 1 else self.decimals
 
     def units(self, source: str) -> tuple[type[BaseUnitConverter], str]:
         """The converter and the unit readings of `source` are kept in."""
@@ -75,6 +81,7 @@ ELECTRICITY = Quantity(
     price_units=("{currency}/kWh", "ct/kWh", "{currency}/MWh"),
     default_key="kwh",
     decimals=3,
+    small_decimals=3,
 )
 
 WATER = Quantity(
@@ -92,6 +99,7 @@ WATER = Quantity(
     price_units=("{currency}/m³", "{currency}/L", "ct/L"),
     default_key="litres",
     decimals=1,
+    small_decimals=3,
 )
 
 QUANTITIES = {quantity.kind: quantity for quantity in (ELECTRICITY, WATER)}

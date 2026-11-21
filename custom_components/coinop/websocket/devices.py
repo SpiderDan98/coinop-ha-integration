@@ -214,11 +214,15 @@ def _measured_suggestions(
                         quantity.default_key, []
                     ).append(measured)
 
-    decimals = {q.default_key: q.decimals for q in QUANTITIES.values()}
+    quantities = {q.default_key: q for q in QUANTITIES.values()}
+
+    def mean(key: str, measured: list[float]) -> float:
+        amount = fmean(measured)
+        return round(amount, quantities[key].shown_decimals(amount))
 
     def means(row: str | None) -> dict[str, Any]:
         return {
-            key: {"mean": round(fmean(measured), decimals[key]), "runs": len(measured)}
+            key: {"mean": mean(key, measured), "runs": len(measured)}
             for key, measured in values.get(row, {}).items()
         }
 

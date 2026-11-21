@@ -384,6 +384,24 @@ describe("Devices tab", () => {
     },
   );
 
+  it.each([
+    ["en", "Coffee machines"],
+    ["de", "Kaffeemaschinen"],
+  ])("lists a coffee machine under its own heading (%s)", async (language, heading) => {
+    const backend = recordedBackend({ language }).reply(LIST, () => ({
+      devices: [recorded.coffeeMachine],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(
+      queryAll(panel, ".device-type").map((section) => [
+        text(query(section, "h2")),
+        ...queryAll(section, ".device h3").map(text),
+      ]),
+    ).toEqual([[heading, "Coffee machine"]]);
+  });
+
   it("shows a dishwasher with a washing machine's parts", async () => {
     const backend = recordedBackend()
       .reply(LIST, () => ({ devices: [recorded.dishwasher] }))

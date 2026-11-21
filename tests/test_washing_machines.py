@@ -48,6 +48,7 @@ async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> No
         "washing_machine",
         "dishwasher",
         "tumble_dryer",
+        "coffee_machine",
         "oven",
     ]
 

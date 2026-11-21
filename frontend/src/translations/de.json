@@ -117,6 +117,7 @@
   "device_type.washing_machine": "Waschmaschinen",
   "device_type.dishwasher": "Spülmaschinen",
   "device_type.tumble_dryer": "Trockner",
+  "device_type.coffee_machine": "Kaffeemaschinen",
   "device_type.oven": "Backöfen",
   "device.none": "Keine",
   "device.edit": "Einstellungen von {device} bearbeiten",
