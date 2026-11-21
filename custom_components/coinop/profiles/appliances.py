@@ -1,7 +1,7 @@
 """Integration Profiles and kind checks of appliance integrations."""
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
@@ -411,25 +411,42 @@ SMARTTHINGS_DEVICE_TYPES = (
     DEVICE_TYPE_TUMBLE_DRYER,
     DEVICE_TYPE_OVEN,
 )
-# By capability with a machine state sensor: the kind it tells, and its running,
-# paused and finished values (finished is also the idle state).
+
+
+class MachineState(NamedTuple):
+    """The kind a SmartThings machine state tells and its values; `finished` is also
+    the idle state."""
+
+    kind: str
+    running: str
+    paused: str
+    finished: str
+
+
+# By capability with a machine state sensor.
 SMARTTHINGS_MACHINE_STATES = {
-    "washerOperatingState": (DEVICE_TYPE_WASHING_MACHINE, "run", "pause", "stop"),
-    "dryerOperatingState": (DEVICE_TYPE_TUMBLE_DRYER, "run", "pause", "stop"),
-    "dishwasherOperatingState": (DEVICE_TYPE_DISHWASHER, "run", "pause", "stop"),
-    "ovenOperatingState": (DEVICE_TYPE_OVEN, "running", "paused", "ready"),
+    "washerOperatingState": MachineState(
+        DEVICE_TYPE_WASHING_MACHINE, "run", "pause", "stop"
+    ),
+    "dryerOperatingState": MachineState(
+        DEVICE_TYPE_TUMBLE_DRYER, "run", "pause", "stop"
+    ),
+    "dishwasherOperatingState": MachineState(
+        DEVICE_TYPE_DISHWASHER, "run", "pause", "stop"
+    ),
+    "ovenOperatingState": MachineState(DEVICE_TYPE_OVEN, "running", "paused", "ready"),
 }
 
 
 def _smartthings_machine_state(
     find: Find, *, disabled: bool = False
-) -> tuple[str, str] | None:
-    """The `main` component's machine state sensor and its capability: a washer's
+) -> tuple[str, MachineState] | None:
+    """The `main` component's machine state sensor and its states: a washer's
     upper washer and an oven's second cavity have one of their own."""
     return next(
         (
-            (status, capability)
-            for capability in SMARTTHINGS_MACHINE_STATES
+            (status, states)
+            for capability, states in SMARTTHINGS_MACHINE_STATES.items()
             if (
                 status := find(
                     "sensor",
@@ -452,14 +469,17 @@ def smartthings(find: Find) -> dict[str, Any]:
     machine_state = _smartthings_machine_state(find)
     if machine_state is None:
         return {"status": {}, "mapping": {}}
-    status, capability = machine_state
-    _, running, paused, finished = SMARTTHINGS_MACHINE_STATES[capability]
+    status, states = machine_state
     energy = find(
         "sensor", "_main_powerConsumptionReport_powerConsumption_energy_meter"
     )
     return {
         "status": {"entity_id": status, "attribute": None},
-        "mapping": mapping(running=[running], paused=[paused], finished=[finished]),
+        "mapping": mapping(
+            running=[states.running],
+            paused=[states.paused],
+            finished=[states.finished],
+        ),
         "consumption": energy_source(energy),
     }
 
@@ -484,4 +504,4 @@ def smartthings_kind(
         for platform, suffix in SMARTTHINGS_STEAM_CLOSET.items()
     ):
         return NoDeviceType.NOT_A_DEVICE
-    return SMARTTHINGS_MACHINE_STATES[machine_state[1]][0]
+    return machine_state[1].kind
