@@ -10,7 +10,7 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
+The kind of Device (3D printer, washing machine, dishwasher, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
 _Avoid_: Category, device class
 _German UI_: Gerätetyp
 
@@ -50,7 +50,7 @@ _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 
 **Program**:
-The washing program a Run of a washing machine ran, such as "Cotton 60°" or "Eco 40-60", as its Program Device Input reports it or the user corrects it.
+The program a Run ran, such as a washing machine's "Cotton 60°" or a dishwasher's "Eco 50°", as the Device's Program Device Input reports it or the user corrects it. Only Device Types with a Program input have one.
 _Avoid_: Cycle, mode, wash type
 _German UI_: Programm
 
@@ -115,7 +115,7 @@ _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
 
 **Dose**:
-One product a washing machine's Runs use, such as detergent or fabric softener, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
+One product a Device's Runs use, such as a washing machine's detergent or a dishwasher's tabs, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
 _Avoid_: Additive, dosage, detergent (as the generic term)
 _German UI_: Dosierung
 

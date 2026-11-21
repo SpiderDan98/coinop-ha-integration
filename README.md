@@ -1,6 +1,6 @@
 # Coin-op
 
-A Home Assistant custom integration that records what each print of your 3D printers and each load of your washing machine costs: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
+A Home Assistant custom integration that records what each Run of your household devices costs, such as each print of a 3D printer or each program of a washing machine or dishwasher: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
 
 Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
 
@@ -14,7 +14,21 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
-- Washing machines are the second Device Type: each load is a Run with electricity, water and the detergent and other products dosed into it. See [Washing machines](#washing-machines).
+- Other appliances are Device Types of their own: each load of a washing machine or dishwasher is a Run with electricity, water and the detergent and other products dosed into it. See [Device Types](#device-types).
+
+## Device Types
+
+The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source and price, and every Run takes Line Items you add by hand or from templates.
+
+| Device Type | A Run records | Pre-filled for |
+|---|---|---|
+| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
+| Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | no integration yet: set up manually |
+
+"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), and manual setup comes pre-filled for them. A device of any other integration is set up manually, by picking its entities yourself.
+
+A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
 
 ## Installation
 
