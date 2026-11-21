@@ -58,7 +58,7 @@ from .device_settings import (
 )
 from .images import DeviceImages
 from .materials import Material, MaterialForm, SpoolmanPrice
-from .metering import LIVE_INTERVAL, Metering
+from .metering import LIVE_INTERVAL, Fallback, Metering
 from .models import (
     CONSUMED_KINDS,
     ConsumptionMethod,
@@ -149,17 +149,13 @@ class DeviceTracker:
     def _per_program(self) -> bool:
         return Capability.PROGRAM_CONSUMPTION in self._config.capabilities
 
-    def _electricity_fallback(
-        self, run: Run
-    ) -> tuple[consumption.Model | float | None, ConsumptionMethod]:
+    def _electricity_fallback(self, run: Run) -> Fallback:
         if self._per_program:
             kwh = self._program_row(run)[0].get(ELECTRICITY.default_key)
             return kwh, ConsumptionMethod.PROGRAM_DEFAULT
         return self._estimate(run), ConsumptionMethod.ESTIMATED
 
-    def _water_fallback(
-        self, run: Run
-    ) -> tuple[float | None, ConsumptionMethod] | None:
+    def _water_fallback(self, run: Run) -> Fallback | None:
         """The Program's litres, unless the Run started before the Device had a
         water source."""
         timeline = run.timelines.get(LineItemKind.WATER)

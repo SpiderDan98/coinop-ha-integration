@@ -31,7 +31,6 @@ class Target(StrEnum):
     IGNORED = "ignored"
 
 
-# The source of a quantity a Device doesn't follow: its Runs get no Line Item of it.
 NO_SOURCE = "none"
 
 
