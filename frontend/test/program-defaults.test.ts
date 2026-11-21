@@ -134,6 +134,29 @@ describe("A tumble dryer's Program Defaults", () => {
     expect(queryAll(dialog, ".doses .dose-name").map(text)).toEqual(["Dryer sheets"]);
   });
 
+  it.each([
+    [
+      "en",
+      "Amounts per Run: kWh when nothing measures them, and a column for each Dose above, in " +
+        "its Material's unit. An empty cell means not set or not dosed. A Run uses the row of " +
+        "its Program, else the Default row.",
+    ],
+    [
+      "de",
+      "Mengen pro Lauf: kWh, wenn nichts sie misst, und eine Spalte für jede Dosierung oben, " +
+        "in der Einheit ihres Materials. Ein leeres Feld heißt nicht festgelegt oder nicht " +
+        "dosiert. Ein Lauf verwendet die Zeile seines Programms, sonst die Standardzeile.",
+    ],
+  ])("are explained by the columns they have, so without litres (%s)", async (language, hint) => {
+    const backend = backendWith(tumbleDryer);
+    backend.update({ language });
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    await click(panel, query(panel, ".device ha-icon-button.edit"));
+
+    expect(text(query(panel, ".settings-dialog .program-defaults .hint"))).toBe(hint);
+  });
+
   it("stay a kWh column once the Dose list is emptied", async () => {
     const backend = backendWith(tumbleDryer);
     const panel = await mountPanel(backend, { path: "/devices" });

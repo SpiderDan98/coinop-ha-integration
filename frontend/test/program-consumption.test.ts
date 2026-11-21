@@ -45,6 +45,11 @@ describe("Electricity and water per Program", () => {
     expect(input(dialog, "Default litres").value).toBe("50");
     expect(input(dialog, "kWh for Wool").value).toBe("0.4");
     expect(input(dialog, "Litres for Wool").value).toBe("45");
+    expect(text(query(dialog, ".program-defaults .hint"))).toBe(
+      "Amounts per Run: kWh and litres when nothing measures them, and a column for each Dose " +
+        "above, in its Material's unit. An empty cell means not set or not dosed. A Run uses " +
+        "the row of its Program, else the Default row.",
+    );
   });
 
   it("store a value entered and drop one cleared", async () => {

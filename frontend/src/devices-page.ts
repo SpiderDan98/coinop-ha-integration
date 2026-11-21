@@ -751,7 +751,11 @@ export class DevicesPage extends LitElement {
       {
         name: "program-defaults",
         group: true,
-        hint: t(dosed ? "device.program_defaults_hint" : "device.program_defaults_hint_undosed"),
+        hint: t(
+          dosed
+            ? `device.program_defaults_hint${consumed.includes("litres") ? "" : "_unwatered"}`
+            : "device.program_defaults_hint_undosed",
+        ),
       },
     );
   }
