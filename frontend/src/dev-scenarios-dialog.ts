@@ -43,6 +43,7 @@ export class DevScenariosDialog extends LitElement {
 
   @state() private list?: Awaited<ReturnType<typeof listScenarios>>;
   @state() private picked = new Set<string>();
+  @state() private preset = "";
   @state() private loading = false;
   @state() private failed = false;
   // Fixed once listed, so that the groups open and close only when the user says so.
@@ -52,7 +53,7 @@ export class DevScenariosDialog extends LitElement {
     super.connectedCallback();
     listScenarios(this.hass).then(
       (list) => {
-        this.picked = new Set(list.selection?.pieces);
+        this.pick(list.selection?.pieces ?? [], list.preset ?? "");
         this.expanded = new Set(
           list.groups
             .filter(({ pieces }) => pieces.some(({ name }) => this.picked.has(name)))
@@ -70,19 +71,20 @@ export class DevScenariosDialog extends LitElement {
       t,
       title: t("dev.title"),
       content: html`<p class="muted small">${t("dev.hint")}</p>
+        ${this.list ? this.renderPresets(this.list.presets, t) : nothing}
         <div class="row">
           <ha-button
             class="all small"
             appearance="plain"
             ?disabled=${this.loading}
-            @click=${() => (this.picked = new Set(this.names()))}
+            @click=${() => this.pick(this.names())}
             >${t("dev.all")}</ha-button
           >
           <ha-button
             class="none small"
             appearance="plain"
             ?disabled=${this.loading}
-            @click=${() => (this.picked = new Set())}
+            @click=${() => this.pick([])}
             >${t("dev.none")}</ha-button
           >
         </div>
@@ -95,6 +97,32 @@ export class DevScenariosDialog extends LitElement {
       onCancel: () => !this.loading && this.dispatchEvent(new Event("close")),
       onSubmit: () => this.load(),
     });
+  }
+
+  private renderPresets(presets: NonNullable<typeof this.list>["presets"], t: Localize) {
+    const picked = presets.find(({ name }) => name === this.preset);
+    return html`<div class="presets">
+      <span class="muted small">${t("dev.presets")}</span>
+      <div class="row">
+        ${presets.map(
+          ({ name, title, selection }) =>
+            html`<ha-button
+              class="preset small"
+              appearance=${name === this.preset ? "filled" : "plain"}
+              ?disabled=${this.loading}
+              @click=${() => this.pick(selection.pieces, name)}
+              >${title}</ha-button
+            >`,
+        )}
+      </div>
+      <span class="muted small">${picked ? picked.description : t("dev.own_selection")}</span>
+    </div>`;
+  }
+
+  /** Picks exactly `names`, as the Preset `preset` does or as the user's own selection. */
+  private pick(names: Iterable<string>, preset = "") {
+    this.picked = new Set(names);
+    this.preset = preset;
   }
 
   /** Every Piece's name, in group, then Piece order. */
@@ -169,12 +197,17 @@ export class DevScenariosDialog extends LitElement {
       if (pick) picked.add(name);
       else picked.delete(name);
     }
-    this.picked = picked;
+    this.pick(picked);
   }
 
   static override styles = [
     shared,
     css`
+      .presets {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
       .group {
         border-top: 1px solid var(--divider-color);
         padding-top: 8px;

@@ -101,6 +101,18 @@ const piece = (dialog: HTMLElement, title: string) => {
   return found.box;
 };
 
+const presetButton = (dialog: HTMLElement, title: string) => {
+  const found = queryAll(dialog, "ha-button.preset").find((button) => text(button) === title);
+  if (!found) throw new Error(`no Preset "${title}"`);
+  return found;
+};
+
+const pickedPreset = (dialog: HTMLElement) => {
+  const picked = queryAll(dialog, "ha-button.preset[appearance=filled]").map(text);
+  expect(picked.length).toBeLessThan(2);
+  return picked[0];
+};
+
 const loadButton = (dialog: HTMLElement) => query(dialog, "ha-button.load");
 
 const selected = (dialog: HTMLElement) =>
@@ -180,6 +192,30 @@ describe("Test data", () => {
 
     expect(selected(dialog)).toEqual([]);
     expect(groupBox(dialog, "3D printers")).toMatchObject({ checked: false, indeterminate: false });
+  });
+
+  it("fills in a Preset's Pieces without loading them", async () => {
+    const backend = devBackend();
+    const panel = await mountPanel(backend);
+    const dialog = await open(panel);
+
+    expect(pickedPreset(dialog)).toBe("3D printer, a few Runs");
+    expect(text(dialog)).toContain("The Prusa with its 7 Runs.");
+
+    await click(panel, presetButton(dialog, "Quick Start"));
+
+    expect(selected(dialog)).toEqual([
+      "Kobra S1 · Anycubic Cloud & LAN",
+      "Washing machine · WashData",
+    ]);
+    expect(pickedPreset(dialog)).toBe("Quick Start");
+    expect(text(dialog)).toContain("Every Quick Start Piece.");
+    expect(backend.sent("call_service")).toEqual([]);
+
+    await click(panel, piece(dialog, "Garden valve"));
+
+    expect(pickedPreset(dialog)).toBeUndefined();
+    expect(text(dialog)).not.toContain("Every Quick Start Piece.");
   });
 
   it("picks every Piece or none", async () => {
