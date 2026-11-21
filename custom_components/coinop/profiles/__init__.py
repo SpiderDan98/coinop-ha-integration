@@ -53,6 +53,12 @@ INTEGRATIONS = {
         appliances.DEVICE_TYPES,
         appliances.home_connect_kind,
     ),
+    "lg_thinq": Integration(
+        "LG ThinQ",
+        appliances.lg_thinq,
+        appliances.LG_THINQ_DEVICE_TYPES,
+        appliances.lg_thinq_kind,
+    ),
     # EV chargers
 }
 

@@ -227,3 +227,141 @@ def home_connect_kind(
         tuple(registered(suffix) for suffix in HOME_CONNECT_SHARED),
         NoDeviceType.CANT_TELL,
     )
+
+
+LG_THINQ_DEVICE_TYPES = (
+    DEVICE_TYPE_WASHING_MACHINE,
+    DEVICE_TYPE_TUMBLE_DRYER,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_OVEN,
+)
+
+
+def lg_thinq(find: Find) -> dict[str, Any]:
+    """HA core `lg_thinq`: unique ids `<device id>_<property>`, a property with a
+    location as `<location>_<key>` (a washer's `main`, an oven's `oven`).
+
+    Its energy sensors count per day and month, so no meter is pre-filled.
+    """
+    status = find("sensor", "_current_state")
+    program = find("sensor", "_current_dish_washing_course")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        # The integration has one list of states for all appliances (its strings.json).
+        "mapping": found(
+            status,
+            **mapping(
+                running=[
+                    "running",
+                    "detecting",
+                    "display_loadsize",
+                    "detergent_amount",
+                    "dispensing",
+                    "add_drain",
+                    "prewash",
+                    "soaking",
+                    "softening",
+                    "steam_softening",
+                    "rinsing",
+                    "spinning",
+                    "refreshing",
+                    "steam",
+                    "drying",
+                    "cool_down",
+                    "end_cooling",
+                    "checking_turbidity",
+                    "night_dry",
+                    "sterilize",
+                    "smart_grid_run",
+                    "preheat",
+                    "preheating",
+                    "preheat_complete",
+                    "preheating_is_done",
+                    "temperature_stabilization",
+                    "proofing",
+                    "cook",
+                    "cooking_in_progress",
+                    "cooling",
+                    "cleaning",
+                ],
+                paused=["pause", "paused", "rinse_hold"],
+                # Wrinkle care only tumbles the dry load until the door opens.
+                finished=[
+                    "end",
+                    "complete",
+                    "done",
+                    "running_end",
+                    "cook_complete",
+                    "cleaning_is_done",
+                    "wrinkle_care",
+                ],
+                cancelled=["cancel"],
+                fault=["error", "as_pop_up", "power_fail"],
+                # Freeze protection runs by itself and is no cycle.
+                ignored=[
+                    "power_off",
+                    "power_on",
+                    "initial",
+                    "initializing",
+                    "standby",
+                    "sleep",
+                    "reserved",
+                    "reservation",
+                    "macrosector",
+                    "setdate",
+                    "preference",
+                    "change_condition",
+                    "lock",
+                    "diagnosis",
+                    "firmware",
+                    "fota",
+                    "frozen_prevent_initial",
+                    "frozen_prevent_running",
+                    "frozen_prevent_pause",
+                ],
+            ),
+        ),
+        "program": found(program, entity_id=program, attribute=None),
+    }
+
+
+# thinqconnect's `DeviceType`s that are a Device Type: a Styler, a fridge, an air
+# conditioner and every other type are not.
+LG_THINQ_KINDS = {
+    "DEVICE_WASHER": DEVICE_TYPE_WASHING_MACHINE,
+    "DEVICE_WASHCOMBO_MAIN": DEVICE_TYPE_WASHING_MACHINE,
+    "DEVICE_WASHCOMBO_MINI": DEVICE_TYPE_WASHING_MACHINE,
+    "DEVICE_WASHTOWER_WASHER": DEVICE_TYPE_WASHING_MACHINE,
+    "DEVICE_DRYER": DEVICE_TYPE_TUMBLE_DRYER,
+    "DEVICE_WASHTOWER_DRYER": DEVICE_TYPE_TUMBLE_DRYER,
+    "DEVICE_DISH_WASHER": DEVICE_TYPE_DISHWASHER,
+    "DEVICE_OVEN": DEVICE_TYPE_OVEN,
+    "DEVICE_MICROWAVE_OVEN": DEVICE_TYPE_OVEN,
+}
+# A WashTower is an HA device per half, whose locations are its sub ids.
+LG_THINQ_WASHTOWER_HALVES = {
+    "_washer_current_state": DEVICE_TYPE_WASHING_MACHINE,
+    "_dryer_current_state": DEVICE_TYPE_TUMBLE_DRYER,
+}
+# The second Status of a TWINWash (`main` and `mini`) or a double oven (`upper`).
+LG_THINQ_SECOND_STATUS = ("_mini_current_state", "_lower_current_state")
+
+
+def lg_thinq_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """The device type the integration writes into the model, `<model> (<type>)`:
+    a unit with two Status sensors on one HA device is set up by hand."""
+    if any(find("sensor", suffix) for suffix in LG_THINQ_SECOND_STATUS):
+        return NoDeviceType.NOT_A_DEVICE
+    device_type = (device.model or "").rpartition("(")[2].removesuffix(")")
+    if device_type == "DEVICE_WASHTOWER":
+        return next(
+            (
+                kind
+                for suffix, kind in LG_THINQ_WASHTOWER_HALVES.items()
+                if find("sensor", suffix)
+            ),
+            NoDeviceType.NOT_A_DEVICE,
+        )
+    return LG_THINQ_KINDS.get(device_type, NoDeviceType.NOT_A_DEVICE)
