@@ -40,6 +40,8 @@ LIVE_INTERVAL = timedelta(minutes=1)
 # silence means Coin-op wasn't watching the meter.
 OUTAGE = LIVE_INTERVAL + LIVE_SAVE_DELAY
 
+type Fallback = tuple[Model | float | None, ConsumptionMethod]
+
 
 class Metering:
     """One quantity of a Device's Runs.
@@ -58,9 +60,7 @@ class Metering:
         quantity: Quantity,
         config: DeviceConfig,
         gap_rates: Callable[[Run], Sequence[tuple[datetime, float | None]]],
-        fallback: Callable[
-            [Run], tuple[Model | float | None, ConsumptionMethod] | None
-        ],
+        fallback: Callable[[Run], Fallback | None],
         *,
         silent_meter_falls_back: bool = False,
     ) -> None:
@@ -72,7 +72,7 @@ class Metering:
         # Without a source there may be no price section.
         self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
         self._gap_rates = gap_rates
-        self._fallback = fallback
+        self._fallback_with_source = fallback
         # The price entity's last valid report, for a Run starting while it has none.
         self._last_price: tuple[datetime, float] | None = None
 
@@ -82,14 +82,12 @@ class Metering:
     def meter(self, run: Run) -> Mapping[str, Any] | None:
         return meter_of(self.quantity, self.timeline(run).source)
 
-    def _fallback_of(
-        self, run: Run
-    ) -> tuple[Model | float | None, ConsumptionMethod] | None:
+    def _fallback_of(self, run: Run) -> Fallback | None:
         """The Run's fallback; None for a Run that started with source none."""
         source = self.timeline(run).source
         if source is not None and source["source"] == NO_SOURCE:
             return None
-        return self._fallback(run)
+        return self._fallback_with_source(run)
 
     def counts(self, run: Run) -> bool:
         """Whether the Run gets a Line Item of the quantity: measured or by its fallback."""
@@ -352,12 +350,7 @@ class Metering:
         fallback = self._fallback_of(run)
         return self._fallen_back(run, until, fallback) if fallback else None
 
-    def _fallen_back(
-        self,
-        run: Run,
-        until: datetime,
-        fallback: tuple[Model | float | None, ConsumptionMethod],
-    ) -> LineItem:
+    def _fallen_back(self, run: Run, until: datetime, fallback: Fallback) -> LineItem:
         value, method = fallback
         item = self.priced(
             run,
