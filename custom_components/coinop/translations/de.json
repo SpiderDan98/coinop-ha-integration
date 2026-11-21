@@ -551,6 +551,20 @@
     "data_corrupt": {
       "title": "Die gespeicherten Daten von Coin-op sind beschädigt",
       "description": "Coin-op konnte {store} lesen, aber der Inhalt ist nicht das, was Coin-op schreibt, etwa nach einer Bearbeitung von Hand. Coin-op wurde nicht gestartet, damit dein Verlauf nicht überschrieben wird.\n\nStelle unter Einstellungen > System > Backups ein Backup von vor der Beschädigung wieder her oder lege eine aufbewahrte Kopie der Datei zurück. Bis dahin bleibt Coin-op gestoppt."
+    },
+    "spoolman_found": {
+      "title": "Spoolman ist installiert, aber nicht mit Coin-op verbunden",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Spoolman verbinden",
+            "description": "Coin-op hat Spoolman unter {url} gefunden, in den Coin-op-Optionen ist aber keine Spoolman-URL eingetragen. Verbinde Spoolman, um Materialien mit Spoolman-Filamenten zu verknüpfen, damit ihr Preis pro Gramm aus Spoolman kommt. Verknüpft wird erst, wenn du das im Reiter Materialien tust.\n\nIgnoriere diesen Hinweis, wenn Coin-op Spoolman nicht lesen soll."
+          }
+        },
+        "abort": {
+          "cannot_connect": "Unter {url} antwortet Spoolman nicht mehr. Prüfe, ob Spoolman läuft, und versuche es erneut oder trage die URL in den Coin-op-Optionen ein."
+        }
+      }
     }
   },
   "selector": {
