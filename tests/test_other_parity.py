@@ -3,30 +3,55 @@ Type's name. A shipped Device Type and an Other Device with the same mix follow 
 same entities here, so every state reaches both, and their Runs must come out alike."""
 
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
-from homeassistant.config_entries import ConfigSubentry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 import pytest
+from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    AiohttpClientMocker,
+)
 
 from .clock import Clock
 from .devices import (
+    MAPPING,
+    STATUS,
     WASHER_ENERGY,
     WASHER_MAPPING,
     WASHER_STATUS,
     WASHER_WATER,
+    add_device,
     add_hub,
     add_other_device,
     add_washing_machine,
 )
-from .stored import place_materials
+from .images import CAMERA, THUMBNAIL, add_camera, add_thumbnail, picture
+from .stored import place_materials, stored_material
 from .test_doses import SCALE, set_scale
+from .test_lifecycle import JOB
 from .test_manual_runs import create
+from .test_material_usage import (
+    FILAMENT,
+    GRAMS_PER_METRE,
+    PETG,
+    PETG_GRAMS_PER_METRE,
+    set_usage,
+)
 from .test_program_consumption import approx
 from .test_program_correction import costs
 from .test_run_event import record_events
 from .test_runs import stored_runs
+from .test_slots import LOADED, SLOTS, fill, load
+from .test_spoolman import (
+    SPOOLMAN,
+    filament,
+    linked_material,
+    serve_spoolman,
+    set_options,
+    spoolman_down,
+)
 from .test_water import set_water
 from .washing import (
     DOSES,
@@ -39,8 +64,18 @@ from .washing import (
 )
 from .websocket import PanelClient
 
-# What tells one Device's Run, Line Item or event from another's.
-IDENTITY = frozenset({"id", "run_id", "device_id", "device_name", "friendly_name"})
+# What tells one Device's Run, Line Item, image or event from another's.
+IDENTITY = frozenset(
+    {
+        "id",
+        "run_id",
+        "device_id",
+        "device_name",
+        "friendly_name",
+        "url",
+        "tile_url",
+    }
+)
 
 
 def likeness(value: Any) -> Any:
@@ -355,3 +390,329 @@ async def test_an_other_device_with_what_a_washing_machine_has_costs_a_run_like_
     cleaned = await runs_of(panel, hass_storage, carpet_cleaner)
     assert likeness(cleaned) == likeness(washed)
     assert likeness(carpet_cleaner_events) == likeness(washer_events)
+
+
+LASER_STATUS = "sensor.laser_cutter_status"
+PLA = stored_material("pla")
+ANY_PETG = PETG | {"default_for_type": True}
+
+
+async def set_printers(hass: HomeAssistant, status: str) -> None:
+    """Both Devices' Status at once: the one entity no two Devices can share."""
+    for entity_id in (STATUS, LASER_STATUS):
+        hass.states.async_set(entity_id, status)
+    await hass.async_block_till_done()
+
+
+async def start_printers(hass: HomeAssistant, job: str) -> None:
+    hass.states.async_set(JOB, job)
+    await set_printers(hass, "printing")
+
+
+async def add_printer_twins(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    panel: PanelClient,
+    *,
+    default: str | None,
+    measured: bool,
+) -> Twins:
+    """A 3D printer ("Kobra") and an Other Device that has what a printer has ("Laser
+    cutter": Job and Material, Images and a Part Count), both idle, on the same job
+    name, Slot, Loaded slot, Thumbnail and camera entities and, if `measured`, the
+    same Material used input, with the same default Material `default`, each
+    estimating its electricity from 120 W. The Thumbnail shows a red picture and the
+    camera answers with blue ones. Their Status entities are set together with
+    `set_printers`."""
+    hass.config.currency = "EUR"
+    await add_thumbnail(hass, picture("red"))
+    await add_camera(hass, *[picture("blue")] * 4)
+    await set_usage(hass, 0)
+    await set_printers(hass, "idle")
+    job: dict[str, Any] = {
+        "entity_id": JOB,
+        "slots": SLOTS,
+        "colour_attribute": "color_hex",
+        "loaded_slot": LOADED,
+    } | ({"material_entity_id": FILAMENT} if measured else {})
+    twins = (
+        await add_device(
+            hass,
+            entry,
+            job=JOB,
+            material=FILAMENT if measured else None,
+            slots=SLOTS,
+            colour_attribute="color_hex",
+            loaded_slot=LOADED,
+            thumbnail=THUMBNAIL,
+            camera=CAMERA,
+        ),
+        await add_other_device(
+            hass,
+            entry,
+            type_name="Laser cutter",
+            name="Laser cutter",
+            status=LASER_STATUS,
+            mapping=MAPPING,
+            has=["job", "images", "part_count"],
+            job=job,
+            thumbnail=THUMBNAIL,
+            camera=CAMERA,
+        ),
+    )
+    for twin in twins:
+        await panel.call(
+            "coinop/devices/update_settings",
+            device_id=twin.subentry_id,
+            settings={"default_material": default},
+        )
+    return twins
+
+
+async def a_job_of_one_metre(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    """An hour that used 1 m, reported as the job finishes."""
+    await start_printers(hass, "Gear_Set.gcode")
+    await clock.advance(hours=1)
+    await set_usage(hass, 1000)
+    await set_printers(hass, "finished")
+    await clock.advance(minutes=5)
+    # Older Home Assistant needs a second pass for the Run event's listeners.
+    await hass.async_block_till_done()
+
+
+async def a_job_of_four_parts(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    """One metre whose Part Count is set while the job runs."""
+    await start_printers(hass, "Gear_Set.gcode")
+    for run in (await panel.call("coinop/runs/list"))["runs"]:
+        await panel.call("coinop/runs/update", run_id=run["id"], part_count=4)
+    await a_job_of_one_metre(hass, clock, panel, twins)
+
+
+async def a_job_from_two_slots(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    """24 minutes from a PETG Slot, then 36 from one whose TPU matches no Material."""
+    await fill(hass, 1, "PETG", "#000000")
+    await fill(hass, 2, "TPU", "#0000ff")
+    await load(hass, 1)
+    await start_printers(hass, "Two_Tone.gcode")
+    await clock.advance(minutes=24)
+    await load(hass, 2)
+    await clock.advance(minutes=36)
+    await set_usage(hass, 1000)
+    await set_printers(hass, "finished")
+    await clock.advance(minutes=5)
+    await hass.async_block_till_done()
+
+
+async def a_cancelled_job(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    await start_printers(hass, "benchy.gcode")
+    await clock.advance(minutes=30)
+    await set_printers(hass, "cancelled")
+    await clock.advance(minutes=5)
+    await hass.async_block_till_done()
+
+
+async def a_job_started_while_another_is_paused(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    """The next job closes the first one's Run and opens its own."""
+    await start_printers(hass, "benchy.gcode")
+    await clock.advance(minutes=30)
+    await set_usage(hass, 500)
+    await set_printers(hass, "paused")
+    await start_printers(hass, "cube.gcode")
+    await clock.advance(minutes=30)
+    await set_usage(hass, 200)
+    await set_printers(hass, "finished")
+    await clock.advance(minutes=5)
+    await hass.async_block_till_done()
+
+
+async def a_manual_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, twins: Twins
+) -> None:
+    await clock.advance(hours=5)
+    for twin in twins:
+        await create(panel, twin.subentry_id)
+
+
+# 120 W for an hour at 0.30 per kWh.
+AN_HOUR = ("electricity", "estimated", 0.12, 0.036)
+HALF_AN_HOUR = ("electricity", "estimated", 0.06, 0.018)
+TO_FILL_IN = ("material", None, None, 0)
+
+
+@pytest.mark.parametrize(
+    (
+        "materials",
+        "spoolman",
+        "default",
+        "measured",
+        "scenario",
+        "flags",
+        "expected",
+        "images",
+        "fired",
+    ),
+    [
+        pytest.param(
+            [PLA],
+            None,
+            "pla",
+            True,
+            a_job_of_four_parts,
+            [[]],
+            [[AN_HOUR, ("material", None, GRAMS_PER_METRE, GRAMS_PER_METRE * 0.02)]],
+            [["thumbnail", "snapshot"]],
+            ["started", "ended"],
+            id="a measured job of four parts",
+        ),
+        pytest.param(
+            [PLA, ANY_PETG],
+            None,
+            "pla",
+            True,
+            a_job_from_two_slots,
+            [["estimated_split", "slot_fallback"]],
+            [
+                [
+                    AN_HOUR,
+                    (
+                        "material",
+                        None,
+                        0.4 * PETG_GRAMS_PER_METRE,
+                        0.4 * PETG_GRAMS_PER_METRE * 0.03,
+                    ),
+                    (
+                        "material",
+                        None,
+                        0.6 * GRAMS_PER_METRE,
+                        0.6 * GRAMS_PER_METRE * 0.02,
+                    ),
+                ]
+            ],
+            [["thumbnail", "snapshot"]],
+            ["started", "ended"],
+            id="a job from two Slots, one matching no Material",
+        ),
+        pytest.param(
+            [linked_material("pla", 0.02)],
+            "up",
+            "pla",
+            True,
+            a_job_of_one_metre,
+            [[]],
+            [[AN_HOUR, ("material", None, GRAMS_PER_METRE, GRAMS_PER_METRE * 0.03)]],
+            [["thumbnail", "snapshot"]],
+            ["started", "ended"],
+            id="a job priced by Spoolman at its end",
+        ),
+        pytest.param(
+            [linked_material("pla", 0.025)],
+            "down",
+            "pla",
+            True,
+            a_job_of_one_metre,
+            [["spoolman_unreachable"]],
+            [[AN_HOUR, ("material", None, GRAMS_PER_METRE, GRAMS_PER_METRE * 0.025)]],
+            [["thumbnail", "snapshot"]],
+            ["started", "ended"],
+            id="a job while Spoolman is down",
+        ),
+        pytest.param(
+            [PLA],
+            None,
+            None,
+            False,
+            a_cancelled_job,
+            [["material_missing", "usage_missing"]],
+            [[HALF_AN_HOUR, TO_FILL_IN]],
+            [["thumbnail", "snapshot"]],
+            ["started", "ended"],
+            id="a cancelled job, no Material used input and no default Material",
+        ),
+        pytest.param(
+            [PLA],
+            None,
+            "pla",
+            True,
+            a_job_started_while_another_is_paused,
+            [[], []],
+            [
+                [
+                    HALF_AN_HOUR,
+                    ("material", None, 0.5 * GRAMS_PER_METRE, GRAMS_PER_METRE * 0.01),
+                ],
+                [
+                    HALF_AN_HOUR,
+                    ("material", None, 0.2 * GRAMS_PER_METRE, GRAMS_PER_METRE * 0.004),
+                ],
+            ],
+            [["thumbnail"], ["thumbnail", "snapshot"]],
+            ["started", "ended", "started", "ended"],
+            id="a job started while another is paused",
+        ),
+        pytest.param(
+            [PLA],
+            None,
+            "pla",
+            True,
+            a_manual_run,
+            [["usage_missing"]],
+            [[("electricity", "estimated", 0.24, 0.072), TO_FILL_IN]],
+            [[]],
+            [],
+            id="a manual Run",
+        ),
+    ],
+)
+async def test_an_other_device_with_what_a_printer_has_costs_a_run_like_one(
+    hass: HomeAssistant,
+    clock: Clock,
+    files: Path,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+    materials: list[dict[str, Any]],
+    spoolman: str | None,
+    default: str | None,
+    measured: bool,
+    scenario: Callable[[HomeAssistant, Clock, PanelClient, Twins], Awaitable[None]],
+    flags: list[list[str]],
+    expected: list[list[tuple[Any, ...]]],
+    images: list[list[str]],
+    fired: list[str],
+) -> None:
+    place_materials(hass_storage, *materials)
+    entry = await add_hub(hass)
+    if spoolman is not None:
+        # Filament 7 at 0.03 per g, which the linked Material last read cheaper.
+        serve_spoolman(aioclient_mock, [filament(7, price=30.0)])
+        await set_options(hass, entry, spoolman_url=SPOOLMAN)
+    if spoolman == "down":
+        spoolman_down(aioclient_mock)
+    twins = await add_printer_twins(
+        hass, entry, panel, default=default, measured=measured
+    )
+    printer, laser_cutter = twins
+    printer_events, laser_cutter_events = (
+        record_events(hass, f"event.{slug}_run") for slug in ("kobra", "laser_cutter")
+    )
+
+    await scenario(hass, clock, panel, twins)
+
+    printed = await runs_of(panel, hass_storage, printer)
+    assert [sorted(run["flags"]) for run in printed["stored"]] == flags
+    assert [approx(costs(run)) for run in printed["stored"]] == expected
+    assert [[i["kind"] for i in run["images"]] for run in printed["panel"]] == images
+    assert [event["event_type"] for event in printer_events] == fired
+    cut = await runs_of(panel, hass_storage, laser_cutter)
+    assert likeness(cut) == likeness(printed)
+    assert likeness(laser_cutter_events) == likeness(printer_events)
