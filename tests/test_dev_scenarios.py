@@ -236,15 +236,22 @@ async def test_the_irrigation_is_listed_under_its_type_name_and_costs_only_its_w
 
 
 @pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    "data", [{"preset": "washing-machine"}, {"pieces": ["washer"]}], ids=str
+)
 async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
-    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    data: dict[str, Any],
 ) -> None:
     """As over REST (`make dev`), whose view awaits the service call in a task."""
     assert await async_setup(hass, {})
     call = hass.services.async_call(
         "coinop_dev",
         "load",
-        {"scenario": "washing-machine"},
+        data,
         blocking=True,
         context=Context(user_id=hass_admin_user.id),
     )
@@ -256,12 +263,16 @@ async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
 
 
 @pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    "data", [{"preset": "washing-machine"}, {"pieces": ["washer"]}], ids=str
+)
 async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_once(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     panel: PanelClient,
     files: Path,
     monkeypatch: pytest.MonkeyPatch,
+    data: dict[str, Any],
 ) -> None:
     """Awaiting an executor job that is done already doesn't suspend, so the load can
     reach its first report before Home Assistant tracks the tasks running it."""
@@ -276,7 +287,7 @@ async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_
     call = hass.services.async_call(
         "coinop_dev",
         "load",
-        {"scenario": "washing-machine"},
+        data,
         blocking=True,
         context=Context(user_id=hass_admin_user.id),
     )
@@ -285,6 +296,78 @@ async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_
         await hass.async_create_task(call)
 
     assert await counts(panel) == (1, 4, 10, 0)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_selection(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    # Coin-op set up before the panel connects, without storing a selection.
+    await async_load(hass, "empty", hass_admin_user)
+    assert await async_setup(hass, {})
+    before = await panel.call("coinop_dev/scenarios")
+
+    await load(hass, hass_admin_user, {"preset": "two-printers"})
+    from_preset = await panel.call("coinop_dev/scenarios")
+    await load(hass, hass_admin_user, {"pieces": ["irrigation", "washer"]})
+    picked = await panel.call("coinop_dev/scenarios")
+
+    assert (before["preset"], before["selection"]) == (None, None)
+    assert [
+        (group["device_type"], [piece["name"] for piece in group["pieces"]])
+        for group in before["groups"]
+    ] == [
+        (
+            "3d_printer",
+            ["prusa", "bambu", "anycubic_cloud.3d_printer", "moonraker.3d_printer"],
+        ),
+        ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
+        ("dishwasher", ["ha_washdata.dishwasher"]),
+        ("ev_charger", ["tesla_wall_connector.ev_charger"]),
+        ("other", ["irrigation"]),
+    ]
+    prusa, _, kobra, _ = before["groups"][0]["pieces"]
+    assert (prusa["title"], prusa["section"]) == ("Prusa MK4", "device")
+    assert (kobra["title"], kobra["section"]) == (
+        "Kobra S1 · Anycubic Cloud & LAN",
+        "quick_start",
+    )
+    assert all(piece["description"] for g in before["groups"] for piece in g["pieces"])
+    presets = {preset["name"]: preset for preset in before["presets"]}
+    assert list(presets) == [
+        "empty",
+        "quick-start",
+        "few-runs",
+        "printing-now",
+        "two-printers",
+        "long-history",
+        "washing-machine",
+        "irrigation",
+    ]
+    assert presets["two-printers"]["title"] == "Two printers"
+    assert presets["two-printers"]["selection"] == {"pieces": ["prusa", "bambu"]}
+    assert presets["quick-start"]["selection"]["pieces"] == [
+        "anycubic_cloud.3d_printer",
+        "moonraker.3d_printer",
+        "ha_washdata.washing_machine",
+        "ha_washdata.dishwasher",
+        "tesla_wall_connector.ev_charger",
+    ]
+    assert (from_preset["preset"], from_preset["selection"]) == (
+        "two-printers",
+        {"pieces": ["prusa", "bambu"]},
+    )
+    assert (picked["preset"], picked["selection"]) == (
+        None,
+        {"pieces": ["washer", "irrigation"]},
+    )
+
+
+async def load(hass: HomeAssistant, user: MockUser, data: dict[str, Any]) -> None:
+    await hass.services.async_call(
+        "coinop_dev", "load", data, blocking=True, context=Context(user_id=user.id)
+    )
+    await hass.async_block_till_done()
 
 
 @pytest.mark.usefixtures("helpers")
