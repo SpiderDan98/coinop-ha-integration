@@ -11,8 +11,21 @@ from custom_components.coinop.device_config import DEVICE_TYPES
 
 from ..stand_ins import Registration, appliances, ev_chargers, printers
 from . import devices, histories
-from .data import DISHWASHER_METERS, DRYER_METERS, IRRIGATION_WATER, WASHER_METERS
-from .seed import Seed
+from .data import (
+    COOKINGS,
+    DISHES,
+    DISHWASHER_METERS,
+    DRINKS,
+    DRYER_METERS,
+    IRRIGATION_WATER,
+    LOADS,
+    MOWS,
+    SESSIONS,
+    TUMBLES,
+    WASHER_METERS,
+    WATERINGS,
+)
+from .seed import Seed, async_set
 
 
 @dataclass(frozen=True)
@@ -33,8 +46,9 @@ class DeviceWithHistory(Piece):
     # The Runs of each history level but none, which leaves the Device alone.
     short: Callable[[Seed], Awaitable[None]]
     long: Callable[[Seed], Awaitable[None]]
-    # Starts a Run through its helpers, as its integration would report one.
-    start: Callable[[Seed], Awaitable[None]]
+    # The helper states that start a Run, set in this order, as its integration would
+    # report one.
+    start: Mapping[str, str | float]
     needs: tuple[str, ...] = ()
     # The panel settings it gets whatever its history, before its Runs.
     setup: Callable[[Seed], Awaitable[None]] | None = None
@@ -44,6 +58,10 @@ class DeviceWithHistory(Piece):
             await self.setup(seed)
         if history != "none":
             await (self.short if history == "short" else self.long)(seed)
+
+    async def open_run(self, seed: Seed) -> None:
+        for entity_id, value in self.start.items():
+            await async_set(seed.hass, entity_id, value)
 
 
 @dataclass(frozen=True)
@@ -124,8 +142,11 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         _printer_helpers("prusa"),
         device=devices.printer("prusa"),
         short=histories.prusa,
-        long=histories.prusa_long,
-        start=histories.prusa_start,
+        long=partial(histories.printer_years, printer="prusa", gaps=range(1, 7)),
+        start={
+            "input_text.prusa_job": "Gridfinity bins 3x2.gcode",
+            "input_select.prusa_status": "printing",
+        },
         needs=("filaments", "tags", "template"),
     ),
     "bambu": DeviceWithHistory(
@@ -136,8 +157,11 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         _printer_helpers("bambu"),
         device=devices.printer("bambu"),
         short=histories.bambu,
-        long=histories.bambu_long,
-        start=histories.bambu_start,
+        long=partial(histories.printer_years, printer="bambu", gaps=range(3, 10)),
+        start={
+            "input_text.bambu_job": "Spool holder.gcode",
+            "input_select.bambu_status": "printing",
+        },
         needs=("filaments", "tags", "template"),
     ),
     "anycubic.3d_printer": StaticPiece(
@@ -217,10 +241,13 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             "input_select.washer_program": "Cotton 60°",
             **{f"input_number.{key}": value for key, value in WASHER_METERS.items()},
         },
-        device=devices.washer(),
-        short=histories.washer_short,
+        device=devices.appliance("washing_machine", "washer"),
+        short=partial(histories.wash, loads=LOADS),
         long=histories.washer_long,
-        start=histories.washer_start,
+        start={
+            "input_select.washer_program": "Cotton 60°",
+            "input_select.washer_status": "running",
+        },
         needs=("laundry",),
         setup=histories.washer_settings,
     ),
@@ -295,9 +322,24 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             },
         },
         device=devices.appliance("dishwasher", "dishwasher"),
-        short=histories.dishwasher_short,
-        long=histories.dishwasher_long,
-        start=partial(histories.start_cycle, key="dishwasher", program="Eco 50°"),
+        short=partial(
+            histories.replay_cycles,
+            key="dishwasher",
+            meters=DISHWASHER_METERS,
+            cycles=DISHES,
+        ),
+        long=partial(
+            histories.replay_years,
+            key="dishwasher",
+            meters=DISHWASHER_METERS,
+            cycles=DISHES,
+            gaps=range(3, 8),
+            hours=(13, 20, 21),
+        ),
+        start={
+            "input_select.dishwasher_program": "Eco 50°",
+            "input_select.dishwasher_status": "running",
+        },
         needs=("dishwasher",),
         setup=partial(
             histories.set_doses,
@@ -407,11 +449,21 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             **{f"input_number.{key}": value for key, value in DRYER_METERS.items()},
         },
         device=devices.appliance("tumble_dryer", "dryer", water=None),
-        short=histories.dryer_short,
-        long=histories.dryer_long,
-        start=partial(
-            histories.start_cycle, key="dryer", program="Cotton cupboard dry"
+        short=partial(
+            histories.replay_cycles, key="dryer", meters=DRYER_METERS, cycles=TUMBLES
         ),
+        long=partial(
+            histories.replay_years,
+            key="dryer",
+            meters=DRYER_METERS,
+            cycles=TUMBLES,
+            gaps=range(4, 11),
+            hours=(10, 11, 18),
+        ),
+        start={
+            "input_select.dryer_program": "Cotton cupboard dry",
+            "input_select.dryer_status": "running",
+        },
         needs=("dryer",),
         setup=partial(
             histories.set_doses,
@@ -496,9 +548,19 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         device=devices.appliance(
             "coffee_machine", "coffee", metered=False, water="per_program"
         ),
-        short=histories.coffee_short,
-        long=histories.coffee_long,
-        start=partial(histories.start_cycle, key="coffee", program="Cappuccino"),
+        short=partial(histories.replay_cycles, key="coffee", meters={}, cycles=DRINKS),
+        long=partial(
+            histories.replay_years,
+            key="coffee",
+            meters={},
+            cycles=DRINKS,
+            gaps=range(3, 9),
+            hours=(7, 8, 15),
+        ),
+        start={
+            "input_select.coffee_program": "Cappuccino",
+            "input_select.coffee_status": "running",
+        },
         needs=("coffee",),
         setup=partial(
             histories.set_doses,
@@ -555,10 +617,22 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             "input_select.kitchen_oven_status": "off",
             "input_select.kitchen_oven_program": "Fan plus 180°",
         },
-        device=devices.oven(),
-        short=histories.oven_short,
-        long=histories.oven_long,
-        start=histories.oven_start,
+        device=devices.appliance("oven", "kitchen_oven", metered=False, water=None),
+        short=partial(
+            histories.replay_cycles, key="kitchen_oven", meters={}, cycles=COOKINGS
+        ),
+        long=partial(
+            histories.replay_years,
+            key="kitchen_oven",
+            meters={},
+            cycles=COOKINGS,
+            gaps=range(3, 10),
+            hours=(12, 13, 17, 18, 19),
+        ),
+        start={
+            "input_select.kitchen_oven_program": "Pizza 220°",
+            "input_select.kitchen_oven_status": "running",
+        },
         setup=histories.oven_settings,
     ),
     "miele.oven": StaticPiece(
@@ -616,9 +690,9 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             "input_number.carport_charger_session": 0,
         },
         device=devices.charger(),
-        short=histories.charger_short,
+        short=partial(histories.charge, sessions=SESSIONS),
         long=histories.charger_long,
-        start=histories.charger_start,
+        start={"input_select.carport_charger_status": "charging"},
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
@@ -696,9 +770,9 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             "input_number.robotic_mower_station_energy": 85.0,
         },
         device=devices.mower(),
-        short=histories.mower_short,
+        short=partial(histories.mow, mows=MOWS),
         long=histories.mower_long,
-        start=histories.mower_start,
+        start={"input_select.robotic_mower_status": "mowing"},
     ),
     "irrigation": DeviceWithHistory(
         "other",
@@ -711,9 +785,9 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             "input_number.irrigation_water": IRRIGATION_WATER,
         },
         device=devices.garden_valve(),
-        short=histories.irrigation_short,
+        short=partial(histories.water, waterings=WATERINGS),
         long=histories.irrigation_long,
-        start=histories.irrigation_start,
+        start={"input_select.irrigation_status": "watering"},
     ),
 }
 

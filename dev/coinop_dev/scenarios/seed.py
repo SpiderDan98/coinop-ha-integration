@@ -28,6 +28,7 @@ from .data import (
     LAUNDRY,
     MATERIALS,
     TAGS,
+    Product,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,24 +113,22 @@ class Seed:
             created = await self.api.call("coinop/materials/create", material=material)
             self.materials[name] = created["material"]
 
-    async def add_products(
-        self, products: Iterable[tuple[str, str, str, float | None, str, float, int]]
-    ) -> None:
-        for name, type_, form, density, pack_unit, pack_price, pack_size in products:
+    async def add_products(self, products: Iterable[Product]) -> None:
+        for product in products:
             material = {
-                "name": name,
-                "form": form,
-                "type": type_,
-                "density": density,
+                "name": product.name,
+                "form": product.form,
+                "type": product.type,
+                "density": product.density,
                 "price": {
                     "source": "fixed",
-                    "pack_price": pack_price,
-                    "pack_size": pack_size,
-                    "pack_unit": pack_unit,
+                    "pack_price": product.pack_price,
+                    "pack_size": product.pack_size,
+                    "pack_unit": product.pack_unit,
                 },
             }
             created = await self.api.call("coinop/materials/create", material=material)
-            self.materials[name] = created["material"]
+            self.materials[product.name] = created["material"]
 
     async def add_tags(self) -> None:
         for tag in TAGS:
@@ -197,11 +196,6 @@ class Seed:
             )
             await runtime.images.async_add(run, ImageKind.THUMBNAIL, data)
 
-    async def set_printer(self, printer: str, status: str, job: str = "") -> None:
-        """Set a printer's helpers, as its integration would report a job."""
-        await async_set(self.hass, f"input_text.{printer}_job", job)
-        await async_set(self.hass, f"input_select.{printer}_status", status)
-
 
 # The shared data a Piece can need, each created once per load, in this order.
 SHARED: dict[str, Callable[[Seed], Awaitable[None]]] = {
@@ -249,7 +243,7 @@ def _picture(colour: str, shape: int) -> bytes:
 
 
 async def replay_meters(
-    hass: HomeAssistant, meters: dict[str, float], at: datetime
+    hass: HomeAssistant, meters: Mapping[str, float], at: datetime
 ) -> None:
     for key, value in meters.items():
         await replay(hass, f"input_number.{key}", value, at)

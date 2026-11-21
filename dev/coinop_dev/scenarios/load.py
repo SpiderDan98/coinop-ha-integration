@@ -73,7 +73,7 @@ async def async_load(
         )
     if open_run:
         for piece in with_history.values():
-            await piece.start(seed)
+            await piece.open_run(seed)
     return {"pieces": pieces, "history": history, "open_run": open_run}
 
 

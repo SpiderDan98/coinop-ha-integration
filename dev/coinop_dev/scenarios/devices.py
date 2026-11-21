@@ -40,41 +40,6 @@ def printer(key: str) -> dict[str, Any]:
     }
 
 
-def washer() -> dict[str, Any]:
-    return {
-        "device_type": "washing_machine",
-        "printer_device_id": None,
-        "status": {"entity_id": "input_select.washer_status", "attribute": None},
-        "mapping": {
-            "running": ["running"],
-            "paused": ["paused"],
-            "finished": ["finished"],
-            "cancelled": ["cancelled"],
-            "ended": [],
-            "fault": [],
-            "ignored": ["off"],
-        },
-        "program": {"entity_id": "input_select.washer_program", "attribute": None},
-        "consumption": {
-            "source": "energy",
-            "entity_id": "input_number.washer_energy",
-            "attribute": None,
-            "unit": "kWh",
-            "factor": None,
-        },
-        "price": {"source": "fixed", "value": 0.32},
-        "water": {
-            "source": "meter",
-            "entity_id": "input_number.washer_water",
-            "attribute": None,
-            "unit": "L",
-            "factor": None,
-        },
-        # Per m³, wastewater included.
-        "water_price": {"source": "fixed", "value": 4.2},
-    }
-
-
 def appliance(
     device_type: str, key: str, *, metered: bool = True, water: str | None = "meter"
 ) -> dict[str, Any]:
@@ -117,32 +82,9 @@ def appliance(
     elif water:
         data["water"] = {"source": water}
     if water:
+        # Per m³, wastewater included.
         data["water_price"] = {"source": "fixed", "value": 4.2}
     return data
-
-
-def oven() -> dict[str, Any]:
-    """An oven without a meter: its electricity comes from its Program Defaults."""
-    return {
-        "device_type": "oven",
-        "printer_device_id": None,
-        "status": {"entity_id": "input_select.kitchen_oven_status", "attribute": None},
-        "mapping": {
-            "running": ["running"],
-            "paused": ["paused"],
-            "finished": ["finished"],
-            "cancelled": ["cancelled"],
-            "ended": [],
-            "fault": [],
-            "ignored": ["off"],
-        },
-        "program": {
-            "entity_id": "input_select.kitchen_oven_program",
-            "attribute": None,
-        },
-        "consumption": {"source": "per_program"},
-        "price": {"source": "fixed", "value": 0.32},
-    }
 
 
 def charger() -> dict[str, Any]:
