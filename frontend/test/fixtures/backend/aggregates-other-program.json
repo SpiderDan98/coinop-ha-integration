@@ -1,0 +1,81 @@
+{
+  "runs": [
+    {
+      "id": "plain-loaf",
+      "device_id": "device-bread-maker",
+      "device_name": "Bread maker",
+      "name": null,
+      "program": null,
+      "started": "2026-01-15T10:00:00+00:00",
+      "ended": "2026-01-15T13:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 10800,
+      "total": 0.12,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    },
+    {
+      "id": "wheat-loaf",
+      "device_id": "device-bread-maker",
+      "device_name": "Bread maker",
+      "name": "Whole wheat",
+      "program": "Whole wheat",
+      "started": "2026-01-15T14:00:00+00:00",
+      "ended": "2026-01-15T17:00:00+00:00",
+      "outcome": "completed",
+      "finalised": true,
+      "running_seconds": 10800,
+      "total": 0.15,
+      "part_count": null,
+      "cost_per_part": null,
+      "flags": [],
+      "tags": [],
+      "cover": null
+    }
+  ],
+  "aggregates": [
+    {
+      "group_by": [
+        "program"
+      ],
+      "run_ids": [
+        "plain-loaf",
+        "wheat-loaf"
+      ],
+      "groups": [
+        {
+          "program": "Whole wheat",
+          "cost": 0.15,
+          "electricity_cost": 0.15,
+          "water_cost": 0.0,
+          "material_cost": 0.0,
+          "other_cost": 0.0,
+          "material_grams": 0.0,
+          "energy_kwh": 0.5,
+          "water_litres": 0.0,
+          "runs": 1,
+          "running_hours": 3.0,
+          "flagged_runs": 0
+        },
+        {
+          "program": null,
+          "cost": 0.12,
+          "electricity_cost": 0.12,
+          "water_cost": 0.0,
+          "material_cost": 0.0,
+          "other_cost": 0.0,
+          "material_grams": 0.0,
+          "energy_kwh": 0.4,
+          "water_litres": 0.0,
+          "runs": 1,
+          "running_hours": 3.0,
+          "flagged_runs": 0
+        }
+      ]
+    }
+  ]
+}
