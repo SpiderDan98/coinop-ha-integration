@@ -55,7 +55,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png" alt="The Cost Statement dialog"></a>
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/statement.png" alt="The first page of a Cost Statement PDF"></a>
       <br><sub>A Cost Statement PDF of the selected Runs</sub>
     </td>
     <td width="50%" valign="top">
