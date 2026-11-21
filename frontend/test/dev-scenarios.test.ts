@@ -182,6 +182,19 @@ describe("Test data", () => {
     expect(groupBox(dialog, "3D printers")).toMatchObject({ checked: false, indeterminate: false });
   });
 
+  it("picks every Piece or none", async () => {
+    const panel = await mountPanel(devBackend());
+    const dialog = await open(panel);
+
+    await click(panel, query(dialog, "ha-button.all"));
+
+    expect(selected(dialog)).toHaveLength(6);
+
+    await click(panel, query(dialog, "ha-button.none"));
+
+    expect(selected(dialog)).toEqual([]);
+  });
+
   it("loads the Pieces picked and opens the panel afresh", async () => {
     let answer = () => {};
     const backend = devBackend().reply(

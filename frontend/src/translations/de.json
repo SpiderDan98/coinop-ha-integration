@@ -373,6 +373,8 @@
   "dev.count": "{count} von {total}",
   "dev.devices_with_history": "Geräte mit Verlauf",
   "dev.quick_start": "Schnellstart",
+  "dev.all": "Alle",
+  "dev.none": "Keine",
   "tab.overview": "Übersicht",
   "tab.runs": "Läufe",
   "overview.recent": "Neueste Läufe",

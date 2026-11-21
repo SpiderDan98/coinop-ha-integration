@@ -373,6 +373,8 @@
   "dev.count": "{count} of {total}",
   "dev.devices_with_history": "Devices with history",
   "dev.quick_start": "Quick Start",
+  "dev.all": "All",
+  "dev.none": "None",
   "tab.overview": "Overview",
   "tab.runs": "Runs",
   "overview.recent": "Recent Runs",

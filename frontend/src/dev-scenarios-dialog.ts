@@ -70,6 +70,22 @@ export class DevScenariosDialog extends LitElement {
       t,
       title: t("dev.title"),
       content: html`<p class="muted small">${t("dev.hint")}</p>
+        <div class="row">
+          <ha-button
+            class="all small"
+            appearance="plain"
+            ?disabled=${this.loading}
+            @click=${() => (this.picked = new Set(this.names()))}
+            >${t("dev.all")}</ha-button
+          >
+          <ha-button
+            class="none small"
+            appearance="plain"
+            ?disabled=${this.loading}
+            @click=${() => (this.picked = new Set())}
+            >${t("dev.none")}</ha-button
+          >
+        </div>
         ${this.list?.groups.map((group) => this.renderGroup(group, t))}`,
       error: this.failed && t("dev.failed"),
       action: "load",
@@ -81,11 +97,13 @@ export class DevScenariosDialog extends LitElement {
     });
   }
 
+  /** Every Piece's name, in group, then Piece order. */
+  private names() {
+    return this.list?.groups.flatMap(({ pieces }) => pieces.map(({ name }) => name)) ?? [];
+  }
+
   private async load() {
-    if (!this.list) return;
-    const pieces = this.list.groups.flatMap((group) =>
-      group.pieces.map(({ name }) => name).filter((name) => this.picked.has(name)),
-    );
+    const pieces = this.names().filter((name) => this.picked.has(name));
     this.loading = true;
     this.failed = false;
     try {
