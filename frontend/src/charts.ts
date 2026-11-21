@@ -55,9 +55,9 @@ export function stackedColumns(
       >
         <span class="value">${valued(column) ? column.value : ""}</span>
         <svg
-          width=${STACK_WIDTH}
           height=${STACK_HEIGHT}
           viewBox="0 0 ${STACK_WIDTH} ${STACK_HEIGHT}"
+          preserveAspectRatio="none"
           aria-hidden="true"
         >
           ${bars}
@@ -109,8 +109,11 @@ export const chartStyles = css`
     overflow-x: auto;
     padding-top: 8px;
   }
+  /* Columns share the width, so a year fits a phone, and stay slim when there are few. */
   .column {
-    flex: 1 0 36px;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 64px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -122,6 +125,10 @@ export const chartStyles = css`
     border-radius: 8px;
     padding: 4px 2px;
     cursor: pointer;
+  }
+  .column svg {
+    width: 100%;
+    max-width: ${STACK_WIDTH}px;
   }
   .column:hover,
   .column:focus-visible {

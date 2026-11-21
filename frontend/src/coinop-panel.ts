@@ -462,6 +462,7 @@ export class CoinOpPanel extends LitElement {
       main {
         padding: 24px 32px 88px;
         max-width: 1400px;
+        margin-inline: auto;
       }
       /* Matches the heading card of HA's sections view. */
       .page-title {

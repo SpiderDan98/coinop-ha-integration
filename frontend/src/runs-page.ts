@@ -167,10 +167,10 @@ export class RunsPage extends LitElement {
       :host {
         display: block;
       }
-      /* Sticks to the bottom while the list scrolls and rests below its last row. */
+      /* Sticks above the floating button while the list scrolls and rests below its last row. */
       .basket {
         position: sticky;
-        bottom: 16px;
+        bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
         z-index: 4;
         margin-top: 16px;
         display: grid;

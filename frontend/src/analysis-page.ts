@@ -265,6 +265,7 @@ export class AnalysisPage extends LitElement {
       .intro {
         margin: 0 0 12px;
       }
+      /* A year of months, then a table scrolls; the next row peeks out to say so. */
       .tables {
         container-type: inline-size;
         display: grid;
@@ -272,6 +273,7 @@ export class AnalysisPage extends LitElement {
         grid-auto-flow: dense;
         gap: 16px;
         align-items: start;
+        --coinop-table-height: 460px;
       }
       .by-month {
         grid-column: 1 / -1;

@@ -251,17 +251,45 @@ export class Overview extends LitElement {
     chartStyles,
     tileStyles,
     css`
-      .stats {
+      /* Tiles and charts share their columns, so their edges line up. */
+      .stats,
+      .charts {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
+      }
+      .charts {
+        grid-template-columns: minmax(0, 1fr);
+        margin-bottom: 24px;
+      }
+      @container (min-width: 521px) {
+        .stats,
+        .charts {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 16px;
+        }
+        .stats {
+          margin-bottom: 16px;
+        }
+        .per-month,
+        .by-material {
+          grid-column: span 2;
+        }
+        .charts:has(.running) .by-material {
+          grid-column: span 1;
+        }
+      }
+      @container (min-width: 901px) {
+        .stats,
+        .charts {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
       }
       .stat {
         font: inherit;
         color: inherit;
         text-align: left;
-        padding: 14px;
       }
       a.stat {
         display: block;
@@ -281,16 +309,7 @@ export class Overview extends LitElement {
       }
       :host {
         display: block;
-      }
-      .charts {
-        display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-        gap: 16px;
-        margin-bottom: 20px;
-        align-items: start;
-      }
-      :host([narrow]) .charts {
-        grid-template-columns: minmax(0, 1fr);
+        container-type: inline-size;
       }
       .running {
         border-color: var(--primary-color);
