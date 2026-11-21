@@ -133,6 +133,49 @@ input_number:
     step: 0.001
     mode: box
     unit_of_measurement: kWh
+  # The plugs of the static stand-ins' printers.
+  anycubic_kobra_power:
+    name: Anycubic Kobra S1 power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  p1s_power:
+    name: P1S power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  core_one_power:
+    name: Prusa Core One power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  octoprint_power:
+    name: OctoPrint power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  k1c_power:
+    name: K1C power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  centauri_carbon_power:
+    name: Centauri Carbon power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -161,6 +204,42 @@ template:
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
+      - name: Anycubic Kobra S1 plug power
+        unique_id: anycubic_kobra_plug_power
+        state: "{{ states('input_number.anycubic_kobra_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: P1S plug power
+        unique_id: p1s_plug_power
+        state: "{{ states('input_number.p1s_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Prusa Core One plug power
+        unique_id: core_one_plug_power
+        state: "{{ states('input_number.core_one_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: OctoPrint plug power
+        unique_id: octoprint_plug_power
+        state: "{{ states('input_number.octoprint_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: K1C plug power
+        unique_id: k1c_plug_power
+        state: "{{ states('input_number.k1c_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Centauri Carbon plug power
+        unique_id: centauri_carbon_plug_power
+        state: "{{ states('input_number.centauri_carbon_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
 
 # A camera without hardware, for a Device's Snapshot: ffmpeg's test picture.
 camera:
