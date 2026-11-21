@@ -290,8 +290,8 @@ async def test_a_cost_statement_shows_a_washing_machine_run_without_part_count(
     compact = await export(panel, browser, run_ids=[run["id"]], detail="compact")
 
     assert "Washer · Jan 15, 2026 · Running time 1 h 30 min" in detailed.lines
-    assert "Electricity 1.2 kWh €0.50 €0.60" in detailed.lines
-    assert compact.lines[3:5] == [
+    assert "Electricity 1.2 kWh × €0.50 €0.60" in detailed.lines  # noqa: RUF001
+    assert compact.lines[4:6] == [
         "Run Device Start Total",
         "Cotton 60 Washer Jan 15, 2026 €0.60",
     ]

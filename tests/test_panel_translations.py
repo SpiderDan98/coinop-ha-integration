@@ -63,9 +63,6 @@ STATEMENT_TERMS = {
     "outcome.cancelled": "outcome_name.cancelled",
     "outcome.failed": "outcome_name.failed",
     "outcome.unknown": "outcome_name.unknown",
-    "item.quantity": "column.quantity",
-    "item.unit_price": "column.unit_price",
-    "item.amount": "column.amount",
 }
 
 

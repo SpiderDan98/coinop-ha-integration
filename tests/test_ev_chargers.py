@@ -307,8 +307,8 @@ async def test_a_cost_statement_lists_a_charging_session_without_part_count(
     compact = await export(panel, browser, run_ids=[run["id"]], detail="compact")
 
     assert "Wallbox · Jan 15, 2026 · Running time 2 h 0 min" in detailed.lines
-    assert "Electricity 11.5 kWh €0.30 €3.45" in detailed.lines
-    assert compact.lines[3:5] == [
+    assert "Electricity 11.5 kWh × €0.30 €3.45" in detailed.lines  # noqa: RUF001
+    assert compact.lines[4:6] == [
         "Run Device Start Total",
         "Company car Wallbox Jan 15, 2026 €3.45",
     ]

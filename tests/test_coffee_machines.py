@@ -256,7 +256,7 @@ async def test_a_cost_statement_shows_a_drinks_water_to_the_millilitre(
     english = await export(panel, browser, run_ids=run_ids)
     german = await export(panel, browser, run_ids=run_ids, language="de")
 
-    assert "Water 0.04 L €4.00/m³ €0.00" in english.lines
-    assert "Wasser 0,04 L 4,00 €/m³ 0,00 €" in german.lines
+    assert "Water 0.04 L × €4.00/m³ €0.00" in english.lines  # noqa: RUF001
+    assert "Wasser 0,04 L × 4,00 €/m³ 0,00 €" in german.lines  # noqa: RUF001
     # The Default row's 0.125 L.
-    assert "Water 0.125 L €4.00/m³ €0.00" in english.lines
+    assert "Water 0.125 L × €4.00/m³ €0.00" in english.lines  # noqa: RUF001
