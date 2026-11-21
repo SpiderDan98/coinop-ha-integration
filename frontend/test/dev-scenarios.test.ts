@@ -95,13 +95,18 @@ const open = async (panel: HTMLElement) => {
 
 const groups = (dialog: HTMLElement) => queryAll(dialog, "details.group") as HTMLDetailsElement[];
 
-const group = (dialog: HTMLElement, name: string) => {
-  const found = groups(dialog).find((candidate) =>
-    text(query(candidate, "summary")).includes(name),
-  );
-  if (!found) throw new Error(`no group "${name}"`);
+const one = <T>(candidates: T[], matches: (candidate: T) => boolean, what: string) => {
+  const found = candidates.find(matches);
+  if (!found) throw new Error(`no ${what}`);
   return found;
 };
+
+const group = (dialog: HTMLElement, name: string) =>
+  one(
+    groups(dialog),
+    (candidate) => text(query(candidate, "summary")).includes(name),
+    `group "${name}"`,
+  );
 
 const groupBox = (dialog: HTMLElement, name: string) =>
   query(query(group(dialog, name), "summary"), "input") as HTMLInputElement;
@@ -112,17 +117,15 @@ const pieces = (root: HTMLElement) =>
     box: query(piece, "input") as HTMLInputElement,
   }));
 
-const piece = (dialog: HTMLElement, title: string) => {
-  const found = pieces(dialog).find((candidate) => candidate.title === title);
-  if (!found) throw new Error(`no Piece "${title}"`);
-  return found.box;
-};
+const piece = (dialog: HTMLElement, title: string) =>
+  one(pieces(dialog), (candidate) => candidate.title === title, `Piece "${title}"`).box;
 
-const presetButton = (dialog: HTMLElement, title: string) => {
-  const found = queryAll(dialog, "ha-button.preset").find((button) => text(button) === title);
-  if (!found) throw new Error(`no Preset "${title}"`);
-  return found;
-};
+const presetButton = (dialog: HTMLElement, title: string) =>
+  one(
+    queryAll(dialog, "ha-button.preset"),
+    (button) => text(button) === title,
+    `Preset "${title}"`,
+  );
 
 const pickedPreset = (dialog: HTMLElement) => {
   const picked = queryAll(dialog, "ha-button.preset[appearance=filled]").map(text);
