@@ -1,0 +1,69 @@
+{
+  "devices": [
+    {
+      "id": "device-bread-maker",
+      "name": "Bread maker",
+      "type": "other",
+      "type_name": "Bread maker",
+      "capabilities": [
+        "program",
+        "program_consumption"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.bread_maker_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "baking"
+          ],
+          "paused": [],
+          "finished": [
+            "done"
+          ],
+          "cancelled": [
+            "cancelled"
+          ],
+          "ended": [],
+          "fault": [],
+          "ignored": []
+        },
+        "program": {
+          "entity_id": "sensor.bread_maker_program",
+          "attribute": null
+        },
+        "consumption": {
+          "source": "per_program"
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {},
+            "kwh": 0.4
+          },
+          "programs": {
+            "Whole wheat": {
+              "doses": {},
+              "kwh": 0.5
+            }
+          }
+        }
+      },
+      "known_programs": [
+        "Basic",
+        "Whole wheat"
+      ]
+    }
+  ]
+}
