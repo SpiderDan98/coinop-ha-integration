@@ -299,6 +299,64 @@ def _miele_kind(
     return MIELE_KINDS.get(device.model or "", NoDeviceType.NOT_A_DEVICE)
 
 
+# Event sensors `home_connect` registers for an appliance's type alone (`EVENT_SENSORS`
+# in its sensor.py), by unique id suffix; the first one found tells the kind. Each
+# is registered since Home Assistant 2026.5, the minimum.
+HOME_CONNECT_KINDS: dict[str, str | NoDeviceType] = {
+    "-LaundryCare.Washer.Event.IDos1FillLevelPoor": DEVICE_TYPE_WASHING_MACHINE,
+    "-LaundryCare.Dryer.Event.DryingProcessFinished": DEVICE_TYPE_TUMBLE_DRYER,
+    "-Dishcare.Dishwasher.Event.SaltNearlyEmpty": DEVICE_TYPE_DISHWASHER,
+    "-ConsumerProducts.CoffeeMaker.Event.BeanContainerEmpty": (
+        DEVICE_TYPE_COFFEE_MACHINE
+    ),
+    "-Cooking.Oven.Event.RegularPreheatFinished": DEVICE_TYPE_OVEN,
+    "-Refrigeration.FridgeFreezer.Event.DoorAlarmRefrigerator": (
+        NoDeviceType.NOT_A_DEVICE
+    ),
+    "-Refrigeration.FridgeFreezer.Event.DoorAlarmFreezer": NoDeviceType.NOT_A_DEVICE,
+    "-Cooking.Common.Event.Hood.GreaseFilterMaxSaturationReached": (
+        NoDeviceType.NOT_A_DEVICE
+    ),
+    "-ConsumerProducts.CleaningRobot.Event.RobotIsStuck": NoDeviceType.NOT_A_DEVICE,
+    # A hob: an oven has the alarm clock too, and was told above.
+    "-BSH.Common.Event.AlarmClockElapsed": NoDeviceType.NOT_A_DEVICE,
+}
+# Sensors several types share (`BSH_PROGRAM_SENSORS` and an event sensor): which of
+# them it has tells a type no event sensor is registered for alone.
+HOME_CONNECT_SHARED = (
+    "-BSH.Common.Event.ProgramAborted",
+    "-BSH.Common.Option.RemainingProgramTime",
+    "-BSH.Common.Option.ProgramProgress",
+)
+HOME_CONNECT_SHARED_KINDS: dict[tuple[bool, ...], str | NoDeviceType] = {
+    # A microwave: a dishwasher has all three too, and was told by its own.
+    (True, True, True): DEVICE_TYPE_OVEN,
+    # A cook processor.
+    (True, True, False): NoDeviceType.NOT_A_DEVICE,
+    # A warming drawer or an air conditioner.
+    (False, False, True): NoDeviceType.NOT_A_DEVICE,
+}
+
+
+def _home_connect_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """The kind the sensors registered for the appliance's type tell: nothing on the
+    HA device does, its model is the product code. The event sensors are disabled
+    until the user enables them."""
+
+    def registered(suffix: str) -> bool:
+        return find("sensor", suffix, disabled=True) is not None
+
+    for suffix, kind in HOME_CONNECT_KINDS.items():
+        if registered(suffix):
+            return kind
+    return HOME_CONNECT_SHARED_KINDS.get(
+        tuple(registered(suffix) for suffix in HOME_CONNECT_SHARED),
+        NoDeviceType.CANT_TELL,
+    )
+
+
 # By integration domain, in the order Quick Start and the HA device step list them.
 INTEGRATIONS = {
     "anycubic": Integration(
@@ -340,8 +398,14 @@ INTEGRATIONS = {
     "home_connect": Integration(
         "Home Connect",
         _home_connect,
-        (DEVICE_TYPE_WASHING_MACHINE,),
-        _always(DEVICE_TYPE_WASHING_MACHINE),
+        (
+            DEVICE_TYPE_WASHING_MACHINE,
+            DEVICE_TYPE_DISHWASHER,
+            DEVICE_TYPE_TUMBLE_DRYER,
+            DEVICE_TYPE_COFFEE_MACHINE,
+            DEVICE_TYPE_OVEN,
+        ),
+        _home_connect_kind,
     ),
 }
 

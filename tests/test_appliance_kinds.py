@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .clock import Clock
@@ -15,7 +16,7 @@ from .test_quick_start import offered, open_add_device, pick, quick_start
 from .test_runs import stored_runs
 from .test_washer_profiles import WASHDATA_PLACEHOLDERS, walk_pre_filled
 from .test_water import water
-from .washers import add_miele, add_washdata
+from .washers import add_home_connect, add_miele, add_washdata
 
 WASHDATA_MAPPING = {
     "running": ["running", "ending"],
@@ -398,3 +399,183 @@ async def test_a_miele_dishwashers_per_cycle_counters_count_each_run_once(
     assert water(second)["quantity"] == pytest.approx(9.5)
     # A counter still unknown as its Run opens flags a gap, as any meter's would.
     assert "meter_reset" not in first["flags"] + second["flags"]
+
+
+HOME_CONNECT_MAPPING = {
+    "running": ["run"],
+    "paused": ["pause", "actionrequired"],
+    "finished": ["finished"],
+    "cancelled": ["aborting"],
+    "ended": [],
+    "fault": ["error"],
+    "ignored": ["inactive", "ready", "delayedstart"],
+}
+
+
+@pytest.mark.parametrize(
+    ("appliance_type", "device_type"),
+    [
+        ("Washer", "washing_machine"),
+        ("WasherDryer", "washing_machine"),
+        ("Dryer", "tumble_dryer"),
+        ("Dishwasher", "dishwasher"),
+        ("CoffeeMaker", "coffee_machine"),
+        ("Oven", "oven"),
+        # No entity is registered for a microwave alone: a combination tells it.
+        ("Microwave", "oven"),
+    ],
+)
+@pytest.mark.parametrize("minimum_ha", [False, True])
+async def test_a_home_connect_appliance_is_added_as_the_kind_its_entities_tell(
+    hass: HomeAssistant, appliance_type: str, device_type: str, minimum_ha: bool
+) -> None:
+    appliance = add_home_connect(
+        hass, appliance_type, name="Appliance", minimum_ha=minimum_ha
+    )
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, appliance.device.id, price=0.3)
+
+    assert data["device_type"] == device_type
+    assert data["status"] == {
+        "entity_id": "sensor.appliance_operation_state",
+        "attribute": None,
+    }
+    assert data["mapping"] == HOME_CONNECT_MAPPING
+    assert data["program"] == {
+        "entity_id": "select.appliance_active_program",
+        "attribute": None,
+    }
+
+
+@pytest.mark.parametrize(
+    ("appliance_type", "minimum_ha"),
+    [
+        # The integration registers nothing for a wine cooler's type.
+        ("WineCooler", False),
+        # Home Assistant 2026.5 doesn't know the type `Hob` yet.
+        ("Hob", True),
+    ],
+)
+async def test_a_home_connect_device_without_a_telling_entity_is_asked_its_device_type(
+    hass: HomeAssistant, appliance_type: str, minimum_ha: bool
+) -> None:
+    appliance = add_home_connect(
+        hass, appliance_type, name="Appliance", minimum_ha=minimum_ha
+    )
+    entry = await add_hub(hass)
+    result = await open_add_device(hass, entry)
+    assert offered(result)[0] == {
+        "value": appliance.device.id,
+        "label": "Appliance · Home Connect",
+    }
+
+    result = await configure(hass, result, {"device": appliance.device.id})
+
+    assert result["step_id"] == "quick_start_device_type"
+    assert offered(result) == [
+        "washing_machine",
+        "dishwasher",
+        "tumble_dryer",
+        "coffee_machine",
+        "oven",
+    ]
+    assert result["description_placeholders"] == {
+        "device": "Appliance",
+        "integration": "Home Connect",
+    }
+    result = await configure(hass, result, {"device_type": "oven"})
+    result = await configure(hass, result, {"price": 0.3})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    [subentry] = entry.subentries.values()
+    assert subentry.data == {
+        "device_type": "oven",
+        "printer_device_id": appliance.device.id,
+        "status": {
+            "entity_id": "sensor.appliance_operation_state",
+            "attribute": None,
+        },
+        "mapping": HOME_CONNECT_MAPPING,
+        # Neither type has programs, so the integration registers no program select.
+        "program": {"entity_id": None, "attribute": None},
+        "consumption": {"source": "per_program"},
+        "price": {"source": "fixed", "value": 0.3},
+    }
+
+
+@pytest.mark.parametrize(
+    ("appliance_type", "minimum_ha"),
+    [
+        ("Refrigerator", False),
+        ("Freezer", False),
+        ("FridgeFreezer", False),
+        ("Hood", False),
+        ("Hob", False),
+        ("Cooktop", False),
+        ("CleaningRobot", False),
+        # Told like the microwave, by which of the shared sensors they have.
+        ("CookProcessor", False),
+        ("WarmingDrawer", False),
+        ("AirConditioner", False),
+        ("Refrigerator", True),
+        ("Hood", True),
+        ("Cooktop", True),
+        ("CookProcessor", True),
+        ("WarmingDrawer", True),
+    ],
+)
+async def test_a_home_connect_appliance_that_is_no_device_type_is_not_offered(
+    hass: HomeAssistant, appliance_type: str, minimum_ha: bool
+) -> None:
+    add_home_connect(hass, appliance_type, name="Appliance", minimum_ha=minimum_ha)
+    washer = add_home_connect(hass)
+    entry = await add_hub(hass)
+
+    result = await open_add_device(hass, entry)
+
+    assert offered(result) == [
+        {"value": washer.device.id, "label": "Washer · Home Connect"},
+        {"value": "manual", "label": "manual"},
+    ]
+
+
+async def test_a_home_connect_event_sensor_the_user_enabled_still_tells_the_kind(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    dryer = add_home_connect(hass, "Dryer")
+    entity_registry.async_update_entity(
+        dryer["LaundryCare.Dryer.Event.DryingProcessFinished"], disabled_by=None
+    )
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, dryer.device.id, price=0.3)
+
+    assert data["device_type"] == "tumble_dryer"
+
+
+@pytest.mark.parametrize(
+    ("appliance_type", "device_type", "asked"),
+    [
+        ("Dishwasher", "dishwasher", ["water_price"]),
+        ("CoffeeMaker", "coffee_machine", ["water_price"]),
+        ("Dryer", "tumble_dryer", []),
+        ("Oven", "oven", []),
+    ],
+)
+async def test_a_home_connect_appliance_is_asked_for_a_water_price_only_with_water(
+    hass: HomeAssistant, appliance_type: str, device_type: str, asked: list[str]
+) -> None:
+    appliance = add_home_connect(hass, appliance_type)
+    entry = await add_hub(hass)
+
+    result = await pick(hass, entry, appliance.device.id)
+    assert fields(result) == ["optional_meter", "price", "price_entity", *asked]
+    result = await configure(hass, result, {"price": 0.3} | dict.fromkeys(asked, 4.0))
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    [subentry] = entry.subentries.values()
+    assert subentry.data["device_type"] == device_type
+    assert ("water" in subentry.data, "water_price" in subentry.data) == (
+        bool(asked),
+        bool(asked),
+    )
