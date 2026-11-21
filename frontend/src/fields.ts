@@ -151,12 +151,14 @@ export const checkbox = ({
   name,
   label,
   checked,
+  indeterminate = false,
   disabled = false,
   onChange,
 }: {
   name?: string;
   label: unknown;
   checked: boolean;
+  indeterminate?: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) =>
@@ -165,6 +167,7 @@ export const checkbox = ({
       type="checkbox"
       name=${ifDefined(name)}
       .checked=${checked}
+      .indeterminate=${indeterminate}
       ?disabled=${disabled}
       @change=${(event: Event) => onChange((event.target as HTMLInputElement).checked)}
     />${label}</label
