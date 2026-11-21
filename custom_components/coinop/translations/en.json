@@ -184,7 +184,7 @@
           "title": "Images",
           "description": "Optionally pick where a Run's images come from. The Thumbnail is copied while the Run is open; the camera takes the Snapshot when the Run ends. Images are stored downscaled and without metadata.",
           "data": {
-            "thumbnail": "Thumbnail image entity (optional)",
+            "thumbnail": "Thumbnail entity (optional)",
             "camera": "Camera (optional)",
             "snapshot": "Take a Snapshot when a Run ends"
           },
