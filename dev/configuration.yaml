@@ -51,6 +51,13 @@ input_select:
   dishwasher_program:
     name: Dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  # The tumble dryer WashData follows, for the stand-in in dev/ha_washdata.
+  washdata_dryer_status:
+    name: WashData dryer status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_dryer_program:
+    name: WashData dryer program
+    options: [Cotton dry, Easy care, Wool finish]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -114,6 +121,13 @@ input_number:
     unit_of_measurement: g
   dishwasher_energy:
     name: Dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_dryer_energy:
+    name: WashData dryer energy
     min: 0
     max: 100000
     step: 0.001
@@ -265,6 +279,12 @@ template:
       - name: Dishwasher plug energy
         unique_id: dishwasher_plug_energy
         state: "{{ states('input_number.dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashData dryer plug energy
+        unique_id: washdata_dryer_plug_energy
+        state: "{{ states('input_number.washdata_dryer_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing

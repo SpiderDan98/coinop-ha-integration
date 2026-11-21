@@ -907,6 +907,15 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_number.bosch_dishwasher_power": 0},
         registration=appliances.home_connect_local,
     ),
+    "ha_washdata.tumble_dryer": QuickStartPiece(
+        "tumble_dryer",
+        "Tumble dryer · WashData",
+        "A tumble dryer WashData follows, with its plug sensor as meter; the "
+        "WashData dryer's helpers run it.",
+        {"input_select.washdata_dryer_status": "off"},
+        domain="ha_washdata",
+        data={"name": "Tumble dryer", "device_type": "dryer"},
+    ),
     "miele.tumble_dryer": StaticPiece(
         "tumble_dryer",
         "Miele tumble dryer · Miele",

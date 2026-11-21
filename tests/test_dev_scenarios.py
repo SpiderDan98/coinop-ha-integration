@@ -192,6 +192,7 @@ async def test_a_device_with_history_loads_alone(
         ("miele.dishwasher", "Miele dishwasher · Miele"),
         ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
         ("homeconnect_ws.dishwasher", "Bosch Dishwasher · Home Connect Local"),
+        ("ha_washdata.tumble_dryer", "Tumble dryer · WashData"),
         ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
         ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
         ("miele.coffee_machine", "Miele coffee system · Miele"),
@@ -234,7 +235,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 24
+    assert len(offered(await open_add_device(hass, entry))) == 25
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
     assert all(hass.states.get(row[5]) for row in APPLIANCES.values())
@@ -437,7 +438,14 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "homeconnect_ws.dishwasher",
             ],
         ),
-        ("tumble_dryer", ["miele.tumble_dryer", "home_connect.tumble_dryer"]),
+        (
+            "tumble_dryer",
+            [
+                "ha_washdata.tumble_dryer",
+                "miele.tumble_dryer",
+                "home_connect.tumble_dryer",
+            ],
+        ),
         ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
         ("oven", ["miele.oven", "home_connect.oven"]),
         ("ev_charger", ["tesla_wall_connector.ev_charger"]),
@@ -480,6 +488,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "miele.dishwasher",
         "home_connect.dishwasher",
         "homeconnect_ws.dishwasher",
+        "ha_washdata.tumble_dryer",
         "miele.tumble_dryer",
         "home_connect.tumble_dryer",
         "miele.coffee_machine",
@@ -905,6 +914,47 @@ async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_sta
 
 
 @pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_dryer_washdata_follows_as_a_tumble_dryer(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, {"pieces": ["ha_washdata.tumble_dryer"]}, hass_admin_user)
+    await hass.async_block_till_done()
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    [device_id] = [
+        o["value"] for o in offered(result) if o["label"] == "Tumble dryer · WashData"
+    ]
+
+    result = await configure(hass, result, {"device": device_id})
+    result = await configure(
+        hass,
+        result,
+        {"optional_meter": "sensor.washdata_dryer_plug_energy", "price": 0.32},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert (device["name"], device["type"]) == ("Tumble dryer", "tumble_dryer")
+    await set_helper(hass, "input_number.washdata_dryer_energy", 20)
+    await set_helper(hass, "input_select.washdata_dryer_program", "Cotton dry")
+    await set_helper(hass, "input_select.washdata_dryer_status", "running")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.washdata_dryer_energy", 21.5)
+    await set_helper(hass, "input_select.washdata_dryer_status", "finished")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["program"], run["outcome"]) == ("Cotton dry", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(1.5)
+
+
+@pytest.mark.usefixtures("helpers")
 @pytest.mark.parametrize("domain", ["miele", "home_connect"])
 async def test_two_pieces_of_an_account_integration_load_under_one_config_entry(
     hass: HomeAssistant, hass_admin_user: MockUser, files: Path, domain: str
@@ -937,7 +987,7 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "ha_creality_ws": 1,
         "elegoo_printer": 1,
         "moonraker": 1,
-        "ha_washdata": 2,
+        "ha_washdata": 3,
         "miele": 1,
         "home_connect": 1,
         "homeconnect_ws": 1,
@@ -1024,6 +1074,7 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Voron 2.4 · Moonraker",
         "Washing machine · WashData",
         "Dishwasher · WashData",
+        "Tumble dryer · WashData",
         "Miele washing machine · Miele",
         "Miele dishwasher · Miele",
         "Miele tumble dryer · Miele",
