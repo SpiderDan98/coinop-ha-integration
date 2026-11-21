@@ -1,0 +1,128 @@
+{
+  "run": {
+    "id": "sign",
+    "device_id": "device-cnc-router",
+    "device_name": "CNC router",
+    "name": "Sign Oak",
+    "job_name": "Sign_Oak.gcode",
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T11:00:00+00:00",
+    "ended": "2026-01-15T11:00:00+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": 3,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "estimate",
+          "running_power": 300.0,
+          "paused_power": null
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 0.3
+        },
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        300.0,
+        null
+      ]
+    ],
+    "usage": {
+      "at": "2026-01-15T11:00:00+00:00",
+      "value": 120.0,
+      "unit": "g"
+    },
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "sign-electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 0.3,
+        "unit": "kWh",
+        "unit_price": 0.3,
+        "amount": 0.09,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T11:00:00+00:00",
+            "kwh": 0.3,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "sign-material",
+        "kind": "material",
+        "label": null,
+        "material_id": "mdf",
+        "material": {
+          "name": "MDF",
+          "type": "MDF",
+          "density": 0.75,
+          "diameter": null,
+          "price_per_gram": 0.005
+        },
+        "measured": true,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 120.0,
+        "unit": "g",
+        "unit_price": 0.005,
+        "amount": 0.6,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "program": null,
+    "running_seconds": 3600,
+    "total": 0.69,
+    "cost_per_part": 0.23,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.09,
+      "water": 0.0,
+      "material": 0.6,
+      "other": 0.0
+    }
+  }
+}

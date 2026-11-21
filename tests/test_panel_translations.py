@@ -133,3 +133,18 @@ def test_shared_terms_read_the_same_in_panel_and_cost_statement(language: str) -
     assert {key: panel[key] for key in STATEMENT_TERMS} == {
         key: statement[statement_key] for key, statement_key in STATEMENT_TERMS.items()
     }
+
+
+@pytest.mark.parametrize(("language", "word"), [("en", "print"), ("de", "druck")])
+def test_only_the_3d_printers_heading_speaks_of_a_printer(
+    language: str, word: str
+) -> None:
+    """An Other Device with Job and Material shows what a 3D printer's Runs show."""
+    shown = [_panel(language), _flat(STATEMENT / f"{language}.json")]
+
+    assert [
+        key
+        for strings in shown
+        for key, text in strings.items()
+        if word in text.lower()
+    ] == ["device_type.3d_printer"]

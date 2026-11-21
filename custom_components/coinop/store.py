@@ -222,6 +222,32 @@ def _runs(data: dict[str, Any]) -> list[Run]:
     return [Run.from_dict(run) for run in data["runs"]]
 
 
+def _all(ended: list[Run], live: list[Run]) -> list[Run]:
+    ended_ids = {run.id for run in ended}
+    # A crash between finalisation's two writes leaves a Run in both Stores.
+    return ended + [run for run in live if run.id not in ended_ids]
+
+
+async def async_stored_runs(hass: HomeAssistant) -> list[Run] | None:
+    """Every Run as setup would read it, for when no hub entry is loaded to ask;
+    None if a Store is missing, newer or of another shape."""
+    try:
+        ended, live = [
+            # A missing Store has no Runs to read either.
+            _runs(await CoinOpStore(hass, name).async_load() or {})
+            for name in ("runs", "live")
+        ]
+    except (
+        UnsupportedStorageVersionError,
+        KeyError,
+        TypeError,
+        ValueError,
+        AttributeError,
+    ):
+        return None
+    return _all(ended, live)
+
+
 class RunStore:
     """Ended Runs in the runs Store, open Runs in the live Store."""
 
@@ -232,11 +258,10 @@ class RunStore:
         self._live_due: datetime | None = None
 
     def runs(self, data: Mapping[str, dict[str, Any]]) -> list[Run]:
-        ended = self._stores.parse(data, "runs", _runs)
-        ended_ids = {run.id for run in ended}
-        live = self._stores.parse(data, "live", _runs)
-        # A crash between finalisation's two writes leaves a Run in both Stores.
-        return ended + [run for run in live if run.id not in ended_ids]
+        return _all(
+            self._stores.parse(data, "runs", _runs),
+            self._stores.parse(data, "live", _runs),
+        )
 
     def schedule_live_save(self, open_runs: Callable[[], Iterable[Run]]) -> None:
         """Save open Runs about a minute after the first unsaved change."""

@@ -1,10 +1,12 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from enum import StrEnum
 from typing import Any
 
 from homeassistant.config_entries import (
     SOURCE_RECONFIGURE,
+    ConfigEntryState,
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
@@ -27,13 +29,19 @@ from homeassistant.helpers.translation import async_get_translations
 
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import (
-    CAPABILITIES,
+    CHOICES,
+    DEVICE_TYPES,
     ENDING_TARGETS,
     NO_SOURCE,
     Capability,
     ConsumptionSource,
     Target,
     WaterSource,
+    capabilities_of,
+    picked_choices,
+    picks_capabilities,
+    refused_combination,
+    stored_capabilities,
 )
 from .device_inputs import (
     entity_unit,
@@ -44,7 +52,10 @@ from .device_inputs import (
 )
 from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
+from .run_book import unfinalised
 from .schema import vol
+from .sensor import async_remove_lost
+from .store import async_stored_runs
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
 ATTRIBUTE_UNITS: dict[str, list[str]] = {
@@ -72,13 +83,21 @@ UNUSED: dict[str, dict[str, Any]] = {
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
 }
-# The sections only a Device Type with the Capability has.
+# The sections only a Device with the Capability has.
 NEEDS = {
     "job": Capability.JOB,
     "images": Capability.IMAGES,
     "program": Capability.PROGRAM,
     "water": Capability.WATER,
     "water_price": Capability.WATER,
+}
+# The sources only a Device with the Capability is offered, by the quantity's section.
+SOURCE_NEEDS: dict[str, dict[StrEnum, Capability]] = {
+    ELECTRICITY.source_key: {
+        ConsumptionSource.ESTIMATE: Capability.AVERAGE_POWER,
+        ConsumptionSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION,
+    },
+    WATER.source_key: {WaterSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION},
 }
 
 
@@ -125,7 +144,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     Add Device walks the sections in order; reconfigure offers them as a menu
     and returns to it after each section. Quick Start takes the sections from an
-    Integration Profile and asks only for what no profile knows.
+    Integration Profile and asks only for what no profile knows. An Other Device's
+    menu leads with the step that changes its Type Name and what it has, after
+    which reconfigure walks the sections the change brings.
     """
 
     def __init__(self) -> None:
@@ -135,15 +156,15 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._meter: dict[str, Any] = {}
         self._price: dict[str, Any] = {}
         self._job: dict[str, Any] = {}
-        # The profile's sections while Detect again walks them.
-        self._detecting: dict[str, Any] = {}
+        # The sections reconfigure walks before it returns to its menu.
+        self._walking: frozenset[str] = frozenset()
         self._candidate: Candidate | None = None
 
     def _capabilities(self) -> frozenset[Capability]:
-        return CAPABILITIES[self._data["device_type"]]
+        return capabilities_of(self._data)
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
-        """Each section's first step, in Add Device order, as the Device Type has them."""
+        """Each section's first step, in Add Device order, as the Device has them."""
         sections = {
             "status": self.async_step_status,
             "job": self.async_step_job,
@@ -161,7 +182,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self._fitting(sections)
 
     def _fitting[T](self, sections: Mapping[str, T]) -> dict[str, T]:
-        """Those of the sections the Device Type has: a profile also finds a washing
+        """Those of the sections the Device has: a profile also finds a washing
         machine's water meter for a Device added as a tumble dryer."""
         capabilities = self._capabilities()
         return {
@@ -171,27 +192,38 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
 
     async def _section_done(self, section: str) -> SubentryFlowResult:
-        sections = self._sections()
-        names = list(sections)
-        following = names[names.index(section) + 1 :]
-        if self.source == SOURCE_RECONFIGURE and not (
-            following and following[0] in self._detecting
-        ):
-            self._detecting = {}
-            return await self.async_step_reconfigure()
+        names = list(self._sections())
+        return await self._walk(names[names.index(section) + 1 :])
+
+    async def _walk(self, following: list[str]) -> SubentryFlowResult:
+        """Go on to the first of the `following` sections. Reconfigure skips those it
+        isn't walking and returns to its menu after the last; Add Device is done."""
+        if self.source == SOURCE_RECONFIGURE:
+            following = [name for name in following if name in self._walking]
+            if not following:
+                self._walking = frozenset()
+                return await self.async_step_reconfigure()
         if following:
-            return await sections[following[0]]()
+            return await self._sections()[following[0]]()
         return self.async_create_entry(title=self._name, data=self._data)
+
+    async def _walk_before_menu(self, sections: Iterable[str]) -> SubentryFlowResult:
+        """Reconfigure walks those of `sections` the Device has, in Add Device's
+        order, before it shows its menu again."""
+        self._walking = frozenset(sections)
+        return await self._walk(list(self._sections()))
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         if not self._data:
             self._data = dict(self._get_reconfigure_subentry().data)
+        # What the Device has decides its sections, so it leads them.
+        choices = ["other"] if picks_capabilities(self._data["device_type"]) else []
         detect_again = ["detect"] if self._detected() else []
         return self.async_show_menu(
             step_id="reconfigure",
-            menu_options=[*self._sections(), *detect_again, "save"],
+            menu_options=[*choices, *self._sections(), *detect_again, "save"],
         )
 
     def _detected(self) -> dict[str, Any] | None:
@@ -204,21 +236,26 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Walk the sections the profile fills, pre-filled with what it finds now."""
-        self._detecting = {
+        detected = {
             section: values
             for section, values in (self._detected() or {}).items()
             if section not in METERS
         }
-        for section, values in self._detecting.items():
+        for section, values in detected.items():
             self._data[section] = (self._data.get(section) or {}) | values
-        return await self.async_step_status()
+        return await self._walk_before_menu(detected)
 
     async def async_step_save(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        return self.async_update_and_abort(
-            self._get_entry(), self._get_reconfigure_subentry(), data=self._data
-        )
+        subentry = self._get_reconfigure_subentry()
+        had, has = capabilities_of(subentry.data), self._capabilities()
+        # A Run may have started after the `other` step let the change through.
+        if has != had and (refusal := await self._async_refusal()):
+            return self.async_abort(reason=refusal)
+        # Only here: a setup or reload must never cost a Device an entity.
+        async_remove_lost(self.hass, subentry.subentry_id, had - has)
+        return self.async_update_and_abort(self._get_entry(), subentry, data=self._data)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -227,6 +264,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         where it has a device to offer."""
         if user_input is not None:
             self._data["device_type"] = user_input["device_type"]
+            if picks_capabilities(self._data["device_type"]):
+                return await self.async_step_other()
             return await self.async_step_device()
         if self._quick_start_devices():
             return await self.async_step_quick_start()
@@ -234,7 +273,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     def _device_type_form(self) -> SubentryFlowResult:
         return self.async_show_form(
-            step_id="user", data_schema=self._device_type_schema(list(CAPABILITIES))
+            step_id="user", data_schema=self._device_type_schema(list(DEVICE_TYPES))
         )
 
     @staticmethod
@@ -250,6 +289,98 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 )
             }
         )
+
+    async def async_step_other(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """What a shipped Device Type answers by itself: the Type Name the Device is
+        listed under and what it has."""
+        if self.source == SOURCE_RECONFIGURE and (
+            refusal := await self._async_refusal()
+        ):
+            return self.async_abort(reason=refusal)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            type_name = user_input["type_name"].strip()
+            picked = [choice for choice in CHOICES if user_input[choice]]
+            if not type_name:
+                errors["type_name"] = "type_name_required"
+            if refused := refused_combination(picked):
+                errors["base"] = refused
+            if not errors:
+                self._data["type_name"] = type_name
+                self._data["capabilities"] = stored_capabilities(picked)
+                if self.source == SOURCE_RECONFIGURE:
+                    return await self._async_fit_sections()
+                return await self.async_step_device()
+        known = list(
+            dict.fromkeys(
+                type_name
+                for subentry in self._get_entry().subentries.values()
+                if (type_name := subentry.data.get("type_name"))
+            )
+        )
+        schema = vol.Schema(
+            {
+                # A picker without anything to pick would only hide the text field.
+                vol.Required("type_name"): SelectSelector(
+                    SelectSelectorConfig(options=known, custom_value=True)
+                )
+                if known
+                else TextSelector(),
+                **{
+                    vol.Optional(choice, default=False): BooleanSelector()
+                    for choice in CHOICES
+                },
+            }
+        )
+        return self.async_show_form(
+            step_id="other",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, user_input or self._stored_choices()
+            ),
+            errors=errors,
+        )
+
+    async def _async_fit_sections(self) -> SubentryFlowResult:
+        """Fit the stored sections to what the Device has now: drop those it no
+        longer has and each source it is no longer offered, then walk those it
+        stores nothing for."""
+        for section in NEEDS.keys() - self._fitting(NEEDS).keys():
+            self._data.pop(section, None)
+        for quantity in (ELECTRICITY, WATER):
+            stored = self._data.get(quantity.source_key)
+            if stored and stored["source"] not in self._sources(quantity):
+                del self._data[quantity.source_key]
+        power = self._stored_meter(ELECTRICITY, ConsumptionSource.POWER)
+        if power and not self._fills_power_gaps(power["source"]):
+            # The average power its gaps were filled from went with the estimate.
+            self._data[ELECTRICITY.source_key] = {
+                key: value for key, value in power.items() if key != "running_power"
+            }
+        return await self._walk_before_menu(self._sections().keys() - self._data.keys())
+
+    async def _async_refusal(self) -> str | None:
+        """Why what the Device being reconfigured has can't change now, as the abort
+        reason: a Run of it isn't final yet, or nothing can tell whether one is."""
+        entry = self._get_entry()
+        device_id = self._get_reconfigure_subentry().subentry_id
+        if entry.state is ConfigEntryState.LOADED:
+            changing = entry.runtime_data.book.unfinalised(device_id)
+            return "run_open" if changing else None
+        # A stored Run goes on once the hub entry is loaded again.
+        if (stored := await async_stored_runs(self.hass)) is None:
+            return "runs_unreadable"
+        return "run_open_not_loaded" if unfinalised(stored, device_id) else None
+
+    def _stored_choices(self) -> dict[str, Any] | None:
+        """The `other` step's input as the Device being reconfigured has it."""
+        if self.source != SOURCE_RECONFIGURE:
+            return None
+        picked = picked_choices(self._capabilities())
+        return {"type_name": self._data["type_name"]} | {
+            choice: choice in picked for choice in CHOICES
+        }
 
     def _quick_start_devices(self) -> dict[str, Candidate]:
         """The HA devices of known integrations that no Device follows yet."""
@@ -319,7 +450,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         """The Device Type of a device whose kind its integration doesn't tell, among
         those the integration serves; a device whose kind is told isn't asked."""
         candidate = self._picked()
-        device_types = [t for t in CAPABILITIES if t in candidate.device_types]
+        device_types = [t for t in DEVICE_TYPES if t in candidate.device_types]
         if user_input is None and len(device_types) > 1:
             return self.async_show_form(
                 step_id="quick_start_device_type",
@@ -774,15 +905,23 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_consumption(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        sources = [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
-        if Capability.AVERAGE_POWER in self._capabilities():
-            sources.append(ConsumptionSource.ESTIMATE)
-        if Capability.PROGRAM_CONSUMPTION in self._capabilities():
-            sources.append(ConsumptionSource.PER_PROGRAM)
-        sources.append(ConsumptionSource.NONE)
+        return self._source_menu(ELECTRICITY)
+
+    def _source_menu(self, quantity: Quantity) -> SubentryFlowResult:
         return self.async_show_menu(
-            step_id="consumption", menu_options=[s.value for s in sources]
+            step_id=quantity.source_key,
+            menu_options=[_step(quantity, s) for s in self._sources(quantity)],
         )
+
+    def _sources(self, quantity: Quantity) -> list[str]:
+        """Where the Device can take the quantity from, as its source menu offers it."""
+        capabilities = self._capabilities()
+        needs = SOURCE_NEEDS[quantity.source_key]
+        return [
+            source.value
+            for source in quantity.sources
+            if source not in needs or needs[source] in capabilities
+        ]
 
     async def async_step_energy(
         self, user_input: dict[str, Any] | None = None
@@ -815,15 +954,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_water(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        sources = [
-            source
-            for source in WaterSource
-            if source is not WaterSource.PER_PROGRAM
-            or Capability.PROGRAM_CONSUMPTION in self._capabilities()
-        ]
-        return self.async_show_menu(
-            step_id="water", menu_options=[_step(WATER, s) for s in sources]
-        )
+        return self._source_menu(WATER)
 
     async def async_step_water_meter(
         self, user_input: dict[str, Any] | None = None
@@ -959,10 +1090,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     async def _meter_done(self, quantity: Quantity) -> SubentryFlowResult:
         self._data[quantity.source_key] = self._meter
-        sections = self._sections()
-        if quantity.price_key in sections and quantity.price_key not in self._data:
+        if quantity.price_key not in self._data:
             # A source picked in reconfigure after none needs its price too.
-            return await sections[quantity.price_key]()
+            self._walking |= {quantity.price_key}
         return await self._section_done(quantity.source_key)
 
     async def async_step_estimate(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Material } from "../src/api";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { click, fill, iconButton, mountPanel, query, queryAll, settle, text } from "./render";
+import { openDialog, rows } from "./settings-dialog";
 
 const SUBSCRIBE = "coinop/runs/subscribe";
 const LIST = "coinop/devices/list";
@@ -34,7 +35,7 @@ describe("Devices tab", () => {
     expect(cards(panel)).toEqual([
       "Kobra " +
         "Status sensor.kobra_status " +
-        "Print job sensor.kobra_job " +
+        "Job name sensor.kobra_job " +
         "Material used sensor.kobra_filament_used · mm " +
         "Not used Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
@@ -84,7 +85,7 @@ describe("Devices tab", () => {
 
     expect(text(query(panel, ".device dl"))).toBe(
       "Status event.kobra_print · event_type " +
-        "Not used Print job, Material used, Slots, Thumbnail, Camera " +
+        "Not used Job name, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
     );
@@ -371,6 +372,102 @@ describe("Devices tab", () => {
     },
   );
 
+  it.each(["en", "de"] as const)(
+    "lists Other Devices under their Type Name, one heading for each (%s)",
+    async (language) => {
+      const backend = recordedBackend({ language }).reply(LIST, () => ({
+        devices: [recorded.wallbox, ...recorded.others, recorded.mower],
+      }));
+
+      const panel = await mountPanel(backend, { path: "/devices" });
+
+      expect(
+        queryAll(panel, ".device-type").map((section) => [
+          text(query(section, "h2")),
+          ...queryAll(section, ".device h3").map(text),
+        ]),
+      ).toEqual([
+        [language === "en" ? "EV chargers" : "Wallboxen", "Wallbox"],
+        ["Kiln", "Kiln"],
+        ["Pump", "Pool pump", "Pond pump"],
+        [language === "en" ? "Robotic mowers" : "Mähroboter", "Mower"],
+      ]);
+    },
+  );
+
+  it("keeps a Type Name that reads like a Device Type's heading a group of its own", async () => {
+    const [kiln, pump] = recorded.others;
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        recorded.mower,
+        { ...kiln, type_name: "Robotic mowers" },
+        { ...pump, type_name: "other" },
+        { ...recorded.mower, id: "device-second-mower", name: "Second mower" },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(
+      queryAll(panel, ".device-type").map((section) => [
+        text(query(section, "h2")),
+        ...queryAll(section, ".device h3").map(text),
+      ]),
+    ).toEqual([
+      ["Robotic mowers", "Mower", "Second mower"],
+      ["Robotic mowers", "Kiln"],
+      ["other", "Pool pump"],
+    ]);
+  });
+
+  it("lists an Other Device under its new Type Name once it was renamed in Home Assistant", async () => {
+    const [kiln, pool, pond] = recorded.others;
+    let devices = [kiln, pool, pond];
+    const backend = recordedBackend().reply(LIST, () => ({ devices }));
+    const panel = await mountPanel(backend, { path: "/devices" });
+    const groups = () =>
+      queryAll(panel, ".device-type").map((section) => [
+        text(query(section, "h2")),
+        ...queryAll(section, ".device h3").map(text),
+      ]);
+    expect(groups()).toEqual([
+      ["Kiln", "Kiln"],
+      ["Pump", "Pool pump", "Pond pump"],
+    ]);
+
+    devices = [kiln, pool, { ...pond, type_name: "Fountain" }];
+    await click(panel, query(panel, `a.tab[href$="/runs"]`));
+    await click(panel, query(panel, `a.tab[href$="/devices"]`));
+
+    expect(groups()).toEqual([
+      ["Kiln", "Kiln"],
+      ["Pump", "Pool pump"],
+      ["Fountain", "Pond pump"],
+    ]);
+  });
+
+  it("shows an Other Device that has nothing with what every Device has", async () => {
+    const [kiln] = recorded.others;
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [kiln] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Kiln " +
+        "Status sensor.kiln_status " +
+        "Consumption source Estimate from average power 2,000 W running " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+    await click(panel, iconButton(panel, "Edit settings of Kiln"));
+    expect(queryAll(panel, ".settings-dialog .field .label").map(text)).toEqual([
+      "Tags for new Runs",
+      "Automatic templates",
+    ]);
+  });
+
   it("shows a dishwasher with a washing machine's parts", async () => {
     const backend = recordedBackend()
       .reply(LIST, () => ({ devices: [recorded.dishwasher] }))
@@ -483,7 +580,7 @@ describe("Devices tab", () => {
 
     expect(text(query(panel, ".device dl"))).toBe(
       "Status sensor.kobra_status " +
-        "Druckauftrag sensor.kobra_job " +
+        "Auftragsname sensor.kobra_job " +
         "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Nicht verwendet Fächer, Vorschaubild, Kamera " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +
@@ -766,18 +863,13 @@ describe("A washing machine's Program rows", () => {
       .reply(SETTINGS, (msg) => ({
         settings: { ...recorded.washer.settings, ...(msg.settings as object) },
       }));
-  const openDialog = async (panel: Element) => {
-    await click(panel, iconButton(panel, "Edit settings of Washer"));
-    return query(panel, ".settings-dialog");
-  };
-  const rows = (dialog: Element) => queryAll(dialog, ".program-defaults tbody tr").map(text);
   const amount = (root: Element, dose: string, program: string) =>
     query(root, `input[aria-label="${dose} for ${program}"]`) as HTMLInputElement;
 
   it("are suggested from the known Programs and stored once a value is entered", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
     expect(rows(dialog)).toEqual([
       "Default",
       "Cotton 60° Suggested",
@@ -805,7 +897,7 @@ describe("A washing machine's Program rows", () => {
   it("store nothing for a suggestion that stays empty", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await fill(panel, amount(dialog, "Colour pods", "Cotton 60°"), "");
     await click(panel, query(dialog, "ha-button.save"));
@@ -816,7 +908,7 @@ describe("A washing machine's Program rows", () => {
   it("are added and removed by hand", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await fill(panel, query(dialog, ".program-defaults > input"), " Rinse ");
     await click(panel, iconButton(dialog, "Remove the row of Wool"));
@@ -845,7 +937,7 @@ describe("A washing machine's Program rows", () => {
   it("lose a removed Dose's amounts", async () => {
     const backend = washerBackend();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await click(panel, iconButton(dialog, "Remove Liquid detergent"));
     await click(panel, query(dialog, "ha-button.save"));
@@ -874,7 +966,7 @@ describe("A washing machine's Program rows", () => {
   it("show the mean kWh of measured Runs beside the cells that have one", async () => {
     const backend = suggesting();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     expect(backend.sent(SUGGESTIONS)).toEqual([{ type: SUGGESTIONS, device_id: "device-washer" }]);
     expect(text(query(cell(dialog, "Default kWh"), ".suggestion"))).toBe("Ø 1.2 kWh · 1 Run");
@@ -890,7 +982,7 @@ describe("A washing machine's Program rows", () => {
   it("apply a measured suggestion with a click, stored on save", async () => {
     const backend = suggesting();
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     await click(panel, query(cell(dialog, "kWh for Cotton 60°"), ".suggestion"));
     expect(
@@ -915,7 +1007,7 @@ describe("A washing machine's Program rows", () => {
       throw new WsError("not_found");
     });
     const panel = await mountPanel(backend, { path: "/devices" });
-    const dialog = await openDialog(panel);
+    const dialog = await openDialog(panel, recorded.washer);
 
     expect(queryAll(dialog, ".suggestion")).toEqual([]);
     expect(rows(dialog)[0]).toBe("Default");

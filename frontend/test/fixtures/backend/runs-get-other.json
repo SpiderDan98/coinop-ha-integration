@@ -1,0 +1,96 @@
+{
+  "run": {
+    "id": "firing",
+    "device_id": "device-kiln",
+    "device_name": "Kiln",
+    "name": null,
+    "job_name": null,
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T11:30:00+00:00",
+    "ended": "2026-01-15T11:30:00+00:00",
+    "outcome": "unknown",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": null,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "estimate",
+          "running_power": 2000.0,
+          "paused_power": null
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 0.3
+        },
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        2000.0,
+        null
+      ]
+    ],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "firing-electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 3.0,
+        "unit": "kWh",
+        "unit_price": 0.3,
+        "amount": 0.9,
+        "method": "estimated",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T11:30:00+00:00",
+            "kwh": 3.0,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "program": null,
+    "running_seconds": 5400,
+    "total": 0.9,
+    "cost_per_part": null,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.9,
+      "water": 0.0,
+      "material": 0.0,
+      "other": 0.0
+    }
+  }
+}

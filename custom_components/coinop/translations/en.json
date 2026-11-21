@@ -21,6 +21,7 @@
           "title": "Reconfigure Device",
           "description": "Pick a section to change. Nothing is saved until you choose Save. Changes apply to an open Run at once; a new consumption source applies from the next Run. Ended Runs never change. Detect again walks the Device Inputs the Integration Profile of the Device's integration knows, pre-filled from its entities, e.g. after an update renamed them; consumption sources and prices stay as they are.",
           "menu_options": {
+            "other": "Type Name & what it has",
             "status": "Status & mapping",
             "job": "Job & Material",
             "images": "Images",
@@ -70,6 +71,30 @@
             "price": "What you pay per kWh, in {currency}. Leave empty if an entity reports the price.",
             "price_entity": "Reports the current price per kWh, e.g. on a dynamic tariff. Leave empty for a fixed price.",
             "water_price": "What you pay per m³, in {currency}, including wastewater. The water comes from the Device's own meter if it has one, otherwise per Program from the Program Defaults. Leave empty to record no water."
+          }
+        },
+        "other": {
+          "title": "Type Name & what the Device has",
+          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.\n\n“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Every other combination works.\n\nYou can add a Material Line Item by hand on any Run, whatever the Device has, so “Job and Material” isn't needed just to record a Material now and then.\n\nYou can change the Type Name and what the Device has later under “Reconfigure Device”, while the Device has no open Run. What you switch on then is asked for right away, and so is an electricity or water source the Device can no longer use: the estimate from average power once it has a Program, “per Program” once it has none. What you switch off loses its Device Inputs, its source, its price and its sensors in Home Assistant; its Doses, Program Defaults and default Material are kept for when you switch it back on.",
+          "data": {
+            "type_name": "Type Name",
+            "program": "Program",
+            "doses": "Doses",
+            "water": "Water",
+            "job": "Job and Material",
+            "images": "Images",
+            "part_count": "Part Count",
+            "per_run_meters": "Meters count each Run from 0"
+          },
+          "data_description": {
+            "type_name": "What kind of Device it is, such as “Kiln” or “Pool pump”: the heading the panel lists it under. Devices with the same Type Name share a heading.",
+            "program": "It reports which program it runs: a Run records its Program and is named after it. Its electricity can then come per Program, from the kWh in the Program Defaults, which replaces the estimate from average power.",
+            "doses": "Products it uses up in a Run, such as a soda maker's CO₂ or a bread maker's flour: you list them as Doses on its card in the panel's Devices tab, each with its amount per Run, or per Program if it has one. Each Dose a Run uses becomes a Material Line Item.",
+            "water": "A water source (a water meter or a flow sensor) and a water price: each Run gets a Water Line Item for the water it used.",
+            "job": "It works through one job at a time and uses up Material doing so, as a laser cutter or a CNC router does: a Run is named after its job and gets a Material Line Item, measured by the Device or left for you to fill in, priced from the Device's default Material or from the Material in a Slot. Not together with Program or Doses.",
+            "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
+            "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",
+            "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset, and one that has no value until it starts a Run at 0 none for a gap in consumption."
           }
         },
         "device": {
@@ -128,7 +153,7 @@
         },
         "job": {
           "title": "Job & Material",
-          "description": "Optionally pick the entity that reports the name of the current print job, and the one that reports how much material the job used. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
+          "description": "Optionally pick the entity that reports the name of the Device's current job, and the one that reports how much Material the job used. A Run is named after its job, and a job that starts again under the same name, e.g. after a power loss, continues the same Run.",
           "data": {
             "entity_id": "Job name entity (optional)",
             "attribute": "Attribute (optional)",
@@ -139,18 +164,18 @@
             "loaded_slot": "Loaded slot entity (optional)"
           },
           "data_description": {
-            "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
-            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity.",
-            "material_entity_id": "The printer's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
+            "entity_id": "Without a job name, a Device that starts again while a Run is open always continues that Run.",
+            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of an event entity that fires for each job.",
+            "material_entity_id": "The Device's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
             "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor.",
-            "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material loaded in it (e.g. PLA) as its state.",
+            "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material in it (e.g. PLA) as its state.",
             "colour_attribute": "The attribute of the Slot entities that carries the Material's colour as a hex code, e.g. color_hex.",
-            "loaded_slot": "Reports the number of the Slot printing right now; any other value means no Slot. Each Slot loaded during a Run is matched to a Material by type and colour."
+            "loaded_slot": "Reports the number of the Slot the Device takes its Material from right now; any other value means no Slot. Each Slot reported during a Run is matched to a Material by type and colour."
           }
         },
         "material_unit": {
           "title": "Unit of the Material used attribute",
-          "description": "In which unit does the attribute report the material used? It must be a length or a mass.",
+          "description": "In which unit does the attribute report the Material used? It must be a length or a mass.",
           "data": {
             "unit": "Unit"
           }
@@ -164,7 +189,7 @@
             "snapshot": "Take a Snapshot when a Run ends"
           },
           "data_description": {
-            "thumbnail": "The image entity of the printer integration that shows the model being printed.",
+            "thumbnail": "An image entity that shows what the Run makes, e.g. the preview of the 3D model from the Device's integration.",
             "snapshot": "Only with a camera. Up to three attempts; none when the end of a Run is only noticed later, e.g. after an outage."
           }
         },
@@ -249,7 +274,7 @@
             "paused_power": "Paused power (optional)"
           },
           "data_description": {
-            "running_power": "The average draw over a whole print, typically 80–150 W for a desktop FDM printer with a heated bed. Do not enter the rated power from the label or power supply: it is far higher than the real average.",
+            "running_power": "The Device's average draw over a whole Run, e.g. 80–150 W for a desktop FDM device with a heated bed. Do not enter the rated power from the label or power supply: it is usually far higher than the real average.",
             "paused_power": "Draw while paused. Leave empty to use the running power."
           }
         },
@@ -395,6 +420,8 @@
         }
       },
       "error": {
+        "type_name_required": "Enter a Type Name.",
+        "job_with_program_or_doses": "“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Switch off one of the two sides. A Material Line Item can still be added by hand on any Run.",
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
@@ -406,7 +433,10 @@
         "unknown_price_unit": "Coin-op doesn't recognise this entity's unit as a price per kWh. Pick another entity or enter a fixed price; with a conversion factor it can be set later under “Reconfigure Device”."
       },
       "abort": {
-        "reconfigure_successful": "The Device was saved."
+        "reconfigure_successful": "The Device was saved.",
+        "run_open": "This Device has a Run that is still open, or that has just ended and waits for the last reports of its meters. What a Device has can't change until then, so that no Run changes what it records halfway. Nothing was saved. Try again once the Run has ended; it waits for its meters for five minutes at most.",
+        "run_open_not_loaded": "Coin-op isn't loaded right now, and this Device has a Run that was still open when Coin-op stopped, or that had just ended and waited for the last reports of its meters. The Run goes on when Coin-op is loaded again. What a Device has can't change until the Run has ended, so that no Run changes what it records halfway. Nothing was saved. Try again once Coin-op is loaded and the Run has ended.",
+        "runs_unreadable": "Coin-op isn't loaded right now and can't read its stored Runs, so it can't tell whether this Device has a Run that is still open. What a Device has can't change while it has one, so that no Run changes what it records halfway. Nothing was saved. Try again once Coin-op is loaded; what keeps it from loading is shown with Coin-op under Settings > Devices & services."
       }
     }
   },
@@ -538,7 +568,8 @@
         "coffee_machine": "Coffee machine",
         "oven": "Oven",
         "ev_charger": "EV charger",
-        "robotic_mower": "Robotic mower"
+        "robotic_mower": "Robotic mower",
+        "other": "Other"
       }
     }
   }

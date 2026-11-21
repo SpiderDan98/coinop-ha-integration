@@ -1,0 +1,61 @@
+{
+  "devices": [
+    {
+      "id": "device-garden-valve",
+      "name": "Garden valve",
+      "type": "other",
+      "type_name": "Irrigation",
+      "capabilities": [
+        "average_power",
+        "water"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.garden_valve_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "on"
+          ],
+          "paused": [],
+          "finished": [],
+          "cancelled": [],
+          "ended": [
+            "off"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "consumption": {
+          "source": "none"
+        },
+        "water": {
+          "source": "meter",
+          "entity_id": "sensor.garden_valve_water",
+          "attribute": null,
+          "unit": "L",
+          "factor": null
+        },
+        "water_price": {
+          "source": "fixed",
+          "value": 4.0
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    }
+  ]
+}

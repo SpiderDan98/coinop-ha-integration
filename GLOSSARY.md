@@ -10,9 +10,14 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, dishwasher, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
+The kind of Device (3D printer, washing machine, dishwasher, …, or Other), chosen when it is added and fixed afterwards. A shipped Device Type determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has. Other is for a Device Coin-op ships no Device Type for: the user gives it a Type Name and picks what it has from those same parts. What is fixed is the Device Type itself: an Other Device stays Other and a shipped one never becomes Other. An Other Device's Type Name and what it has can be changed later, while it has no open Run (nor one that ended and still waits for its meters' last reports); what a shipped Device Type has can't.
 _Avoid_: Category, device class
-_German UI_: Gerätetyp
+_German UI_: Gerätetyp (Other: Sonstiges)
+
+**Type Name**:
+The user's own name for what kind of Device an Other Device is, such as "Kiln" or "Pool pump"; the panel lists the Devices that share one under it as their heading. Only Other Devices have one, and unlike the Device Type it can be changed later. It is not a Device Type: one that reads like a shipped Device Type's name is still a group of its own.
+_Avoid_: Custom type, type label, category
+_German UI_: Typbezeichnung
 
 **Device Input**:
 A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
@@ -45,12 +50,12 @@ _Avoid_: Result, status (for the ending)
 _German UI_: Ausgang (Abgeschlossen, Abgebrochen, Fehlgeschlagen, Unbekannt)
 
 **Part Count**:
-The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of 3D printers have one.
+The number of usable parts a Run produced, which its total cost is divided by to give the cost per part. Only Runs of a Device that has a Part Count have one: a 3D printer, or an Other Device it was picked for.
 _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 
 **Program**:
-The program a Run ran, such as a washing machine's "Cotton 60°", a dishwasher's "Eco 50°" or a coffee machine's "Cappuccino", as the Device's Program Device Input reports it or the user corrects it. Only Device Types with a Program input have one.
+The program a Run ran, such as a washing machine's "Cotton 60°", a dishwasher's "Eco 50°" or a coffee machine's "Cappuccino", as the Device's Program Device Input reports it or the user corrects it. Only Devices with a Program input have one: those of a Device Type that has it, and an Other Device given one.
 _Avoid_: Cycle, mode, wash type
 _German UI_: Programm
 
@@ -65,7 +70,7 @@ _Avoid_: Warning, error, notice
 _German UI_: Hinweis
 
 **Thumbnail**:
-The preview image of the model a Run produces, taken from the Device's thumbnail.
+The preview image of what a Run produces, such as the model a 3D printer prints, taken from the Device's thumbnail.
 _Avoid_: Preview, model image
 _German UI_: Vorschaubild
 
@@ -115,7 +120,7 @@ _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
 
 **Dose**:
-One product a Device's Runs use, such as a washing machine's detergent or a dishwasher's tabs, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
+One product a Device's Runs use, such as a washing machine's detergent, a dishwasher's tabs or a soda maker's CO₂, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
 _Avoid_: Additive, dosage, detergent (as the generic term)
 _German UI_: Dosierung
 
@@ -125,6 +130,6 @@ _Avoid_: Level sensor, fill level
 _German UI_: Bestandssensor
 
 **Program Defaults**:
-A Device's kWh, litres and Dose amounts for each Program, whichever of them its Device Type has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+A Device's kWh, litres and Dose amounts for each Program, whichever of them the Device has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure. On a Device with Doses and no Program they are the Default row alone, which every Run uses.
 _Avoid_: Presets, program profiles, estimates
 _German UI_: Programmvorgaben

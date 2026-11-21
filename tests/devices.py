@@ -1,5 +1,6 @@
 """Set up the hub and add Devices through the real flows, the way a user does."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -14,6 +15,8 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.coinop.const import DOMAIN
+
+from .clock import Clock
 
 STATUS = "sensor.kobra_status"
 ENERGY = "sensor.kobra_plug_energy"
@@ -65,9 +68,11 @@ async def start_add_device(
     *,
     printer: str | None = None,
     device_type: str = "3d_printer",
+    other: dict[str, Any] | None = None,
 ) -> Any:
     """Open Add Device, pick the Device Type and the HA device (or none); returns the
-    name form. Where Quick Start offers a device, it is set up manually."""
+    name form. Where Quick Start offers a device, it is set up manually. `other`
+    answers the step only the Device Type Other has (see `other_input`)."""
     result = await hass.config_entries.subentries.async_init(
         (entry.entry_id, "device"), context={"source": SOURCE_USER}
     )
@@ -75,6 +80,9 @@ async def start_add_device(
         result = await configure(hass, result, {"device": "manual"})
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": device_type})
+    if other is not None:
+        assert result["step_id"] == "other", result.get("errors")
+        result = await configure(hass, result, other)
     assert result["step_id"] in ("device", "device_without_profile"), result.get(
         "errors"
     )
@@ -104,10 +112,13 @@ async def walk_to_mapping(
     status: str = STATUS,
     attribute: str | None = None,
     device_type: str = "3d_printer",
+    other: dict[str, Any] | None = None,
 ) -> Any:
     result = await configure(
         hass,
-        await start_add_device(hass, entry, printer=printer, device_type=device_type),
+        await start_add_device(
+            hass, entry, printer=printer, device_type=device_type, other=other
+        ),
         {"name": name},
     )
     assert result["step_id"] == "status"
@@ -190,29 +201,13 @@ async def add_device(
         assert result["step_id"] == "material_unit", result.get("errors")
         result = await configure(hass, result, {"unit": material_unit})
     assert result["step_id"] == "images", result.get("errors")
-    images = {
-        key: value
-        for key, value in (
-            ("thumbnail", thumbnail),
-            ("camera", camera),
-            ("snapshot", snapshot),
-        )
-        if value is not None
-    }
-    result = await configure(hass, result, images)
-    assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source == "estimate":
-        estimate = {"running_power": running_power}
-        if paused_power is not None:
-            estimate["paused_power"] = paused_power
-        result = await configure(hass, result, estimate)
-    elif source != "none":
-        result = await configure(hass, result, meter)
-    if source != "none":
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    result = await configure(hass, result, images_input(thumbnail, camera, snapshot))
+    estimate = {"running_power": running_power} | (
+        {} if paused_power is None else {"paused_power": paused_power}
+    )
+    result = await answer_electricity(
+        hass, result, source, estimate if source == "estimate" else meter, price
+    )
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -246,12 +241,7 @@ async def add_basic_device(
         "consumption",
         ["energy", "power", "none"],
     ), result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source != "none":
-        result = await configure(hass, result, meter)
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    result = await answer_electricity(hass, result, source, meter, price)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
@@ -296,6 +286,176 @@ def coinop_entities(entity_registry: er.EntityRegistry) -> list[str]:
     )
 
 
+OTHER_MAPPING = {"running": ["on"], "ended": ["off"]}
+# Every choice the `other` step offers, in its order.
+CHOICES = (
+    "program",
+    "doses",
+    "water",
+    "job",
+    "images",
+    "part_count",
+    "per_run_meters",
+)
+
+
+async def report_status(hass: HomeAssistant, entity_id: str, status: str) -> None:
+    """Report `status` on a Device's Status entity and let Coin-op follow it."""
+    hass.states.async_set(entity_id, status)
+    await hass.async_block_till_done()
+
+
+async def settle(hass: HomeAssistant) -> None:
+    """Wait once more after a Run's end: older Home Assistant needs a second pass
+    for the Run event's listeners."""
+    await hass.async_block_till_done()
+
+
+async def run_once(
+    hass: HomeAssistant,
+    clock: Clock,
+    status: str,
+    *,
+    minutes: float,
+    running: str = "on",
+    ended: str = "off",
+) -> None:
+    """A Run on the Status entity `status`: `running` for `minutes`, then `ended`."""
+    await report_status(hass, status, running)
+    await clock.advance(minutes=minutes)
+    await report_status(hass, status, ended)
+    await settle(hass)
+
+
+def other_input(type_name: str, has: Iterable[str] = ()) -> dict[str, Any]:
+    """The input of the step only the Device Type Other has: its Type Name and the
+    choices picked of what the Device has, by key (such as "per_run_meters")."""
+    return {"type_name": type_name} | dict.fromkeys(has, True)
+
+
+async def add_other_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    type_name: str,
+    name: str,
+    status: str,
+    has: Iterable[str] = (),
+    device: str | None = None,
+    mapping: dict[str, list[str]] = OTHER_MAPPING,
+    job: dict[str, Any] | None = None,
+    material_unit: str | None = None,
+    thumbnail: str | None = None,
+    camera: str | None = None,
+    snapshot: bool | None = None,
+    program: dict[str, Any] | None = None,
+    source: str = "estimate",
+    meter: dict[str, Any] | None = None,
+    running_power: float = 120,
+    price: float | dict[str, Any] = 0.30,
+    water: str = "none",
+    water_meter: dict[str, Any] | None = None,
+    water_price: float | dict[str, Any] = 4.0,
+) -> ConfigSubentry:
+    """Walk Add Device to the end for an Other Device with `type_name` that has the
+    choices `has`, running while its Status is "on" unless `mapping` says otherwise.
+
+    With the choice "job" (Job and Material), `job` is the job step's input, by its
+    fields (`entity_id`, `material_entity_id`, `slots`, `loaded_slot`, ...; no job
+    input without it), and `material_unit` answers the unit step that a
+    `material_attribute` brings.
+    With "images" among `has`, `thumbnail`, `camera` and `snapshot` answer the images
+    step, each left as the step has it when not given. With the choice "program",
+    `program` is the Program step's input (no Program input without it). `source` is
+    "estimate" (from `running_power`), "energy" or "power" (read from `meter`),
+    "per_program" or "none", which takes no price. With the choice "water", `water`
+    is its source: "meter" or "flow" (read from `water_meter`), "per_program" or
+    "none"; a fixed `water_price` is per m³. The choice "doses" brings no step. It
+    fails on any step beyond those the choices bring.
+    """
+    has = list(has)
+    result = await walk_to_mapping(
+        hass,
+        entry,
+        name=name,
+        printer=device,
+        status=status,
+        device_type="other",
+        other=other_input(type_name, has),
+    )
+    result = await configure(hass, result, mapping)
+    if "job" in has:
+        assert result["step_id"] == "job", result.get("errors")
+        result = await configure(hass, result, job or {})
+        if (job or {}).get("material_attribute"):
+            assert result["step_id"] == "material_unit", result.get("errors")
+            result = await configure(hass, result, {"unit": material_unit})
+    if "images" in has:
+        assert result["step_id"] == "images", result.get("errors")
+        result = await configure(
+            hass, result, images_input(thumbnail, camera, snapshot)
+        )
+    if "program" in has:
+        assert result["step_id"] == "program", result.get("errors")
+        result = await configure(hass, result, program or {})
+    estimate = {"running_power": running_power}
+    result = await answer_electricity(
+        hass, result, source, estimate if source == "estimate" else meter, price
+    )
+    if "water" in has:
+        result = await answer_water(hass, result, water, water_meter, water_price)
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await hass.async_block_till_done()
+    subentry = list(entry.subentries.values())[-1]
+    assert subentry.title == name
+    return subentry
+
+
+async def answer_electricity(
+    hass: HomeAssistant,
+    result: Any,
+    source: str,
+    meter: dict[str, Any] | None,
+    price: float | dict[str, Any],
+) -> Any:
+    """Answer Add Device's electricity steps from the source menu `result`: the
+    `source`, its step's input `meter` unless it is "per_program" or "none" (for
+    "estimate" the average powers), and the `price` unless it is "none"."""
+    assert result["step_id"] == "consumption", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    if source not in ("per_program", "none"):
+        result = await configure(hass, result, meter)
+    if source != "none":
+        assert result["step_id"] == "price", result.get("errors")
+        result = await configure(hass, result, price_choice(price))
+        result = await configure(hass, result, price_input(price))
+    return result
+
+
+async def answer_water(
+    hass: HomeAssistant,
+    result: Any,
+    source: str,
+    meter: dict[str, Any] | None,
+    price: float | dict[str, Any],
+) -> Any:
+    """Answer Add Device's water steps from the water source menu `result`: the
+    `source`, its `meter` for "meter" and "flow", and the `price` unless it is "none"."""
+    assert result["step_id"] == "water", result.get("errors")
+    result = await configure(hass, result, {"next_step_id": f"water_{source}"})
+    if source in ("meter", "flow"):
+        result = await configure(hass, result, meter)
+    if source != "none":
+        assert result["step_id"] == "water_price", result.get("errors")
+        result = await configure(
+            hass,
+            result,
+            {"next_step_id": f"water_{price_choice(price)['next_step_id']}"},
+        )
+        result = await configure(hass, result, price_input(price))
+    return result
+
+
 async def add_washing_machine(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -333,34 +493,33 @@ async def add_washing_machine(
     result = await configure(hass, result, mapping)
     assert result["step_id"] == "program", result.get("errors")
     result = await configure(hass, result, program or {})
-    assert result["type"] is FlowResultType.MENU, result.get("errors")
-    result = await configure(hass, result, {"next_step_id": source})
-    if source not in ("per_program", "none"):
-        result = await configure(hass, result, meter or {"entity_id": WASHER_ENERGY})
-    if source != "none":
-        assert result["step_id"] == "price", result.get("errors")
-        result = await configure(hass, result, price_choice(price))
-        result = await configure(hass, result, price_input(price))
+    result = await answer_electricity(
+        hass, result, source, meter or {"entity_id": WASHER_ENERGY}, price
+    )
     if water is not None:
-        assert result["step_id"] == "water", result.get("errors")
-        result = await configure(hass, result, {"next_step_id": f"water_{water}"})
-    if water in ("meter", "flow"):
-        result = await configure(
-            hass, result, water_meter or {"entity_id": WASHER_WATER}
+        result = await answer_water(
+            hass, result, water, water_meter or {"entity_id": WASHER_WATER}, water_price
         )
-    if water not in (None, "none"):
-        assert result["step_id"] == "water_price", result.get("errors")
-        result = await configure(
-            hass,
-            result,
-            {"next_step_id": f"water_{price_choice(water_price)['next_step_id']}"},
-        )
-        result = await configure(hass, result, price_input(water_price))
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
     await hass.async_block_till_done()
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+def images_input(
+    thumbnail: str | None, camera: str | None, snapshot: bool | None
+) -> dict[str, Any]:
+    """The images step's input; what is None is left as the step has it."""
+    return {
+        key: value
+        for key, value in (
+            ("thumbnail", thumbnail),
+            ("camera", camera),
+            ("snapshot", snapshot),
+        )
+        if value is not None
+    }
 
 
 def price_choice(price: float | dict[str, Any]) -> dict[str, str]:
@@ -405,6 +564,43 @@ async def reconfigure(
     for user_input in inputs:
         result = await configure(hass, result, user_input)
     assert result["step_id"] == "reconfigure", result.get("errors")
-    result = await configure(hass, result, {"next_step_id": "save"})
+    return await save(hass, result)
+
+
+async def save(hass: HomeAssistant, menu: Any) -> Any:
+    """Choose Save in the reconfigure menu; returns what answers, a refusal included,
+    once the hub entry reloaded."""
+    result = await configure(hass, menu, {"next_step_id": "save"})
     await hass.async_block_till_done()
     return result
+
+
+async def open_other(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry
+) -> Any:
+    """Pick the reconfigure menu's entry for an Other Device's Type Name and what it
+    has; returns what answers: the `other` step, or the refusal."""
+    result = await start_reconfigure(hass, entry, subentry)
+    return await configure(hass, result, {"next_step_id": "other"})
+
+
+async def change_other_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    subentry: ConfigSubentry,
+    *inputs: Any,
+    type_name: str | None = None,
+    has: Iterable[str],
+) -> Any:
+    """Change what an Other Device has to exactly the choices `has` in its reconfigure
+    menu, and its Type Name if `type_name` is given; answer the steps the change
+    brings with `inputs` in turn, then Save. It fails unless `inputs` lead back to
+    the menu."""
+    return await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "other"},
+        other_input(type_name or subentry.data["type_name"], has),
+        *inputs,
+    )

@@ -1,0 +1,62 @@
+{
+  "devices": [
+    {
+      "id": "device-soda-maker",
+      "name": "Soda maker",
+      "type": "other",
+      "type_name": "Soda maker",
+      "capabilities": [
+        "average_power",
+        "doses"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.soda_maker_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "on"
+          ],
+          "paused": [],
+          "finished": [],
+          "cancelled": [],
+          "ended": [
+            "off"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "consumption": {
+          "source": "none"
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [
+          {
+            "id": "dose-co2",
+            "material_id": "co2"
+          },
+          {
+            "id": "dose-syrup",
+            "material_id": "syrup"
+          }
+        ],
+        "program_defaults": {
+          "default": {
+            "doses": {
+              "dose-co2": 8.0,
+              "dose-syrup": 40.0
+            }
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    }
+  ]
+}

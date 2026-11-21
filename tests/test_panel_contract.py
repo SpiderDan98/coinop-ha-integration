@@ -37,6 +37,17 @@ from .stored import (
     stored_run,
 )
 from .test_ev_chargers import add_charger
+from .test_other_devices import add_kiln, add_pump, fire
+from .test_other_doses import add_brew_kettle, add_soda_maker, carbonate, dose
+from .test_other_images_and_parts import (
+    KILN_CAMERA,
+    KILN_THUMBNAIL,
+    add_kiln_camera,
+    add_kiln_thumbnail,
+)
+from .test_other_jobs import add_cnc_router, cut
+from .test_other_programs import add_bread_maker, bake, set_bread_program
+from .test_other_water import add_irrigation, irrigate, set_valve_water
 from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
     add_spoolman_hub,
@@ -603,6 +614,29 @@ async def test_record_a_device_with_electricity_source_none(
     assert_recorded("line-items-add-electricity", stable_ids(added, ids))
 
 
+async def test_record_an_other_device_with_water_and_a_watering(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A garden valve under the Type Name "Irrigation": an Other Device that has water,
+    on a water meter and with the electricity source none; and a watering of 120 L."""
+    await set_valve_water(hass, 1000)
+    valve = await add_irrigation(hass)
+    await irrigate(hass, clock, start=1000, litres=120)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [water] = detail["run"]["line_items"]
+    ids = {
+        valve.subentry_id: "device-garden-valve",
+        run["id"]: "watering",
+        water["id"]: "watering-water",
+    }
+    assert_recorded("devices-list-other-water", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-water", stable_ids(detail, ids))
+
+
 async def test_record_a_dishwasher(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
@@ -1021,6 +1055,185 @@ async def test_record_an_ev_charger(hass: HomeAssistant, panel: PanelClient) -> 
     )
 
 
+async def test_record_other_devices_and_a_firing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """Other Devices under two Type Names: a kiln ("Kiln") that has nothing and
+    estimates its electricity, and a pool pump and a pond pump (both "Pump") whose
+    meters count each Run from 0; and a firing of the kiln."""
+    entry = await add_hub(hass)
+    kiln = await add_kiln(hass, entry=entry)
+    pool = await add_pump(hass, entry=entry)
+    pond = await add_pump(
+        hass, entry=entry, name="Pond pump", status="sensor.pond_pump_status"
+    )
+    await fire(hass, clock)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        kiln.subentry_id: "device-kiln",
+        pool.subentry_id: "device-pool-pump",
+        pond.subentry_id: "device-pond-pump",
+        run["id"]: "firing",
+        electricity["id"]: "firing-electricity",
+    }
+    assert_recorded("devices-list-other", stable_ids(devices, ids))
+    assert_recorded("runs-get-other", stable_ids(detail, ids))
+
+
+async def test_record_an_other_device_with_images_and_a_part_count(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    """A studio kiln ("Kiln") that has images and a Part Count and no job, and its
+    firing "Mugs" of 9 parts with its Thumbnail and its Snapshot."""
+    await add_kiln_thumbnail(hass, picture("red"))
+    await add_kiln_camera(hass, picture("blue"))
+    kiln = await add_kiln(
+        hass,
+        name="Studio kiln",
+        has=["images", "part_count"],
+        thumbnail=KILN_THUMBNAIL,
+        camera=KILN_CAMERA,
+    )
+    await fire(hass, clock)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], name="Mugs", part_count=9)
+
+    devices = await panel.call("coinop/devices/list")
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    thumbnail, snapshot = detail["run"]["images"]
+    assert (thumbnail["kind"], snapshot["kind"]) == ("thumbnail", "snapshot")
+    ids = {
+        kiln.subentry_id: "device-studio-kiln",
+        run["id"]: "mugs",
+        electricity["id"]: "mugs-electricity",
+        thumbnail["id"]: "mugs-thumbnail",
+        snapshot["id"]: "mugs-snapshot",
+    }
+    assert_recorded("devices-list-other-images", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-images", stable_ids(detail, ids))
+
+
+async def test_record_an_other_device_with_a_program_and_its_loaves(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A bread maker ("Bread maker"): an Other Device with a Program and no Doses,
+    its electricity per Program, after a loaf without a Program and a "Whole wheat"
+    one; its Program input also knows "Basic"."""
+    bread_maker = await add_bread_maker(hass, panel)
+    await bake(hass, clock)
+    await clock.advance(hours=1)
+    await bake(hass, clock, "Whole wheat")
+    await set_bread_program(hass, "unknown", {"options": ["Basic", "Whole wheat"]})
+
+    devices = await panel.call("coinop/devices/list")
+    runs = await panel.call("coinop/runs/list")
+    [plain] = [run for run in runs["runs"] if run["program"] is None]
+    [wheat] = [run for run in runs["runs"] if run["program"] == "Whole wheat"]
+    detail = await panel.call("coinop/runs/get", run_id=wheat["id"])
+    by_program = await panel.call(
+        "coinop/aggregates/get",
+        group_by=["program"],
+        run_ids=[plain["id"], wheat["id"]],
+    )
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        bread_maker.subentry_id: "device-bread-maker",
+        plain["id"]: "plain-loaf",
+        wheat["id"]: "wheat-loaf",
+        electricity["id"]: "wheat-loaf-electricity",
+    }
+    asked = {"group_by": ["program"], "run_ids": ["plain-loaf", "wheat-loaf"]}
+    assert_recorded("devices-list-other-program", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-program", stable_ids(detail, ids))
+    assert_recorded(
+        "aggregates-other-program",
+        stable_ids(runs | {"aggregates": [asked | by_program]}, ids),
+    )
+
+
+async def test_record_an_other_device_with_doses_and_no_program_and_a_bottle(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A soda maker ("Soda maker"): an Other Device with Doses and no Program, dosing
+    8 g of "co2" and 40 ml of "syrup" in its Default row, with the electricity source
+    none, and a bottle it carbonated. The catalogue holds the Materials of its Doses
+    and of the brew kettle's below."""
+    soda_maker = await add_soda_maker(hass, hass_storage)
+    await dose(panel, soda_maker, {"dose-co2": 8, "dose-syrup": 40})
+    await carbonate(hass, clock)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalogue = await panel.event()
+
+    co2, syrup = detail["run"]["line_items"]
+    ids = {
+        soda_maker.subentry_id: "device-soda-maker",
+        run["id"]: "bottle",
+        co2["id"]: "bottle-co2",
+        syrup["id"]: "bottle-syrup",
+    }
+    assert_recorded("devices-list-other-doses", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-doses", stable_ids(detail, ids))
+    assert_recorded("catalog-subscribe-other-doses", catalogue)
+
+
+async def test_record_an_other_device_with_a_program_doses_and_water(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A brew kettle ("Brew kettle"): an Other Device with a Program, Doses and water,
+    its electricity and its water per Program, dosing "malt" and "hops"."""
+    brew_kettle = await add_brew_kettle(hass, panel, hass_storage)
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-other-program-doses",
+        stable_ids(devices, {brew_kettle.subentry_id: "device-brew-kettle"}),
+    )
+
+
+async def test_record_an_other_device_with_job_and_material_and_its_run(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A CNC router ("CNC router"): an Other Device with Job and Material, Images and
+    a Part Count, with its job name and Material used inputs, no image input and the
+    default Material "mdf", and its Run "Sign Oak" of 3 parts that used 120 g. The
+    catalogue holds "mdf" (by g) and "plywood" (by piece)."""
+    router = await add_cnc_router(
+        hass, panel, hass_storage, has=["job", "images", "part_count"]
+    )
+    await cut(hass, clock, "Sign_Oak.gcode", grams=120)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], part_count=3)
+
+    devices = await panel.call("coinop/devices/list")
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalogue = await panel.event()
+
+    electricity, material = detail["run"]["line_items"]
+    ids = {
+        router.subentry_id: "device-cnc-router",
+        run["id"]: "sign",
+        electricity["id"]: "sign-electricity",
+        material["id"]: "sign-material",
+    }
+    assert_recorded("devices-list-other-job", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-job", stable_ids(detail, ids))
+    assert_recorded("catalog-subscribe-other-job", catalogue)
+
+
 async def test_record_what_the_image_commands_answer(
     hass: HomeAssistant,
     clock: Clock,
@@ -1221,6 +1434,34 @@ async def test_record_dishwasher_and_beverage_materials(
             [material for material, _ in created],
             {material["id"]: fixed for material, fixed in created},
         ),
+    )
+
+
+async def test_record_a_material_of_the_form_other(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    result = await panel.call(
+        "coinop/materials/create",
+        material={
+            "name": "Liquid fertiliser",
+            "form": "other",
+            "type": "Fertiliser",
+            "density": 1.2,
+            "price": {
+                "source": "fixed",
+                "pack_price": 6,
+                "pack_size": 500,
+                "pack_unit": "ml",
+            },
+        },
+    )
+
+    material = result["material"]
+    assert_recorded(
+        "materials-create-other",
+        stable_ids(material, {material["id"]: "material-fertiliser"}),
     )
 
 

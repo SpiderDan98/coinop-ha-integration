@@ -1,0 +1,20 @@
+{
+  "id": "material-fertiliser",
+  "name": "Liquid fertiliser",
+  "form": "other",
+  "type": "Fertiliser",
+  "density": 1.2,
+  "vendor": null,
+  "colour": null,
+  "diameter": null,
+  "default_for_type": false,
+  "archived": false,
+  "price": {
+    "source": "fixed",
+    "pack_price": 6.0,
+    "pack_size": 500.0,
+    "pack_unit": "ml"
+  },
+  "price_per_gram": 0.01,
+  "price_per_piece": null
+}

@@ -3,7 +3,7 @@
 from typing import Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 import pytest
 
@@ -20,13 +20,20 @@ def record_events(
 ) -> list[dict[str, Any]]:
     """Attributes of each event the Run event entity fires, in order."""
     fired: list[dict[str, Any]] = []
-    # The state is the event's timestamp; a restart restores it without firing.
-    seen = {STATE_UNKNOWN, STATE_UNAVAILABLE}
+    # The state is the event's timestamp; a restart restores it without firing. Older
+    # Home Assistant gives two events of one instant the same timestamp, so the
+    # event's type tells them apart.
+    seen: set[tuple[str, Any]] = set()
 
+    # Without it Home Assistant runs the listener in a thread, in no certain order.
+    @callback
     def on_change(event: Event[EventStateChangedData]) -> None:
         new = event.data["new_state"]
-        if new is not None and new.state not in seen:
-            seen.add(new.state)
+        if new is None or new.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            return
+        key = (new.state, new.attributes.get("event_type"))
+        if key not in seen:
+            seen.add(key)
             fired.append(dict(new.attributes))
 
     async_track_state_change_event(hass, entity_id, on_change)

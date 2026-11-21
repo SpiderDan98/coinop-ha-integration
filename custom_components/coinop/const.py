@@ -14,3 +14,5 @@ DEVICE_TYPE_COFFEE_MACHINE = "coffee_machine"
 DEVICE_TYPE_OVEN = "oven"
 DEVICE_TYPE_EV_CHARGER = "ev_charger"
 DEVICE_TYPE_ROBOTIC_MOWER = "robotic_mower"
+# Its Devices store a Type Name and their own Capabilities (ADR 0009).
+DEVICE_TYPE_OTHER = "other"

@@ -21,6 +21,7 @@
           "title": "Gerät neu konfigurieren",
           "description": "Wähle einen Bereich zum Ändern. Gespeichert wird erst mit Speichern. Änderungen gelten sofort für einen offenen Lauf; eine neue Verbrauchsquelle gilt ab dem nächsten Lauf. Beendete Läufe ändern sich nie. Erneut erkennen führt durch die Geräteeingänge, die das Integrationsprofil der Integration des Geräts kennt, vorausgefüllt aus ihren Entitäten, z. B. wenn ein Update sie umbenannt hat; Verbrauchsquellen und Preise bleiben unverändert.",
           "menu_options": {
+            "other": "Typbezeichnung & was es hat",
             "status": "Status & Zuordnung",
             "job": "Auftrag & Material",
             "images": "Bilder",
@@ -70,6 +71,30 @@
             "price": "Was du pro kWh zahlst, in {currency}. Leer lassen, wenn eine Entität den Preis meldet.",
             "price_entity": "Meldet den aktuellen Preis pro kWh, z. B. bei einem dynamischen Tarif. Leer lassen bei einem festen Preis.",
             "water_price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser. Das Wasser kommt vom Zähler des Geräts, wenn es einen hat, sonst je Programm aus den Programmvorgaben. Leer lassen, um kein Wasser zu erfassen."
+          }
+        },
+        "other": {
+          "title": "Typbezeichnung & was das Gerät hat",
+          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.\n\n„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Jede andere Kombination funktioniert.\n\nEinen Material-Posten kannst du an jedem Lauf von Hand hinzufügen, egal was das Gerät hat. „Auftrag und Material“ brauchst du also nicht, nur um ab und zu ein Material zu erfassen.\n\nDie Typbezeichnung und was das Gerät hat, kannst du später unter „Gerät neu konfigurieren“ ändern, solange das Gerät keinen offenen Lauf hat. Was du dann einschaltest, wird gleich abgefragt, ebenso eine Strom- oder Wasserquelle, die das Gerät nicht mehr nutzen kann: die Schätzung aus der Durchschnittsleistung, sobald es ein Programm hat, „je Programm“, sobald es keines hat. Was du ausschaltest, verliert seine Geräteeingänge, seine Quelle, seinen Preis und seine Sensoren in Home Assistant; seine Dosierungen, Programmvorgaben und sein Standardmaterial bleiben erhalten, falls du es wieder einschaltest.",
+          "data": {
+            "type_name": "Typbezeichnung",
+            "program": "Programm",
+            "doses": "Dosierungen",
+            "water": "Wasser",
+            "job": "Auftrag und Material",
+            "images": "Bilder",
+            "part_count": "Teileanzahl",
+            "per_run_meters": "Zähler zählen jeden Lauf ab 0"
+          },
+          "data_description": {
+            "type_name": "Was für ein Gerät es ist, etwa „Brennofen“ oder „Poolpumpe“: die Überschrift, unter der das Panel es aufführt. Geräte mit derselben Typbezeichnung teilen sich eine Überschrift.",
+            "program": "Es meldet, welches Programm es ausführt: Ein Lauf speichert sein Programm und wird danach benannt. Sein Strom kann dann je Programm kommen, aus den kWh in den Programmvorgaben; das ersetzt die Schätzung aus der Durchschnittsleistung.",
+            "doses": "Produkte, die es in einem Lauf verbraucht, etwa das CO₂ eines Wassersprudlers oder das Mehl eines Brotbackautomaten: Du trägst sie auf seiner Karte im Geräte-Tab des Panels als Dosierungen ein, jede mit ihrer Menge pro Lauf, oder pro Programm, wenn es eines hat. Jede Dosierung, die ein Lauf verwendet, wird zu einem Material-Posten.",
+            "water": "Eine Wasserquelle (Wasserzähler oder Durchflusssensor) und ein Wasserpreis: Jeder Lauf bekommt einen Wasser-Posten für das Wasser, das er verbraucht hat.",
+            "job": "Es arbeitet einen Auftrag nach dem anderen ab und verbraucht dabei Material, wie ein Lasercutter oder eine CNC-Fräse: Ein Lauf wird nach seinem Auftrag benannt und bekommt einen Material-Posten, vom Gerät gemessen oder zum Ausfüllen, bepreist mit dem Standardmaterial des Geräts oder dem Material in einem Fach. Nicht zusammen mit Programm oder Dosierungen.",
+            "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
+            "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",
+            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler, und hat er keinen Wert, bis er einen Lauf bei 0 beginnt, keinen auf eine Lücke im Verbrauch."
           }
         },
         "device": {
@@ -128,7 +153,7 @@
         },
         "job": {
           "title": "Auftrag & Material",
-          "description": "Wähle optional die Entität, die den Namen des aktuellen Druckauftrags meldet, und die, die meldet, wie viel Material der Auftrag verbraucht hat. Ein Lauf wird nach seinem Auftrag benannt, und ein Druck, der mit demselben Auftragsnamen wieder startet, z. B. nach einem Stromausfall, setzt denselben Lauf fort.",
+          "description": "Wähle optional die Entität, die den Namen des aktuellen Auftrags des Geräts meldet, und die, die meldet, wie viel Material der Auftrag verbraucht hat. Ein Lauf wird nach seinem Auftrag benannt, und ein Auftrag, der unter demselben Namen wieder startet, z. B. nach einem Stromausfall, setzt denselben Lauf fort.",
           "data": {
             "entity_id": "Auftragsname-Entität (optional)",
             "attribute": "Attribut (optional)",
@@ -139,13 +164,13 @@
             "loaded_slot": "Entität für das geladene Fach (optional)"
           },
           "data_description": {
-            "entity_id": "Ohne Auftragsnamen setzt ein Druck, der bei offenem Lauf wieder startet, immer diesen Lauf fort.",
-            "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Druckereignis-Entität.",
-            "material_entity_id": "Die vom Drucker gemessene Gesamtmenge des Auftrags, als Länge (z. B. mm Filament) oder Masse (g). Eine Länge wird über Durchmesser und Dichte des Materials in Gramm umgerechnet. Ohne sie bekommt jeder Lauf einen Material-Posten mit leerer Menge zum Ausfüllen.",
+            "entity_id": "Ohne Auftragsnamen setzt ein Gerät, das bei offenem Lauf wieder startet, immer diesen Lauf fort.",
+            "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Ereignis-Entität, die für jeden Auftrag auslöst.",
+            "material_entity_id": "Die vom Gerät gemessene Gesamtmenge des Auftrags, als Länge (z. B. mm Filament) oder Masse (g). Eine Länge wird über Durchmesser und Dichte des Materials in Gramm umgerechnet. Ohne sie bekommt jeder Lauf einen Material-Posten mit leerer Menge zum Ausfüllen.",
             "material_attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Längen-Attribut eines Filament-Sensors.",
             "slots": "Eine Entität je Fach einer Mehrmaterial-Einheit, in Fach-Reihenfolge: die erste ist Fach 1. Jede meldet als Zustand den Typ des eingelegten Materials (z. B. PLA).",
             "colour_attribute": "Das Attribut der Fach-Entitäten, das die Farbe des Materials als Hex-Code enthält, z. B. color_hex.",
-            "loaded_slot": "Meldet die Nummer des Fachs, aus dem gerade gedruckt wird; jeder andere Wert bedeutet kein Fach. Jedes während eines Laufs geladene Fach wird über Typ und Farbe einem Material zugeordnet."
+            "loaded_slot": "Meldet die Nummer des Fachs, aus dem das Gerät gerade sein Material nimmt; jeder andere Wert bedeutet kein Fach. Jedes während eines Laufs gemeldete Fach wird über Typ und Farbe einem Material zugeordnet."
           }
         },
         "material_unit": {
@@ -164,7 +189,7 @@
             "snapshot": "Kamerabild am Ende eines Laufs aufnehmen"
           },
           "data_description": {
-            "thumbnail": "Die Bild-Entität der Drucker-Integration, die das gedruckte Modell zeigt.",
+            "thumbnail": "Eine Bild-Entität, die zeigt, was der Lauf herstellt, z. B. die Vorschau des 3D-Modells aus der Integration des Geräts.",
             "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
           }
         },
@@ -249,7 +274,7 @@
             "paused_power": "Leistung in Pause (optional)"
           },
           "data_description": {
-            "running_power": "Die durchschnittliche Leistung über einen ganzen Druck, typisch 80–150 W für einen FDM-Tischdrucker mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt weit über dem echten Durchschnitt.",
+            "running_power": "Die durchschnittliche Leistung des Geräts über einen ganzen Lauf, z. B. 80–150 W bei einem FDM-Tischgerät mit Heizbett. Trage nicht die Nennleistung vom Typenschild oder Netzteil ein: Sie liegt meist weit über dem echten Durchschnitt.",
             "paused_power": "Leistung während einer Pause. Leer lassen, um die Betriebsleistung zu verwenden."
           }
         },
@@ -395,6 +420,8 @@
         }
       },
       "error": {
+        "type_name_required": "Gib eine Typbezeichnung ein.",
+        "job_with_program_or_doses": "„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Schalte eine der beiden Seiten aus. Einen Material-Posten kannst du trotzdem an jedem Lauf von Hand hinzufügen.",
         "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
@@ -406,7 +433,10 @@
         "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen."
       },
       "abort": {
-        "reconfigure_successful": "Das Gerät wurde gespeichert."
+        "reconfigure_successful": "Das Gerät wurde gespeichert.",
+        "run_open": "Dieses Gerät hat einen Lauf, der noch offen ist oder gerade beendet wurde und auf die letzten Meldungen seiner Zähler wartet. Was ein Gerät hat, lässt sich bis dahin nicht ändern, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn der Lauf beendet ist; auf seine Zähler wartet er höchstens fünf Minuten.",
+        "run_open_not_loaded": "Coin-op ist gerade nicht geladen, und dieses Gerät hat einen Lauf, der noch offen war, als Coin-op angehalten wurde, oder gerade beendet war und auf die letzten Meldungen seiner Zähler wartete. Der Lauf geht weiter, sobald Coin-op wieder geladen ist. Was ein Gerät hat, lässt sich nicht ändern, bis der Lauf beendet ist, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn Coin-op geladen und der Lauf beendet ist.",
+        "runs_unreadable": "Coin-op ist gerade nicht geladen und kann seine gespeicherten Läufe nicht lesen. Ob dieses Gerät einen noch offenen Lauf hat, lässt sich deshalb nicht sagen. Was ein Gerät hat, lässt sich nicht ändern, solange es einen hat, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn Coin-op geladen ist; was das Laden verhindert, steht bei Coin-op unter Einstellungen > Geräte & Dienste."
       }
     }
   },
@@ -538,7 +568,8 @@
         "coffee_machine": "Kaffeemaschine",
         "oven": "Backofen",
         "ev_charger": "Wallbox",
-        "robotic_mower": "Mähroboter"
+        "robotic_mower": "Mähroboter",
+        "other": "Sonstiges"
       }
     }
   }

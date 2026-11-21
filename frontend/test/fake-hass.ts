@@ -21,7 +21,10 @@ import type {
 } from "../src/api";
 import aggregatesByProgram from "./fixtures/backend/aggregates-by-program.json";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
+import aggregatesOtherProgram from "./fixtures/backend/aggregates-other-program.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
+import catalogSubscribeOtherDoses from "./fixtures/backend/catalog-subscribe-other-doses.json";
+import catalogSubscribeOtherJob from "./fixtures/backend/catalog-subscribe-other-job.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
@@ -29,6 +32,13 @@ import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-mac
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
 import devicesListElectricityNone from "./fixtures/backend/devices-list-electricity-none.json";
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
+import devicesListOther from "./fixtures/backend/devices-list-other.json";
+import devicesListOtherDoses from "./fixtures/backend/devices-list-other-doses.json";
+import devicesListOtherImages from "./fixtures/backend/devices-list-other-images.json";
+import devicesListOtherJob from "./fixtures/backend/devices-list-other-job.json";
+import devicesListOtherProgram from "./fixtures/backend/devices-list-other-program.json";
+import devicesListOtherProgramDoses from "./fixtures/backend/devices-list-other-program-doses.json";
+import devicesListOtherWater from "./fixtures/backend/devices-list-other-water.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
@@ -54,6 +64,7 @@ import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateDishwasherAndBeverage from "./fixtures/backend/materials-create-dishwasher-and-beverage.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
+import materialsCreateOther from "./fixtures/backend/materials-create-other.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
@@ -61,6 +72,12 @@ import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
 import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
+import runsGetOther from "./fixtures/backend/runs-get-other.json";
+import runsGetOtherDoses from "./fixtures/backend/runs-get-other-doses.json";
+import runsGetOtherImages from "./fixtures/backend/runs-get-other-images.json";
+import runsGetOtherJob from "./fixtures/backend/runs-get-other-job.json";
+import runsGetOtherProgram from "./fixtures/backend/runs-get-other-program.json";
+import runsGetOtherWater from "./fixtures/backend/runs-get-other-water.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -75,6 +92,10 @@ const [snapshot, ...changes] = runsSubscribe;
 const found = <T>(value: T | undefined, what: string) => {
   if (value === undefined) throw new Error(`nothing recorded for ${what}`);
   return value;
+};
+const byProgram = aggregatesByProgram as {
+  runs: RunSummary[];
+  aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
 };
 
 export const recorded = {
@@ -95,10 +116,7 @@ export const recorded = {
   /** `coinop/runs/list` of Kobra's "vase" and the "device-washer" Runs "monday" and
    * "tuesday" (Cotton 60°, 0.07 and 0.57), "eco" (Eco 40-60, 0.07) and "unknown" (no
    * Program, 0.07), with `coinop/aggregates/get` of those four by Program. */
-  programs: aggregatesByProgram as {
-    runs: RunSummary[];
-    aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
-  },
+  programs: byProgram,
   /** `coinop/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
@@ -176,6 +194,58 @@ export const recorded = {
   /** `coinop/runs/get` of its Run "mowing": 65 minutes of mowing, then 55 minutes paused
    * while it charged 0.25 kWh at 0.30 ("mowing-electricity"); ended with Outcome Unknown. */
   mowing: runsGetRoboticMower.run as RunDetail,
+  /** `coinop/devices/list` with three Other Devices under two Type Names: "device-kiln"
+   * ("Kiln"), which has nothing and estimates its electricity from 2 kW, then
+   * "device-pool-pump" and "device-pond-pump" (both "Pump") on a cycle energy sensor,
+   * whose meters count each Run from 0. */
+  others: devicesListOther.devices as Device[],
+  /** `coinop/runs/get` of the kiln's unnamed Run "firing": 90 minutes estimated as 3 kWh
+   * at 0.30 ("firing-electricity"); ended with Outcome Unknown. */
+  firing: runsGetOther.run as RunDetail,
+  /** `coinop/devices/list` with only "device-studio-kiln", an Other Device ("Kiln") that
+   * has images and a Part Count and no job: its Thumbnail image entity and its camera. */
+  studioKiln: devicesListOtherImages.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "mugs" of 9 parts: 3 kWh estimated at 0.30
+   * ("mugs-electricity"), with "mugs-thumbnail" and "mugs-snapshot". */
+  mugs: runsGetOtherImages.run as RunDetail,
+  /** `coinop/devices/list` with only "device-bread-maker", an Other Device under the Type
+   * Name "Bread maker" with a Program and no Doses, its electricity per Program: the
+   * Default row 0.4 kWh, "Whole wheat" 0.5 kWh; its Program input also knows "Basic". */
+  breadMaker: devicesListOtherProgram.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "wheat-loaf" (Whole wheat): 0.5 kWh from the Program's
+   * row at 0.30 ("wheat-loaf-electricity"). */
+  wheatLoaf: runsGetOtherProgram.run as RunDetail,
+  /** `coinop/runs/list` of its Runs "plain-loaf" (no Program, 0.12) and "wheat-loaf"
+   * (Whole wheat, 0.15), with `coinop/aggregates/get` of the two by Program. */
+  loaves: aggregatesOtherProgram as typeof byProgram,
+  /** `coinop/devices/list` with only "device-soda-maker", an Other Device under the Type
+   * Name "Soda maker" with Doses and no Program, with the electricity source none: its
+   * Default row doses 8 g of "co2" and 40 ml of "syrup". */
+  sodaMaker: devicesListOtherDoses.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-brew-kettle", an Other Device under the Type
+   * Name "Brew kettle" with a Program, Doses and water, its electricity and water per
+   * Program: the Default row 3 kWh, 25 L, 4,000 g of "malt" and 30 g of "hops", "Pale ale"
+   * 3.6 kWh, 30 L and 4,500 g of "malt". */
+  brewKettle: devicesListOtherProgramDoses.devices[0] as Device,
+  /** `coinop/runs/get` of the soda maker's unnamed Run "bottle": 8 g of CO₂ at 0.02
+   * ("bottle-co2") and 40 ml of Cola syrup at 0.01 ("bottle-syrup"), both from the Default
+   * row, and no Electricity Line Item; ended with Outcome Unknown. */
+  bottle: runsGetOtherDoses.run as RunDetail,
+  /** `coinop/catalog/subscribe` with the Materials the Doses of both point to, all of the
+   * form Other: "co2" (CO₂, by g), "syrup" (Cola syrup, by ml), "malt" (Pale malt, by g) and
+   * "hops" (Hop pellets, by g). */
+  doseMaterials: catalogSubscribeOtherDoses as Catalog,
+  /** `coinop/devices/list` with only "device-cnc-router", an Other Device under the Type
+   * Name "CNC router" with Job and Material, Images and a Part Count: its job name and
+   * Material used inputs (in g), no Slots and no image input, the default Material "mdf". */
+  cncRouter: devicesListOtherJob.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "sign" ("Sign Oak", after its job) of 3 parts: 0.3 kWh
+   * estimated at 0.30 ("sign-electricity") and 120 g of MDF measured at 0.005
+   * ("sign-material"). */
+  sign: runsGetOtherJob.run as RunDetail,
+  /** `coinop/catalog/subscribe` with the Materials of the form Other it can charge: "mdf"
+   * (MDF, by g) and "plywood" (Plywood sheet, by piece). */
+  stock: catalogSubscribeOtherJob as Catalog,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
@@ -210,6 +280,13 @@ export const recorded = {
   /** `coinop/line_items/add`: 0.4 kWh at 0.30 ("unpowered-electricity") added to it by
    * hand. */
   lineItemsAddElectricity: lineItemsAddElectricity as { run: RunDetail },
+  /** `coinop/devices/list` with only "device-garden-valve", an Other Device under the Type
+   * Name "Irrigation" that has water: on a water meter at 4.00 per m³, with the electricity
+   * source none. */
+  irrigation: devicesListOtherWater.devices[0] as Device,
+  /** `coinop/runs/get` of its unnamed Run "watering": 120 L measured at 4.00 per m³
+   * ("watering-water") and no Electricity Line Item; ended with Outcome Unknown. */
+  watering: runsGetOtherWater.run as RunDetail,
   /**
    * `coinop/catalog/subscribe`: first empty, then the whole catalogue a panel opened
    * later gets: "material-1" (eSun PLA+ black, default for PLA), "material-2" (Standard
@@ -243,6 +320,9 @@ export const recorded = {
   /** `coinop/materials/create` of "material-tabs" (60 pieces for 9.00) and
    * "material-beans" (1,000 g for 16.00), each answer's Material. */
   dishwasherAndBeverage: materialsCreateDishwasherAndBeverage as Material[],
+  /** `coinop/materials/create` of "material-fertiliser" (form Other, 500 ml for 6.00):
+   * the answer's Material. */
+  otherMaterial: materialsCreateOther as Material,
   material: (id: string) =>
     found(
       recorded.catalog.filled.materials.find((material) => material.id === id),
@@ -398,9 +478,11 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       const asked = `${String(msg.group_by)} of ${String(runIds)}`;
       return {
         groups: found(
-          [...recorded.aggregates, ...recorded.programs.aggregates].find(
-            (answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked,
-          ),
+          [
+            ...recorded.aggregates,
+            ...recorded.programs.aggregates,
+            ...recorded.loaves.aggregates,
+          ].find((answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked),
           `grouping ${asked}`,
         ).groups,
       };

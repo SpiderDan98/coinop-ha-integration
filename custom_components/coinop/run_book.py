@@ -5,7 +5,7 @@ listeners (sensors, events, panel subscriptions) never disagree.
 """
 
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 
 from homeassistant.core import CALLBACK_TYPE, callback
@@ -23,6 +23,12 @@ class RunChange(StrEnum):
     UPDATED = "updated"
     ENDED = "ended"
     DELETED = "deleted"
+
+
+def unfinalised(runs: Iterable[Run], device_id: str) -> list[Run]:
+    """The Device's Runs that can still change: an open one, or an ended one that
+    waits for its inputs' last reports."""
+    return [run for run in runs if run.device_id == device_id and not run.finalised]
 
 
 class RunBook:
@@ -49,6 +55,9 @@ class RunBook:
             ),
             None,
         )
+
+    def unfinalised(self, device_id: str) -> list[Run]:
+        return unfinalised(self._runs.values(), device_id)
 
     def uses_material(self, material_id: str) -> bool:
         return any(
