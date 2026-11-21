@@ -4,12 +4,11 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .chargers import add_wallbox
 from .clock import Clock
-from .devices import ENERGY, add_hub, configure, report_status, start_reconfigure
+from .devices import ENERGY, add_hub, configure, report_status
 from .registry import HaDevice
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
@@ -209,36 +208,3 @@ async def test_manual_setup_of_a_wallbox_comes_pre_filled(
     }
     assert data["mapping"] == MAPPING
     assert data["consumption"]["entity_id"] == wallbox["added_energy"]
-
-
-async def test_detect_again_on_a_wallbox_leaves_electricity_and_price_alone(
-    hass: HomeAssistant, entity_registry: er.EntityRegistry
-) -> None:
-    wallbox = add_wallbox(hass)
-    entry = await add_hub(hass)
-    await quick_start(hass, entry, wallbox.device.id, price=0.3)
-    [subentry] = entry.subentries.values()
-    before = dict(subentry.data)
-    # The user renamed the Status and swapped in a plug's meter of their own.
-    renamed = entity_registry.async_update_entity(
-        wallbox["status_description"], new_entity_id="sensor.wallbox_state"
-    ).entity_id
-    entity_registry.async_update_entity(
-        wallbox["added_energy"], disabled_by=er.RegistryEntryDisabler.USER
-    )
-    menu = await start_reconfigure(hass, entry, subentry)
-
-    result = await configure(hass, menu, {"next_step_id": "detect"})
-    shown = []
-    while result["type"] is FlowResultType.FORM:
-        shown.append(result["step_id"])
-        result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping"]
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
-
-    data = entry.subentries[subentry.subentry_id].data
-    assert data["status"] == {"entity_id": renamed, "attribute": None}
-    assert data["mapping"] == MAPPING
-    assert data["consumption"] == before["consumption"]
-    assert data["price"] == before["price"]

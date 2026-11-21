@@ -1,5 +1,7 @@
-"""Integration Profiles for EV chargers: Tesla Wall Connector."""
+"""Integration Profiles for EV chargers: Tesla Wall Connector, and Detect again on
+every EV charger integration."""
 
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -7,11 +9,12 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from .chargers import add_wall_connector
+from .chargers import add_charge_point, add_evcc_site, add_wall_connector, add_wallbox
 from .clock import Clock
 from .devices import ENERGY, add_hub, configure, report_status, start_reconfigure
 from .registry import HaDevice
 from .test_device_flow import fields, suggested
+from .test_easee_zaptec_go_e import CHARGERS
 from .test_integration_profiles import accepted
 from .test_measured import electricity
 from .test_quick_start import offered, open_add_device, pick, quick_start, register
@@ -64,21 +67,35 @@ async def test_quick_start_adds_a_wall_connector_with_its_lifetime_counter(
     assert data["price"] == {"source": "fixed", "value": 0.3}
 
 
-async def test_detect_again_on_a_wall_connector_leaves_electricity_and_price_alone(
-    hass: HomeAssistant, entity_registry: er.EntityRegistry
+# Each EV charger integration's fixture and its Status's key.
+DETECT_AGAIN = {
+    "tesla_wall_connector": (add_wall_connector, "status"),
+    "evcc_intg": (lambda hass: add_evcc_site(hass)[0], "charging"),
+    "ocpp": (lambda hass: add_charge_point(hass)[0], "status_connector"),
+    **{key: (charger.add, charger.status) for key, charger in CHARGERS.items()},
+    "wallbox": (add_wallbox, "status_description"),
+}
+
+
+@pytest.mark.parametrize(("add", "status"), DETECT_AGAIN.values(), ids=DETECT_AGAIN)
+async def test_detect_again_on_an_ev_charger_leaves_electricity_and_price_alone(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+    add: Callable[[HomeAssistant], HaDevice],
+    status: str,
 ) -> None:
-    charger = add_wall_connector(hass)
+    charger = add(hass)
     entry = await add_hub(hass)
     await quick_start(hass, entry, charger.device.id, price=0.3)
     [subentry] = entry.subentries.values()
     before = dict(subentry.data)
-    # An update renamed the Status; the user disabled the lifetime counter, which a
-    # Detect again that pre-filled the meter would swap for the session counter.
+    # An update renamed the Status; the user disabled the pre-filled counter, which a
+    # Detect again that pre-filled the meter would swap for another one.
     renamed = entity_registry.async_update_entity(
-        charger["status"], new_entity_id="sensor.wall_connector_state"
+        charger[status], new_entity_id=f"{charger[status]}_renamed"
     ).entity_id
     entity_registry.async_update_entity(
-        charger["energy_kWh"], disabled_by=er.RegistryEntryDisabler.USER
+        before["consumption"]["entity_id"], disabled_by=er.RegistryEntryDisabler.USER
     )
     menu = await start_reconfigure(hass, entry, subentry)
     assert menu["menu_options"] == ["status", "consumption", "price", "detect", "save"]
@@ -94,7 +111,7 @@ async def test_detect_again_on_a_wall_connector_leaves_electricity_and_price_alo
 
     data = entry.subentries[subentry.subentry_id].data
     assert data["status"] == {"entity_id": renamed, "attribute": None}
-    assert data["mapping"] == WALL_CONNECTOR_MAPPING
+    assert data["mapping"] == before["mapping"]
     assert data["consumption"] == before["consumption"]
     assert data["price"] == before["price"]
 
