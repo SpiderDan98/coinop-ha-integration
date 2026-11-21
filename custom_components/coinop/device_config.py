@@ -147,6 +147,7 @@ CHOICES = {
     "program": frozenset({Capability.PROGRAM, Capability.PROGRAM_CONSUMPTION}),
     "doses": frozenset({Capability.DOSES}),
     "water": frozenset({Capability.WATER}),
+    "job": frozenset({Capability.JOB, Capability.MATERIAL}),
     "images": frozenset({Capability.IMAGES}),
     "part_count": frozenset({Capability.PART_COUNT}),
     "per_run_meters": frozenset({Capability.PER_RUN_METERS}),
@@ -156,6 +157,17 @@ CHOICES = {
 def picks_capabilities(device_type: str) -> bool:
     """Whether the user picks what a Device of the type has, as no set is shipped."""
     return device_type not in CAPABILITIES
+
+
+def refused_combination(choices: Iterable[str]) -> str | None:
+    """Why an Other Device can't have these of `CHOICES` together, as the key of the
+    flow's error that explains it; None when it can."""
+    picked = frozenset(choices)
+    # A Dose's Material Line Item would stand in for the Run's own one and its Flags,
+    # and the job and the Program would both name the Run.
+    if "job" in picked and picked & {"program", "doses"}:
+        return "job_with_program_or_doses"
+    return None
 
 
 def chosen_capabilities(choices: Iterable[str]) -> frozenset[Capability]:

@@ -74,12 +74,13 @@
         },
         "other": {
           "title": "Typbezeichnung & was das Gerät hat",
-          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.",
+          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.\n\n„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Jede andere Kombination funktioniert.\n\nEinen Material-Posten kannst du an jedem Lauf von Hand hinzufügen, egal was das Gerät hat. „Auftrag und Material“ brauchst du also nicht, nur um ab und zu ein Material zu erfassen.",
           "data": {
             "type_name": "Typbezeichnung",
             "program": "Programm",
             "doses": "Dosierungen",
             "water": "Wasser",
+            "job": "Auftrag und Material",
             "images": "Bilder",
             "part_count": "Teileanzahl",
             "per_run_meters": "Zähler zählen jeden Lauf ab 0"
@@ -89,6 +90,7 @@
             "program": "Es meldet, welches Programm es ausführt: Ein Lauf speichert sein Programm und wird danach benannt. Sein Strom kann dann je Programm kommen, aus den kWh in den Programmvorgaben; das ersetzt die Schätzung aus der Durchschnittsleistung.",
             "doses": "Produkte, die es in einem Lauf verbraucht, etwa das CO₂ eines Wassersprudlers oder das Mehl eines Brotbackautomaten: Du trägst sie auf seiner Karte im Geräte-Tab des Panels als Dosierungen ein, jede mit ihrer Menge pro Lauf, oder pro Programm, wenn es eines hat. Jede Dosierung, die ein Lauf verwendet, wird zu einem Material-Posten.",
             "water": "Eine Wasserquelle (Wasserzähler oder Durchflusssensor) und ein Wasserpreis: Jeder Lauf bekommt einen Wasser-Posten für das Wasser, das er verbraucht hat.",
+            "job": "Es arbeitet einen Auftrag nach dem anderen ab und verbraucht dabei Material, wie ein Lasercutter oder eine CNC-Fräse: Ein Lauf wird nach seinem Auftrag benannt und bekommt einen Material-Posten, vom Gerät gemessen oder zum Ausfüllen, bepreist mit dem Standardmaterial des Geräts oder dem Material in einem Fach. Nicht zusammen mit Programm oder Dosierungen.",
             "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
             "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",
             "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler."
@@ -418,6 +420,7 @@
       },
       "error": {
         "type_name_required": "Gib eine Typbezeichnung ein.",
+        "job_with_program_or_doses": "„Auftrag und Material“ lässt sich nicht mit „Programm“ oder „Dosierungen“ kombinieren: Auftrag und Programm würden beide den Lauf benennen, und der Material-Posten einer Dosierung träte an die Stelle des eigenen Material-Postens des Laufs und seiner Hinweise. Schalte eine der beiden Seiten aus. Einen Material-Posten kannst du trotzdem an jedem Lauf von Hand hinzufügen.",
         "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",

@@ -315,6 +315,8 @@ async def add_other_device(
     has: Iterable[str] = (),
     device: str | None = None,
     mapping: dict[str, list[str]] = OTHER_MAPPING,
+    job: dict[str, Any] | None = None,
+    material_unit: str | None = None,
     thumbnail: str | None = None,
     camera: str | None = None,
     snapshot: bool | None = None,
@@ -330,6 +332,10 @@ async def add_other_device(
     """Walk Add Device to the end for an Other Device with `type_name` that has the
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
 
+    With the choice "job" (Job and Material), `job` is the job step's input, by its
+    fields (`entity_id`, `material_entity_id`, `slots`, `loaded_slot`, ...; no job
+    input without it), and `material_unit` answers the unit step that a
+    `material_attribute` brings.
     With "images" among `has`, `thumbnail`, `camera` and `snapshot` answer the images
     step, each left as the step has it when not given. With the choice "program",
     `program` is the Program step's input (no Program input without it). `source` is
@@ -350,6 +356,12 @@ async def add_other_device(
         other=other_input(type_name, has),
     )
     result = await configure(hass, result, mapping)
+    if "job" in has:
+        assert result["step_id"] == "job", result.get("errors")
+        result = await configure(hass, result, job or {})
+        if (job or {}).get("material_attribute"):
+            assert result["step_id"] == "material_unit", result.get("errors")
+            result = await configure(hass, result, {"unit": material_unit})
     if "images" in has:
         assert result["step_id"] == "images", result.get("errors")
         result = await configure(

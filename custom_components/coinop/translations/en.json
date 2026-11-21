@@ -74,12 +74,13 @@
         },
         "other": {
           "title": "Type Name & what the Device has",
-          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.",
+          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.\n\n“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Every other combination works.\n\nYou can add a Material Line Item by hand on any Run, whatever the Device has, so “Job and Material” isn't needed just to record a Material now and then.",
           "data": {
             "type_name": "Type Name",
             "program": "Program",
             "doses": "Doses",
             "water": "Water",
+            "job": "Job and Material",
             "images": "Images",
             "part_count": "Part Count",
             "per_run_meters": "Meters count each Run from 0"
@@ -89,6 +90,7 @@
             "program": "It reports which program it runs: a Run records its Program and is named after it. Its electricity can then come per Program, from the kWh in the Program Defaults, which replaces the estimate from average power.",
             "doses": "Products it uses up in a Run, such as a soda maker's CO₂ or a bread maker's flour: you list them as Doses on its card in the panel's Devices tab, each with its amount per Run, or per Program if it has one. Each Dose a Run uses becomes a Material Line Item.",
             "water": "A water source (a water meter or a flow sensor) and a water price: each Run gets a Water Line Item for the water it used.",
+            "job": "It works through one job at a time and uses up Material doing so, as a laser cutter or a CNC router does: a Run is named after its job and gets a Material Line Item, measured by the Device or left for you to fill in, priced from the Device's default Material or from the Material in a Slot. Not together with Program or Doses.",
             "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
             "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",
             "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset."
@@ -418,6 +420,7 @@
       },
       "error": {
         "type_name_required": "Enter a Type Name.",
+        "job_with_program_or_doses": "“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Switch off one of the two sides. A Material Line Item can still be added by hand on any Run.",
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",

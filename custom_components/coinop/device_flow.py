@@ -38,6 +38,7 @@ from .device_config import (
     capabilities_of,
     chosen_capabilities,
     picks_capabilities,
+    refused_combination,
 )
 from .device_inputs import (
     entity_unit,
@@ -264,16 +265,18 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         listed under and what it has."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            if type_name := user_input["type_name"].strip():
+            type_name = user_input["type_name"].strip()
+            picked = [choice for choice in CHOICES if user_input[choice]]
+            if not type_name:
+                errors["type_name"] = "type_name_required"
+            if refused := refused_combination(picked):
+                errors["base"] = refused
+            if not errors:
                 self._data["type_name"] = type_name
                 self._data["capabilities"] = sorted(
-                    capability.value
-                    for capability in chosen_capabilities(
-                        choice for choice in CHOICES if user_input[choice]
-                    )
+                    capability.value for capability in chosen_capabilities(picked)
                 )
                 return await self.async_step_device()
-            errors["type_name"] = "type_name_required"
         known = list(
             dict.fromkeys(
                 type_name

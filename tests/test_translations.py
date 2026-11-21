@@ -196,6 +196,26 @@ async def test_what_an_other_device_can_have_is_named_and_explained(
     assert [text for text in shown if unseen in text.lower()] == []
 
 
+@pytest.mark.parametrize(
+    ("language", "quoted", "by_hand"),
+    [("en", "“{}”", "by hand"), ("de", "„{}“", "von Hand")],
+)
+async def test_the_other_step_says_which_choices_cant_be_combined_and_what_to_do_instead(
+    hass: HomeAssistant, language: str, quoted: str, by_hand: str
+) -> None:
+    texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])
+
+    prefix = f"component.{DOMAIN}.config_subentries.device"
+    description = texts[f"{prefix}.step.other.description"]
+    refusal = texts[f"{prefix}.error.job_with_program_or_doses"]
+    # Stated before anything is picked, and again when the mix is refused.
+    for text in (description, refusal):
+        for choice in ("job", "program", "doses"):
+            name = texts[f"{prefix}.step.other.data.{choice}"]
+            assert quoted.format(name) in text, (choice, text)
+    assert by_hand in description
+
+
 async def test_entities_are_named_in_the_configured_language(
     hass: HomeAssistant, clock: Clock
 ) -> None:
