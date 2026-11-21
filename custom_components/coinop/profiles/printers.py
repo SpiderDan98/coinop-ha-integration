@@ -123,6 +123,31 @@ def bambu_lab(find: Find) -> dict[str, Any]:
     }
 
 
+def prusalink(find: Find) -> dict[str, Any]:
+    """Home Assistant's PrusaLink: unique ids `<config entry id>_<key>`, no Material used."""
+    status = find("sensor", "_printer.state")
+    job = find("sensor", "_job.filename")
+    # The job preview is a camera; the integration has no webcam.
+    thumbnail = find("camera", "_job_preview")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["printing"],
+                # `attention` waits for the user, such as on a filament runout.
+                paused=["paused", "attention"],
+                finished=["finished"],
+                cancelled=["stopped"],
+                fault=["error"],
+                ignored=["idle", "ready", "busy"],
+            ),
+        ),
+        "job": found(job, entity_id=job, attribute=None),
+        "images": found(thumbnail, thumbnail=thumbnail),
+    }
+
+
 def moonraker(find: Find) -> dict[str, Any]:
     """marcolivierarsenault/moonraker-home-assistant: unique ids `<entry id>_<key>`."""
     # The print's state, not the printer's own `state` (ready, shutdown and so on).

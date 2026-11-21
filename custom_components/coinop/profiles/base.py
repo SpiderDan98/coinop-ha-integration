@@ -29,12 +29,18 @@ KindCheck = Callable[[Find, dr.DeviceEntry, ConfigEntry], str | NoDeviceType]
 @dataclass(frozen=True)
 class Integration:
     """A known integration: its name, the profile that finds its Device Inputs, the
-    Device Types it serves and how it tells which of them an HA device is."""
+    Device Types it serves and how it tells which of them an HA device is.
+
+    `linked_devices` is whether the profile also finds the entities of the HA devices
+    linked to the chosen one (a multi-material unit); an integration whose linked
+    devices are Devices of their own reads the chosen one alone.
+    """
 
     name: str
     profile: Callable[[Find], dict[str, Any]]
     device_types: tuple[str, ...]
     kind: KindCheck
+    linked_devices: bool = True
 
 
 def found(entity: str | list[str] | None, /, **fields: Any) -> dict[str, Any]:
