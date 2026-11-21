@@ -14,6 +14,7 @@ from .devices import (
     add_device,
     add_hub,
     configure,
+    report_status,
     start_reconfigure,
 )
 from .octoprint import add_octoprint
@@ -113,13 +114,8 @@ async def test_an_octoprint_printer_without_a_webcam_has_no_snapshot(
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
 
 
-async def set_state(hass: HomeAssistant, printer: HaDevice, state: str) -> None:
-    hass.states.async_set(printer["Current State"], state)
-    await hass.async_block_till_done()
-
-
 async def added(hass: HomeAssistant, printer: HaDevice) -> HaDevice:
-    await set_state(hass, printer, "operational")
+    await report_status(hass, printer["Current State"], "operational")
     hass.states.async_set(printer["Current File"], "benchy.gcode")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
@@ -131,17 +127,17 @@ async def test_an_octoprint_print_seen_going_back_to_operational_ends_unknown(
 ) -> None:
     printer = await added(hass, add_octoprint(hass))
 
-    await set_state(hass, printer, "starting")
+    await report_status(hass, printer["Current State"], "starting")
     await clock.advance(minutes=1)
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["Current State"], "printing")
     await clock.advance(minutes=30)
-    await set_state(hass, printer, "pausing")
-    await set_state(hass, printer, "paused")
+    await report_status(hass, printer["Current State"], "pausing")
+    await report_status(hass, printer["Current State"], "paused")
     await clock.advance(minutes=10)
-    await set_state(hass, printer, "resuming")
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["Current State"], "resuming")
+    await report_status(hass, printer["Current State"], "printing")
     await clock.advance(minutes=20)
-    await set_state(hass, printer, "operational")
+    await report_status(hass, printer["Current State"], "operational")
 
     [run] = stored_runs(hass_storage)
     assert run["started"] == at()
@@ -156,11 +152,11 @@ async def test_an_octoprint_print_seen_finishing_is_completed(
 ) -> None:
     printer = await added(hass, add_octoprint(hass))
 
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["Current State"], "printing")
     await clock.advance(hours=1)
-    await set_state(hass, printer, "finishing")
+    await report_status(hass, printer["Current State"], "finishing")
     await clock.advance(seconds=30)
-    await set_state(hass, printer, "operational")
+    await report_status(hass, printer["Current State"], "operational")
 
     [run] = stored_runs(hass_storage)
     assert run["ended"] == at(hours=1)
@@ -172,11 +168,11 @@ async def test_an_octoprint_print_seen_cancelling_is_cancelled(
 ) -> None:
     printer = await added(hass, add_octoprint(hass))
 
-    await set_state(hass, printer, "printing_sd")
+    await report_status(hass, printer["Current State"], "printing_sd")
     await clock.advance(minutes=20)
-    await set_state(hass, printer, "cancelling")
+    await report_status(hass, printer["Current State"], "cancelling")
     await clock.advance(seconds=30)
-    await set_state(hass, printer, "operational")
+    await report_status(hass, printer["Current State"], "operational")
 
     [run] = stored_runs(hass_storage)
     assert run["ended"] == at(minutes=20)
@@ -188,12 +184,12 @@ async def test_sending_a_file_to_the_sd_card_opens_no_run(
 ) -> None:
     printer = await added(hass, add_octoprint(hass))
 
-    await set_state(hass, printer, "starting_streaming")
-    await set_state(hass, printer, "printing_streaming")
+    await report_status(hass, printer["Current State"], "starting_streaming")
+    await report_status(hass, printer["Current State"], "printing_streaming")
     await clock.advance(minutes=5)
-    await set_state(hass, printer, "transferring_file")
+    await report_status(hass, printer["Current State"], "transferring_file")
     await clock.advance(minutes=1)
-    await set_state(hass, printer, "operational")
+    await report_status(hass, printer["Current State"], "operational")
 
     assert stored_runs(hass_storage) == []
 

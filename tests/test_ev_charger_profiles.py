@@ -9,7 +9,7 @@ import pytest
 
 from .chargers import add_wall_connector
 from .clock import Clock
-from .devices import ENERGY, add_hub, configure, start_reconfigure
+from .devices import ENERGY, add_hub, configure, report_status, start_reconfigure
 from .registry import HaDevice
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
@@ -152,29 +152,24 @@ async def set_counter(hass: HomeAssistant, charger: HaDevice, kwh: float) -> Non
     await hass.async_block_till_done()
 
 
-async def set_status(hass: HomeAssistant, charger: HaDevice, status: str) -> None:
-    hass.states.async_set(charger["status"], status)
-    await hass.async_block_till_done()
-
-
 async def test_a_session_that_waits_and_charges_again_is_one_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     charger = await add_wall_connector_device(hass)
 
-    await set_status(hass, charger, "connected")
-    await set_status(hass, charger, "charging")
+    await report_status(hass, charger["status"], "connected")
+    await report_status(hass, charger["status"], "charging")
     await clock.advance(hours=1)
     await set_counter(hass, charger, 1207)
     # Load management waits for the cheap hours, then charges at reduced current.
-    await set_status(hass, charger, "waiting_car")
+    await report_status(hass, charger["status"], "waiting_car")
     await clock.advance(hours=3)
-    await set_status(hass, charger, "charging_reduced")
+    await report_status(hass, charger["status"], "charging_reduced")
     await clock.advance(hours=1)
     await set_counter(hass, charger, 1210.5)
-    await set_status(hass, charger, "charging_finished")
+    await report_status(hass, charger["status"], "charging_finished")
     await clock.advance(hours=2)
-    await set_status(hass, charger, "not_connected")
+    await report_status(hass, charger["status"], "not_connected")
     await clock.advance(minutes=10)
 
     [run] = stored_runs(hass_storage)
@@ -189,11 +184,11 @@ async def test_a_wall_connector_error_flags_the_run(
 ) -> None:
     charger = await add_wall_connector_device(hass)
 
-    await set_status(hass, charger, "charging")
+    await report_status(hass, charger["status"], "charging")
     await clock.advance(hours=1)
-    await set_status(hass, charger, "error")
+    await report_status(hass, charger["status"], "error")
     await clock.advance(minutes=5)
-    await set_status(hass, charger, "not_connected")
+    await report_status(hass, charger["status"], "not_connected")
     await clock.advance(minutes=10)
 
     [run] = stored_runs(hass_storage)

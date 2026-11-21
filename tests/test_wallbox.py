@@ -9,7 +9,7 @@ import pytest
 
 from .chargers import add_wallbox
 from .clock import Clock
-from .devices import ENERGY, add_hub, configure, start_reconfigure
+from .devices import ENERGY, add_hub, configure, report_status, start_reconfigure
 from .registry import HaDevice
 from .test_device_flow import fields, suggested
 from .test_integration_profiles import accepted
@@ -94,7 +94,7 @@ async def add_wallbox_device(hass: HomeAssistant) -> HaDevice:
     """A Wallbox without a car, its session counter at 0, added by Quick Start."""
     wallbox = add_wallbox(hass)
     await set_energy(hass, wallbox, 0)
-    await set_status(hass, wallbox, "Ready")
+    await report_status(hass, wallbox["status_description"], "Ready")
     await quick_start(hass, await add_hub(hass), wallbox.device.id, price=0.3)
     return wallbox
 
@@ -106,32 +106,27 @@ async def set_energy(hass: HomeAssistant, wallbox: HaDevice, kwh: float) -> None
     await hass.async_block_till_done()
 
 
-async def set_status(hass: HomeAssistant, wallbox: HaDevice, state: str) -> None:
-    hass.states.async_set(wallbox["status_description"], state)
-    await hass.async_block_till_done()
-
-
 async def charge(
     hass: HomeAssistant, clock: Clock, wallbox: HaDevice, *, kwh: float
 ) -> None:
     """A session that charges, is paused, loses the cloud for a poll and charges again
     until the car is full and unplugged. Its counter starts from 0 when the car is
     plugged in and ends at `kwh`, which it holds until the next session."""
-    await set_status(hass, wallbox, "Waiting for car demand")
+    await report_status(hass, wallbox["status_description"], "Waiting for car demand")
     await set_energy(hass, wallbox, 0)
-    await set_status(hass, wallbox, "Charging")
+    await report_status(hass, wallbox["status_description"], "Charging")
     await clock.advance(hours=1)
     await set_energy(hass, wallbox, kwh / 2)
-    await set_status(hass, wallbox, "Paused")
+    await report_status(hass, wallbox["status_description"], "Paused")
     await clock.advance(hours=2)
-    await set_status(hass, wallbox, "Disconnected")
+    await report_status(hass, wallbox["status_description"], "Disconnected")
     await clock.advance(minutes=2)
-    await set_status(hass, wallbox, "Charging")
+    await report_status(hass, wallbox["status_description"], "Charging")
     await clock.advance(hours=1)
     await set_energy(hass, wallbox, kwh)
-    await set_status(hass, wallbox, "Waiting for car demand")
+    await report_status(hass, wallbox["status_description"], "Waiting for car demand")
     await clock.advance(hours=1)
-    await set_status(hass, wallbox, "Ready")
+    await report_status(hass, wallbox["status_description"], "Ready")
     await clock.advance(minutes=10)
 
 
@@ -168,12 +163,12 @@ async def test_a_wallbox_error_flags_the_run(
 ) -> None:
     wallbox = await add_wallbox_device(hass)
 
-    await set_status(hass, wallbox, "Charging")
+    await report_status(hass, wallbox["status_description"], "Charging")
     await clock.advance(hours=1)
     await set_energy(hass, wallbox, 6)
-    await set_status(hass, wallbox, "Error")
+    await report_status(hass, wallbox["status_description"], "Error")
     await clock.advance(minutes=5)
-    await set_status(hass, wallbox, "Ready")
+    await report_status(hass, wallbox["status_description"], "Ready")
     await clock.advance(minutes=10)
 
     [run] = stored_runs(hass_storage)

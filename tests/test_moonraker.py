@@ -15,6 +15,7 @@ from .devices import (
     add_device,
     add_hub,
     configure,
+    report_status,
     start_reconfigure,
 )
 from .moonraker import add_moonraker
@@ -128,11 +129,6 @@ async def test_a_disabled_moonraker_webcam_is_not_pre_filled(
     assert subentry.data["images"]["camera"] is None
 
 
-async def set_print(hass: HomeAssistant, printer: HaDevice, state: str) -> None:
-    hass.states.async_set(printer["print_state"], state)
-    await hass.async_block_till_done()
-
-
 async def set_filament(hass: HomeAssistant, printer: HaDevice, metres: float) -> None:
     hass.states.async_set(
         printer["filament_used"], str(metres), {"unit_of_measurement": "m"}
@@ -142,7 +138,7 @@ async def set_filament(hass: HomeAssistant, printer: HaDevice, metres: float) ->
 
 async def idle_printer(hass: HomeAssistant, printer: HaDevice) -> None:
     """A printer in standby with the lifetime total far above any one print."""
-    await set_print(hass, printer, "standby")
+    await report_status(hass, printer["print_state"], "standby")
     hass.states.async_set(printer["filename"], "")
     hass.states.async_set(printer["state"], "ready")
     hass.states.async_set(
@@ -167,15 +163,15 @@ async def test_a_moonraker_print_is_one_run_with_its_outcome(
     await walk_pre_filled(hass, entry, printer)
 
     hass.states.async_set(printer["filename"], "Gear_Set.gcode")
-    await set_print(hass, printer, "printing")
+    await report_status(hass, printer["print_state"], "printing")
     await clock.advance(minutes=30)
     await set_filament(hass, printer, 2.1)
-    await set_print(hass, printer, "paused")
+    await report_status(hass, printer["print_state"], "paused")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "printing")
+    await report_status(hass, printer["print_state"], "printing")
     await clock.advance(minutes=30)
     await set_filament(hass, printer, 4.25)
-    await set_print(hass, printer, ending)
+    await report_status(hass, printer["print_state"], ending)
     await clock.advance(minutes=10)
     await idle_printer(hass, printer)
 
@@ -198,18 +194,18 @@ async def test_a_moonraker_print_in_error_is_flagged_and_ended_by_the_standby_af
     await walk_pre_filled(hass, entry, printer)
 
     hass.states.async_set(printer["filename"], "Benchy.gcode")
-    await set_print(hass, printer, "printing")
+    await report_status(hass, printer["print_state"], "printing")
     await clock.advance(minutes=30)
     # The printer's own state goes too, but the Run follows the print's.
     hass.states.async_set(printer["state"], "shutdown")
-    await set_print(hass, printer, "error")
+    await report_status(hass, printer["print_state"], "error")
     await clock.advance(minutes=10)
     await idle_printer(hass, printer)
     await clock.advance(minutes=10)
     hass.states.async_set(printer["filename"], "Cube.gcode")
-    await set_print(hass, printer, "printing")
+    await report_status(hass, printer["print_state"], "printing")
     await clock.advance(minutes=30)
-    await set_print(hass, printer, "complete")
+    await report_status(hass, printer["print_state"], "complete")
     await clock.advance(minutes=10)
 
     benchy, cube = stored_runs(hass_storage)

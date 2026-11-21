@@ -14,10 +14,10 @@ from .devices import (
     add_device,
     add_hub,
     configure,
+    report_status,
     start_reconfigure,
 )
 from .elegoo import add_elegoo
-from .registry import HaDevice
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register
@@ -153,33 +153,28 @@ async def test_manual_setup_comes_pre_filled_from_an_elegoo_printer(
     }
 
 
-async def set_print(hass: HomeAssistant, printer: HaDevice, status: str) -> None:
-    hass.states.async_set(printer["print_status"], status)
-    await hass.async_block_till_done()
-
-
 async def test_an_elegoo_print_parked_on_its_milestones_is_one_finished_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_elegoo(hass)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_print(hass, printer, "file_checking")
+    await report_status(hass, printer["print_status"], "file_checking")
     hass.states.async_set(printer["filename"], "Gear_Set.gcode")
     await clock.advance(seconds=5)
-    await set_print(hass, printer, "print_started")
+    await report_status(hass, printer["print_status"], "print_started")
     await clock.advance(minutes=5)
     # The Centauri Carbon may stay on a milestone like this for the whole print.
-    await set_print(hass, printer, "preheating_completed")
+    await report_status(hass, printer["print_status"], "preheating_completed")
     await clock.advance(hours=1)
     hass.states.async_set(
         printer["current_extrusion"], "5230.5", {"unit_of_measurement": "mm"}
     )
-    await set_print(hass, printer, "complete")
+    await report_status(hass, printer["print_status"], "complete")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
 
     [run] = stored_runs(hass_storage)
     assert run["started"] == at(seconds=5)
@@ -193,23 +188,23 @@ async def test_a_stopped_elegoo_print_is_cancelled(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_elegoo(hass, resin=True)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_print(hass, printer, "printing")
+    await report_status(hass, printer["print_status"], "printing")
     await clock.advance(minutes=30)
-    await set_print(hass, printer, "pausing")
+    await report_status(hass, printer["print_status"], "pausing")
     await clock.advance(seconds=10)
-    await set_print(hass, printer, "paused")
+    await report_status(hass, printer["print_status"], "paused")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "lifting")
+    await report_status(hass, printer["print_status"], "lifting")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "stopping")
+    await report_status(hass, printer["print_status"], "stopping")
     await clock.advance(seconds=20)
-    await set_print(hass, printer, "stopped")
+    await report_status(hass, printer["print_status"], "stopped")
     await clock.advance(minutes=1)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
 
     [run] = stored_runs(hass_storage)
     assert run["pauses"] == [

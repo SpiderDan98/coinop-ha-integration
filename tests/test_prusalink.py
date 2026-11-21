@@ -14,10 +14,10 @@ from .devices import (
     add_device,
     add_hub,
     configure,
+    report_status,
     start_reconfigure,
 )
 from .prusalink import add_prusalink
-from .registry import HaDevice
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register
@@ -103,32 +103,27 @@ async def test_a_disabled_job_preview_is_not_pre_filled(
     assert subentry.data["images"]["thumbnail"] is None
 
 
-async def set_state(hass: HomeAssistant, printer: HaDevice, state: str) -> None:
-    hass.states.async_set(printer["printer.state"], state)
-    await hass.async_block_till_done()
-
-
 async def test_a_prusalink_print_that_asks_for_attention_pauses_and_continues(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_prusalink(hass)
-    await set_state(hass, printer, "idle")
+    await report_status(hass, printer["printer.state"], "idle")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_state(hass, printer, "busy")
+    await report_status(hass, printer["printer.state"], "busy")
     await clock.advance(minutes=1)
     hass.states.async_set(printer["job.filename"], "Benchy.bgcode")
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["printer.state"], "printing")
     await clock.advance(minutes=30)
     # A filament runout.
-    await set_state(hass, printer, "attention")
+    await report_status(hass, printer["printer.state"], "attention")
     await clock.advance(minutes=10)
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["printer.state"], "printing")
     await clock.advance(minutes=20)
-    await set_state(hass, printer, "finished")
+    await report_status(hass, printer["printer.state"], "finished")
     await clock.advance(minutes=10)
-    await set_state(hass, printer, "idle")
+    await report_status(hass, printer["printer.state"], "idle")
 
     [run] = stored_runs(hass_storage)
     assert run["started"] == at(minutes=1)
@@ -142,17 +137,17 @@ async def test_a_stopped_prusalink_print_is_cancelled(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_prusalink(hass)
-    await set_state(hass, printer, "ready")
+    await report_status(hass, printer["printer.state"], "ready")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_state(hass, printer, "printing")
+    await report_status(hass, printer["printer.state"], "printing")
     await clock.advance(minutes=30)
-    await set_state(hass, printer, "paused")
+    await report_status(hass, printer["printer.state"], "paused")
     await clock.advance(minutes=10)
-    await set_state(hass, printer, "stopped")
+    await report_status(hass, printer["printer.state"], "stopped")
     await clock.advance(minutes=10)
-    await set_state(hass, printer, "idle")
+    await report_status(hass, printer["printer.state"], "idle")
 
     [run] = stored_runs(hass_storage)
     assert run["ended"] == at(minutes=40)

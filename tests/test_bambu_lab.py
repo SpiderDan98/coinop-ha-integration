@@ -15,6 +15,7 @@ from .devices import (
     add_device,
     add_hub,
     configure,
+    report_status,
     start_reconfigure,
 )
 from .registry import HaDevice
@@ -129,11 +130,6 @@ async def test_a_disabled_print_weight_is_not_pre_filled(
     assert subentry.data["job"]["material"] is None
 
 
-async def set_print(hass: HomeAssistant, printer: HaDevice, status: str) -> None:
-    hass.states.async_set(printer["print_status"], status)
-    await hass.async_block_till_done()
-
-
 async def set_weight(hass: HomeAssistant, printer: HaDevice, grams: float) -> None:
     hass.states.async_set(
         printer["print_weight"], str(grams), {"unit_of_measurement": "g"}
@@ -145,7 +141,7 @@ async def test_a_bambu_lab_print_is_one_run_from_its_preparation_to_its_finish(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_bambu_lab(hass)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
     hass.states.async_set(printer["subtask_name"], "Benchy")
     await set_weight(hass, printer, 31.4)
     entry = await add_hub(hass)
@@ -159,11 +155,11 @@ async def test_a_bambu_lab_print_is_one_run_from_its_preparation_to_its_finish(
     # The weight of the 3MF arrives once the printer has downloaded it.
     await set_weight(hass, printer, 12.5)
     await clock.advance(minutes=5)
-    await set_print(hass, printer, "running")
+    await report_status(hass, printer["print_status"], "running")
     await clock.advance(hours=1)
-    await set_print(hass, printer, "finish")
+    await report_status(hass, printer["print_status"], "finish")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
 
     [run] = stored_runs(hass_storage)
     assert run["started"] == at()
@@ -177,17 +173,17 @@ async def test_a_paused_bambu_lab_print_that_is_stopped_is_cancelled(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_bambu_lab(hass)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_print(hass, printer, "running")
+    await report_status(hass, printer["print_status"], "running")
     await clock.advance(minutes=30)
-    await set_print(hass, printer, "pause")
+    await report_status(hass, printer["print_status"], "pause")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "running")
+    await report_status(hass, printer["print_status"], "running")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "failed")
+    await report_status(hass, printer["print_status"], "failed")
     await clock.advance(minutes=10)
 
     [run] = stored_runs(hass_storage)
@@ -200,18 +196,18 @@ async def test_a_bambu_lab_printer_going_offline_doesnt_end_its_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     printer = add_bambu_lab(hass)
-    await set_print(hass, printer, "idle")
+    await report_status(hass, printer["print_status"], "idle")
     hass.states.async_set(printer["subtask_name"], "Benchy")
     entry = await add_hub(hass)
     await walk_pre_filled(hass, entry, printer)
 
-    await set_print(hass, printer, "running")
+    await report_status(hass, printer["print_status"], "running")
     await clock.advance(minutes=30)
-    await set_print(hass, printer, "offline")
+    await report_status(hass, printer["print_status"], "offline")
     await clock.advance(minutes=10)
-    await set_print(hass, printer, "running")
+    await report_status(hass, printer["print_status"], "running")
     await clock.advance(minutes=30)
-    await set_print(hass, printer, "finish")
+    await report_status(hass, printer["print_status"], "finish")
     await clock.advance(minutes=10)
 
     [run] = stored_runs(hass_storage)
