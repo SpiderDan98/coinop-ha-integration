@@ -38,6 +38,12 @@ from .stored import (
 )
 from .test_ev_chargers import add_charger
 from .test_other_devices import add_kiln, add_pump, fire
+from .test_other_images_and_parts import (
+    KILN_CAMERA,
+    KILN_PREVIEW,
+    add_kiln_camera,
+    add_kiln_preview,
+)
 from .test_other_programs import add_bread_maker, bake, set_bread_program
 from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
@@ -1051,6 +1057,41 @@ async def test_record_other_devices_and_a_firing(
     }
     assert_recorded("devices-list-other", stable_ids(devices, ids))
     assert_recorded("runs-get-other", stable_ids(detail, ids))
+
+
+async def test_record_an_other_device_with_images_and_a_part_count(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    """A studio kiln ("Kiln") that has images and a Part Count and no job, and its
+    firing "Mugs" of 9 parts with its Thumbnail and its Snapshot."""
+    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_camera(hass, picture("blue"))
+    kiln = await add_kiln(
+        hass,
+        name="Studio kiln",
+        has=["images", "part_count"],
+        thumbnail=KILN_PREVIEW,
+        camera=KILN_CAMERA,
+    )
+    await fire(hass, clock)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call("coinop/runs/update", run_id=run["id"], name="Mugs", part_count=9)
+
+    devices = await panel.call("coinop/devices/list")
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    [electricity] = detail["run"]["line_items"]
+    thumbnail, snapshot = detail["run"]["images"]
+    assert (thumbnail["kind"], snapshot["kind"]) == ("thumbnail", "snapshot")
+    ids = {
+        kiln.subentry_id: "device-studio-kiln",
+        run["id"]: "mugs",
+        electricity["id"]: "mugs-electricity",
+        thumbnail["id"]: "mugs-thumbnail",
+        snapshot["id"]: "mugs-snapshot",
+    }
+    assert_recorded("devices-list-other-images", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-images", stable_ids(detail, ids))
 
 
 async def test_record_an_other_device_with_a_program_and_its_loaves(

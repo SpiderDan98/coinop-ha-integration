@@ -78,11 +78,15 @@
           "data": {
             "type_name": "Typbezeichnung",
             "program": "Programm",
+            "images": "Bilder",
+            "part_count": "Teileanzahl",
             "per_run_meters": "Zähler zählen jeden Lauf ab 0"
           },
           "data_description": {
             "type_name": "Was für ein Gerät es ist, etwa „Brennofen“ oder „Poolpumpe“: die Überschrift, unter der das Panel es aufführt. Geräte mit derselben Typbezeichnung teilen sich eine Überschrift.",
             "program": "Es meldet, welches Programm es ausführt: Ein Lauf speichert sein Programm und wird danach benannt. Sein Strom kann dann je Programm kommen, aus den kWh in den Programmvorgaben; das ersetzt die Schätzung aus der Durchschnittsleistung.",
+            "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
+            "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",
             "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler."
           }
         },
@@ -178,7 +182,7 @@
             "snapshot": "Kamerabild am Ende eines Laufs aufnehmen"
           },
           "data_description": {
-            "thumbnail": "Die Bild-Entität der Drucker-Integration, die das gedruckte Modell zeigt.",
+            "thumbnail": "Eine Bild-Entität, die zeigt, was der Lauf herstellt, z. B. die Vorschau des 3D-Modells aus der Integration des Geräts.",
             "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
           }
         },
