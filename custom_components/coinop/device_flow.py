@@ -23,8 +23,9 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
 )
+from homeassistant.helpers.translation import async_get_translations
 
-from .const import SUBENTRY_DEVICE
+from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import (
     CAPABILITIES,
     ENDING_TARGETS,
@@ -40,7 +41,7 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
-from .profiles import METERS, candidates, detect, known_integrations
+from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
 from .schema import vol
 
@@ -127,8 +128,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._job: dict[str, Any] = {}
         # The profile's sections while Detect again walks them.
         self._detecting: dict[str, Any] = {}
-        # The name of the integration Quick Start took the sections from.
-        self._integration = ""
+        # The HA device picked in Quick Start.
+        self._candidate = Candidate((), "", {})
 
     def _capabilities(self) -> frozenset[Capability]:
         return CAPABILITIES[self._data["device_type"]]
@@ -222,20 +223,25 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self._device_type_form()
 
     def _device_type_form(self) -> SubentryFlowResult:
-        schema = vol.Schema(
+        return self.async_show_form(
+            step_id="user", data_schema=self._device_type_schema(list(CAPABILITIES))
+        )
+
+    @staticmethod
+    def _device_type_schema(device_types: list[str]) -> vol.Schema:
+        return vol.Schema(
             {
                 vol.Required("device_type"): SelectSelector(
                     SelectSelectorConfig(
-                        options=list(CAPABILITIES),
+                        options=device_types,
                         translation_key="device_type",
                         mode=SelectSelectorMode.LIST,
                     )
                 )
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
 
-    def _quick_start_devices(self) -> dict[str, tuple[str, str, dict[str, Any]]]:
+    def _quick_start_devices(self) -> dict[str, Candidate]:
         """The HA devices of known integrations that no Device follows yet."""
         followed = {
             subentry.data["printer_device_id"]
@@ -246,7 +252,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             device_id: candidate
             for device_id, candidate in candidates(self.hass).items()
             if device_id not in followed
-            and not self._status_used_elsewhere(candidate[2]["status"]["entity_id"])
+            and not self._status_used_elsewhere(
+                candidate.sections["status"]["entity_id"]
+            )
         }
 
     async def async_step_quick_start(
@@ -263,33 +271,15 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             device_id = user_input["device"]
             if device_id == MANUAL:
                 return self._device_type_form()
-            device_type, self._integration, sections = offered[device_id]
+            self._candidate = offered[device_id]
             self._name = names[device_id]
-            self._data = {"device_type": device_type, "printer_device_id": device_id}
-            self._data |= {
-                name: values
-                for name, values in sections.items()
-                if name not in UNUSED and name not in METERS
-            }
-            self._data |= {
-                name: unused | sections.get(name, {})
-                for name, unused in UNUSED.items()
-                if name in self._sections()
-            }
-            for quantity in (ELECTRICITY, WATER):
-                found = sections.get(quantity.source_key)
-                if found and (
-                    meter := self._meter_of(
-                        quantity, found["entity_id"], [found["source"]]
-                    )
-                ):
-                    self._data[quantity.source_key] = meter
-            return await self.async_step_quick_start_confirm()
+            self._data = {"printer_device_id": device_id}
+            return await self.async_step_quick_start_device_type()
         options = [
             SelectOptionDict(
-                value=device_id, label=f"{names[device_id]} · {integration}"
+                value=device_id, label=f"{names[device_id]} · {candidate.integration}"
             )
-            for device_id, (_, integration, _) in offered.items()
+            for device_id, candidate in offered.items()
         ]
         schema = vol.Schema(
             {
@@ -312,6 +302,44 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 schema, {"device": next(iter(offered))}
             ),
         )
+
+    async def async_step_quick_start_device_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """The Device Type of a device whose kind its integration doesn't tell, among
+        those the integration serves; a device whose kind is told isn't asked."""
+        candidate = self._candidate
+        device_types = [t for t in CAPABILITIES if t in candidate.device_types]
+        if user_input is None and len(device_types) > 1:
+            return self.async_show_form(
+                step_id="quick_start_device_type",
+                data_schema=self._device_type_schema(device_types),
+                description_placeholders={
+                    "device": self._name,
+                    "integration": candidate.integration,
+                },
+            )
+        self._data["device_type"] = (
+            user_input["device_type"] if user_input else device_types[0]
+        )
+        sections = candidate.sections
+        self._data |= {
+            name: values
+            for name, values in sections.items()
+            if name not in UNUSED and name not in METERS
+        }
+        self._data |= {
+            name: unused | sections.get(name, {})
+            for name, unused in UNUSED.items()
+            if name in self._sections()
+        }
+        for quantity in (ELECTRICITY, WATER):
+            found = sections.get(quantity.source_key)
+            if found and (
+                meter := self._meter_of(quantity, found["entity_id"], [found["source"]])
+            ):
+                self._data[quantity.source_key] = meter
+        return await self.async_step_quick_start_confirm()
 
     def _meter_of(
         self, quantity: Quantity, entity_id: str, sources: list[str]
@@ -395,11 +423,20 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             errors=errors,
             description_placeholders={
                 "device": self._name,
-                "integration": self._integration,
+                "device_type": await self._device_type_name(),
+                "integration": self._candidate.integration,
                 "inputs": "\n".join(f"- {name}" for name in self._found_inputs()),
                 "currency": currency,
             },
         )
+
+    async def _device_type_name(self) -> str:
+        """The Device Type's name in HA's language: a flow doesn't know its user's."""
+        names = await async_get_translations(
+            self.hass, self.hass.config.language, "selector", [DOMAIN]
+        )
+        key = f"selector.device_type.options.{self._data['device_type']}"
+        return names[f"component.{DOMAIN}.{key}"]
 
     def _quick_meter(self, entity_id: str | None) -> dict[str, Any] | None:
         """Electricity from the picked meter, per Program without one; None if the

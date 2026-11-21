@@ -1,6 +1,8 @@
-"""Registry entries shaped like WashData, Miele and Home Connect register a washer.
+"""Registry entries shaped like WashData, Miele and Home Connect register an
+appliance.
 
-Unique ids, units and options follow each integration's source.
+Unique ids, units, options and what tells the appliance's kind follow each
+integration's source.
 """
 
 from dataclasses import dataclass, field
@@ -59,10 +61,40 @@ def _add(
     )
 
 
-def add_washdata(hass: HomeAssistant) -> Washer:
-    """3dg1luk43/ha_washdata: one HA device per config entry, unique ids
-    `<entry id>_<key>`."""
-    config_entry, washer = _washer(hass, "ha_washdata", "washdata", "Washer")
+def add_washdata(
+    hass: HomeAssistant,
+    device_type: str | None = "washing_machine",
+    *,
+    name: str = "Washer",
+    changed_to: str | None = None,
+) -> Washer:
+    """3dg1luk43/ha_washdata: one HA device per config entry, named after it, unique
+    ids `<entry id>_<key>`.
+
+    `device_type` is the kind picked when the entry was created, which WashData keeps
+    in the entry's data (None: an entry without one, which WashData reads as a washing
+    machine). `changed_to` is a kind picked later: it goes to the options, and the
+    data keeps the old one.
+    """
+    settings = {"power_sensor": "sensor.plug_power", "min_power": 2.0}
+    kind = {} if device_type is None else {"device_type": device_type}
+    config_entry = MockConfigEntry(
+        domain="ha_washdata",
+        title=name,
+        version=3,
+        minor_version=13,
+        data={"name": name} | kind | settings,
+        options={"device_type": changed_to} | settings if changed_to else {},
+    )
+    config_entry.add_to_hass(hass)
+    washer = Washer(
+        dr.async_get(hass).async_get_or_create(
+            config_entry_id=config_entry.entry_id,
+            identifiers={("ha_washdata", config_entry.entry_id)},
+            manufacturer="WashData",
+            name=name,
+        )
+    )
 
     def add(key: str, **kwargs: Any) -> None:
         _add(

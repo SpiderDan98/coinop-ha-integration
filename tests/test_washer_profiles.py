@@ -20,6 +20,7 @@ from .devices import (
 )
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
+from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
 from .washers import Washer, add_home_connect, add_miele, add_washdata
 from .websocket import PanelClient
@@ -45,15 +46,20 @@ ANSWERS = {
 
 
 async def walk_pre_filled(
-    hass: HomeAssistant, entry: ConfigEntry, washer: Washer, **answers: Any
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    washer: Washer,
+    device_type: str = "washing_machine",
+    **answers: Any,
 ) -> tuple[list[str], ConfigSubentry]:
-    """Add Device accepting every pre-filled form; `answers` (by step id) answer the
-    menus and the forms nothing pre-fills. Returns the steps shown and the Device."""
+    """Add Device as `device_type`, accepting every pre-filled form; `answers` (by
+    step id) answer the menus and the forms nothing pre-fills. Returns the steps
+    shown and the Device."""
     answers = ANSWERS | answers
     result = await configure(
         hass,
         await start_add_device(
-            hass, entry, printer=washer.device.id, device_type="washing_machine"
+            hass, entry, printer=washer.device.id, device_type=device_type
         ),
         {"name": "Washer"},
     )
@@ -332,11 +338,106 @@ async def test_profiles_only_detect_for_their_device_type(
         assert suggested(result, "entity_id") is None
 
 
+@pytest.mark.parametrize("kind", ["generic", "dishwasher"])
+async def test_manual_setup_pre_fills_the_chosen_device_type_whatever_kind_is_told(
+    hass: HomeAssistant, kind: str
+) -> None:
+    plug = add_washdata(hass, kind)
+    entry = await add_hub(hass)
+
+    shown, subentry = await walk_pre_filled(
+        hass, entry, plug, "oven", consumption={"next_step_id": "per_program"}
+    )
+
+    assert shown == [
+        "status",
+        "mapping",
+        "program",
+        "consumption",
+        "price",
+        "fixed_price",
+    ]
+    data = subentry.data
+    assert data["device_type"] == "oven"
+    assert data["status"] == {"entity_id": plug["washer_state"], "attribute": None}
+    assert data["mapping"]["finished"] == ["finished", "anti_wrinkle", "clean"]
+    assert data["program"] == {
+        "entity_id": plug["washer_program"],
+        "attribute": None,
+        "ignored": WASHDATA_PLACEHOLDERS,
+    }
+
+
+async def test_a_device_type_washdata_doesnt_serve_pre_fills_nothing(
+    hass: HomeAssistant,
+) -> None:
+    plug = add_washdata(hass, "generic")
+    entry = await add_hub(hass)
+
+    result = await configure(
+        hass,
+        await start_add_device(
+            hass, entry, printer=plug.device.id, device_type="3d_printer"
+        ),
+        {"name": "Plug"},
+    )
+
+    assert result["step_id"] == "status"
+    assert suggested(result, "entity_id") is None
+
+
+async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    dishwasher = add_washdata(hass, "dishwasher")
+    register(hass, WASHER_ENERGY, "kWh")
+    entry = await add_hub(hass)
+    before = await quick_start(
+        hass,
+        entry,
+        dishwasher.device.id,
+        optional_meter=WASHER_ENERGY,
+        price=0.3,
+        water_price=4.0,
+    )
+    [subentry] = entry.subentries.values()
+    # An update of the integration renamed its entities.
+    renamed = {
+        key: entity_registry.async_update_entity(
+            dishwasher[key], new_entity_id=dishwasher[key].replace("washer", "wd")
+        ).entity_id
+        for key in ("washer_state", "washer_program")
+    }
+
+    result = await configure(
+        hass, await start_reconfigure(hass, entry, subentry), {"next_step_id": "detect"}
+    )
+    shown = []
+    while result["type"] is FlowResultType.FORM:
+        shown.append(result["step_id"])
+        result = await configure(hass, result, accepted(result))
+    assert shown == ["status", "mapping", "program"]
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["device_type"] == "dishwasher"
+    assert data["status"]["entity_id"] == renamed["washer_state"]
+    assert data["program"]["entity_id"] == renamed["washer_program"]
+    assert data["program"]["ignored"] == WASHDATA_PLACEHOLDERS
+    for section in ("consumption", "price", "water", "water_price"):
+        assert data[section] == before[section]
+
+
 @pytest.mark.parametrize(
     ("device_type", "integrations"),
     [
         ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
         ("washing_machine", "WashData, Miele, Home Connect"),
+        ("dishwasher", "WashData"),
+        ("tumble_dryer", "WashData"),
+        ("coffee_machine", "WashData"),
+        ("oven", "WashData"),
     ],
 )
 async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(

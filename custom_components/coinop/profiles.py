@@ -14,11 +14,20 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
-from .const import DEVICE_TYPE_3D_PRINTER, DEVICE_TYPE_WASHING_MACHINE
+from .const import (
+    DEVICE_TYPE_3D_PRINTER,
+    DEVICE_TYPE_COFFEE_MACHINE,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_OVEN,
+    DEVICE_TYPE_TUMBLE_DRYER,
+    DEVICE_TYPE_WASHING_MACHINE,
+)
 from .device_config import ConsumptionSource, Target, WaterSource
 from .quantities import ELECTRICITY, WATER
 
 # Finds the entity of a platform whose unique id ends in one of the suffixes, in order.
+# A Device Input must be enabled; `disabled=True` also finds a disabled entity, which
+# still tells a kind check that the integration registered it.
 Find = Callable[..., str | None]
 
 
@@ -242,6 +251,28 @@ def _always(device_type: str) -> KindCheck:
     return lambda *_: device_type
 
 
+# WashData's device types (`DEVICE_TYPES` in its const.py) that say what the device
+# is. Its `generic` and `other` say nothing, so they aren't listed.
+WASHDATA_KINDS: dict[str, str | NoDeviceType] = {
+    "washing_machine": DEVICE_TYPE_WASHING_MACHINE,
+    "washer_dryer": DEVICE_TYPE_WASHING_MACHINE,
+    "dryer": DEVICE_TYPE_TUMBLE_DRYER,
+    "dishwasher": DEVICE_TYPE_DISHWASHER,
+    "pump": NoDeviceType.NOT_A_DEVICE,
+}
+
+
+def _washdata_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """The kind the user picked in WashData: in its config entry's data when the
+    entry was created, in its options once changed, a washing machine without one."""
+    kind = config_entry.options.get(
+        "device_type", config_entry.data.get("device_type", "washing_machine")
+    )
+    return WASHDATA_KINDS.get(kind, NoDeviceType.CANT_TELL)
+
+
 # By integration domain, in the order Quick Start and the HA device step list them.
 INTEGRATIONS = {
     "anycubic": Integration(
@@ -259,8 +290,14 @@ INTEGRATIONS = {
     "ha_washdata": Integration(
         "WashData",
         _washdata,
-        (DEVICE_TYPE_WASHING_MACHINE,),
-        _always(DEVICE_TYPE_WASHING_MACHINE),
+        (
+            DEVICE_TYPE_WASHING_MACHINE,
+            DEVICE_TYPE_DISHWASHER,
+            DEVICE_TYPE_TUMBLE_DRYER,
+            DEVICE_TYPE_COFFEE_MACHINE,
+            DEVICE_TYPE_OVEN,
+        ),
+        _washdata_kind,
     ),
     "miele": Integration(
         "Miele",
@@ -304,17 +341,21 @@ def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> F
     candidates = [
         entity
         for device in device_ids
-        for entity in er.async_entries_for_device(entities, device)
+        for entity in er.async_entries_for_device(
+            entities, device, include_disabled_entities=True
+        )
         if entity.platform == config_entry.domain
     ]
 
-    def find(platform: str, *suffixes: str) -> str | None:
+    def find(platform: str, *suffixes: str, disabled: bool = False) -> str | None:
         return next(
             (
                 entity.entity_id
                 for suffix in suffixes
                 for entity in candidates
-                if entity.domain == platform and entity.unique_id.endswith(suffix)
+                if entity.domain == platform
+                and entity.unique_id.endswith(suffix)
+                and (disabled or not entity.disabled)
             ),
             None,
         )
@@ -351,15 +392,25 @@ def detect(
     )
 
 
-def candidates(hass: HomeAssistant) -> dict[str, tuple[str, str, dict[str, Any]]]:
-    """The HA devices Quick Start can add, by device id: their Device Type, their
-    integration's name and the sections its profile fills in.
+@dataclass(frozen=True)
+class Candidate:
+    """An HA device Quick Start can add: the Device Types it can be added as (one
+    where its integration tells its kind, else those the integration serves), its
+    integration's name and the sections its profile fills in."""
+
+    device_types: tuple[str, ...]
+    integration: str
+    sections: dict[str, Any]
+
+
+def candidates(hass: HomeAssistant) -> dict[str, Candidate]:
+    """The HA devices Quick Start can add, by device id.
 
     Those are the devices a profile finds a Status for, so not a multi-material unit,
-    and whose kind is a Device Type.
+    and whose kind is a Device Type or can't be told.
     """
     devices = dr.async_get(hass)
-    found: dict[str, tuple[str, str, dict[str, Any]]] = {}
+    found: dict[str, Candidate] = {}
     for domain, integration in INTEGRATIONS.items():
         for config_entry in hass.config_entries.async_entries(
             domain, include_ignore=False, include_disabled=False
@@ -372,6 +423,14 @@ def candidates(hass: HomeAssistant) -> dict[str, tuple[str, str, dict[str, Any]]
                 if not sections["status"]:
                     continue
                 kind = integration.kind(find, device, config_entry)
-                if isinstance(kind, str):
-                    found.setdefault(device.id, (kind, integration.name, sections))
+                if kind is NoDeviceType.NOT_A_DEVICE:
+                    continue
+                device_types = (
+                    integration.device_types
+                    if kind is NoDeviceType.CANT_TELL
+                    else (kind,)
+                )
+                found.setdefault(
+                    device.id, Candidate(device_types, integration.name, sections)
+                )
     return found

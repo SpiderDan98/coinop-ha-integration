@@ -42,14 +42,21 @@
         },
         "quick_start": {
           "title": "Schnellstart",
-          "description": "Coin-op hat Geräte von Integrationen gefunden, die es kennt. Wähle eines, um es mit den Geräteeingängen aus seinem Integrationsprofil einzurichten; Coin-op fragt dann nur noch nach Zähler und Preisen. Oder richte ein Gerät manuell ein und gehe jeden Schritt selbst durch.",
+          "description": "Coin-op hat Geräte von Integrationen gefunden, die es kennt. Wähle eines, um es mit den Geräteeingängen aus seinem Integrationsprofil einzurichten; Coin-op fragt dann nur noch nach dem, was die Integration nicht weiß, etwa nach Zähler und Preisen. Oder richte ein Gerät manuell ein und gehe jeden Schritt selbst durch.",
           "data": {
             "device": "Gerät"
           }
         },
+        "quick_start_device_type": {
+          "title": "Gerätetyp",
+          "description": "{integration} verrät Coin-op nicht, was für ein Gerät **{device}** ist. Wähle den Gerätetyp, als der es hinzugefügt wird. Er bestimmt, was seine Läufe erfassen, und lässt sich später nicht ändern.",
+          "data": {
+            "device_type": "Gerätetyp"
+          }
+        },
         "quick_start_confirm": {
           "title": "Zähler & Preise",
-          "description": "**{device}** wird mit den Geräteeingängen eingerichtet, die Coin-op bei {integration} gefunden hat:\n\n{inputs}\n\nSie und die Status-Zuordnung kannst du später unter „Gerät neu konfigurieren“ prüfen und ändern.",
+          "description": "**{device}** wird als Gerätetyp **{device_type}** hinzugefügt und mit den Geräteeingängen eingerichtet, die Coin-op bei {integration} gefunden hat:\n\n{inputs}\n\nSie und die Status-Zuordnung kannst du später unter „Gerät neu konfigurieren“ prüfen und ändern. Der Gerätetyp lässt sich später nicht ändern: Ist er falsch, schließe diesen Dialog und richte das Gerät manuell ein.",
           "data": {
             "meter": "Energiezähler oder Leistungssensor",
             "optional_meter": "Energiezähler oder Leistungssensor (optional)",
