@@ -66,6 +66,23 @@ async def test_a_camera_without_a_picture_yet_is_asked_again_while_the_run_runs(
     assert await thumbnail_colour(panel, http) == "green"
 
 
+async def test_a_camera_is_asked_again_while_the_run_runs_and_the_latest_picture_kept(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    """At the start some show a placeholder, or the previous print's preview."""
+    camera = await add_camera(hass, picture("red"), entity_id=PREVIEW)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=PREVIEW)
+    await set_status(hass, "printing")
+    assert await thumbnail_colour(panel, http) == "red"
+
+    camera.answers = [picture("green")]
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    assert await thumbnail_colour(panel, http) == "green"
+
+
 async def test_a_camera_without_a_picture_leaves_the_run_without_a_thumbnail(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
@@ -102,4 +119,4 @@ async def test_a_camera_thumbnail_and_a_snapshot_camera_work_side_by_side(
 
     assert await thumbnail_colour(panel, http) == "red"
     assert await snapshot_colour(panel, http) == "blue"
-    assert (preview.requests, webcam.requests) == (1, 1)
+    assert webcam.requests == 1, "the webcam is asked for the Snapshot alone"

@@ -244,6 +244,24 @@ async def test_an_unfetched_image_entity_without_a_picture_yet_is_asked_again(
     assert await thumbnail_colour(panel, http) == "green"
 
 
+async def test_an_unfetched_image_entity_is_asked_again_while_the_run_runs(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    """Creality's preview answers with a placeholder until the print's is there."""
+    thumbnail = await add_thumbnail(hass, picture("red"), fetched=False)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+
+    thumbnail.content = picture("green")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    thumbnail.content = picture("blue")
+    await clock.advance(hours=1)
+
+    assert await thumbnail_colour(panel, http) == "green"
+
+
 async def test_an_unavailable_or_empty_thumbnail_never_replaces_the_stored_one(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
