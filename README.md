@@ -306,7 +306,7 @@ The step offers seven things to switch on. With nothing switched on, a Run recor
 | **Job and Material** | The Job & Material step: the job name, Material used, Slot and Loaded slot entities, each optional | Its name from the job, and a Material Line Item: measured by the Device, or left for you to fill in | The sensor **Material used** (grams). `ended` carries the grams |
 | **Images** | The Images step: a Thumbnail image entity, a camera, and whether to take a Snapshot | The Thumbnail while it is open and a Snapshot from the camera when it ends | None |
 | **Part Count** | Nothing | A Part Count, 1 until you change it on the Run, and with it a cost per part | No entity of its own. `ended` and Last Run cost carry the Part Count and the cost per part |
-| **Meters count each Run from 0** | Nothing | No meter reset Flag when a meter is back at 0 after its end. See [below](#meters-count-each-run-from-0) | None |
+| **Meters count each Run from 0** | Nothing | No meter reset Flag when a meter is back at 0 after its end, and no consumption gap Flag when a meter without a value starts it at 0. See [below](#meters-count-each-run-from-0) | None |
 
 Next to these, every Other Device has what every Device has: the Status and its mapping, an electricity source with its price, the sensors for cost totals, energy, Run count and running time, the current and last Run's cost, the Flagged Runs counter and the Run event.
 
@@ -340,7 +340,9 @@ Switch this on when the energy or water meter you pick counts the current Run on
 
 Coin-op takes a meter that reads less than before for a meter reset. Such a Run is still counted correctly, but when the drop arrives in the minutes after the Run's end, while Coin-op waits for the meter's last report, the Run gets the meter reset Flag. With this switched on, a drop after the end of a Run is expected and raises no Flag.
 
-Leave it off for a meter that only counts up, such as a metering plug's total energy or a water meter on the supply: there a drop is a real reset and the Flag is right. A counter that only drops once the next Run is already running gets that Run the Flag either way.
+Such a sensor often has no value at all between two Runs, and still has none at the moment the Status starts the next one. Coin-op takes a meter without a value at a Run's start for a consumption gap, since a meter that only counts up and comes back later may have counted in between. With this switched on, a meter that has no value as the Run starts and then begins at 0 raises no Flag: it counted nothing before that 0. A meter whose first value is above 0, one that loses its value during the Run or never has one, and a power or flow sensor without a value get the consumption gap Flag either way.
+
+Leave it off for a meter that only counts up, such as a metering plug's total energy or a water meter on the supply: there a drop is a real reset, a meter that comes back at 0 after having no value lost what it counted, and the Flags are right. A counter that only drops once the next Run is already running gets that Run the Flag either way.
 
 ### What can't be combined
 

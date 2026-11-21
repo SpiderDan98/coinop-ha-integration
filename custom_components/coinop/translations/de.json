@@ -94,7 +94,7 @@
             "job": "Es arbeitet einen Auftrag nach dem anderen ab und verbraucht dabei Material, wie ein Lasercutter oder eine CNC-Fräse: Ein Lauf wird nach seinem Auftrag benannt und bekommt einen Material-Posten, vom Gerät gemessen oder zum Ausfüllen, bepreist mit dem Standardmaterial des Geräts oder dem Material in einem Fach. Nicht zusammen mit Programm oder Dosierungen.",
             "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
             "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",
-            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler."
+            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler, und hat er keinen Wert, bis er einen Lauf bei 0 beginnt, keinen auf eine Lücke im Verbrauch."
           }
         },
         "device": {

@@ -94,7 +94,7 @@
             "job": "It works through one job at a time and uses up Material doing so, as a laser cutter or a CNC router does: a Run is named after its job and gets a Material Line Item, measured by the Device or left for you to fill in, priced from the Device's default Material or from the Material in a Slot. Not together with Program or Doses.",
             "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
             "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",
-            "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset."
+            "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset, and one that has no value until it starts a Run at 0 none for a gap in consumption."
           }
         },
         "device": {
