@@ -11,8 +11,9 @@ import pytest
 from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
-from .devices import add_device, add_hub, configure
+from .devices import add_device, add_hub, configure, start_reconfigure
 from .test_device_flow import fields, offered
+from .test_other_devices import add_kiln, set_kiln
 
 TRANSLATIONS = Path(__file__).parents[1] / "custom_components" / DOMAIN / "translations"
 STATEMENT = TRANSLATIONS.parent / "statement" / "strings"
@@ -221,6 +222,35 @@ async def test_the_other_step_says_which_choices_cant_be_combined_and_what_to_do
             name = texts[f"{prefix}.step.other.data.{choice}"]
             assert quoted.format(name) in text, (choice, text)
     assert by_hand in description
+
+
+@pytest.mark.parametrize(
+    ("language", "quoted", "unseen"),
+    [("en", "“{}”", "capabilit"), ("de", "„{}“", "fähigkeit")],
+)
+async def test_changing_what_an_other_device_has_is_named_announced_and_refused_in_words(
+    hass: HomeAssistant, language: str, quoted: str, unseen: str
+) -> None:
+    entry = await add_hub(hass)
+    kiln = await add_kiln(hass, entry)
+    menu = await start_reconfigure(hass, entry, kiln)
+    await set_kiln(hass, "on")
+    refused = await configure(hass, menu, {"next_step_id": "other"})
+
+    texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])
+
+    prefix = f"component.{DOMAIN}.config_subentries.device"
+    named = [
+        texts.get(f"{prefix}.step.reconfigure.menu_options.{option}", "")
+        for option in menu["menu_options"]
+    ]
+    assert all(named), named
+    refusal = texts[f"{prefix}.abort.{refused['reason']}"]
+    assert refusal
+    assert [text for text in (named[0], refusal) if unseen in text.lower()] == []
+    # Add Device says where its answers can be changed, before they are given.
+    reconfigure = texts[f"{prefix}.step.reconfigure.title"]
+    assert quoted.format(reconfigure) in texts[f"{prefix}.step.other.description"]
 
 
 async def test_entities_are_named_in_the_configured_language(

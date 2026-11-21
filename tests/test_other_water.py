@@ -104,6 +104,7 @@ async def test_water_adds_the_water_source_and_its_price_to_add_device_and_recon
     [valve] = entry.subentries.values()
     result = await start_reconfigure(hass, entry, valve)
     assert result["menu_options"] == [
+        "other",
         "status",
         "consumption",
         "water",
@@ -145,7 +146,7 @@ async def test_the_water_source_none_skips_the_water_price(
     assert valve.data["water"] == {"source": "none"}
     assert "water_price" not in valve.data
     result = await start_reconfigure(hass, entry, valve)
-    assert result["menu_options"] == ["status", "consumption", "water", "save"]
+    assert result["menu_options"] == ["other", "status", "consumption", "water", "save"]
 
 
 async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
@@ -165,6 +166,7 @@ async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
     result = await configure(hass, result, {"price": 2.5})
 
     assert result["menu_options"] == [
+        "other",
         "status",
         "consumption",
         "water",

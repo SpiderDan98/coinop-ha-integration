@@ -529,3 +529,34 @@ async def reconfigure(
     result = await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
     return result
+
+
+async def open_other(
+    hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry
+) -> Any:
+    """Pick the reconfigure menu's entry for an Other Device's Type Name and what it
+    has; returns what answers: the `other` step, or the refusal."""
+    result = await start_reconfigure(hass, entry, subentry)
+    return await configure(hass, result, {"next_step_id": "other"})
+
+
+async def change_other_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    subentry: ConfigSubentry,
+    *inputs: Any,
+    type_name: str | None = None,
+    has: Iterable[str],
+) -> Any:
+    """Change what an Other Device has to exactly the choices `has` in its reconfigure
+    menu, and its Type Name if `type_name` is given; answer the steps the change
+    brings with `inputs` in turn, then Save. It fails unless `inputs` lead back to
+    the menu."""
+    return await reconfigure(
+        hass,
+        entry,
+        subentry,
+        {"next_step_id": "other"},
+        other_input(type_name or subentry.data["type_name"], has),
+        *inputs,
+    )

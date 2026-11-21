@@ -186,6 +186,7 @@ async def test_reconfigure_has_the_program_section_and_per_program_for_the_estim
     result = await start_reconfigure(hass, entry, bread_maker)
 
     assert result["menu_options"] == [
+        "other",
         "status",
         "program",
         "consumption",

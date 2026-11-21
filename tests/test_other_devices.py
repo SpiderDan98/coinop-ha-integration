@@ -264,7 +264,7 @@ async def test_reconfiguring_an_other_device_offers_its_sections_and_no_detect_a
 
     result = await start_reconfigure(hass, entry, kiln)
 
-    assert result["menu_options"] == ["status", "consumption", "price", "save"]
+    assert result["menu_options"] == ["other", "status", "consumption", "price", "save"]
 
 
 async def test_reconfiguring_a_section_leaves_the_type_name_and_what_it_has_alone(

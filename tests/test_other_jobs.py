@@ -210,6 +210,7 @@ async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sect
     assert {"program", "water", "water_price"}.isdisjoint(router.data)
     result = await start_reconfigure(hass, entry, router)
     assert result["menu_options"] == [
+        "other",
         "status",
         "job",
         "images",

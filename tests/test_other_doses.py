@@ -181,7 +181,7 @@ async def test_doses_without_a_program_bring_no_step_and_no_section(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     [soda_maker] = entry.subentries.values()
     result = await start_reconfigure(hass, entry, soda_maker)
-    assert result["menu_options"] == ["status", "consumption", "save"]
+    assert result["menu_options"] == ["other", "status", "consumption", "save"]
 
 
 async def test_without_a_program_every_run_takes_the_default_rows_amounts(
@@ -592,6 +592,7 @@ async def test_program_doses_and_water_bring_the_program_step_and_water_per_prog
     [brew_kettle] = entry.subentries.values()
     result = await start_reconfigure(hass, entry, brew_kettle)
     assert result["menu_options"] == [
+        "other",
         "status",
         "program",
         "consumption",
