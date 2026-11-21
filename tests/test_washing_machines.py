@@ -43,7 +43,16 @@ async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> No
 
     assert result["step_id"] == "user"
     assert fields(result) == ["device_type"]
-    assert offered(result, "device_type") == ["3d_printer", "washing_machine"]
+    assert offered(result, "device_type") == [
+        "3d_printer",
+        "washing_machine",
+        "dishwasher",
+        "tumble_dryer",
+        "coffee_machine",
+        "oven",
+        "ev_charger",
+        "robotic_mower",
+    ]
 
 
 async def test_a_washing_machine_asks_status_mapping_electricity_and_price(

@@ -10,7 +10,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.coinop.const import DOMAIN
@@ -75,7 +75,9 @@ async def start_add_device(
         result = await configure(hass, result, {"device": "manual"})
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": device_type})
-    assert result["step_id"] == "device", result.get("errors")
+    assert result["step_id"] in ("device", "device_without_profile"), result.get(
+        "errors"
+    )
     result = await configure(
         hass, result, {} if printer is None else {"device": printer}
     )
@@ -216,6 +218,80 @@ async def add_device(
     return subentry
 
 
+async def add_basic_device(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    device_type: str,
+    name: str,
+    status: str,
+    mapping: dict[str, list[str]],
+    meter: dict[str, Any],
+    source: str = "energy",
+    price: float | dict[str, Any] = 0.30,
+) -> ConfigSubentry:
+    """Walk Add Device to the end for a Device Type with only the sections every
+    Device has: HA device and name, Status, mapping, electricity source and price.
+
+    `source` is "energy" or "power", the only ones offered, read from `meter`.
+    """
+    result = await walk_to_mapping(
+        hass, entry, name=name, status=status, device_type=device_type
+    )
+    result = await configure(hass, result, mapping)
+    assert (result["step_id"], result["menu_options"]) == (
+        "consumption",
+        ["energy", "power"],
+    ), result.get("errors")
+    result = await configure(hass, result, {"next_step_id": source})
+    result = await configure(hass, result, meter)
+    assert result["step_id"] == "price", result.get("errors")
+    result = await configure(hass, result, price_choice(price))
+    result = await configure(hass, result, price_input(price))
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    await hass.async_block_till_done()
+    subentry = list(entry.subentries.values())[-1]
+    assert subentry.title == name
+    return subentry
+
+
+# What a Device with only the sections every Device has stores.
+BASIC_DATA = [
+    "consumption",
+    "device_type",
+    "mapping",
+    "price",
+    "printer_device_id",
+    "status",
+]
+
+
+def basic_entities(slug: str) -> list[str]:
+    """The entities every Device has, of the Device whose entity ids start with
+    `slug`: none for water or Material used."""
+    sensors = (
+        "current_run_cost",
+        "electricity_cost",
+        "energy_in_runs",
+        "flagged_runs",
+        "last_run_cost",
+        "material_cost",
+        "other_cost",
+        "running_time",
+        "runs",
+        "total_cost",
+    )
+    return [f"event.{slug}_run", *(f"sensor.{slug}_{key}" for key in sensors)]
+
+
+def coinop_entities(entity_registry: er.EntityRegistry) -> list[str]:
+    return sorted(
+        entity.entity_id
+        for entity in entity_registry.entities.values()
+        if entity.platform == "coinop"
+    )
+
+
 async def add_washing_machine(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -228,16 +304,19 @@ async def add_washing_machine(
     source: str = "energy",
     meter: dict[str, Any] | None = None,
     price: float | dict[str, Any] = 0.30,
-    water: str = "none",
+    water: str | None = "none",
     water_meter: dict[str, Any] | None = None,
     water_price: float | dict[str, Any] = 4.0,
+    device_type: str = "washing_machine",
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
-    energy meter, no Program input and no water source.
+    energy meter, no Program input and no water source. `device_type` walks it for
+    another Device Type with the washing machine's steps.
 
     `source` "per_program" takes no `meter`. `water` is "meter" (on `WASHER_WATER`
     unless `water_meter` gives the input), "flow", "per_program" or "none"; a fixed
-    `water_price` is per m³.
+    `water_price` is per m³. `water=None` walks a Device Type without water, which
+    is done after the electricity price.
     """
     result = await walk_to_mapping(
         hass,
@@ -245,7 +324,7 @@ async def add_washing_machine(
         name=name,
         printer=device,
         status=status,
-        device_type="washing_machine",
+        device_type=device_type,
     )
     result = await configure(hass, result, mapping)
     assert result["step_id"] == "program", result.get("errors")
@@ -257,13 +336,14 @@ async def add_washing_machine(
     assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, price_choice(price))
     result = await configure(hass, result, price_input(price))
-    assert result["step_id"] == "water", result.get("errors")
-    result = await configure(hass, result, {"next_step_id": f"water_{water}"})
+    if water is not None:
+        assert result["step_id"] == "water", result.get("errors")
+        result = await configure(hass, result, {"next_step_id": f"water_{water}"})
     if water in ("meter", "flow"):
         result = await configure(
             hass, result, water_meter or {"entity_id": WASHER_WATER}
         )
-    if water != "none":
+    if water not in (None, "none"):
         assert result["step_id"] == "water_price", result.get("errors")
         result = await configure(
             hass,

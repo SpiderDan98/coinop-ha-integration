@@ -1,0 +1,15 @@
+{
+  "suggestions": {
+    "default": {
+      "kwh": {
+        "mean": 0.012,
+        "runs": 2
+      },
+      "litres": {
+        "mean": 0.045,
+        "runs": 2
+      }
+    },
+    "programs": {}
+  }
+}

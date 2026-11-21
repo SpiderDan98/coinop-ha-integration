@@ -114,6 +114,18 @@ def test_shared_terms_read_the_same_in_panel_and_backend(language: str) -> None:
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
+def test_the_panel_has_a_heading_for_every_device_type(language: str) -> None:
+    named = "selector.device_type.options."
+    heading = "device_type."
+
+    assert sorted(
+        key.removeprefix(heading) for key in _panel(language) if key.startswith(heading)
+    ) == sorted(
+        key.removeprefix(named) for key in _backend(language) if key.startswith(named)
+    )
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
 def test_shared_terms_read_the_same_in_panel_and_cost_statement(language: str) -> None:
     panel, statement = _panel(language), _flat(STATEMENT / f"{language}.json")
 

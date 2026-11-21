@@ -9,6 +9,7 @@ import pytest
 from .clock import Clock
 from .devices import add_device, add_hub
 from .http import HttpClient
+from .stored import place_materials, stored_material
 from .test_cost_statement import export
 from .test_persistence import restart
 from .test_runs import stored_runs, value
@@ -73,6 +74,72 @@ async def test_each_dose_of_the_default_row_is_a_material_line_item(
     assert doses(run) == [
         ("dose-liquid", "default_row", "liquid", 75, "ml", 0.006, 0.45),
         ("dose-pods", "default_row", "pods", 1, "pcs", 0.30, 0.30),
+    ]
+    assert run["flags"] == []
+
+
+async def test_dishwasher_products_and_beverage_ingredients_are_dosed(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    def pack(price: float, size: float, unit: str) -> dict[str, Any]:
+        return {
+            "diameter": None,
+            "price": {
+                "source": "fixed",
+                "pack_price": price,
+                "pack_size": size,
+                "pack_unit": unit,
+            },
+        }
+
+    place_materials(
+        hass_storage,
+        stored_material(
+            "tabs",
+            form="dishwasher_product",
+            type="Dishwasher tabs",
+            density=None,
+            **pack(9.0, 60.0, "pcs"),
+        ),
+        stored_material(
+            "beans",
+            form="beverage_ingredient",
+            type="Coffee beans",
+            density=0.4,
+            **pack(16.0, 1000.0, "g"),
+        ),
+        stored_material(
+            "milk",
+            form="beverage_ingredient",
+            type="Milk",
+            density=1.03,
+            **pack(1.2, 1000.0, "ml"),
+        ),
+    )
+    device = await add_washer(hass, program=False, price=0.50)
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device.subentry_id,
+        settings={
+            "doses": [
+                {"id": f"dose-{material}", "material_id": material}
+                for material in ("tabs", "beans", "milk")
+            ],
+            "program_defaults": {
+                "default": {
+                    "doses": {"dose-tabs": 1, "dose-beans": 10, "dose-milk": 150}
+                }
+            },
+        },
+    )
+
+    await washed(hass, clock, kwh=1.2)
+
+    [run] = stored_runs(hass_storage)
+    assert doses(run) == [
+        ("dose-tabs", "default_row", "tabs", 1, "pcs", 0.15, 0.15),
+        ("dose-beans", "default_row", "beans", 10, "g", 0.016, 0.16),
+        ("dose-milk", "default_row", "milk", 150, "ml", 0.0012, 0.18),
     ]
     assert run["flags"] == []
 

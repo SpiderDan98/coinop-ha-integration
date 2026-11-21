@@ -46,9 +46,9 @@ class Metering:
     `gap_rates(run)` are the (since, rate) a rate input's gaps hold, None for its
     last value; `fallback(run)` is the method without measurement with a model,
     an amount for the whole Run (spread evenly over it) or None for no value (an
-    empty quantity), and is None for no Line Item at all. With
-    `silent_meter_falls_back`, a meter without any valid reading up to the Run's
-    end falls back too.
+    empty quantity), and is None for no Line Item at all. A meter without any
+    valid reading up to the Run's end flags the ended Run `consumption_gap`; with
+    `silent_meter_falls_back` it falls back too.
     """
 
     def __init__(
@@ -66,7 +66,7 @@ class Metering:
         self._hass = hass
         self.quantity = quantity
         self._silent_meter_falls_back = silent_meter_falls_back
-        self._restarts_after_end = Capability.PER_RUN_METERS in config.capabilities
+        self._per_run = Capability.PER_RUN_METERS in config.capabilities
         self._source: Mapping[str, Any] = config.flow_data[quantity.source_key]
         # Without a source there may be no price section.
         self._price: Mapping[str, Any] = config.flow_data.get(quantity.price_key, {})
@@ -185,18 +185,13 @@ class Metering:
         assert meter is not None
         value = meter_reading(self.quantity, state, meter)
         if state is None:
-            add_reading(self.quantity, run, dt_util.utcnow(), None)
+            times = [dt_util.utcnow()]
         elif value is None:
-            add_reading(self.quantity, run, state.last_updated, None)
+            times = [state.last_updated]
         else:
-            for at in (state.last_updated, state.last_reported):
-                add_reading(
-                    self.quantity,
-                    run,
-                    at,
-                    value,
-                    restarts_after_end=self._restarts_after_end,
-                )
+            times = [state.last_updated, state.last_reported]
+        for at in times:
+            add_reading(self.quantity, run, at, value, per_run=self._per_run)
 
     def awaits_report(self, run: Run) -> bool:
         """Whether the meter may still report the ended Run's end."""
@@ -323,13 +318,13 @@ class Metering:
         without measurement and fallback."""
         fallback = self._fallback(run)
         metered = self.meter(run) is not None
-        if metered and not (
-            self._silent_meter_falls_back and fallback and self._silent(run)
-        ):
+        silent = metered and self._silent(run)
+        if silent and run.ended is not None:
+            # Open, a per-Run meter may still start at 0; other gaps are flagged as read.
+            add_flag(run, Flag.CONSUMPTION_GAP)
+        if metered and not (self._silent_meter_falls_back and fallback and silent):
             item = self.priced(run, until, self.model(run), ConsumptionMethod.MEASURED)
         elif fallback:
-            if metered:
-                add_flag(run, Flag.CONSUMPTION_GAP)
             item = self._fallen_back(run, until, fallback)
         else:
             return None

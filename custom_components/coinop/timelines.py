@@ -42,12 +42,14 @@ def add_reading(
     at: datetime,
     value: float | None,
     *,
-    restarts_after_end: bool = False,
+    per_run: bool = False,
 ) -> None:
     """Add a reading (None while it had no value) and flag gaps and resets.
 
-    With `restarts_after_end`, the meter counts each Run from 0 (e.g. Miele's
-    per-cycle counters): a drop reported after the end is no reset.
+    With `per_run`, the meter counts each Run from 0 (e.g. Miele's per-cycle
+    counters): a drop reported after the end is no reset, and a meter without a
+    value from the Run's start on has no gap if its first value is 0, since it
+    counted nothing before that.
     """
     timeline = run.timelines[quantity.kind]
     readings = timeline.readings
@@ -70,16 +72,22 @@ def add_reading(
         ),
         None,
     )
+    meter = meter_of(quantity, timeline.source)
+    is_counter = meter is not None and meter["source"] == quantity.total_source
     if value is None:
-        if run.ended is None or at < run.ended:
+        awaits_first_value = per_run and is_counter and previous is None
+        if not awaits_first_value and (run.ended is None or at < run.ended):
+            add_flag(run, Flag.CONSUMPTION_GAP)
+    elif not is_counter:
+        return
+    elif previous is None:
+        # The first value after none at all: anything but 0 was counted unseen.
+        if per_run and index and value:
             add_flag(run, Flag.CONSUMPTION_GAP)
     elif (
-        (meter := meter_of(quantity, timeline.source))
-        and meter["source"] == quantity.total_source
-        and previous is not None
-        and value < previous[1]
+        value < previous[1]
         and (run.ended is None or previous[0] < run.ended)
-        and not (restarts_after_end and after_end)
+        and not (per_run and after_end)
     ):
         add_flag(run, Flag.METER_RESET)
 

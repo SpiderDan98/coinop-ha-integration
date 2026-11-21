@@ -339,6 +339,105 @@ describe("Devices tab", () => {
     expect(queryAll(dialog, ".new-run-tags, .automatic-templates")).toHaveLength(2);
   });
 
+  // A recorded Device of each Device Type: its name, then its heading in English and German.
+  const HEADINGS = [
+    [recorded.washer, "Washer", "Washing machines", "Waschmaschinen"],
+    [recorded.dishwasher, "Dishwasher", "Dishwashers", "Spülmaschinen"],
+    [recorded.tumbleDryer, "Tumble dryer", "Tumble dryers", "Trockner"],
+    [recorded.oven, "Oven", "Ovens", "Backöfen"],
+    [recorded.coffeeMachine, "Coffee machine", "Coffee machines", "Kaffeemaschinen"],
+    [recorded.wallbox, "Wallbox", "EV chargers", "Wallboxen"],
+    [recorded.mower, "Mower", "Robotic mowers", "Mähroboter"],
+  ] as const;
+
+  it.each([
+    ["en", 2],
+    ["de", 3],
+  ] as const)(
+    "lists each Device under its Device Type's heading (%s)",
+    async (language, column) => {
+      const backend = recordedBackend({ language }).reply(LIST, () => ({
+        devices: HEADINGS.map(([device]) => device),
+      }));
+
+      const panel = await mountPanel(backend, { path: "/devices" });
+
+      expect(
+        queryAll(panel, ".device-type").map((section) => [
+          text(query(section, "h2")),
+          ...queryAll(section, ".device h3").map(text),
+        ]),
+      ).toEqual(HEADINGS.map((row) => [row[column], row[1]]));
+    },
+  );
+
+  it("shows a dishwasher with a washing machine's parts", async () => {
+    const backend = recordedBackend()
+      .reply(LIST, () => ({ devices: [recorded.dishwasher] }))
+      .subscription("coinop/catalog/subscribe", () => [
+        { ...recorded.catalog.filled, materials: recorded.dishwasherAndBeverage },
+      ]);
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Dishwasher " +
+        "Status sensor.washer_status " +
+        "Program sensor.washer_program " +
+        "Consumption source Energy meter sensor.washer_plug_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Water source Per Program (litres in the Program Defaults) " +
+        "Water price €4.00 per m³ " +
+        "Reconfigure in Home Assistant " +
+        "Doses All-in-one tabs 1 pcs " +
+        "Program rows Eco 50° " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+  });
+
+  it("shows a robotic mower, a Device without Capabilities, with what every Device has", async () => {
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [recorded.mower] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Mower " +
+        "Status sensor.mower_status " +
+        "Consumption source Energy meter sensor.mower_station_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+    await click(panel, iconButton(panel, "Edit settings of Mower"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(queryAll(dialog, ".field .label").map(text)).toEqual([
+      "Tags for new Runs",
+      "Automatic templates",
+    ]);
+    expect(queryAll(dialog, "table")).toEqual([]);
+    expect(backend.calls.map((call) => call.type)).not.toContain(
+      "coinop/devices/measured_suggestions",
+    );
+  });
+
+  it("shows an EV charger without Dose list, Program rows or water", async () => {
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [recorded.wallbox] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Wallbox " +
+        "Status sensor.wallbox_status " +
+        "Consumption source Energy meter sensor.wallbox_session_energy " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+  });
+
   it("names a washing machine's water source and water price, or its unused Program input", async () => {
     const { perProgram } = recorded;
     const water = { attribute: "total", unit: "L", factor: null };

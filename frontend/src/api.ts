@@ -1,6 +1,7 @@
 // Coin-op's websocket commands (custom_components/coinop/websocket/). Amounts,
 // subtotals and totals arrive rounded to the currency; the panel only formats them.
 import type { HomeAssistant, Message } from "./hass";
+import type { Key } from "./localize";
 
 export const OUTCOMES = ["completed", "cancelled", "failed", "unknown"] as const;
 export const KINDS = ["electricity", "water", "material", "other"] as const;
@@ -113,8 +114,9 @@ export interface RunDetail extends RunSummary {
 export interface Device {
   id: string;
   name: string;
-  /** The Device Type, which the Devices tab groups by. */
-  type: "3d_printer" | "washing_machine";
+  /** The Device Type, which the Devices tab groups by: every key with a `device_type.<key>`
+   * heading in the translations. */
+  type: keyof { [K in Key as K extends `device_type.${infer Type}` ? Type : never]: unknown };
   capabilities: (typeof CAPABILITIES)[number][];
   /** The Device's subentry data as its flow wrote it; changed only by reconfiguring. */
   ha_settings: {
@@ -460,6 +462,8 @@ export const MATERIAL_FORMS = [
   "detergent",
   "fabric_softener",
   "laundry_additive",
+  "dishwasher_product",
+  "beverage_ingredient",
 ] as const;
 export type MaterialForm = (typeof MATERIAL_FORMS)[number];
 export const PACK_UNITS = ["g", "ml", "pcs"] as const;

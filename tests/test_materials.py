@@ -564,3 +564,80 @@ async def test_a_catalogue_stored_before_laundry_products_loads_unchanged(
         "price_per_gram": pytest.approx(0.02),
         "price_per_piece": None,
     }
+
+
+TABS = {
+    "name": "All-in-one tabs",
+    "form": "dishwasher_product",
+    "type": "Dishwasher tabs",
+    "price": {"source": "fixed", "pack_price": 9, "pack_size": 60},
+}
+BEANS = {
+    "name": "Espresso beans",
+    "form": "beverage_ingredient",
+    "type": "Coffee beans",
+    "density": 0.4,
+    "price": {"source": "fixed", "pack_price": 16, "pack_size": 1000},
+}
+
+
+async def test_a_dishwasher_product_and_a_beverage_ingredient_are_created_and_edited(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    tabs = await create(panel, **TABS, diameter=1.75)
+    beans = await create(panel, **BEANS, diameter=1.75)
+    milk = await panel.call(
+        "coinop/materials/update",
+        material_id=beans["id"],
+        material={
+            "name": "Whole milk",
+            "type": "Milk",
+            "density": 1.03,
+            "price": {
+                "source": "fixed",
+                "pack_price": 1.2,
+                "pack_size": 1000,
+                "pack_unit": "ml",
+            },
+        },
+    )
+
+    assert (tabs["form"], beans["form"]) == (
+        "dishwasher_product",
+        "beverage_ingredient",
+    )
+    assert (tabs["price"]["pack_unit"], beans["price"]["pack_unit"]) == ("pcs", "g")
+    assert (tabs["price_per_piece"], tabs["density"]) == (pytest.approx(0.15), None)
+    assert beans["price_per_gram"] == pytest.approx(0.016)
+    assert (tabs["diameter"], beans["diameter"]) == (None, None)
+    assert milk["material"]["form"] == "beverage_ingredient"
+    assert milk["material"]["price_per_gram"] == pytest.approx(1.2 / 1030)
+    assert await materials(panel) == [tabs, milk["material"]]
+
+
+async def test_built_in_dishwasher_and_beverage_types_pre_fill_form_density_and_pack_unit(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_hub(hass)
+
+    result = await panel.call("coinop/materials/types")
+
+    types = {
+        entry["type"]: (entry["form"], entry["pack_unit"], entry["density"])
+        for entry in result["types"]
+    }
+    assert {
+        name: built_in
+        for name, built_in in types.items()
+        if built_in[0] in ("dishwasher_product", "beverage_ingredient")
+    } == {
+        "Dishwasher tabs": ("dishwasher_product", "pcs", None),
+        "Dishwasher powder": ("dishwasher_product", "g", 0.95),
+        "Dishwasher salt": ("dishwasher_product", "g", 1.2),
+        "Rinse aid": ("dishwasher_product", "ml", 1.02),
+        "Coffee beans": ("beverage_ingredient", "g", 0.4),
+        "Ground coffee": ("beverage_ingredient", "g", 0.35),
+        "Milk": ("beverage_ingredient", "ml", 1.03),
+    }

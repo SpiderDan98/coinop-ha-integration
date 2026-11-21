@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from custom_components.coinop.cost.rounding import currency_decimals
+from custom_components.coinop.quantities import QUANTITIES
 
 from .export import LANGUAGES
 
@@ -20,7 +21,8 @@ STRINGS: dict[str, dict[str, Any]] = {
     for language in LANGUAGES
 }
 
-QUANTITY_DECIMALS = {"kWh": 3, "L": 1, "g": 1, "ml": 1, "h": 2, "pcs": 0}
+QUANTITIES_BY_UNIT = {quantity.unit: quantity for quantity in QUANTITIES.values()}
+QUANTITY_DECIMALS = {"g": 1, "ml": 1, "h": 2, "pcs": 0}
 SYMBOLS = {
     "EUR": "€",
     "USD": "$",
@@ -72,7 +74,12 @@ class Text:
         return self._money(price, max(4, self.decimals))
 
     def quantity(self, quantity: float, unit: str) -> str:
-        return f"{self.number(quantity, QUANTITY_DECIMALS.get(unit, 2))} {unit}"
+        decimals = (
+            QUANTITIES_BY_UNIT[unit].shown_decimals(quantity)
+            if unit in QUANTITIES_BY_UNIT
+            else QUANTITY_DECIMALS.get(unit, 2)
+        )
+        return f"{self.number(quantity, decimals)} {unit}"
 
     def percent(self, percent: float) -> str:
         return self.number(percent, 2)

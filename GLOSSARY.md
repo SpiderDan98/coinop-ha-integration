@@ -10,7 +10,7 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
+The kind of Device (3D printer, washing machine, dishwasher, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
 _Avoid_: Category, device class
 _German UI_: Gerätetyp
 
@@ -25,12 +25,12 @@ _Avoid_: Gate, bay, tray
 _German UI_: Fach
 
 **Integration Profile**:
-The known Device Inputs of a specific integration for one Device Type, used to fill in a Device's Device Inputs automatically.
+The known Device Inputs of a specific integration, used to fill in a Device's Device Inputs automatically for the Device Types the integration serves. It also tells an HA device's appliance kind: what the integration itself registered it as (Miele's "Tumble dryer", WashData's "dishwasher"), before it is a Device. A kind is not a Device Type: Quick Start adds a kind that is one as that Device Type (several kinds can be the same one, as a washer-dryer is a Washing machine), asks for the Device Type where the integration doesn't tell the kind, and leaves out a kind that is none, such as a fridge. The kind is never stored.
 _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 
 **Quick Start**:
-The short way through Add Device: the user picks an HA device of an integration with an Integration Profile, and the Device takes every Device Input the profile finds without showing its steps, asking only for the meter and the prices.
+The short way through Add Device: the user picks an HA device of an integration with an Integration Profile, and the Device takes the Device Type the integration says it is and every Device Input the profile finds without showing its steps, asking only for the meter and the prices, and for the Device Type where the integration doesn't say.
 _Avoid_: Wizard, auto-setup, express setup
 _German UI_: Schnellstart
 
@@ -50,7 +50,7 @@ _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 
 **Program**:
-The washing program a Run of a washing machine ran, such as "Cotton 60°" or "Eco 40-60", as its Program Device Input reports it or the user corrects it.
+The program a Run ran, such as a washing machine's "Cotton 60°", a dishwasher's "Eco 50°" or a coffee machine's "Cappuccino", as the Device's Program Device Input reports it or the user corrects it. Only Device Types with a Program input have one.
 _Avoid_: Cycle, mode, wash type
 _German UI_: Programm
 
@@ -115,7 +115,7 @@ _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
 
 **Dose**:
-One product a washing machine's Runs use, such as detergent or fabric softener, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
+One product a Device's Runs use, such as a washing machine's detergent or a dishwasher's tabs, pointing to one Material; each Dose a Run uses becomes one Material Line Item.
 _Avoid_: Additive, dosage, detergent (as the generic term)
 _German UI_: Dosierung
 
@@ -125,6 +125,6 @@ _Avoid_: Level sensor, fill level
 _German UI_: Bestandssensor
 
 **Program Defaults**:
-A Device's kWh, litres and Dose amounts for each Program, plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+A Device's kWh, litres and Dose amounts for each Program, whichever of them its Device Type has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
 _Avoid_: Presets, program profiles, estimates
 _German UI_: Programmvorgaben

@@ -41,6 +41,12 @@ input_select:
   washer_program:
     name: Washing machine program
     options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
+  dishwasher_status:
+    name: Dishwasher status
+    options: ["off", running, paused, finished, cancelled]
+  dishwasher_program:
+    name: Dishwasher program
+    options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
 
 input_text:
   prusa_job:
@@ -79,6 +85,13 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: g
+  dishwasher_energy:
+    name: Dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -92,6 +105,12 @@ template:
       - name: Washing machine plug energy
         unique_id: washer_plug_energy
         state: "{{ states('input_number.washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Dishwasher plug energy
+        unique_id: dishwasher_plug_energy
+        state: "{{ states('input_number.dishwasher_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing

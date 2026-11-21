@@ -7,7 +7,16 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
 
-from .const import DEVICE_TYPE_3D_PRINTER, DEVICE_TYPE_WASHING_MACHINE
+from .const import (
+    DEVICE_TYPE_3D_PRINTER,
+    DEVICE_TYPE_COFFEE_MACHINE,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_EV_CHARGER,
+    DEVICE_TYPE_OVEN,
+    DEVICE_TYPE_ROBOTIC_MOWER,
+    DEVICE_TYPE_TUMBLE_DRYER,
+    DEVICE_TYPE_WASHING_MACHINE,
+)
 
 
 class Target(StrEnum):
@@ -57,10 +66,11 @@ class Capability(StrEnum):
     # Electricity and water from the Program Defaults' kWh and litres when not measured.
     PROGRAM_CONSUMPTION = "program_consumption"
     # Meters may count each Run from 0, such as per-cycle counters: a drop after
-    # the end is no reset.
+    # the end is no reset, and no value until a first value of 0 is no gap.
     PER_RUN_METERS = "per_run_meters"
 
 
+# Every Device Type, in the order Add Device lists them.
 CAPABILITIES = {
     DEVICE_TYPE_3D_PRINTER: frozenset(
         {
@@ -80,6 +90,42 @@ CAPABILITIES = {
             Capability.PER_RUN_METERS,
         }
     ),
+    DEVICE_TYPE_DISHWASHER: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.WATER,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_TUMBLE_DRYER: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_COFFEE_MACHINE: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.WATER,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_OVEN: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    # A session energy sensor starts each charging session from 0.
+    DEVICE_TYPE_EV_CHARGER: frozenset({Capability.PER_RUN_METERS}),
+    DEVICE_TYPE_ROBOTIC_MOWER: frozenset[Capability](),
 }
 
 ENDING_TARGETS = frozenset({Target.FINISHED, Target.CANCELLED, Target.ENDED})

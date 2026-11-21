@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Coin-op records what each Run of your Devices costs, such as each print of a 3D printer or each load of a washing machine. After setup, add each of them as a Device."
+        "description": "Coin-op records what each Run of your Devices costs, for 3D printers, washing machines and the other Device Types it knows. After setup, add each of yours as a Device."
       }
     },
     "abort": {
@@ -42,14 +42,21 @@
         },
         "quick_start": {
           "title": "Quick Start",
-          "description": "Coin-op found devices of integrations it knows. Pick one to set it up with the Device Inputs from its Integration Profile; Coin-op then only asks for the meter and the prices. Or set a Device up manually and walk every step yourself.",
+          "description": "Coin-op found devices of integrations it knows. Pick one to set it up with the Device Inputs from its Integration Profile; Coin-op then only asks for what the integration doesn't know, such as the meter and the prices. Or set a Device up manually and walk every step yourself.",
           "data": {
             "device": "Device"
           }
         },
+        "quick_start_device_type": {
+          "title": "Device Type",
+          "description": "{integration} doesn't tell Coin-op what kind of device **{device}** is. Choose the Device Type to add it as. It decides what its Runs record and can't be changed later.",
+          "data": {
+            "device_type": "Device Type"
+          }
+        },
         "quick_start_confirm": {
           "title": "Meter & prices",
-          "description": "**{device}** is set up with the Device Inputs Coin-op found at {integration}:\n\n{inputs}\n\nYou can check and change them and the Status mapping later under “Reconfigure Device”.",
+          "description": "**{device}** is added as the Device Type **{device_type}**, set up with the Device Inputs Coin-op found at {integration}:\n\n{inputs}\n\nYou can check and change them and the Status mapping later under “Reconfigure Device”. The Device Type can't be changed later: if it is wrong, close this dialog and set the Device up manually.",
           "data": {
             "meter": "Energy meter or power sensor",
             "optional_meter": "Energy meter or power sensor (optional)",
@@ -68,6 +75,16 @@
         "device": {
           "title": "Home Assistant device",
           "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows for this Device Type ({integrations}), the next steps come pre-filled from its entities; check and change them as you like.",
+          "data": {
+            "device": "The Device's Home Assistant device (optional)"
+          },
+          "data_description": {
+            "device": "Coin-op's own device for this Device is linked to it. Entity pickers in the next steps still offer every entity."
+          }
+        },
+        "device_without_profile": {
+          "title": "Home Assistant device",
+          "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. Coin-op knows no integration for this Device Type yet, so you pick the entities in the next steps yourself.",
           "data": {
             "device": "The Device's Home Assistant device (optional)"
           },
@@ -153,7 +170,7 @@
         },
         "program": {
           "title": "Program",
-          "description": "Optionally pick the entity that reports which program the machine runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
+          "description": "Optionally pick the entity that reports which program the Device runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
           "data": {
             "entity_id": "Program entity (optional)",
             "attribute": "Attribute (optional)",
@@ -288,7 +305,7 @@
         },
         "water_meter": {
           "title": "Water meter",
-          "description": "Pick the entity that counts the Device's water, e.g. the machine's water consumption sensor or a water meter on its supply. It does not need to be available now.",
+          "description": "Pick the entity that counts the Device's water, e.g. its own water consumption sensor or a water meter on its supply. It does not need to be available now.",
           "data": {
             "entity_id": "Water entity",
             "attribute": "Attribute (optional)",
@@ -336,7 +353,7 @@
         },
         "water_price": {
           "title": "Water price",
-          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so the cost per load is realistic.",
+          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so a Run's water cost is realistic.",
           "menu_options": {
             "water_fixed_price": "Fixed price",
             "water_price_entity": "Price entity"
@@ -514,7 +531,13 @@
     "device_type": {
       "options": {
         "3d_printer": "3D printer",
-        "washing_machine": "Washing machine"
+        "washing_machine": "Washing machine",
+        "dishwasher": "Dishwasher",
+        "tumble_dryer": "Tumble dryer",
+        "coffee_machine": "Coffee machine",
+        "oven": "Oven",
+        "ev_charger": "EV charger",
+        "robotic_mower": "Robotic mower"
       }
     }
   }

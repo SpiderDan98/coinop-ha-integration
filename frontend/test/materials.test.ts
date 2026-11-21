@@ -531,3 +531,123 @@ describe("Laundry Materials", () => {
     expect(marked(panel)).toEqual(["density"]);
   });
 });
+
+describe("Dishwasher products and beverage ingredients", () => {
+  const listed = [{ ...recorded.catalog.filled, materials: recorded.dishwasherAndBeverage }];
+
+  it("are listed under their own Material forms", async () => {
+    const panel = await mountPanel(
+      catalogBackend().subscription(CATALOG, () => listed),
+      { path: "/materials" },
+    );
+
+    expect(rows(panel)).toEqual([
+      "All-in-one tabs Dishwasher product · Dishwasher tabs €9.00 / 60 pcs €0.15 / pcs",
+      "Espresso beans Beverage ingredient · Coffee beans 0.4 g/cm³ €16.00 / 1,000 g €16.00 / kg",
+    ]);
+  });
+
+  it("name their forms in German", async () => {
+    const panel = await mountPanel(
+      recordedBackend({ language: "de" }).subscription(CATALOG, () => listed),
+      { path: "/materials" },
+    );
+
+    expect(rows(panel).map((row) => row.split(" · ")[0])).toEqual([
+      "All-in-one tabs Spülmaschinenprodukt",
+      "Espresso beans Getränkezutat",
+    ]);
+  });
+
+  it.each([
+    ["Dishwasher tabs", "dishwasher_product", "pcs", undefined],
+    ["Dishwasher powder", "dishwasher_product", "g", "0.95"],
+    ["Dishwasher salt", "dishwasher_product", "g", "1.2"],
+    ["Rinse aid", "dishwasher_product", "ml", "1.02"],
+    ["Coffee beans", "beverage_ingredient", "g", "0.4"],
+    ["Ground coffee", "beverage_ingredient", "g", "0.35"],
+    ["Milk", "beverage_ingredient", "ml", "1.03"],
+  ])("pre-fill form, pack unit and density from the type %s", async (type, form, unit, density) => {
+    const panel = await mountPanel(catalogBackend(), { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "type"), type);
+
+    expect((field(panel, "form") as HTMLSelectElement).value).toBe(form);
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe(unit);
+    expect(
+      queryAll(panel, `${DIALOG} [name=density]`).map((input) => (input as HTMLInputElement).value),
+    ).toEqual(density ? [density] : []);
+    expect(queryAll(panel, `${DIALOG} [name=diameter]`)).toHaveLength(0);
+  });
+
+  it("are created by the piece from the type Dishwasher tabs", async () => {
+    const backend = catalogBackend();
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "name"), "All-in-one tabs");
+    await fill(panel, field(panel, "type"), "Dishwasher tabs");
+    await fill(panel, field(panel, "pack_price"), "9");
+    await fill(panel, field(panel, "pack_size"), "60");
+    await save(panel);
+
+    expect(backend.sent(CREATE)).toEqual([
+      {
+        type: CREATE,
+        material: {
+          name: "All-in-one tabs",
+          form: "dishwasher_product",
+          type: "Dishwasher tabs",
+          density: null,
+          vendor: null,
+          colour: null,
+          diameter: null,
+          default_for_type: false,
+          price: { source: "fixed", pack_price: 9, pack_size: 60, pack_unit: "pcs" },
+        },
+      },
+    ]);
+  });
+
+  it.each([
+    ["dishwasher_product", "pcs"],
+    ["beverage_ingredient", "g"],
+  ])("take the usual pack unit of the form %s picked by hand", async (form, unit) => {
+    const panel = await mountPanel(catalogBackend(), { path: "/materials" });
+    await click(panel, button(panel, "New Material"));
+
+    await fill(panel, field(panel, "form"), form);
+
+    expect((field(panel, "pack_unit") as HTMLSelectElement).value).toBe(unit);
+    expect(queryAll(panel, `${DIALOG} [name=diameter]`)).toHaveLength(0);
+  });
+
+  it("are edited without a diameter", async () => {
+    const backend = catalogBackend().subscription(CATALOG, () => listed);
+    const panel = await mountPanel(backend, { path: "/materials" });
+    await click(panel, button(row(panel, "Espresso beans"), "Edit"));
+
+    expect(queryAll(panel, `${DIALOG} [name=diameter]`)).toHaveLength(0);
+    await fill(panel, field(panel, "pack_price"), "18");
+    await save(panel);
+
+    expect(backend.sent(UPDATE)).toEqual([
+      {
+        type: UPDATE,
+        material_id: "material-beans",
+        material: {
+          name: "Espresso beans",
+          form: "beverage_ingredient",
+          type: "Coffee beans",
+          density: 0.4,
+          vendor: null,
+          colour: null,
+          diameter: null,
+          default_for_type: false,
+          price: { source: "fixed", pack_price: 18, pack_size: 1000, pack_unit: "g" },
+        },
+      },
+    ]);
+  });
+});

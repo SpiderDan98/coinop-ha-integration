@@ -25,9 +25,18 @@ import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-machine.json";
+import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
+import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
+import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
+import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
+import devicesListTumbleDryer from "./fixtures/backend/devices-list-tumble-dryer.json";
+import devicesListTumbleDryerFromMiele from "./fixtures/backend/devices-list-tumble-dryer-from-miele.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
+import devicesMeasuredSuggestionsOven from "./fixtures/backend/devices-measured-suggestions-oven.json";
+import devicesMeasuredSuggestionsSmall from "./fixtures/backend/devices-measured-suggestions-small.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
@@ -40,6 +49,7 @@ import lineItemsAddWater from "./fixtures/backend/line-items-add-water.json";
 import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
+import materialsCreateDishwasherAndBeverage from "./fixtures/backend/materials-create-dishwasher-and-beverage.json";
 import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
 import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
@@ -47,7 +57,9 @@ import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
+import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
+import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
 import runsGetWater from "./fixtures/backend/runs-get-water.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
@@ -125,11 +137,52 @@ export const recorded = {
   devices: devicesList.devices as Device[],
   /** `coinop/devices/list` with only "device-washer", a washing machine on an energy meter. */
   washer: devicesListWashingMachine.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
+   * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
+  dishwasher: devicesListDishwasher.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dryer", a Tumble dryer on an energy meter,
+   * dosing "material-sheets" (not in a recorded catalogue): 1 in the Default row, 2 for
+   * "Cupboard dry". */
+  tumbleDryer: devicesListTumbleDryer.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dryer", a Tumble dryer set up manually from a
+   * Miele washing machine's HA device, whose profile finds a water meter too; no Doses. */
+  dryerFromWasher: devicesListTumbleDryerFromMiele.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-coffee-machine", a Coffee machine whose
+   * electricity and water come per Program, dosing "material-beans" (see
+   * `dishwasherAndBeverage`): the Default row 0.02 kWh and 0.125 L, "Espresso" 0.012 kWh
+   * and 0.04 L. */
+  coffeeMachine: devicesListCoffeeMachine.devices[0] as Device,
+  /** `coinop/runs/get` of its "Espresso" Run "espresso": 0.012 kWh at 0.30
+   * ("espresso-electricity") and 0.04 L at 4.00 per m³ ("espresso-water") from the
+   * Program's row, both amounts rounding to 0.00. */
+  espresso: runsGetCoffeeMachine.run as RunDetail,
+  /** `coinop/devices/list` with only "device-oven", an Oven (a Program and no Doses) on an
+   * energy meter: the Default row 1 kWh, "Fan plus 180°" 1.6 kWh. */
+  oven: devicesListOven.devices[0] as Device,
+  /** `coinop/devices/measured_suggestions` of "device-oven" after a "Fan plus 180°" Run:
+   * 1.4 kWh from 1 Run for that Program, nothing for the Default row. */
+  ovenSuggestions: devicesMeasuredSuggestionsOven.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
+  /** `coinop/devices/list` with only "device-wallbox", an EV charger on its session energy
+   * sensor; per-Run meters is its only Capability. */
+  wallbox: devicesListEvCharger.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-mower", a robotic mower (no Capability at all)
+   * on its charging station's energy meter, with charging mapped to Paused. */
+  mower: devicesListRoboticMower.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "mowing": 65 minutes of mowing, then 55 minutes paused
+   * while it charged 0.25 kWh at 0.30 ("mowing-electricity"); ended with Outcome Unknown. */
+  mowing: runsGetRoboticMower.run as RunDetail,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
    * no row of its own): 1.2 kWh from 1 Run for the Default row and for "Cotton 60°". */
   measuredSuggestions: devicesMeasuredSuggestions.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
+  /** `coinop/devices/measured_suggestions` of a Device with a water meter after two Runs
+   * without a Program that took 0.04 and 0.05 L: 0.045 L for the Default row. */
+  smallSuggestions: devicesMeasuredSuggestionsSmall.suggestions as Awaited<
     ReturnType<typeof getMeasuredSuggestions>
   >,
   /** `coinop/runs/get` of "water-wash" on "device-washer" with a water meter: 50 L measured,
@@ -174,6 +227,9 @@ export const recorded = {
   /** `coinop/materials/create` of "material-detergent" (1,500 ml for 7.80) and
    * "material-pods" (40 pieces for 12.00), each answer's Material. */
   laundry: materialsCreateLaundry as Material[],
+  /** `coinop/materials/create` of "material-tabs" (60 pieces for 9.00) and
+   * "material-beans" (1,000 g for 16.00), each answer's Material. */
+  dishwasherAndBeverage: materialsCreateDishwasherAndBeverage as Material[],
   material: (id: string) =>
     found(
       recorded.catalog.filled.materials.find((material) => material.id === id),

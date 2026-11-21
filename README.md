@@ -1,6 +1,6 @@
 # Coin-op
 
-A Home Assistant custom integration that records what each print of your 3D printers and each load of your washing machine costs: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
+A Home Assistant custom integration that records what each Run of your household devices costs, such as each print of a 3D printer or each program of a washing machine or dishwasher: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
 
 Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
 
@@ -14,7 +14,35 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
-- Washing machines are the second Device Type: each load is a Run with electricity, water and the detergent and other products dosed into it. See [Washing machines](#washing-machines).
+- Other Devices have a Device Type of their own: each load of a washing machine or dishwasher is a Run with electricity, water and the detergent and other products dosed into it. See [Device Types](#device-types).
+
+## Device Types
+
+The Device Type is chosen when a Device is added and can't be changed afterwards. It decides which setup steps the Device has and what its Runs record. Every Device has a Status that opens and closes its Runs and an electricity source and price, and every Run takes Line Items you add by hand or from templates.
+
+| Device Type | A Run records | Pre-filled for |
+|---|---|---|
+| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
+| Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
+| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | no integration: set up manually |
+| Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
+
+"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), which adds each as the Device Type its integration says it is, and manual setup comes pre-filled for them whenever you pick a Device Type the integration is named for. A device of any other integration is set up manually, by picking its entities yourself.
+
+A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
+
+So does a coffee machine. Each drink is a Run named after its Program, such as "Cappuccino", and beans and milk are Doses with an amount per drink in the Program Defaults, so a cappuccino costs more than an espresso. A Program's litres take amounts down to the millilitre: enter an espresso's 40 ml as 0.04.
+
+Very short Runs, such as a coffee, are better priced "per Program" than from a meter. A metering plug counts in steps and reports at intervals that are coarse against a Run of under a minute, so what it measures for one drink is mostly chance. Choose "per Program" as the electricity source and give each drink its kWh in the Program Defaults.
+
+A tumble dryer and an oven are set up like a washing machine without the water source and the water price. They have no water sensors, and their Run event's `ended` carries the Program but no litres. What [Washing machines](#washing-machines) says about the Program, the Program Defaults, Flags and manual Runs applies to both, with these differences:
+
+- **Tumble dryer**: the Dose list is optional (dryer sheets, fragrance); an empty one adds nothing to a Run. Its Program Defaults have the kWh and a column per Dose, never litres.
+- **Oven**: it has no Dose list. Its Program Defaults are just the kWh per Program, with rows suggested from the Program input and past Runs and the measured kWh suggested per Program, as for a washing machine.
 
 ## Installation
 
@@ -29,15 +57,23 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 
 ## Quick Start
 
-If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [washing machines](#washing-machine-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
+If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([Anycubic printers](#anycubic-printers), [WashData, Miele and Home Connect](#washing-machine-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
 
-1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions.
-2. Check the list of entities Coin-op found, then fill in what no profile knows:
-   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine brings its own meters and isn't asked.
+1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
+2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
+   - the **energy meter or power sensor**, such as a metering plug's (its unit tells Coin-op which of the two it is). A washing machine, dishwasher, tumble dryer, coffee machine or oven may leave it empty and takes its kWh per Program from the Program Defaults; a printer without one is set up manually, where electricity can be estimated. A Miele washing machine, washer-dryer, dishwasher or tumble dryer brings its own meter and isn't asked.
    - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
-   - for a washing machine, optionally the **water price** per m³. With it, water comes from the machine's own meter or per Program from the Program Defaults; without it, no water is recorded.
+   - for a Device Type with water (washing machine, dishwasher, coffee machine), optionally the **water price** per m³. With it, water comes from the Device's own meter or per Program from the Program Defaults; without it, no water is recorded.
 
-Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; a washing machine's Doses and Program Defaults are set on its card in the panel's Devices tab. Miele and Home Connect also list their other appliances: pick only the ones you want to follow as a washing machine.
+The Device Type can't be changed once the Device is added. If the second form names the wrong one, close it and set the Device up manually: there you choose the Device Type yourself, and the steps still come pre-filled.
+
+Which Device Type a device becomes:
+
+- **WashData** knows the device type you picked when you set the device up there (or changed it to later): a washing machine or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher. For its generic types ("Other (Advanced)" and "Threshold Device"), such as a plug on a coffee machine or an oven, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven. A pump is no Device Type and isn't offered.
+- **Miele** reports what each appliance is: a washing machine or a washer-dryer becomes a Washing machine, a tumble dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee system a Coffee machine, and an oven, steam oven, combination oven, dialog oven or microwave an Oven. Its other appliances (fridges, freezers, hobs, hoods, wine cabinets, warming drawers, robot vacuums) are no Device Type and aren't offered.
+- **Home Connect** doesn't say what kind an appliance is, so Coin-op tells it from the sensors Home Connect creates for each kind (they needn't be enabled): a washer or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee machine a Coffee machine, an oven or a microwave an Oven. Fridges, freezers, hobs, hoods and other appliances that are no Device Type aren't offered. For an appliance whose kind those sensors don't tell, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven.
+
+Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; the Doses and Program Defaults of a Device that has them are set on its card in the panel's Devices tab.
 
 Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities. Devices Coin-op already follows aren't offered again.
 
@@ -117,9 +153,9 @@ You can correct the Program of a Run on its page, also after it ended. The new P
 
 Each washing machine's card in the panel's Devices tab has a Dose list and a Program Defaults table.
 
-- **Materials**: detergents, fabric softeners and laundry additives are Materials in the Materials tab, like filament. Built-in types (liquid and powder detergent, pods, fabric softener, whitener, stain remover, colour catcher sheets) pre-fill a typical density. Pods and sheets are priced per piece: 40 pods for €12 cost €0.30 each.
+- **Materials**: detergents, fabric softeners and laundry additives are Materials in the Materials tab, like filament. Built-in types (liquid and powder detergent, pods, fabric softener, whitener, stain remover, colour catcher sheets) pre-fill a typical density. Pods and sheets are priced per piece: 40 pods for €12 cost €0.30 each. Dishwasher products and beverage ingredients are Material forms of their own, with built-in types for dishwasher tabs (priced per piece), dishwasher powder, dishwasher salt, rinse aid, coffee beans, ground coffee and milk; Materials of these two forms are never linked to Spoolman.
 - **Doses**: one entry per product that goes into the machine, each pointing to a Material. Each Dose a Run uses becomes its own Material Line Item.
-- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them.
+- **Program Defaults**: one row per Program, with kWh, litres and an amount per Dose in the Material's unit (g, ml or pieces). A Run uses its Program's row, and the **Default** row when it has no Program or its Program has no row. An empty cell means "not set" (kWh, litres) or "not dosed" (Doses), so the whitener only shows up on the programs you use it with. kWh and litres only count when nothing measures them. Every amount is stored as entered; water of under a litre reads to the millilitre everywhere (0.04 L), larger amounts to a tenth of a litre as before.
 - Rows are suggested from the values the Program input offers and from Programs seen on past Runs; a suggested row is stored once you enter a value.
 - With a meter, a row suggests the average measured kWh and litres of that Program's completed Runs, with the number of Runs. One click applies it; it is never applied automatically.
 
@@ -161,17 +197,69 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 
 ### Washing machine Integration Profiles
 
-[Quick Start](#quick-start) offers the washing machines of these integrations. When you set one up manually and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
+[Quick Start](#quick-start) offers the washing machines, dishwashers, tumble dryers, coffee machines and ovens of these integrations, each as the Device Type it is. When you set one up manually, as the Device Type you choose, and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
 
 | Integration | Status | Program | Electricity | Water |
 |---|---|---|---|---|
 | [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`) | State sensor | Program sensor | your plug's energy meter, chosen by you | chosen by you |
-| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle | Water consumption sensor of the current cycle |
+| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle, where the appliance has one | Water consumption sensor of the current cycle, where the appliance has one |
 | [Home Connect](https://www.home-assistant.io/integrations/home_connect/) (`home_connect`) | Operation state sensor | Active program select | chosen by you | chosen by you |
 
+- WashData's profile also serves dishwashers, tumble dryers, coffee machines and ovens: its State and Program sensors are the same for every device it follows, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
 - WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor reports placeholders such as `detecting...`; the profile fills them in as values to ignore (Program step), so they never become a Run's Program or a suggested Program row.
-- Miele's consumption sensors count the current cycle and drop to 0 afterwards. Coin-op keeps the reading at the load's end, so that drop is neither lost nor counted twice.
+- Miele's profile also serves dishwashers, tumble dryers, coffee systems (as Coffee machines) and ovens, steam, combination and dialog ovens and microwaves included: the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup. The consumption sensors are pre-filled wherever the appliance has them: energy and water on a washing machine, washer-dryer and dishwasher, energy alone on a tumble dryer. A coffee system and an oven have neither, so pick a plug's meter or take the kWh per Program. A Miele microwave or dialog oven has a Program sensor that never reports a program, so its Runs have no Program unless you enter one.
+- Miele's consumption sensors count the current cycle: they keep its total once the program has ended, have no value or read 0 while the appliance is off, and start the next cycle from 0. Coin-op keeps the reading at the Run's end, so that drop is neither lost nor counted twice, and it is never taken for a meter reset, whatever the Device Type. A counter that still has no value as the Run starts and then begins at 0 is no consumption gap either: nothing was counted before that 0. A counter whose first value is above 0, or one that loses its value during the Run, still marks the Run with a consumption gap.
+- Home Connect's profile also serves dishwashers, tumble dryers, coffee machines and ovens: each of them has the same Operation state sensor and Active program select, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
 - **Detect again** in the reconfigure menu re-applies the Status, the mapping and the Program, and leaves electricity, water and prices as they are.
+
+## EV chargers
+
+Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. No integration is pre-filled, so pick your charger's entities yourself.
+
+- **Status**: the charger's status sensor. Map charging to Running, a car that is plugged in without charging (waiting, paused by load management or a solar surplus control, fully charged) to Paused, and the unplugged charger to Finished. The Run then lasts from the first charging until the car is unplugged, a break in charging doesn't split it, and its running time is the time the car really charged. To end the Run as soon as the car is full instead, map that value to Finished too.
+- **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger.
+- **Electricity price**: a fixed price per kWh or a price entity. With a dynamic tariff, pick its price entity: each kWh is priced at what it cost when it was charged, so a Run over the cheap hours of the night costs what you really paid.
+
+To tell cars apart, tag the Runs: set the usual car as the **Tags for new Runs** on the charger's card in the Devices tab and change the Tag on the Runs of another car. Automatic Line Item Templates work as for every Device. Filter the Runs tab by a Tag and select its Runs for a [Cost Statement](#cost-statement) of that car's Runs; it lists them without a Part Count.
+
+An EV charger's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count. A manual Run asks for its times and Outcome; its kWh come from recorder history when the meter covers the period, else you enter them.
+
+## Robotic mowers
+
+Choose **Robotic mower** as the Device Type when you add a Device. A Run is one mowing trip together with the recharge it causes. The mower runs on its battery, so its electricity is what the charging station draws: put a metering plug in front of the charging station and pick its energy meter (or its power sensor) as the electricity source. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else. No integration is pre-filled, so pick the entities yourself.
+
+Map the mower's Status like this:
+
+| The mower is | Status mapping |
+|---|---|
+| mowing, returning to the charging station | Running |
+| charging | Paused |
+| parked (in the station, charged) | Ended |
+
+- The Run stays open while the mower charges, so the electricity the charging station draws after mowing lands in the Run that caused it. Pauses don't count as running time, so the Run's running time is the mowing time without the charging.
+- While the mower charges, its open Run is paused: its running time stands still and its electricity keeps counting.
+- A mower that leaves again right after charging continues the same Run, so a day of mowing in several trips can be one Run. The Run ends once the mower is parked.
+- Map a stop by hand to Paused and an error to Fault, as for a printer. Ended gives the Run the Outcome Unknown; map parked to Finished instead if you want these Runs to end as Completed.
+
+This needs a Status that tells charging from parked. Many integrations report one value for both, such as `docked`: the Run would then end the moment the mower docks, without the electricity of its recharge. Give Coin-op a Status of your own in that case, in one of two ways:
+
+- A **template helper** that combines the mower's state with what tells you it is charging, such as its battery level or a charging sensor: `charging` while it is docked and not full, `parked` once it is.
+- **Following the charging station's plug**: the station draws clearly more power while it charges than while the mower is parked. The template sensor below reports `charging` while the mower is docked and the plug draws more than 5 W (set the threshold above your station's standby power). The first five minutes after docking count as charging too, so the Run doesn't end before the plug has reported the higher power:
+
+```yaml
+template:
+  - sensor:
+      - name: Mower status
+        state: >
+          {% if is_state('lawn_mower.my_mower', 'docked') %}
+            {% set just_docked = now() - states.lawn_mower.my_mower.last_changed < timedelta(minutes=5) %}
+            {{ 'charging' if just_docked or states('sensor.mower_station_power') | float(0) > 5 else 'parked' }}
+          {% else %}
+            {{ states('lawn_mower.my_mower') }}
+          {% endif %}
+```
+
+Pick that sensor as the Device's Status. Line Item Templates per running hour, such as blade wear, then count the mowing time only, and Tags for new Runs work as for every Device. A robotic mower's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count.
 
 ## Spoolman
 
