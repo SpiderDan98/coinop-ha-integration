@@ -25,12 +25,14 @@ import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-machine.json";
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
+import devicesMeasuredSuggestionsSmall from "./fixtures/backend/devices-measured-suggestions-small.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
 import imagesUploadTooMany from "./fixtures/backend/images-upload-too-many.json";
@@ -51,6 +53,7 @@ import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
+import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -133,6 +136,15 @@ export const recorded = {
   /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
    * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
   dishwasher: devicesListDishwasher.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-coffee-machine", a Coffee machine whose
+   * electricity and water come per Program, dosing "material-beans" (see
+   * `dishwasherAndBeverage`): the Default row 0.02 kWh and 0.125 L, "Espresso" 0.012 kWh
+   * and 0.04 L. */
+  coffeeMachine: devicesListCoffeeMachine.devices[0] as Device,
+  /** `coinop/runs/get` of its "Espresso" Run "espresso": 0.012 kWh at 0.30
+   * ("espresso-electricity") and 0.04 L at 4.00 per m³ ("espresso-water") from the
+   * Program's row, both amounts rounding to 0.00. */
+  espresso: runsGetCoffeeMachine.run as RunDetail,
   /** `coinop/devices/list` with only "device-wallbox", an EV charger on its session energy
    * sensor; per-Run meters is its only Capability. */
   wallbox: devicesListEvCharger.devices[0] as Device,
@@ -147,6 +159,11 @@ export const recorded = {
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
    * no row of its own): 1.2 kWh from 1 Run for the Default row and for "Cotton 60°". */
   measuredSuggestions: devicesMeasuredSuggestions.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
+  /** `coinop/devices/measured_suggestions` of a Device with a water meter after two Runs
+   * without a Program that took 0.04 and 0.05 L: 0.045 L for the Default row. */
+  smallSuggestions: devicesMeasuredSuggestionsSmall.suggestions as Awaited<
     ReturnType<typeof getMeasuredSuggestions>
   >,
   /** `coinop/runs/get` of "water-wash" on "device-washer" with a water meter: 50 L measured,

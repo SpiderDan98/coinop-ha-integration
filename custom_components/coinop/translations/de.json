@@ -526,6 +526,7 @@
         "3d_printer": "3D-Drucker",
         "washing_machine": "Waschmaschine",
         "dishwasher": "Spülmaschine",
+        "coffee_machine": "Kaffeemaschine",
         "ev_charger": "Wallbox",
         "robotic_mower": "Mähroboter"
       }

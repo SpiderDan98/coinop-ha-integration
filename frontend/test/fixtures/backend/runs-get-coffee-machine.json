@@ -1,0 +1,163 @@
+{
+  "run": {
+    "id": "espresso",
+    "device_id": "device-coffee-machine",
+    "device_name": "Coffee machine",
+    "name": "Espresso",
+    "job_name": null,
+    "program": "Espresso",
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T10:00:00+00:00",
+    "ended": "2026-01-15T10:00:40+00:00",
+    "outcome": "completed",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": null,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "per_program"
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 0.3
+        },
+        "prices": []
+      },
+      "water": {
+        "source": {
+          "source": "per_program"
+        },
+        "cost_source": {
+          "source": "fixed",
+          "value": 4.0
+        },
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        null,
+        null
+      ]
+    ],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "espresso-electricity",
+        "kind": "electricity",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 0.012,
+        "unit": "kWh",
+        "unit_price": 0.3,
+        "amount": 0.0,
+        "method": "program_default",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T10:00:40+00:00",
+            "kwh": 0.012,
+            "unit_price": 0.3
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "espresso-water",
+        "kind": "water",
+        "label": null,
+        "material_id": null,
+        "material": null,
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "quantity": 0.04,
+        "unit": "L",
+        "unit_price": 0.004,
+        "amount": 0.0,
+        "method": "program_default",
+        "segments": [
+          {
+            "start": "2026-01-15T10:00:00+00:00",
+            "end": "2026-01-15T10:00:40+00:00",
+            "kwh": 0.04,
+            "unit_price": 0.004
+          }
+        ],
+        "computed": null,
+        "locked": false,
+        "deletable": false
+      },
+      {
+        "id": "espresso-material",
+        "kind": "material",
+        "label": null,
+        "material_id": "material-beans",
+        "material": {
+          "name": "Espresso beans",
+          "type": "Coffee beans",
+          "density": 0.4,
+          "diameter": null,
+          "price_per_gram": 0.016
+        },
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "dose_id": "dose-beans",
+        "dose_source": "program_default",
+        "quantity": 8.0,
+        "unit": "g",
+        "unit_price": 0.016,
+        "amount": 0.13,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "running_seconds": 40,
+    "total": 0.13,
+    "cost_per_part": null,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.0,
+      "water": 0.0,
+      "material": 0.13,
+      "other": 0.0
+    }
+  }
+}

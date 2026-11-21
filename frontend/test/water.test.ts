@@ -83,6 +83,40 @@ describe("Water", () => {
     ]);
   });
 
+  it.each([
+    ["en", ["0.04 L", "€4.00/m³", "€0.00"]],
+    ["de", ["0,04 L", "4,00 €/m³", "0,00 €"]],
+  ])("reads to the millilitre under a litre (%s)", async (language, shown) => {
+    const backend = recordedBackend({ language })
+      .reply("coinop/devices/list", () => ({ devices: [recorded.coffeeMachine] }))
+      .reply(GET, () => ({ run: recorded.espresso }));
+    const panel = await mountPanel(backend, { path: "/run/espresso" });
+
+    expect(values(query(waterCard(panel), ".item"))).toEqual(shown);
+  });
+
+  it.each([
+    [0.125, "0.125 L"],
+    [1, "1 L"],
+    [9.5, "9.5 L"],
+    [52.46, "52.5 L"],
+    [1234.56, "1,234.6 L"],
+  ])("reads %s litres as %s", async (quantity, shown) => {
+    const { espresso } = recorded;
+    const run = {
+      ...espresso,
+      line_items: espresso.line_items.map((item) =>
+        item.kind === "water" ? { ...item, quantity } : item,
+      ),
+    };
+    const backend = recordedBackend()
+      .reply("coinop/devices/list", () => ({ devices: [recorded.coffeeMachine] }))
+      .reply(GET, () => ({ run }));
+    const panel = await mountPanel(backend, { path: "/run/espresso" });
+
+    expect(values(query(waterCard(panel), ".item"))[0]).toBe(shown);
+  });
+
   it("has no card on a printer's Run", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 

@@ -116,6 +116,7 @@
   "device_type.3d_printer": "3D-Drucker",
   "device_type.washing_machine": "Waschmaschinen",
   "device_type.dishwasher": "Spülmaschinen",
+  "device_type.coffee_machine": "Kaffeemaschinen",
   "device_type.ev_charger": "Wallboxen",
   "device_type.robotic_mower": "Mähroboter",
   "device.none": "Keine",

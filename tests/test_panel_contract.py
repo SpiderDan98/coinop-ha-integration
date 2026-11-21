@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from http import HTTPStatus
-from itertools import combinations
+from itertools import combinations, pairwise
 from pathlib import Path
 from typing import Any
 
@@ -598,6 +598,119 @@ async def test_record_a_dishwasher(
         "devices-list-dishwasher",
         stable_ids(devices, {subentry.subentry_id: "device-dishwasher"}),
     )
+
+
+async def test_record_a_coffee_machine_and_its_espresso(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A Coffee machine with electricity and water per Program and beans as its Dose."""
+    hass.config.currency = "EUR"
+    place_materials(
+        hass_storage,
+        stored_material(
+            "material-beans",
+            name="Espresso beans",
+            form="beverage_ingredient",
+            type="Coffee beans",
+            density=0.4,
+            diameter=None,
+            price={
+                "source": "fixed",
+                "pack_price": 16.0,
+                "pack_size": 1000.0,
+                "pack_unit": "g",
+            },
+        ),
+    )
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set(
+        "sensor.washer_program", "Espresso", {"options": ["Espresso", "Cappuccino"]}
+    )
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        name="Coffee machine",
+        device_type="coffee_machine",
+        program={"entity_id": "sensor.washer_program"},
+        source="per_program",
+        water="per_program",
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [{"id": "dose-beans", "material_id": "material-beans"}],
+            "program_defaults": {
+                "default": {"doses": {"dose-beans": 8}, "kwh": 0.02, "litres": 0.125},
+                "programs": {
+                    "Espresso": {
+                        "doses": {"dose-beans": 8},
+                        "kwh": 0.012,
+                        "litres": 0.04,
+                    },
+                },
+            },
+        },
+    )
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(seconds=40)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    ids = {
+        subentry.subentry_id: "device-coffee-machine",
+        run["id"]: "espresso",
+        **{
+            item["id"]: f"espresso-{item['kind']}"
+            for item in detail["run"]["line_items"]
+        },
+    }
+    assert_recorded("devices-list-coffee-machine", stable_ids(devices, ids))
+    assert_recorded("runs-get-coffee-machine", stable_ids(detail, ids))
+
+
+async def test_record_measured_suggestions_of_under_a_litre(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """Two measured Runs without a Program of 0.04 and 0.05 L, 0.012 kWh each."""
+
+    def report(kwh: float, litres: float) -> None:
+        for meter, reading, unit in (
+            (WASHER_ENERGY, kwh, "kWh"),
+            (WASHER_WATER, litres, "L"),
+        ):
+            hass.states.async_set(
+                meter, str(reading), {"unit_of_measurement": unit}, force_update=True
+            )
+
+    readings = [(100, 1000), (100.012, 1000.04), (100.024, 1000.09)]
+    report(*readings[0])
+    hass.states.async_set(WASHER_STATUS, "off")
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        name="Coffee machine",
+        device_type="coffee_machine",
+        water="meter",
+    )
+    for start, end in pairwise(readings):
+        hass.states.async_set(WASHER_STATUS, "running")
+        # Reported at the start, so the meters aren't interpolated from the last Run's end.
+        report(*start)
+        await clock.advance(seconds=40)
+        report(*end)
+        hass.states.async_set(WASHER_STATUS, "finished")
+        await clock.advance(minutes=10)
+
+    suggestions = await panel.call(
+        "coinop/devices/measured_suggestions", device_id=subentry.subentry_id
+    )
+
+    assert_recorded("devices-measured-suggestions-small", suggestions)
 
 
 async def test_record_what_deleting_a_run_drops(
