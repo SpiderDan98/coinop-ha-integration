@@ -21,6 +21,7 @@ import type {
 } from "../src/api";
 import aggregatesByProgram from "./fixtures/backend/aggregates-by-program.json";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
+import aggregatesOtherProgram from "./fixtures/backend/aggregates-other-program.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
@@ -31,6 +32,7 @@ import devicesListElectricityNone from "./fixtures/backend/devices-list-electric
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
 import devicesListOther from "./fixtures/backend/devices-list-other.json";
 import devicesListOtherImages from "./fixtures/backend/devices-list-other-images.json";
+import devicesListOtherProgram from "./fixtures/backend/devices-list-other-program.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListRoboticMower from "./fixtures/backend/devices-list-robotic-mower.json";
@@ -66,6 +68,7 @@ import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.jso
 import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
 import runsGetOther from "./fixtures/backend/runs-get-other.json";
 import runsGetOtherImages from "./fixtures/backend/runs-get-other-images.json";
+import runsGetOtherProgram from "./fixtures/backend/runs-get-other-program.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
 import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json";
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
@@ -80,6 +83,10 @@ const [snapshot, ...changes] = runsSubscribe;
 const found = <T>(value: T | undefined, what: string) => {
   if (value === undefined) throw new Error(`nothing recorded for ${what}`);
   return value;
+};
+const byProgram = aggregatesByProgram as {
+  runs: RunSummary[];
+  aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
 };
 
 export const recorded = {
@@ -100,10 +107,7 @@ export const recorded = {
   /** `coinop/runs/list` of Kobra's "vase" and the "device-washer" Runs "monday" and
    * "tuesday" (Cotton 60°, 0.07 and 0.57), "eco" (Eco 40-60, 0.07) and "unknown" (no
    * Program, 0.07), with `coinop/aggregates/get` of those four by Program. */
-  programs: aggregatesByProgram as {
-    runs: RunSummary[];
-    aggregates: { group_by: Dimension[]; run_ids: string[]; groups: Group[] }[];
-  },
+  programs: byProgram,
   /** `coinop/runs/create`: Kobra's manual Run "manual" ("Bracket", Tag "Batch 7"),
    * estimated from average power. */
   manualRun: runsCreate.run as RunDetail,
@@ -195,6 +199,16 @@ export const recorded = {
   /** `coinop/runs/get` of its Run "mugs" of 9 parts: 3 kWh estimated at 0.30
    * ("mugs-electricity"), with "mugs-thumbnail" and "mugs-snapshot". */
   mugs: runsGetOtherImages.run as RunDetail,
+  /** `coinop/devices/list` with only "device-bread-maker", an Other Device under the Type
+   * Name "Bread maker" with a Program and no Doses, its electricity per Program: the
+   * Default row 0.4 kWh, "Whole wheat" 0.5 kWh; its Program input also knows "Basic". */
+  breadMaker: devicesListOtherProgram.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "wheat-loaf" (Whole wheat): 0.5 kWh from the Program's
+   * row at 0.30 ("wheat-loaf-electricity"). */
+  wheatLoaf: runsGetOtherProgram.run as RunDetail,
+  /** `coinop/runs/list` of its Runs "plain-loaf" (no Program, 0.12) and "wheat-loaf"
+   * (Whole wheat, 0.15), with `coinop/aggregates/get` of the two by Program. */
+  loaves: aggregatesOtherProgram as typeof byProgram,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
@@ -420,9 +434,11 @@ export function recordedBackend(options?: ConstructorParameters<typeof FakeBacke
       const asked = `${String(msg.group_by)} of ${String(runIds)}`;
       return {
         groups: found(
-          [...recorded.aggregates, ...recorded.programs.aggregates].find(
-            (answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked,
-          ),
+          [
+            ...recorded.aggregates,
+            ...recorded.programs.aggregates,
+            ...recorded.loaves.aggregates,
+          ].find((answer) => `${String(answer.group_by)} of ${String(answer.run_ids)}` === asked),
           `grouping ${asked}`,
         ).groups,
       };

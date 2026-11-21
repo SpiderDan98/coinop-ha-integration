@@ -44,6 +44,7 @@ from .test_other_images_and_parts import (
     add_kiln_camera,
     add_kiln_preview,
 )
+from .test_other_programs import add_bread_maker, bake, set_bread_program
 from .test_robotic_mowers import add_mower, mow
 from .test_spoolman import (
     add_spoolman_hub,
@@ -1091,6 +1092,45 @@ async def test_record_an_other_device_with_images_and_a_part_count(
     }
     assert_recorded("devices-list-other-images", stable_ids(devices, ids))
     assert_recorded("runs-get-other-images", stable_ids(detail, ids))
+
+
+async def test_record_an_other_device_with_a_program_and_its_loaves(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A bread maker ("Bread maker"): an Other Device with a Program and no Doses,
+    its electricity per Program, after a loaf without a Program and a "Whole wheat"
+    one; its Program input also knows "Basic"."""
+    bread_maker = await add_bread_maker(hass, panel)
+    await bake(hass, clock)
+    await clock.advance(hours=1)
+    await bake(hass, clock, "Whole wheat")
+    await set_bread_program(hass, "unknown", {"options": ["Basic", "Whole wheat"]})
+
+    devices = await panel.call("coinop/devices/list")
+    runs = await panel.call("coinop/runs/list")
+    [plain] = [run for run in runs["runs"] if run["program"] is None]
+    [wheat] = [run for run in runs["runs"] if run["program"] == "Whole wheat"]
+    detail = await panel.call("coinop/runs/get", run_id=wheat["id"])
+    by_program = await panel.call(
+        "coinop/aggregates/get",
+        group_by=["program"],
+        run_ids=[plain["id"], wheat["id"]],
+    )
+
+    [electricity] = detail["run"]["line_items"]
+    ids = {
+        bread_maker.subentry_id: "device-bread-maker",
+        plain["id"]: "plain-loaf",
+        wheat["id"]: "wheat-loaf",
+        electricity["id"]: "wheat-loaf-electricity",
+    }
+    asked = {"group_by": ["program"], "run_ids": ["plain-loaf", "wheat-loaf"]}
+    assert_recorded("devices-list-other-program", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-program", stable_ids(detail, ids))
+    assert_recorded(
+        "aggregates-other-program",
+        stable_ids(runs | {"aggregates": [asked | by_program]}, ids),
+    )
 
 
 async def test_record_what_the_image_commands_answer(

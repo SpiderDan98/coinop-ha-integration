@@ -33,6 +33,7 @@ from .test_image_uploads import uploads
 from .test_images import only_run, run_images
 from .test_manual_runs import create
 from .test_other_devices import KILN_STATUS, add_kiln, choose_other, fire, set_kiln
+from .test_other_programs import add_bread_maker, bake
 from .test_run_event import record_events
 from .test_runs import stored_runs
 from .test_sensors import state_of
@@ -281,6 +282,28 @@ async def test_a_run_of_a_device_without_a_part_count_has_none_and_takes_none(
     assert stored["part_count"] is None
     last = state_of(hass, "sensor.kiln_last_run_cost")
     assert {"part_count", "cost_per_part"}.isdisjoint(last.attributes)
+
+
+async def test_images_and_a_part_count_go_with_a_program(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
+) -> None:
+    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_camera(hass, picture("blue"))
+    # The helper expects the images step before the Program step, as Add Device asks.
+    await add_bread_maker(
+        hass,
+        panel,
+        has=["program", "images", "part_count"],
+        thumbnail=KILN_PREVIEW,
+        camera=KILN_CAMERA,
+    )
+
+    await bake(hass, clock, "Whole wheat")
+
+    run = await fired_run(panel)
+    assert (run["name"], run["program"]) == ("Whole wheat", "Whole wheat")
+    assert (run["total"], run["part_count"], run["cost_per_part"]) == (0.15, 1, 0.15)
+    assert [image["kind"] for image in run["images"]] == ["thumbnail", "snapshot"]
 
 
 async def test_a_manual_run_has_a_part_count_only_on_a_device_with_one(

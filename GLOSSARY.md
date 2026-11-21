@@ -55,7 +55,7 @@ _Avoid_: Quantity, pieces, copies
 _German UI_: Teileanzahl
 
 **Program**:
-The program a Run ran, such as a washing machine's "Cotton 60°", a dishwasher's "Eco 50°" or a coffee machine's "Cappuccino", as the Device's Program Device Input reports it or the user corrects it. Only Device Types with a Program input have one.
+The program a Run ran, such as a washing machine's "Cotton 60°", a dishwasher's "Eco 50°" or a coffee machine's "Cappuccino", as the Device's Program Device Input reports it or the user corrects it. Only Devices with a Program input have one: those of a Device Type that has it, and an Other Device given one.
 _Avoid_: Cycle, mode, wash type
 _German UI_: Programm
 
@@ -130,6 +130,6 @@ _Avoid_: Level sensor, fill level
 _German UI_: Bestandssensor
 
 **Program Defaults**:
-A Device's kWh, litres and Dose amounts for each Program, whichever of them its Device Type has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+A Device's kWh, litres and Dose amounts for each Program, whichever of them the Device has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
 _Avoid_: Presets, program profiles, estimates
 _German UI_: Programmvorgaben

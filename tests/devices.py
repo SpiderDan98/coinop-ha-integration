@@ -318,6 +318,7 @@ async def add_other_device(
     thumbnail: str | None = None,
     camera: str | None = None,
     snapshot: bool | None = None,
+    program: dict[str, Any] | None = None,
     source: str = "estimate",
     meter: dict[str, Any] | None = None,
     running_power: float = 120,
@@ -327,11 +328,13 @@ async def add_other_device(
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
 
     With "images" among `has`, `thumbnail`, `camera` and `snapshot` answer the images
-    step, each left as the step has it when not given.
-    `source` is "estimate" (from `running_power`), "energy" or "power" (read from
-    `meter`) or "none", which takes no price. It fails on any step beyond those the
-    choices bring.
+    step, each left as the step has it when not given. With the choice "program",
+    `program` is the Program step's input (no Program input without it). `source` is
+    "estimate" (from `running_power`), "energy" or "power" (read from `meter`),
+    "per_program" or "none", which takes no price. It fails on any step beyond those
+    the choices bring.
     """
+    has = list(has)
     result = await walk_to_mapping(
         hass,
         entry,
@@ -347,11 +350,14 @@ async def add_other_device(
         result = await configure(
             hass, result, images_input(thumbnail, camera, snapshot)
         )
+    if "program" in has:
+        assert result["step_id"] == "program", result.get("errors")
+        result = await configure(hass, result, program or {})
     assert result["step_id"] == "consumption", result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     if source == "estimate":
         result = await configure(hass, result, {"running_power": running_power})
-    elif source != "none":
+    elif source not in ("per_program", "none"):
         result = await configure(hass, result, meter)
     if source != "none":
         assert result["step_id"] == "price", result.get("errors")
