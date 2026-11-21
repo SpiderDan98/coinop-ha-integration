@@ -19,6 +19,8 @@ from .devices import (
     basic_entities,
     coinop_entities,
     configure,
+    open_device_types,
+    open_other,
     other_input,
     price_choice,
     price_input,
@@ -119,9 +121,7 @@ async def pump(hass: HomeAssistant, clock: Clock, kwh: float) -> None:
 
 async def choose_other(hass: HomeAssistant, entry: ConfigEntry) -> Any:
     """Open Add Device and choose the Device Type Other."""
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
+    result = await open_device_types(hass, entry)
     return await configure(hass, result, {"device_type": "other"})
 
 
@@ -141,6 +141,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
         "images",
         "part_count",
         "per_run_meters",
+        "change_device_type",
     ]
     steps = []
     for user_input in (
@@ -185,6 +186,40 @@ async def test_the_type_name_is_required_and_stored_trimmed(
     )
     kiln = await add_kiln(hass, entry=entry, type_name="  Kiln ")
     assert kiln.data["type_name"] == "Kiln"
+
+
+async def test_without_any_type_name_the_other_step_asks_for_one(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+
+    result = await configure(hass, await choose_other(hass, entry), {})
+
+    assert result["errors"] == {"type_name": "type_name_required"}
+
+
+async def test_the_other_step_leads_back_to_the_device_type_without_a_type_name(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+
+    result = await configure(
+        hass, await choose_other(hass, entry), {"change_device_type": True}
+    )
+
+    assert result["step_id"] == "user"
+
+
+async def test_reconfigure_offers_no_change_of_device_type(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+    kiln = await add_kiln(hass, entry=entry)
+
+    result = await open_other(hass, entry, kiln)
+
+    assert result["step_id"] == "other"
+    assert "change_device_type" not in fields(result)
 
 
 async def test_the_type_names_of_other_devices_are_suggested_and_a_new_one_accepted(
@@ -245,7 +280,7 @@ async def test_no_integration_pre_fills_an_other_device(hass: HomeAssistant) -> 
     result = await configure(
         hass, await open_add_device(hass, entry), {"device": "manual"}
     )
-    assert offered(result, "device_type")[-1] == "other"
+    assert "other" in offered(result, "device_type")
     result = await configure(hass, result, {"device_type": "other"})
     result = await configure(hass, result, other_input("Kiln"))
     assert result["step_id"] == "device_without_profile"

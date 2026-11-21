@@ -118,11 +118,14 @@ def test_shared_terms_read_the_same_in_panel_and_backend(language: str) -> None:
 def test_the_panel_has_a_heading_for_every_device_type(language: str) -> None:
     named = "selector.device_type.options."
     heading = "device_type."
+    # The Device Type choices' ways back are no Device Types.
+    back = {"quick_start", "pick_another_device"}
 
     assert sorted(
         key.removeprefix(heading) for key in _panel(language) if key.startswith(heading)
     ) == sorted(
-        key.removeprefix(named) for key in _backend(language) if key.startswith(named)
+        {key.removeprefix(named) for key in _backend(language) if key.startswith(named)}
+        - back
     )
 
 

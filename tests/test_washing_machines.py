@@ -17,6 +17,7 @@ from .devices import (
     add_hub,
     add_washing_machine,
     configure,
+    open_device_types,
     start_add_device,
     start_reconfigure,
     walk_to_mapping,
@@ -35,11 +36,9 @@ def washer_entry(hass: HomeAssistant) -> ConfigEntry:
     return entry
 
 
-async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> None:
+async def test_manual_setup_starts_with_the_device_type(hass: HomeAssistant) -> None:
     entry = await add_hub(hass)
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
+    result = await open_device_types(hass, entry)
 
     assert result["step_id"] == "user"
     assert fields(result) == ["device_type"]
@@ -53,6 +52,7 @@ async def test_add_device_starts_with_the_device_type(hass: HomeAssistant) -> No
         "ev_charger",
         "robotic_mower",
         "other",
+        "quick_start",
     ]
 
 

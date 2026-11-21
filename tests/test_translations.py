@@ -11,7 +11,14 @@ import pytest
 from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
-from .devices import add_device, add_hub, configure, open_other, start_reconfigure
+from .devices import (
+    add_device,
+    add_hub,
+    configure,
+    open_device_types,
+    open_other,
+    start_reconfigure,
+)
 from .test_device_flow import fields, offered
 from .test_other_devices import add_kiln, set_kiln
 
@@ -151,13 +158,12 @@ async def test_every_device_type_add_device_offers_is_named(
     hass: HomeAssistant, language: str
 ) -> None:
     entry = await add_hub(hass)
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
+    result = await open_device_types(hass, entry)
 
     named = _load(language)["selector"]["device_type"]["options"]
 
-    assert list(named) == offered(result, "device_type")
+    # Quick Start's Device Type step offers the way back to its device list too.
+    assert list(named) == [*offered(result, "device_type"), "pick_another_device"]
     assert all(named.values())
 
 
@@ -172,9 +178,7 @@ async def test_what_an_other_device_can_have_is_named_and_explained(
     hass: HomeAssistant, language: str, other: str, type_name: str, unseen: str
 ) -> None:
     entry = await add_hub(hass)
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
+    result = await open_device_types(hass, entry)
     result = await configure(hass, result, {"device_type": "other"})
 
     texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])

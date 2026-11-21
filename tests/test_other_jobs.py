@@ -149,7 +149,7 @@ async def test_job_and_material_is_offered_after_what_the_device_consumes(
 
     result = await choose_other(hass, entry)
 
-    assert fields(result) == ["type_name", *CHOICES]
+    assert fields(result) == ["type_name", *CHOICES, "change_device_type"]
 
 
 async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sections(

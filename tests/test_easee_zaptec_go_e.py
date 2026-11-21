@@ -190,7 +190,7 @@ async def test_quick_start_adds_the_charger_with_its_energy_counter(
         {"value": device.device.id, "label": charger.label}
     ]
     result = await pick(hass, entry, device.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -218,7 +218,7 @@ async def test_without_its_first_counter_the_charger_takes_the_other(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, device.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -235,7 +235,7 @@ async def test_a_charger_without_energy_counters_asks_for_a_meter(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, device.device.id)
-    assert fields(result) == ["meter", "price", "price_entity"]
+    assert fields(result) == ["meter", "price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"meter": ENERGY, "price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY

@@ -75,7 +75,7 @@ async def test_an_other_device_can_have_images_and_a_part_count(
     result = await choose_other(hass, entry)
 
     # Offered after what the Device consumes, before how its meters count.
-    assert fields(result)[-3:] == ["images", "part_count", "per_run_meters"]
+    assert fields(result)[-4:-1] == ["images", "part_count", "per_run_meters"]
 
 
 async def test_images_alone_bring_the_images_step_and_no_job_step(

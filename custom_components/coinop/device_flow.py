@@ -27,7 +27,7 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.helpers.translation import async_get_translations
 
-from .const import DOMAIN, SUBENTRY_DEVICE
+from .const import DOMAIN, SUBENTRY_DEVICE, SUPPORTED_INTEGRATIONS_URL
 from .device_config import (
     CHOICES,
     DEVICE_TYPES,
@@ -70,6 +70,15 @@ FACTOR = NumberSelector(
 )
 # Quick Start's choice to walk every step instead.
 MANUAL = "manual"
+# The Device Type choice's way back to Quick Start.
+BACK_TO_QUICK_START = "quick_start"
+# The choice on Quick Start's steps after a pick that returns to its device list.
+PICK_ANOTHER_DEVICE = "pick_another_device"
+# The toggle on the first step after the Device Type choice that returns to it.
+CHANGE_DEVICE_TYPE = "change_device_type"
+CHANGE_DEVICE_TYPE_TOGGLE = {
+    vol.Optional(CHANGE_DEVICE_TYPE, default=False): BooleanSelector()
+}
 # The sections a profile may fill only in part, as their steps store them unused.
 UNUSED: dict[str, dict[str, Any]] = {
     "job": {
@@ -150,6 +159,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     """
 
     def __init__(self) -> None:
+        self._start_over()
+
+    def _start_over(self) -> None:
+        """Forget what Add Device gathered: the user went back to start over."""
         self._data: dict[str, Any] = {}
         self._name = ""
         # The consumption or price section while its unit is still being asked for.
@@ -260,20 +273,24 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """The Device Type, fixed once the Device is added; Quick Start comes first
-        where it has a device to offer."""
-        if user_input is not None:
-            self._data["device_type"] = user_input["device_type"]
-            if picks_capabilities(self._data["device_type"]):
-                return await self.async_step_other()
-            return await self.async_step_device()
-        if self._quick_start_devices():
+        """The Device Type, fixed once the Device is added; Add Device opens on Quick
+        Start."""
+        if user_input is None or user_input["device_type"] == BACK_TO_QUICK_START:
+            self._start_over()
             return await self.async_step_quick_start()
+        self._data["device_type"] = user_input["device_type"]
+        if picks_capabilities(self._data["device_type"]):
+            return await self.async_step_other()
+        return await self.async_step_device()
+
+    def _change_device_type(self) -> SubentryFlowResult:
+        self._start_over()
         return self._device_type_form()
 
     def _device_type_form(self) -> SubentryFlowResult:
         return self.async_show_form(
-            step_id="user", data_schema=self._device_type_schema(list(DEVICE_TYPES))
+            step_id="user",
+            data_schema=self._device_type_schema([*DEVICE_TYPES, BACK_TO_QUICK_START]),
         )
 
     @staticmethod
@@ -295,13 +312,14 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """What a shipped Device Type answers by itself: the Type Name the Device is
         listed under and what it has."""
-        if self.source == SOURCE_RECONFIGURE and (
-            refusal := await self._async_refusal()
-        ):
+        adding = self.source != SOURCE_RECONFIGURE
+        if not adding and (refusal := await self._async_refusal()):
             return self.async_abort(reason=refusal)
         errors: dict[str, str] = {}
         if user_input is not None:
-            type_name = user_input["type_name"].strip()
+            if user_input.get(CHANGE_DEVICE_TYPE):
+                return self._change_device_type()
+            type_name = user_input.get("type_name", "").strip()
             picked = [choice for choice in CHOICES if user_input[choice]]
             if not type_name:
                 errors["type_name"] = "type_name_required"
@@ -310,7 +328,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             if not errors:
                 self._data["type_name"] = type_name
                 self._data["capabilities"] = stored_capabilities(picked)
-                if self.source == SOURCE_RECONFIGURE:
+                if not adding:
                     return await self._async_fit_sections()
                 return await self.async_step_device()
         known = list(
@@ -320,10 +338,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 if (type_name := subentry.data.get("type_name"))
             )
         )
+        # Changing the Device Type must not need a Type Name; its absence is an error.
+        type_name_field = vol.Optional if adding else vol.Required
         schema = vol.Schema(
             {
                 # A picker without anything to pick would only hide the text field.
-                vol.Required("type_name"): SelectSelector(
+                type_name_field("type_name"): SelectSelector(
                     SelectSelectorConfig(options=known, custom_value=True)
                 )
                 if known
@@ -332,6 +352,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                     vol.Optional(choice, default=False): BooleanSelector()
                     for choice in CHOICES
                 },
+                **(CHANGE_DEVICE_TYPE_TOGGLE if adding else {}),
             }
         )
         return self.async_show_form(
@@ -382,8 +403,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             choice: choice in picked for choice in CHOICES
         }
 
-    def _quick_start_devices(self) -> dict[str, Candidate]:
-        """The HA devices of known integrations that no Device follows yet."""
+    def _unfollowed(self, found: dict[str, Candidate]) -> dict[str, Candidate]:
+        """Those of the HA devices found that no Device follows yet."""
         followed = {
             subentry.data["printer_device_id"]
             for subentry in self._get_entry().subentries.values()
@@ -391,7 +412,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
         return {
             device_id: candidate
-            for device_id, candidate in candidates(self.hass).items()
+            for device_id, candidate in found.items()
             if device_id not in followed
             and not self._status_used_elsewhere(
                 candidate.sections["status"]["entity_id"]
@@ -401,7 +422,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_quick_start(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        offered = self._quick_start_devices()
+        found_devices = candidates(self.hass)
+        offered = self._unfollowed(found_devices)
         devices = dr.async_get(self.hass)
         names = {
             device_id: device.name_by_user or device.name or device_id
@@ -437,24 +459,42 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 )
             }
         )
+        # hassfest refuses a URL inside a translation.
+        placeholders = {"supported_integrations": SUPPORTED_INTEGRATIONS_URL}
+        if offered:
+            step_id = "quick_start"
+        elif found_devices:
+            step_id = "quick_start_all_followed"
+        else:
+            step_id = "quick_start_nothing_found"
+            placeholders["integrations"] = known_integrations()
         return self.async_show_form(
-            step_id="quick_start",
+            # A step has one text, so each state that needs its own is its own step.
+            step_id=step_id,
             data_schema=self.add_suggested_values_to_schema(
-                schema, {"device": next(iter(offered))}
+                schema, {"device": next(iter(offered), MANUAL)}
             ),
+            description_placeholders=placeholders,
         )
+
+    async_step_quick_start_all_followed = async_step_quick_start
+    async_step_quick_start_nothing_found = async_step_quick_start
 
     async def async_step_quick_start_device_type(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """The Device Type of a device whose kind its integration doesn't tell, among
         those the integration serves; a device whose kind is told isn't asked."""
+        if user_input and user_input["device_type"] == PICK_ANOTHER_DEVICE:
+            return await self._pick_another_device()
         candidate = self._picked()
         device_types = [t for t in DEVICE_TYPES if t in candidate.device_types]
         if user_input is None and len(device_types) > 1:
             return self.async_show_form(
                 step_id="quick_start_device_type",
-                data_schema=self._device_type_schema(device_types),
+                data_schema=self._device_type_schema(
+                    [*device_types, PICK_ANOTHER_DEVICE]
+                ),
                 description_placeholders={
                     "device": self._name,
                     "integration": candidate.integration,
@@ -464,6 +504,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             user_input["device_type"] if user_input else device_types[0]
         )
         return await self.async_step_quick_start_confirm()
+
+    async def _pick_another_device(self) -> SubentryFlowResult:
+        self._start_over()
+        return await self.async_step_quick_start()
 
     def _picked(self) -> Candidate:
         """The HA device picked in Quick Start, which its later steps are about."""
@@ -523,11 +567,17 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         found = self._found_sections()
         needs_meter = ELECTRICITY.source_key not in found
         if user_input is not None:
+            if user_input.get(PICK_ANOTHER_DEVICE):
+                return await self._pick_another_device()
             data = self._data | found
             if needs_meter:
-                data["consumption"] = self._quick_meter(user_input.get(meter_field))
-                if data["consumption"] is None:
+                meter = user_input.get(meter_field)
+                if meter is None and not per_program:
+                    errors[meter_field] = "meter_required"
+                elif (consumption := self._quick_meter(meter)) is None:
                     errors[meter_field] = "not_energy_or_power"
+                else:
+                    data["consumption"] = consumption
             price, price_entity = (
                 user_input.get("price"),
                 user_input.get("price_entity"),
@@ -550,14 +600,15 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 return self.async_create_entry(title=self._name, data=data)
         schema: dict[Any, Any] = {}
         if needs_meter:
-            required = vol.Optional if per_program else vol.Required
-            schema[required(meter_field)] = EntitySelector(
+            # Picking another device must not need a meter; its absence is an error.
+            schema[vol.Optional(meter_field)] = EntitySelector(
                 EntitySelectorConfig(domain="sensor", device_class=["energy", "power"])
             )
         schema[vol.Optional("price")] = _price_selector(ELECTRICITY, currency)
         schema[vol.Optional("price_entity")] = EntitySelector()
         if Capability.WATER in capabilities:
             schema[vol.Optional("water_price")] = _price_selector(WATER, currency)
+        schema[vol.Optional(PICK_ANOTHER_DEVICE, default=False)] = BooleanSelector()
         last_fixed = self._stored_price(ELECTRICITY, "fixed")
         last_price = self._stored_price(ELECTRICITY, "entity")
         last_water = self._stored_price(WATER, "fixed")
@@ -640,6 +691,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         if user_input is not None:
+            if user_input.get(CHANGE_DEVICE_TYPE):
+                return self._change_device_type()
             self._data["printer_device_id"] = user_input.get("device")
             self._data |= self._detected() or {}
             return await self.async_step_name()
@@ -647,7 +700,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             # A step has one text, so the one that names no integration is its own.
             step_id="device" if integrations else "device_without_profile",
-            data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
+            data_schema=vol.Schema(
+                {vol.Optional("device"): DeviceSelector(), **CHANGE_DEVICE_TYPE_TOGGLE}
+            ),
             description_placeholders=(
                 {"integrations": integrations} if integrations else None
             ),

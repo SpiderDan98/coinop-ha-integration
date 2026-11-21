@@ -1343,7 +1343,7 @@ async def test_quick_start_adds_a_static_ev_charger_with_the_counter_it_brings(
     assert list(devices) == [charger.label for charger in chargers] + ["manual"]
     for charger in chargers:
         result = await pick(hass, entry, devices[charger.label])
-        assert fields(result) == ["price", "price_entity"]
+        assert fields(result) == ["price", "price_entity", "pick_another_device"]
         result = await configure(hass, result, {"price": 0.32})
         assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
         data = list(entry.subentries.values())[-1].data

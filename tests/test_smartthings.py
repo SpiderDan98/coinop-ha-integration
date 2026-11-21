@@ -196,7 +196,7 @@ async def test_a_smartthings_appliance_is_asked_for_a_meter_only_without_its_own
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, washer.device.id)
-    assert fields(result) == asked
+    assert fields(result) == [*asked, "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3, "water_price": 4.0})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY

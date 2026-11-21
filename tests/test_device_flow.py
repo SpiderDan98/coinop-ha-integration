@@ -6,6 +6,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
+import pytest
 
 from .devices import (
     ENERGY,
@@ -15,7 +16,10 @@ from .devices import (
     add_device,
     add_hub,
     add_printer,
+    answer_electricity,
     configure,
+    open_device_types,
+    other_input,
     start_add_device,
     walk_to_consumption,
     walk_to_mapping,
@@ -327,3 +331,55 @@ async def test_a_status_entity_used_by_another_device_is_refused(
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"entity_id": "status_already_used"}
+
+
+@pytest.mark.parametrize(
+    ("device_type", "step"),
+    [("3d_printer", "device"), ("robotic_mower", "device_without_profile")],
+)
+async def test_the_ha_device_step_leads_back_to_the_device_type(
+    hass: HomeAssistant, device_type: str, step: str
+) -> None:
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_device_types(hass, entry), {"device_type": device_type}
+    )
+    assert result["step_id"] == step
+
+    result = await configure(hass, result, {"change_device_type": True})
+
+    assert result["step_id"] == "user"
+
+
+async def test_a_device_type_chosen_after_going_back_keeps_nothing_of_the_first(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_printer(hass)
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_device_types(hass, entry), {"device_type": "other"}
+    )
+    result = await configure(hass, result, other_input("Kiln", ["program", "water"]))
+    result = await configure(
+        hass, result, {"device": printer.id, "change_device_type": True}
+    )
+    assert result["step_id"] == "user"
+
+    result = await configure(hass, result, {"device_type": "robotic_mower"})
+    result = await configure(hass, result, {})
+    result = await configure(hass, result, {"name": "Mower"})
+    result = await configure(hass, result, {"entity_id": STATUS})
+    result = await configure(hass, result, MAPPING)
+    result = await answer_electricity(hass, result, "none", None, 0)
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+    [subentry] = entry.subentries.values()
+    assert sorted(subentry.data) == [
+        "consumption",
+        "device_type",
+        "mapping",
+        "printer_device_id",
+        "status",
+    ]
+    assert subentry.data["device_type"] == "robotic_mower"
+    assert subentry.data["printer_device_id"] is None

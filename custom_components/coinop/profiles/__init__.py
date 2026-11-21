@@ -101,9 +101,10 @@ def _serving(device_type: str) -> dict[str, Integration]:
     }
 
 
-def known_integrations(device_type: str) -> str:
-    """The names of the integrations with a profile for the Device Type."""
-    return ", ".join(integration.name for integration in _serving(device_type).values())
+def known_integrations(device_type: str | None = None) -> str:
+    """The names of the integrations with a profile for the Device Type, or of all."""
+    serving = INTEGRATIONS if device_type is None else _serving(device_type)
+    return ", ".join(integration.name for integration in serving.values())
 
 
 def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:

@@ -62,6 +62,18 @@ def add_printer(hass: HomeAssistant, name: str = "Kobra S1") -> dr.DeviceEntry:
     )
 
 
+async def open_device_types(hass: HomeAssistant, entry: ConfigEntry) -> Any:
+    """Open Add Device and choose manual setup in Quick Start, whatever it offers;
+    returns the Device Type choice."""
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": SOURCE_USER}
+    )
+    assert result["step_id"].startswith("quick_start"), result["step_id"]
+    result = await configure(hass, result, {"device": "manual"})
+    assert result["step_id"] == "user"
+    return result
+
+
 async def start_add_device(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -71,14 +83,9 @@ async def start_add_device(
     other: dict[str, Any] | None = None,
 ) -> Any:
     """Open Add Device, pick the Device Type and the HA device (or none); returns the
-    name form. Where Quick Start offers a device, it is set up manually. `other`
+    name form, set up manually whatever Quick Start offers. `other`
     answers the step only the Device Type Other has (see `other_input`)."""
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": SOURCE_USER}
-    )
-    if result["step_id"] == "quick_start":
-        result = await configure(hass, result, {"device": "manual"})
-    assert result["step_id"] == "user"
+    result = await open_device_types(hass, entry)
     result = await configure(hass, result, {"device_type": device_type})
     if other is not None:
         assert result["step_id"] == "other", result.get("errors")

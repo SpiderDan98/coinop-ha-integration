@@ -4,9 +4,11 @@ from typing import Any
 
 from homeassistant.config_entries import SOURCE_USER, ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType, InvalidData
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
+
+from custom_components.coinop.profiles import INTEGRATIONS
 
 from .clock import Clock
 from .devices import (
@@ -16,10 +18,17 @@ from .devices import (
     WASHER_ENERGY,
     add_hub,
     add_printer,
+    add_washing_machine,
     configure,
     walk_to_price,
 )
-from .registry import add_anycubic_local, add_home_connect, add_miele, add_washdata
+from .registry import (
+    add_anycubic_local,
+    add_home_connect,
+    add_home_connect_local,
+    add_miele,
+    add_washdata,
+)
 from .test_device_flow import fields, suggested
 from .test_runs import stored_runs
 
@@ -35,6 +44,26 @@ def register(hass: HomeAssistant, entity_id: str, unit: str | None) -> None:
         suggested_object_id=object_id,
         unit_of_measurement=unit,
     )
+
+
+QUICK_START_STATES = (
+    "quick_start",
+    "quick_start_nothing_found",
+    "quick_start_all_followed",
+)
+
+
+async def open_quick_start_in(hass: HomeAssistant, state: str) -> Any:
+    """Open Add Device with Quick Start in `state`, one of `QUICK_START_STATES`: a
+    WashData washer to offer, none, or one already a Device."""
+    if state != "quick_start_nothing_found":
+        washer = add_washdata(hass)
+    entry = await add_hub(hass)
+    if state == "quick_start_all_followed":
+        await quick_start(hass, entry, washer.device.id, price=0.3)
+    result = await open_add_device(hass, entry)
+    assert result["step_id"] == state
+    return result
 
 
 async def open_add_device(hass: HomeAssistant, entry: ConfigEntry) -> Any:
@@ -83,13 +112,54 @@ async def quick_start(
     return dict(list(entry.subentries.values())[-1].data)
 
 
-async def test_without_a_known_integration_add_device_starts_at_the_device_type(
+async def test_without_a_known_integrations_device_quick_start_names_those_it_knows(
     hass: HomeAssistant,
 ) -> None:
     add_printer(hass)
     entry = await add_hub(hass)
 
     result = await open_add_device(hass, entry)
+
+    assert result["step_id"] == "quick_start_nothing_found"
+    assert offered(result) == [{"value": "manual", "label": "manual"}]
+    assert result["description_placeholders"]["integrations"] == ", ".join(
+        integration.name for integration in INTEGRATIONS.values()
+    )
+
+
+async def test_with_every_device_followed_quick_start_says_so(
+    hass: HomeAssistant,
+) -> None:
+    washer = add_washdata(hass)
+    entry = await add_hub(hass)
+    await quick_start(hass, entry, washer.device.id, price=0.3)
+
+    result = await open_add_device(hass, entry)
+
+    assert result["step_id"] == "quick_start_all_followed"
+    assert offered(result) == [{"value": "manual", "label": "manual"}]
+
+
+async def test_with_its_status_used_by_another_device_quick_start_says_so(
+    hass: HomeAssistant,
+) -> None:
+    washer = add_washdata(hass)
+    register(hass, WASHER_ENERGY, "kWh")
+    entry = await add_hub(hass)
+    await add_washing_machine(hass, entry, status=washer["washer_state"])
+
+    result = await open_add_device(hass, entry)
+
+    assert result["step_id"] == "quick_start_all_followed"
+
+
+@pytest.mark.parametrize("state", QUICK_START_STATES)
+async def test_manual_setup_leads_to_the_device_type_in_every_state(
+    hass: HomeAssistant, state: str
+) -> None:
+    result = await open_quick_start_in(hass, state)
+
+    result = await configure(hass, result, {"device": "manual"})
 
     assert result["step_id"] == "user"
 
@@ -127,7 +197,7 @@ async def test_a_device_whose_status_entity_is_disabled_is_not_offered(
 
     result = await open_add_device(hass, entry)
 
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "quick_start_nothing_found"
 
 
 async def test_a_renamed_ha_device_is_offered_by_the_users_name(
@@ -153,6 +223,60 @@ async def test_manual_setup_leads_to_the_device_type(hass: HomeAssistant) -> Non
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": "washing_machine"})
     assert result["step_id"] == "device"
+
+
+async def test_the_device_type_choice_leads_back_to_quick_start(
+    hass: HomeAssistant,
+) -> None:
+    washer = add_washdata(hass)
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_add_device(hass, entry), {"device": "manual"}
+    )
+    assert offered(result)[-1] == "quick_start"
+
+    result = await configure(hass, result, {"device_type": "quick_start"})
+
+    assert result["step_id"] == "quick_start"
+    assert [option["value"] for option in offered(result)] == [
+        washer.device.id,
+        "manual",
+    ]
+
+
+async def test_back_to_quick_start_shows_it_in_the_state_it_is_in(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_add_device(hass, entry), {"device": "manual"}
+    )
+
+    result = await configure(hass, result, {"device_type": "quick_start"})
+
+    assert result["step_id"] == "quick_start_nothing_found"
+
+
+async def test_after_going_back_to_quick_start_a_pick_keeps_nothing_of_before(
+    hass: HomeAssistant,
+) -> None:
+    washer = add_washdata(hass)
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_add_device(hass, entry), {"device": "manual"}
+    )
+    result = await configure(hass, result, {"device_type": "quick_start"})
+    result = await configure(hass, result, {"device": "manual"})
+    assert result["step_id"] == "user"
+    result = await configure(hass, result, {"device_type": "quick_start"})
+
+    result = await configure(hass, result, {"device": washer.device.id})
+    result = await configure(hass, result, {"price": 0.3})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    [subentry] = entry.subentries.values()
+    assert subentry.data["device_type"] == "washing_machine"
+    assert subentry.data["printer_device_id"] == washer.device.id
 
 
 async def test_quick_start_shows_what_the_profile_found(hass: HomeAssistant) -> None:
@@ -181,7 +305,13 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, washer.device.id)
-    assert fields(result) == ["optional_meter", "price", "price_entity", "water_price"]
+    assert fields(result) == [
+        "optional_meter",
+        "price",
+        "price_entity",
+        "water_price",
+        "pick_another_device",
+    ]
     result = await configure(
         hass, result, {"optional_meter": WASHER_ENERGY, "price": 0.3}
     )
@@ -295,7 +425,12 @@ async def test_mieles_own_meters_need_no_meter_from_the_user(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, washer.device.id)
-    assert fields(result) == ["price", "price_entity", "water_price"]
+    assert fields(result) == [
+        "price",
+        "price_entity",
+        "water_price",
+        "pick_another_device",
+    ]
     result = await configure(hass, result, {"price": 0.3, "water_price": 4.0})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -335,7 +470,7 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, printer.device.id)
-    assert fields(result) == ["meter", "price", "price_entity"]
+    assert fields(result) == ["meter", "price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"meter": POWER, "price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -400,10 +535,65 @@ async def test_a_printer_needs_a_meter(hass: HomeAssistant) -> None:
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, printer.device.id)
+    result = await configure(hass, result, {"price": 0.3})
 
-    with pytest.raises(InvalidData) as refused:
-        await configure(hass, result, {"price": 0.3})
-    assert list(refused.value.schema_errors) == ["meter"]
+    assert result["errors"] == {"meter": "meter_required"}
+    assert suggested(result, "price") == 0.3
+
+
+async def test_the_device_type_step_leads_back_to_the_device_list(
+    hass: HomeAssistant,
+) -> None:
+    appliance = add_home_connect_local(hass)
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_add_device(hass, entry), {"device": appliance.device.id}
+    )
+    assert result["step_id"] == "quick_start_device_type"
+    assert offered(result)[-1] == "pick_another_device"
+
+    result = await configure(hass, result, {"device_type": "pick_another_device"})
+
+    assert result["step_id"] == "quick_start"
+    assert [option["value"] for option in offered(result)] == [
+        appliance.device.id,
+        "manual",
+    ]
+
+
+async def test_the_meter_and_prices_step_leads_back_with_nothing_filled_in(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_local(hass)
+    entry = await add_hub(hass)
+    result = await pick(hass, entry, printer.device.id)
+    assert fields(result)[-1] == "pick_another_device"
+
+    result = await configure(hass, result, {"pick_another_device": True})
+
+    assert result["step_id"] == "quick_start"
+
+
+async def test_after_picking_another_device_nothing_of_the_first_is_kept(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_anycubic_local(hass)
+    appliance = add_home_connect_local(hass)
+    register(hass, POWER, "W")
+    entry = await add_hub(hass)
+    result = await configure(
+        hass, await open_add_device(hass, entry), {"device": appliance.device.id}
+    )
+    result = await configure(hass, result, {"device_type": "dishwasher"})
+    result = await configure(hass, result, {"pick_another_device": True})
+
+    data = await quick_start(hass, entry, printer.device.id, meter=POWER, price=0.3)
+
+    assert data["device_type"] == "3d_printer"
+    assert data["printer_device_id"] == printer.device.id
+    assert "program" not in data
+    assert "water" not in data
+    assert list(entry.subentries.values())[-1].title == "Anycubic Kobra S1"
 
 
 @pytest.mark.parametrize("answers", [{}, {"price": 0.3, "price_entity": PRICE}])
@@ -484,18 +674,6 @@ async def test_the_price_entity_of_the_last_device_is_pre_filled_and_kept_whole(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert list(entry.subentries.values())[-1].data["price"] == first.data["price"]
-
-
-async def test_a_device_coinop_already_follows_is_not_offered_again(
-    hass: HomeAssistant,
-) -> None:
-    washer = add_washdata(hass)
-    entry = await add_hub(hass)
-    await quick_start(hass, entry, washer.device.id, price=0.3)
-
-    result = await open_add_device(hass, entry)
-
-    assert result["step_id"] == "user"
 
 
 async def test_a_device_added_by_quick_start_records_runs(

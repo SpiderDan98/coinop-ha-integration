@@ -22,6 +22,7 @@ from .devices import (
     add_other_device,
     change_other_device,
     configure,
+    open_device_types,
     open_other,
     other_input,
     save,
@@ -113,10 +114,12 @@ async def add_shipped(
 
 async def shipped_device_types(hass: HomeAssistant, entry: ConfigEntry) -> list[str]:
     """The Device Types Add Device offers besides Other."""
-    add_device = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": "user"}
-    )
-    return [t for t in offered(add_device, "device_type") if t != "other"]
+    add_device = await open_device_types(hass, entry)
+    return [
+        t
+        for t in offered(add_device, "device_type")
+        if t not in ("other", "quick_start")
+    ]
 
 
 async def test_only_an_other_devices_reconfigure_menu_offers_its_type_name_and_what_it_has(

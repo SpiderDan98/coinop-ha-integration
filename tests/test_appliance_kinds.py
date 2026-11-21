@@ -94,6 +94,7 @@ async def test_a_washdata_device_of_a_generic_kind_is_asked_its_device_type(
         "tumble_dryer",
         "coffee_machine",
         "oven",
+        "pick_another_device",
     ]
     assert result["description_placeholders"] == {
         "device": "Plug",
@@ -135,7 +136,7 @@ async def test_a_washdata_pump_is_no_device_type_and_not_offered(
     ]
 
 
-async def test_with_nothing_but_a_pump_add_device_starts_at_the_device_type(
+async def test_with_nothing_but_a_pump_quick_start_finds_nothing(
     hass: HomeAssistant,
 ) -> None:
     add_washdata(hass, "pump", name="Sump pump")
@@ -143,7 +144,7 @@ async def test_with_nothing_but_a_pump_add_device_starts_at_the_device_type(
 
     result = await open_add_device(hass, entry)
 
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "quick_start_nothing_found"
 
 
 async def test_a_dishwasher_followed_as_a_washing_machine_is_not_offered_again(
@@ -159,7 +160,7 @@ async def test_a_dishwasher_followed_as_a_washing_machine_is_not_offered_again(
 
     result = await open_add_device(hass, entry)
 
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "quick_start_all_followed"
 
 
 @pytest.mark.parametrize(
@@ -208,7 +209,13 @@ async def test_the_second_form_asks_for_a_water_price_only_for_a_device_type_wit
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, appliance.device.id, chosen)
-    assert fields(result) == ["optional_meter", "price", "price_entity", *asked]
+    assert fields(result) == [
+        "optional_meter",
+        "price",
+        "price_entity",
+        *asked,
+        "pick_another_device",
+    ]
     result = await configure(hass, result, {"price": 0.3} | dict.fromkeys(asked, 4.0))
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -326,7 +333,7 @@ async def test_a_miele_appliance_brings_the_meters_it_has_and_is_asked_for_the_r
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, appliance.device.id)
-    assert fields(result) == asked
+    assert fields(result) == [*asked, "pick_another_device"]
     prices = {"price": 0.3} | ({"water_price": 4.0} if "water_price" in asked else {})
     result = await configure(hass, result, prices)
 
@@ -478,6 +485,7 @@ async def test_a_home_connect_device_without_a_telling_entity_is_asked_its_devic
         "tumble_dryer",
         "coffee_machine",
         "oven",
+        "pick_another_device",
     ]
     assert result["description_placeholders"] == {
         "device": "Appliance",
@@ -568,7 +576,13 @@ async def test_a_home_connect_appliance_is_asked_for_a_water_price_only_with_wat
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, appliance.device.id)
-    assert fields(result) == ["optional_meter", "price", "price_entity", *asked]
+    assert fields(result) == [
+        "optional_meter",
+        "price",
+        "price_entity",
+        *asked,
+        "pick_another_device",
+    ]
     result = await configure(hass, result, {"price": 0.3} | dict.fromkeys(asked, 4.0))
 
     assert result["type"] is FlowResultType.CREATE_ENTRY

@@ -53,7 +53,7 @@ async def test_quick_start_asks_a_home_connect_local_appliance_its_device_type(
     result = await configure(hass, result, {"device": appliance.device.id})
 
     assert result["step_id"] == "quick_start_device_type"
-    assert offered(result) == DEVICE_TYPES
+    assert offered(result) == [*DEVICE_TYPES, "pick_another_device"]
     result = await configure(hass, result, {"device_type": "dishwasher"})
     result = await configure(hass, result, {"price": 0.3})
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -118,7 +118,7 @@ async def test_quick_start_asks_a_home_connect_alt_appliance_its_device_type(
     result = await configure(hass, result, {"device": appliance.device.id})
 
     assert result["step_id"] == "quick_start_device_type"
-    assert offered(result) == DEVICE_TYPES
+    assert offered(result) == [*DEVICE_TYPES, "pick_another_device"]
     result = await configure(hass, result, {"device_type": "washing_machine"})
     result = await configure(hass, result, {"price": 0.3})
     assert result["type"] is FlowResultType.CREATE_ENTRY

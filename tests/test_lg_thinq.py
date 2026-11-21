@@ -205,7 +205,13 @@ async def test_an_lg_appliances_energy_sensors_are_no_meter_and_one_is_asked_for
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, washer.device.id)
-    assert fields(result) == ["optional_meter", "price", "price_entity", "water_price"]
+    assert fields(result) == [
+        "optional_meter",
+        "price",
+        "price_entity",
+        "water_price",
+        "pick_another_device",
+    ]
     result = await configure(
         hass, result, {"optional_meter": WASHER_ENERGY, "price": 0.3}
     )

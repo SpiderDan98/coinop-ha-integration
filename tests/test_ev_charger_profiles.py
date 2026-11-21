@@ -53,7 +53,7 @@ async def test_quick_start_adds_a_wall_connector_with_its_lifetime_counter(
         "label": "Tesla Wall Connector · Tesla Wall Connector",
     }
     result = await pick(hass, entry, charger.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -131,7 +131,7 @@ async def test_without_its_lifetime_counter_a_wall_connector_takes_its_session_c
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, charger.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -149,7 +149,7 @@ async def test_a_wall_connector_without_energy_counters_asks_for_a_meter(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, charger.device.id)
-    assert fields(result) == ["meter", "price", "price_entity"]
+    assert fields(result) == ["meter", "price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"meter": ENERGY, "price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY

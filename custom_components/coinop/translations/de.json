@@ -43,7 +43,21 @@
         },
         "quick_start": {
           "title": "Schnellstart",
-          "description": "Coin-op hat Geräte von Integrationen gefunden, die es kennt. Wähle eines, um es mit den Geräteeingängen aus seinem Integrationsprofil einzurichten; Coin-op fragt dann nur noch nach dem, was die Integration nicht weiß, etwa nach Zähler und Preisen. Oder richte ein Gerät manuell ein und gehe jeden Schritt selbst durch.",
+          "description": "Coin-op hat Geräte von Integrationen gefunden, die es kennt. Wähle eines, um es mit den Geräteeingängen aus seinem Integrationsprofil einzurichten; Coin-op fragt dann nur noch nach dem, was die Integration nicht weiß, etwa nach Zähler und Preisen. Oder richte ein Gerät manuell ein und gehe jeden Schritt selbst durch.\n\nDie Seite [Unterstützte Integrationen]({supported_integrations}) nennt jede Integration, die Coin-op kennt, und warum ein Gerät nicht angeboten wird.",
+          "data": {
+            "device": "Gerät"
+          }
+        },
+        "quick_start_nothing_found": {
+          "title": "Schnellstart",
+          "description": "Der Schnellstart richtet ein Gerät aus einem Gerät einer Integration ein, für die Coin-op ein Integrationsprofil hat, aber Coin-op hat keines gefunden. Es hat eines für {integrations}; die Seite [Unterstützte Integrationen]({supported_integrations}) nennt sie und warum ein Gerät nicht angeboten wird.\n\nGehört dein Gerät zu einer davon, richte zuerst diese Integration in Home Assistant ein und öffne „Gerät hinzufügen“ erneut. Andernfalls richte das Gerät manuell ein und gehe jeden Schritt selbst durch.",
+          "data": {
+            "device": "Gerät"
+          }
+        },
+        "quick_start_all_followed": {
+          "title": "Schnellstart",
+          "description": "Coin-op hat Geräte von Integrationen gefunden, für die es ein Integrationsprofil hat, aber jedes davon ist schon ein Gerät, oder sein Status wird schon von einem verwendet. Richte ein weiteres Gerät manuell ein und gehe jeden Schritt selbst durch.\n\nDie Seite [Unterstützte Integrationen]({supported_integrations}) nennt, warum ein Gerät nicht angeboten wird.",
           "data": {
             "device": "Gerät"
           }
@@ -57,20 +71,22 @@
         },
         "quick_start_confirm": {
           "title": "Zähler & Preise",
-          "description": "**{device}** wird als Gerätetyp **{device_type}** hinzugefügt und mit den Geräteeingängen eingerichtet, die Coin-op bei {integration} gefunden hat:\n\n{inputs}\n\nSie und die Status-Zuordnung kannst du später unter „Gerät neu konfigurieren“ prüfen und ändern. Der Gerätetyp lässt sich später nicht ändern: Ist er falsch, schließe diesen Dialog und richte das Gerät manuell ein.",
+          "description": "**{device}** wird als Gerätetyp **{device_type}** hinzugefügt und mit den Geräteeingängen eingerichtet, die Coin-op bei {integration} gefunden hat:\n\n{inputs}\n\nSie und die Status-Zuordnung kannst du später unter „Gerät neu konfigurieren“ prüfen und ändern. Der Gerätetyp lässt sich später nicht ändern: Ist er falsch, wähle unten ein anderes Gerät und richte das Gerät manuell ein.",
           "data": {
             "meter": "Energiezähler oder Leistungssensor",
             "optional_meter": "Energiezähler oder Leistungssensor (optional)",
             "price": "Fester Strompreis pro kWh",
             "price_entity": "oder Strompreis-Entität",
-            "water_price": "Wasserpreis pro m³ (optional)"
+            "water_price": "Wasserpreis pro m³ (optional)",
+            "pick_another_device": "Anderes Gerät wählen"
           },
           "data_description": {
             "meter": "Der Sensor, der die Energie (z. B. kWh) oder die Leistung (W) des Geräts misst, etwa der einer Messsteckdose. Ohne einen solchen Sensor richte das Gerät manuell ein: Dort lässt sich der Strom aus der Durchschnittsleistung schätzen.",
             "optional_meter": "Der Sensor, der die Energie (z. B. kWh) oder die Leistung (W) des Geräts misst, etwa der einer Messsteckdose. Leer lassen, um den Strom je Programm aus den Programmvorgaben zu nehmen.",
             "price": "Was du pro kWh zahlst, in {currency}. Leer lassen, wenn eine Entität den Preis meldet.",
             "price_entity": "Meldet den aktuellen Preis pro kWh, z. B. bei einem dynamischen Tarif. Leer lassen bei einem festen Preis.",
-            "water_price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser. Das Wasser kommt vom Zähler des Geräts, wenn es einen hat, sonst je Programm aus den Programmvorgaben. Leer lassen, um kein Wasser zu erfassen."
+            "water_price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser. Das Wasser kommt vom Zähler des Geräts, wenn es einen hat, sonst je Programm aus den Programmvorgaben. Leer lassen, um kein Wasser zu erfassen.",
+            "pick_another_device": "Einschalten und absenden, um zur Liste der Geräte zurückzukehren. Von dieser Auswahl wird nichts behalten, und Zähler und Preise dürfen leer bleiben."
           }
         },
         "other": {
@@ -84,7 +100,8 @@
             "job": "Auftrag und Material",
             "images": "Bilder",
             "part_count": "Teileanzahl",
-            "per_run_meters": "Zähler zählen jeden Lauf ab 0"
+            "per_run_meters": "Zähler zählen jeden Lauf ab 0",
+            "change_device_type": "Gerätetyp ändern"
           },
           "data_description": {
             "type_name": "Was für ein Gerät es ist, etwa „Brennofen“ oder „Poolpumpe“: die Überschrift, unter der das Panel es aufführt. Geräte mit derselben Typbezeichnung teilen sich eine Überschrift.",
@@ -94,27 +111,32 @@
             "job": "Es arbeitet einen Auftrag nach dem anderen ab und verbraucht dabei Material, wie ein Lasercutter oder eine CNC-Fräse: Ein Lauf wird nach seinem Auftrag benannt und bekommt einen Material-Posten, vom Gerät gemessen oder zum Ausfüllen, bepreist mit dem Standardmaterial des Geräts oder dem Material in einem Fach. Nicht zusammen mit Programm oder Dosierungen.",
             "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
             "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",
-            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler, und hat er keinen Wert, bis er einen Lauf bei 0 beginnt, keinen auf eine Lücke im Verbrauch."
+            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler, und hat er keinen Wert, bis er einen Lauf bei 0 beginnt, keinen auf eine Lücke im Verbrauch.",
+            "change_device_type": "Einschalten und absenden, um stattdessen einen anderen Gerätetyp zu wählen. Von dieser Einrichtung wird nichts behalten."
           }
         },
         "device": {
           "title": "Home-Assistant-Gerät",
           "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op für diesen Gerätetyp kennt ({integrations}), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
           "data": {
-            "device": "Home-Assistant-Gerät (optional)"
+            "device": "Home-Assistant-Gerät (optional)",
+            "change_device_type": "Gerätetyp ändern"
           },
           "data_description": {
-            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
+            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an.",
+            "change_device_type": "Einschalten und absenden, um stattdessen einen anderen Gerätetyp zu wählen. Von dieser Einrichtung wird nichts behalten."
           }
         },
         "device_without_profile": {
           "title": "Home-Assistant-Gerät",
           "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Für diesen Gerätetyp kennt Coin-op noch keine Integration; die Entitäten wählst du in den nächsten Schritten selbst.",
           "data": {
-            "device": "Home-Assistant-Gerät (optional)"
+            "device": "Home-Assistant-Gerät (optional)",
+            "change_device_type": "Gerätetyp ändern"
           },
           "data_description": {
-            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an."
+            "device": "Das eigene Gerät von Coin-op wird damit verknüpft. Die Entitätsauswahl in den nächsten Schritten bietet weiterhin alle Entitäten an.",
+            "change_device_type": "Einschalten und absenden, um stattdessen einen anderen Gerätetyp zu wählen. Von dieser Einrichtung wird nichts behalten."
           }
         },
         "name": {
@@ -429,6 +451,7 @@
         "status_already_used": "Ein anderes Gerät nutzt diese Entität schon als Status. Jeder Lauf würde doppelt erfasst.",
         "not_length_or_mass": "Coin-op kann als Materialverbrauch nur eine Länge (z. B. mm) oder eine Masse (z. B. g) nutzen. Wähle eine andere Entität oder Einheit.",
         "not_energy_or_power": "Coin-op erkennt die Einheit dieser Entität weder als Energie noch als Leistung. Wähle eine andere Entität oder richte das Gerät manuell ein.",
+        "meter_required": "Wähle den Energiezähler oder Leistungssensor des Geräts. Ohne einen solchen Sensor richte das Gerät manuell ein: Dort lässt sich der Strom aus der Durchschnittsleistung schätzen.",
         "one_price": "Gib entweder einen festen Preis ein oder wähle eine Preis-Entität.",
         "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen."
       },
@@ -583,7 +606,9 @@
         "oven": "Backofen",
         "ev_charger": "Wallbox",
         "robotic_mower": "Mähroboter",
-        "other": "Sonstiges"
+        "other": "Sonstiges",
+        "quick_start": "Zurück zum Schnellstart",
+        "pick_another_device": "Anderes Gerät wählen"
       }
     }
   }

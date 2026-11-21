@@ -14,6 +14,7 @@ from .devices import (
     WASHER_WATER,
     add_hub,
     configure,
+    open_device_types,
     start_add_device,
     start_reconfigure,
 )
@@ -675,9 +676,7 @@ async def test_the_ha_device_step_names_the_integrations_known_for_the_device_ty
     hass: HomeAssistant, device_type: str, integrations: str
 ) -> None:
     entry = await add_hub(hass)
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, "device"), context={"source": SOURCE_USER}
-    )
+    result = await open_device_types(hass, entry)
 
     result = await configure(hass, result, {"device_type": device_type})
 

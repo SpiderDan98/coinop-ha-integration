@@ -10,7 +10,7 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## What it does
 
-- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the [printer integrations Coin-op has a profile for](#3d-printer-integration-profiles), the entities are filled in automatically.
+- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the [printer integrations Coin-op has a profile for](docs/supported-integrations.md#3d-printers), the entities are filled in automatically.
 - Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
 - A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
 - Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost, a Flagged Runs counter and a Run event entity for automations.
@@ -22,19 +22,19 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 
 | Device Type | A Run records | Pre-filled for |
 |---|---|---|
-| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab, PrusaLink, OctoPrint, Creality, Elegoo, Moonraker](#3d-printer-integration-profiles) |
-| Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](#washing-machine-integration-profiles) |
-| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](#washing-machine-integration-profiles) |
-| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](#washing-machine-integration-profiles) |
-| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](#washing-machine-integration-profiles) |
-| Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](#washing-machine-integration-profiles) |
-| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector, evcc, OCPP, Easee, Zaptec, go-e Charger MQTT, go-e Charger API v2, Wallbox](#ev-charger-integration-profiles) |
+| 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab, PrusaLink, OctoPrint, Creality, Elegoo, Moonraker](docs/supported-integrations.md#3d-printers) |
+| Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
+| Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
+| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
+| Coffee machine | The drink as its Program, electricity and water (per Program or measured) and the Doses of beans, milk and other ingredients | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt](docs/supported-integrations.md#washing-machines-and-other-appliances) |
+| Oven | Its Program and electricity (measured or per Program) | [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ, SmartThings](docs/supported-integrations.md#washing-machines-and-other-appliances) |
+| EV charger | The electricity of a charging Run, from a session or lifetime energy sensor or a power sensor. See [EV chargers](#ev-chargers) | [Tesla Wall Connector, evcc, OCPP, Easee, Zaptec, go-e Charger MQTT, go-e Charger API v2, Wallbox](docs/supported-integrations.md#ev-chargers) |
 | Robotic mower | The electricity of a mowing Run, the recharge after it included. See [Robotic mowers](#robotic-mowers) | no integration: set up manually |
 | Other | Its electricity and whatever you pick for it: a Program, Doses, water, a job with its Material, images, a Part Count. See [Other Devices](#other-devices) | no integration: set up manually |
 
 **Other** is for a Device none of the shipped Device Types fits. You give it a Type Name and pick what it has yourself, and unlike the Device Type, both can be changed later.
 
-"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), which adds each as the Device Type its integration says it is, and manual setup comes pre-filled for them whenever you pick a Device Type the integration is named for. A device of any other integration is set up manually, by picking its entities yourself.
+"Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), which adds each as the Device Type its integration says it is, and manual setup comes pre-filled for them whenever you pick a Device Type the integration is named for. What each profile fills in, and its notes, are under [Supported integrations](docs/supported-integrations.md). A device of any other integration is set up manually, by picking its entities yourself.
 
 A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
 
@@ -60,7 +60,7 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 
 ## Quick Start
 
-If the device you want to add already belongs to an integration Coin-op has an Integration Profile for ([3D printers](#3d-printer-integration-profiles), [WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, LG ThinQ and SmartThings](#washing-machine-integration-profiles), [EV chargers](#ev-charger-integration-profiles)), Add Device starts with **Quick Start**: it lists those devices, and picking one sets the Device up in two forms.
+Add Device always starts with **Quick Start**. It lists the devices of the integrations Coin-op has an Integration Profile for (see [Supported integrations](docs/supported-integrations.md)), and picking one sets the Device up in two forms.
 
 1. Pick the device. Its Device Type, its name and every Device Input the profile finds are taken over without further questions. Where the integration doesn't say what kind of device it is, Coin-op asks you for the Device Type instead of guessing, among those the integration is named for in the [Device Types](#device-types) table.
 2. Check the Device Type the Device will be added as and the list of entities Coin-op found, then fill in what no profile knows:
@@ -68,20 +68,21 @@ If the device you want to add already belongs to an integration Coin-op has an I
    - the **electricity price**, fixed per kWh or from a price entity, pre-filled from the Device you added last.
    - for a Device Type with water (washing machine, dishwasher, coffee machine), optionally the **water price** per m³. With it, water comes from the Device's own meter or per Program from the Program Defaults; without it, no water is recorded.
 
-The Device Type can't be changed once the Device is added. If the second form names the wrong one, close it and set the Device up manually: there you choose the Device Type yourself, and the steps still come pre-filled.
+The Device Type can't be changed once the Device is added. If the second form names the wrong one, choose **Pick another device** in it and then **Set up manually**, where you choose the Device Type yourself; the steps still come pre-filled.
 
-Which Device Type a device becomes:
-
-- **WashData** knows the device type you picked when you set the device up there (or changed it to later): a washing machine or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher. For its generic types ("Other (Advanced)" and "Threshold Device"), such as a plug on a coffee machine or an oven, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven. A pump is no Device Type and isn't offered.
-- **Miele** reports what each appliance is: a washing machine or a washer-dryer becomes a Washing machine, a tumble dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee system a Coffee machine, and an oven, steam oven, combination oven, dialog oven or microwave an Oven. Its other appliances (fridges, freezers, hobs, hoods, wine cabinets, warming drawers, robot vacuums) are no Device Type and aren't offered.
-- **Home Connect** doesn't say what kind an appliance is, so Coin-op tells it from the sensors Home Connect creates for each kind (they needn't be enabled): a washer or a washer-dryer becomes a Washing machine, a dryer a Tumble dryer, a dishwasher a Dishwasher, a coffee machine a Coffee machine, an oven or a microwave an Oven. Fridges, freezers, hobs, hoods and other appliances that are no Device Type aren't offered. For an appliance whose kind those sensors don't tell, Coin-op asks: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven.
-- For **Home Connect Local** and **Home Connect Alt**, Coin-op doesn't tell what kind an appliance is and asks for each of their appliances: Washing machine, Dishwasher, Tumble dryer, Coffee machine or Oven. An appliance that is none of them, such as a hood, is offered too; set it up manually instead, as another Device Type, or leave it.
-- **LG ThinQ** writes the appliance's type into its model: a washer, a WashCombo or a WashTower's washer becomes a Washing machine, a dryer or a WashTower's dryer a Tumble dryer, a dishwasher a Dishwasher, an oven or a microwave an Oven. A Styler, air conditioners, fridges, purifiers, vacuums and its other appliances are no Device Type and aren't offered.
-- **SmartThings** is told by the machine state SmartThings reports: a washer's becomes a Washing machine, a dryer's a Tumble dryer, a dishwasher's a Dishwasher, and an oven's an Oven, ranges and microwaves included. Its other devices (TVs, fridges, vacuums, an AirDresser and the rest) are no Device Type and aren't offered.
+How each integration tells which Device Type a device becomes is under [Which Device Type a device becomes](docs/supported-integrations.md#which-device-type-a-device-becomes).
 
 Everything Quick Start filled in can be checked and changed afterwards in the Device's reconfigure menu; the Doses and Program Defaults of a Device that has them are set on its card in the panel's Devices tab.
 
-Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities. Devices Coin-op already follows aren't offered again.
+Choose **Set up manually** to walk every step yourself, for a device of any other integration or to map different entities. Devices Coin-op already follows aren't offered again. When Quick Start has nothing to offer, it says why: either it found no device of an integration it has an Integration Profile for, and names those integrations, or every device it found is already a Device or has its Status used by one. [Why isn't my device offered?](docs/supported-integrations.md#why-isnt-my-device-offered) lists every reason a device is left out.
+
+### Going back
+
+Add Device lets you go back instead of closing the dialog and starting over. Nothing you entered before going back is kept.
+
+- **Pick another device**, in Quick Start's Device Type step and its meter and prices step, shows the list of devices again. The meter and the prices may stay empty for it.
+- **Back to Quick Start**, among the Device Types of manual setup, shows Quick Start again.
+- **Change Device Type**, on the Home Assistant device step and on an Other Device's Type Name and what it has, returns to the Device Type choice. Reconfigure doesn't offer it: the Device Type is fixed once the Device is added.
 
 ## Estimating electricity without a meter
 
@@ -130,36 +131,6 @@ days_to_show: 365
 
 Corrections and deleted Runs change the totals at the moment you make them, so they show up in that month rather than rewriting earlier ones.
 
-## 3D printer Integration Profiles
-
-[Quick Start](#quick-start) offers the printers of these integrations. When you set a Device up manually and pick a printer's Home Assistant device from one of them, every setup step comes pre-filled. Check each step and change what you like; Coin-op stores the entities themselves, not a link to the integration. Every profile also fills in the job name and the mapping of its Status.
-
-| Integration | Status | Material used | Thumbnail | Camera | Slots |
-|---|---|---|---|---|---|
-| [Anycubic 3D Printer - Local Control](https://github.com/chrisfore/anycubic_ha_local) (`anycubic`) | Print event | Filament used, its `length_mm` attribute (mm) | Object top view (or Object thumbnail) | Camera, with Snapshot | ACE Slot 1–4, colour attribute `color`, Loaded slot |
-| [Anycubic Cloud & LAN](https://github.com/Nino6689/hass-anycubic) (`anycubic_cloud`, 3.0 and 2.x) | Job state | Job filament used (mm) | Job preview (cloud mode only) | The local camera, with Snapshot | ACE Slot 1–4, colour attribute `color_hex`, ACE loaded slot |
-| [Bambu Lab](https://github.com/greghesp/ha-bambulab) (`bambu_lab`) | Print status | Print weight (g) | Cover image | Camera, with Snapshot, where the printer has one | none |
-| [PrusaLink](https://www.home-assistant.io/integrations/prusalink/) (`prusalink`) | Printer state | none | Job preview (a camera) | none | none |
-| [OctoPrint](https://www.home-assistant.io/integrations/octoprint/) (`octoprint`) | Current state | none | none | OctoPrint camera, with Snapshot, where the webcam is enabled | none |
-| [Creality](https://github.com/3dg1luk43/ha_creality_ws) (`ha_creality_ws`) | Print status; the job name is its `file` attribute | Used material length (cm) | Current print preview | Camera, with Snapshot | none |
-| [Elegoo](https://github.com/danielcherubini/elegoo-homeassistant) (`elegoo_printer`) | Print status | Current extrusion (mm), where the printer has it | Cover image, where the printer has it | Chamber camera, with Snapshot | none |
-| [Moonraker](https://github.com/marcolivierarsenault/moonraker-home-assistant) (`moonraker`) | Print state | Filament used (m) | Thumbnail (a camera) | The first webcam, with Snapshot | none |
-
-- **Anycubic Cloud & LAN** 2.x in LAN mode goes from printing straight to idle, so its Runs end with Outcome Unknown.
-- **Bambu Lab**: the preparation (heating, levelling) is part of the Run, a print stopped on the printer or one that failed ends as Cancelled, and the printer going offline during a print doesn't end the Run. The print weight is the slicer's planned figure for the whole print, not a measurement: a cancelled print is charged its full planned weight until you correct the Run's Material. Coin-op only takes a weight reported during the Run; with the integration connected through the cloud only, a print that is sliced in the cloud before it starts may report its weight before that, and its Run then asks you for the quantity. The AMS isn't read, so the weight is one Material Line Item of the Device's Default Material, and the AMS isn't offered as a Device of its own. Without the camera entity (the integration's camera turned off, or its chamber picture shown as an image) the Device has no camera and no Snapshot.
-- **PrusaLink**: a printer that asks for attention during a print (a filament runout, for example) pauses the Run, which continues once the print does, and a stopped print ends as Cancelled. The integration reports no Material used, so add a Run's Material by hand or let an automatic Line Item Template add it. The job preview is fetched as the Thumbnail while the print runs; the integration has no webcam, so the Device has no camera and no Snapshot.
-- **OctoPrint** has no state for a finished print: it goes from printing back to operational, so a finished print usually ends with Outcome Unknown and you set it to Completed yourself. Home Assistant asks OctoPrint every 30 seconds, and only when that catches OctoPrint's few seconds of finishing does the Run end as Completed. A cancelled print ends as Cancelled when the cancelling is caught the same way, otherwise with Outcome Unknown too. Sending a file to the SD card opens no Run. OctoPrint reports no Material used: add the Material to the Run by hand or with a Line Item Template.
-- **Creality**: a print stopped on the printer ends as Cancelled; `processing`, the start of a print and the state a cancelled print stays in, and the self-test are left out of the Run. An error the printer reports holds the Run as paused with a fault Flag, and some printers never clear an error code, so a Run may not open until the error is cleared on the printer. The job name is the file's full path; the Run is named after the file alone. The used material length drops to 0 while the printer is unreachable or switched off, so a printer switched off within minutes of a print's end can leave its Run with 0 cm; correct the Run's Material then. The integration's current release needs Home Assistant 2026.7 or later. The integration registers a camera entity also on models that may have no camera; turn the Snapshot off there. Its unique ids contain the printer's address: the integration moves them to a new address itself, so Devices keep working, and Detect again repairs a Device if they ever don't match.
-- **Elegoo**: resin and filament printers are both covered, with every state of the filament printers (they may stay on a step like "preheating completed" for a whole print, which is still part of the Run), a stopped print ends as Cancelled and a failed filament unload pauses the Run. Only filament printers with OpenCentauri firmware or the CC2 protocol report the extrusion, and printers connected over MQTT have no cover image. The chamber camera entity exists also for printers without a camera; turn the Snapshot off there.
-- **Moonraker**: the Status is the print's state, not the printer's. The filament used is Klipper's measured extrusion of the print, not the lifetime total. The job name is the file's path in Klipper's folders; the Run is named after the file alone. The preview camera only shows a picture while the print runs, so Coin-op takes the Thumbnail then. A print that ends in `error` gets the Fault Flag and is paused; once Klipper is reset to standby (also at the start of the next print), the Run ends with Outcome Unknown. The integration adds a webcam camera even where the printer has none; disable that entity, or turn off the Snapshot, if the printer has no webcam.
-- **Creality** and **Elegoo** preview pictures only get a state once something fetches them. Coin-op therefore asks for the picture itself when a Run starts and the picture has no state yet, and again each minute until it gets one, never after the Run ended.
-
-If an update of the integration renames or replaces its entities, open the Device's reconfigure menu and choose **Detect again**. It walks the status, job and image steps pre-filled from the integration again and leaves the consumption source and price as they are.
-
-## Using it with hass-anycubic
-
-The hass-anycubic integration has cost sensors of its own (such as job energy, job electricity cost and last job total cost). Coin-op ignores them and computes every cost itself. Turn off one of the two cost features, for example by disabling hass-anycubic's cost entities, so your dashboards don't count the same print twice.
-
 ## Washing machines
 
 Choose **Washing machine** as the Device Type when you add a Device. Like a printer, a washing machine is followed through entities its integration already provides: a Status opens and closes each load's Run, and its costs are frozen into Line Items when it ends. Coin-op doesn't detect wash cycles or programs itself.
@@ -170,7 +141,7 @@ A washing machine's Runs get these Line Items:
 - **Water**, from a water meter or a flow sensor (any of Home Assistant's volume and flow units), or "per Program" from the litres in the Program Defaults. It is priced per m³ from a fixed value or a price entity (per m³ or per litre, sub-units such as ct/L included). Include the wastewater charge in the price. With the water source "None" there is no Water Line Item, but you can add one by hand on a Run.
 - **Doses**: one Material Line Item for each detergent, fabric softener or other product the load uses.
 
-The setup asks for the Status, its mapping, an optional Program input, the electricity source and price, and the water source and price. Part Count, Slots, Material used, Thumbnail and Camera don't apply to washing machines and aren't shown.
+The setup asks for the Status, its mapping, an optional Program input, the electricity source and price, and the water source and price. Part Count, Slots, Material used, Thumbnail and Camera don't apply to washing machines and aren't shown. For the [supported integrations](docs/supported-integrations.md#washing-machines-and-other-appliances), the Status, its mapping and the Program are pre-filled.
 
 ### Only a smart plug?
 
@@ -228,35 +199,9 @@ A level in whole percent changes in steps of 1 % of the tank (14 ml here), so a 
 - The Overview and Analysis show Water as a cost kind, and the Analysis compares Programs by Run count and cost per Run. The Runs tab filters by Program.
 - A Cost Statement shows each load's Program, Water and Doses, without Part Count.
 
-### Washing machine Integration Profiles
-
-[Quick Start](#quick-start) offers the washing machines, dishwashers, tumble dryers, coffee machines and ovens of these integrations, each as the Device Type it is. When you set one up manually, as the Device Type you choose, and pick its Home Assistant device from one of them, the Status, its mapping and the Program are pre-filled. Check each step and change what you like.
-
-| Integration | Status | Program | Electricity | Water |
-|---|---|---|---|---|
-| [WashData](https://github.com/3dg1luk43/ha_washdata) (`ha_washdata`) | State sensor | Program sensor | your plug's energy meter, chosen by you | chosen by you |
-| [Miele](https://www.home-assistant.io/integrations/miele/) (`miele`) | Status sensor | Program sensor | Energy consumption sensor of the current cycle, where the appliance has one | Water consumption sensor of the current cycle, where the appliance has one |
-| [Home Connect](https://www.home-assistant.io/integrations/home_connect/) (`home_connect`) | Operation state sensor | Active program select | chosen by you | chosen by you |
-| [Home Connect Local](https://github.com/chris-mc1/homeconnect_local_hass) (`homeconnect_ws`) | Operation state sensor | Active program sensor | chosen by you | chosen by you |
-| [Home Connect Alt](https://github.com/ekutner/home-connect-hass) (`home_connect_alt`) | Operation state sensor | Active program sensor | chosen by you | chosen by you |
-| [LG ThinQ](https://www.home-assistant.io/integrations/lg_thinq/) (`lg_thinq`) | Current status sensor | Current cycle sensor, on a dishwasher | chosen by you | chosen by you |
-| [SmartThings](https://www.home-assistant.io/integrations/smartthings/) (`smartthings`) | Machine state sensor | none | Energy sensor, where the appliance reports one | chosen by you |
-
-- WashData's profile also serves dishwashers, tumble dryers, coffee machines and ovens: its State and Program sensors are the same for every device it follows, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
-- WashData's anti-wrinkle phase ends the Run as Completed, so a load ends when the washing is done, not when you open the door. WashData's own energy and cost sensors are ignored. Before it recognises the program, its program sensor reports placeholders such as `detecting...`; the profile fills them in as values to ignore (Program step), so they never become a Run's Program or a suggested Program row.
-- Miele's profile also serves dishwashers, tumble dryers, coffee systems (as Coffee machines) and ovens, steam, combination and dialog ovens and microwaves included: the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup. The consumption sensors are pre-filled wherever the appliance has them: energy and water on a washing machine, washer-dryer and dishwasher, energy alone on a tumble dryer. A coffee system and an oven have neither, so pick a plug's meter or take the kWh per Program. A Miele microwave or dialog oven has a Program sensor that never reports a program, so its Runs have no Program unless you enter one.
-- Miele's consumption sensors count the current cycle: they keep its total once the program has ended, have no value or read 0 while the appliance is off, and start the next cycle from 0. Coin-op keeps the reading at the Run's end, so that drop is neither lost nor counted twice, and it is never taken for a meter reset, whatever the Device Type. A counter that still has no value as the Run starts and then begins at 0 is no consumption gap either: nothing was counted before that 0. A counter whose first value is above 0, or one that loses its value during the Run, still marks the Run with a consumption gap.
-- Home Connect's profile also serves dishwashers, tumble dryers, coffee machines and ovens: each of them has the same Operation state sensor and Active program select, so the Status, its mapping and the Program are pre-filled for each of these Device Types, in [Quick Start](#quick-start) and in manual setup.
-- Home Connect Local's and Home Connect Alt's profiles serve the same five Device Types, with the same mapping as Home Connect's in the states each integration reports. Coin-op doesn't tell their appliances' kind, so [Quick Start](#quick-start) asks for the Device Type.
-- Home Connect Alt reports the states in the mapping only with its translation mode "local", its default. With "server", it reports the state names translated into your language, which the pre-filled mapping doesn't match, so no Run opens: map the Status's states by hand in the Device's reconfigure menu. Its active program sensor appears only once the appliance has run a program while the integration was loaded; until then the Program is left empty, and **Detect again** fills it in later.
-- LG ThinQ's profile serves washing machines, tumble dryers, dishwashers and ovens, not coffee machines. Every phase of a cycle (detecting, rinsing, spinning, drying, preheating and so on) keeps the Run running, so a cycle is one Run; `end` completes it, `cancel` cancels it and an error gives it its Flag. A dryer's wrinkle care completes the Run, like WashData's anti-wrinkle phase. Only a dishwasher reports what it runs, so the Program is pre-filled for a dishwasher alone. LG's energy sensors count per day and month, not per cycle, so they are no meter: pick a plug's meter or take the kWh per Program.
-- An LG WashTower is two Home Assistant devices, one per half, and Quick Start offers each: the washer as a Washing machine, the dryer as a Tumble dryer. A TWINWash with its mini washer and a double oven report two Statuses on one Home Assistant device, and one Device follows one Status: Quick Start and manual setup read the main washer or the upper cavity; set the mini washer or the lower cavity up manually as a Device of its own.
-- SmartThings' profile serves washing machines, tumble dryers, dishwashers and ovens, not coffee machines: the Status, its mapping and the energy sensor, where the appliance reports its energy, are pre-filled for each of them, in [Quick Start](#quick-start) and in manual setup. On a washer with a second, upper washer, or an oven with a second cavity, only the main one is read; set the other one up manually as a Device of its own. Known limits: every Run ends as Completed, since the machine state reads `stop` (an oven's `ready`) whether a cycle finished, was stopped or the appliance is idle; and there is no Program, so its Runs have none unless you enter one.
-- **Detect again** in the reconfigure menu re-applies the Status, the mapping and the Program, and leaves electricity, water and prices as they are.
-
 ## EV chargers
 
-Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. For the integrations [below](#ev-charger-integration-profiles) every step is pre-filled; for any other charger, pick its entities yourself.
+Choose **EV charger** as the Device Type when you add a Device. A charging session is a Run: the charger's status opens and closes it, and its electricity is priced when it ends. The setup asks for the Status, its mapping, the electricity source and the electricity price, and nothing else: an EV charger has no Program, Doses or water. For the [supported integrations](docs/supported-integrations.md#ev-chargers) every step is pre-filled; for any other charger, pick its entities yourself.
 
 - **Status**: the charger's status sensor. Map charging to Running, a car that is plugged in without charging (waiting, paused by load management or a solar surplus control, fully charged) to Paused, and the unplugged charger to Finished. The Run then lasts from the first charging until the car is unplugged, a break in charging doesn't split it, and its running time is the time the car really charged. To end the Run as soon as the car is full instead, map that value to Finished too.
 - **Electricity source**: choose **Energy meter** and pick either the charger's session energy sensor (the energy of the current session, starting from 0 each time) or its lifetime energy sensor; both give the same kWh. Coin-op knows that an EV charger's meter may start every Run from 0, so the session sensor dropping back to 0 between two Runs is not taken for a meter reset, and one that has no value until the session starts and then begins at 0 is no consumption gap. A meter that has no value as the Run starts and comes back at any other reading, as a lifetime sensor does, gets the consumption gap Flag, and the Run counts from that reading on. A sensor that only drops once the next Run is already charging still counts that Run correctly, but the Run gets the meter reset Flag; the lifetime sensor avoids that. A **Power sensor** works too. There is no estimate and no "per Program" for an EV charger; [None](#electricity-source-none) follows its Runs without their electricity.
@@ -265,34 +210,6 @@ Choose **EV charger** as the Device Type when you add a Device. A charging sessi
 To tell cars apart, tag the Runs: set the usual car as the **Tags for new Runs** on the charger's card in the Devices tab and change the Tag on the Runs of another car. Automatic Line Item Templates work as for every Device. Filter the Runs tab by a Tag and select its Runs for a [Cost Statement](#cost-statement) of that car's Runs; it lists them without a Part Count.
 
 An EV charger's sensors are those of a printer without Material used, and its Run event's `ended` carries neither Program, litres nor Part Count. A manual Run asks for its times and Outcome; its kWh come from recorder history when the meter covers the period, else you enter them.
-
-### EV charger Integration Profiles
-
-[Quick Start](#quick-start) offers the chargers of these integrations as EV chargers and asks for nothing but the electricity price. When you set one up manually as an EV charger and pick its Home Assistant device, the Status, its mapping and the electricity source are pre-filled. Check each step and change what you like.
-
-| Integration | Status | Electricity |
-|---|---|---|
-| [Tesla Wall Connector](https://www.home-assistant.io/integrations/tesla_wall_connector/) (`tesla_wall_connector`) | Status sensor | Energy sensor (lifetime), else Session energy sensor |
-| [evcc](https://github.com/marq24/ha-evcc) (`evcc_intg`), each loadpoint | Charging binary sensor | Charged energy (session), else Charge total import (the charger's meter) |
-| [OCPP](https://github.com/lbbrhzn/ocpp) (`ocpp`), each connector | Status.Connector sensor | Energy.Active.Import.Register (the charger's meter), else Energy.Session |
-| [Easee](https://github.com/nordicopen/easee_hass) (`easee`) | Status sensor | Lifetime energy sensor, else Session energy sensor |
-| [Zaptec](https://github.com/custom-components/zaptec) (`zaptec`) | Charger operation mode sensor | Session total charge sensor, else Energy meter sensor (lifetime, only on chargers that report it) |
-| [go-e Charger MQTT](https://github.com/syssi/homeassistant-goecharger-mqtt) (`goecharger_mqtt`) | Car state sensor | Total energy sensor (lifetime), else Charged energy sensor |
-| [go-e Charger API v2](https://github.com/marq24/ha-goecharger-api2) (`goecharger_api2`) | Car state sensor (the text, not the code) | Energy total sensor (lifetime), else Energy since car connected sensor |
-| [Wallbox](https://www.home-assistant.io/integrations/wallbox/) (`wallbox`) | Status description sensor | Added energy sensor (session; Wallbox has no lifetime counter) |
-
-- The mapping follows the advice above: charging (also at reduced current) is Running; a car that is plugged in without charging (connected, ready, negotiating, waiting for the car, charging finished) is Paused; the unplugged charger is Finished, and an error is a Fault, which gives the Run its Flag. Booting is ignored.
-- OCPP's mapping uses the connector statuses as OCPP spells them, for OCPP 1.6 and 2.0.1 charge points alike: `Charging` is Running; `Preparing`, `SuspendedEV`, `SuspendedEVSE` and `Finishing` are Paused; `Available` is Finished and `Faulted` a Fault. `Unavailable` and `Reserved` are ignored. A charge point with several connectors is offered once per connector, each with its own Status and meter; with one connector, the charge point itself is offered.
-- evcc's Charging sensor is only on or off: on is Running and off is Finished. evcc doesn't say whether a car is still plugged in there, so **a session that evcc interrupts** (for want of solar surplus, by a plan or by the car) **is recorded as several Runs**. To keep such a session one Run, pick a Status of your own that tells charging, plugged in and unplugged apart, such as a template sensor over the loadpoint's Charging and Connected sensors, and map it as above. Each loadpoint is offered as its own EV charger.
-- The electricity source is the charger's lifetime energy counter where the integration registers one and you haven't disabled it, else its session energy counter; with neither, Quick Start asks for a meter. The lifetime counter is preferred because it avoids the meter reset Flag a session counter can get. Two integrations are the exception and take the session counter first, the lifetime one only where you disabled it:
-  - evcc registers the charger's meter for every loadpoint, also where the charger has none and it never reports.
-  - Zaptec updates its Energy meter sensor only about once an hour, so a Run measured on it would miss the energy charged since the last update.
-- Only a Zaptec charger is offered, not the installation it belongs to.
-- Easee's further states follow the same advice: waiting for load balancing, a smart or scheduled start, authentication or the equalizer, and starting or stopping a charge are Paused; its specific errors (erratic EV, temperature too high, overcurrent and the like) are Faults; offline and searching for its master are ignored.
-- go-e: waiting for the car and complete are Paused, idle is Finished, and an error, the unknown one included, is a Fault. go-e Charger API v2 reports the car state as a text in Home Assistant's language, German or else English; the mapping holds both.
-- Wallbox: discharging to the home (V2G), paused, scheduled, every kind of waiting (for the car, in the Power Sharing, Power Boost or Eco-Smart queue, after a MID check) and locked with a car connected are Paused; ready and locked without a car are Finished. Disconnected is ignored, because Wallbox reports it both for an unplugged car and for a charger that lost its connection, and a dropout must not end the session; the unplugged charger reports ready next.
-- The charger integration's own cost or price sensors are ignored: Coin-op computes every cost itself.
-- **Detect again** in the reconfigure menu re-applies the Status and the mapping, and leaves the electricity source and the price as they are.
 
 ## Robotic mowers
 

@@ -49,7 +49,7 @@ async def test_quick_start_adds_a_wallbox_with_its_session_counter(
         {"value": "manual", "label": "manual"},
     ]
     result = await pick(hass, entry, wallbox.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     await configure(hass, result, {"price": 0.3})
 
     [subentry] = entry.subentries.values()
@@ -81,7 +81,7 @@ async def test_a_wallbox_without_its_session_counter_asks_for_a_meter(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, wallbox.device.id)
-    assert fields(result) == ["meter", "price", "price_entity"]
+    assert fields(result) == ["meter", "price", "price_entity", "pick_another_device"]
     data = await quick_start(hass, entry, wallbox.device.id, meter=ENERGY, price=0.3)
 
     assert data["consumption"]["entity_id"] == ENERGY

@@ -38,7 +38,7 @@ async def test_confirmation_chains_into_add_device(hass: HomeAssistant) -> None:
     [flow] = hass.config_entries.subentries.async_progress()
     assert flow["flow_id"] == flow_id
     assert flow["handler"] == (entry.entry_id, "device")
-    assert flow["step_id"] == "user"
+    assert flow["step_id"] == "quick_start_nothing_found"
 
 
 async def test_second_hub_is_refused(hass: HomeAssistant) -> None:

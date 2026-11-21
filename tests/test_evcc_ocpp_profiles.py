@@ -56,7 +56,7 @@ async def test_quick_start_adds_an_evcc_site_with_one_loadpoint(
         site.device.id: "evcc ☀️🚘 Solar Charging [evcc] · evcc"
     }
     result = await pick(hass, entry, site.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -100,7 +100,7 @@ async def test_without_its_session_counter_an_evcc_loadpoint_takes_the_chargers_
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, site.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     data = await quick_start(hass, entry, site.device.id, price=0.3)
     assert data["consumption"]["entity_id"] == site["charge_total_import"]
 
@@ -214,7 +214,7 @@ async def test_quick_start_adds_an_ocpp_charge_point_with_its_meter(
 
     assert await chargers_offered(hass, entry) == {charger.device.id: "charger · OCPP"}
     result = await pick(hass, entry, charger.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     result = await configure(hass, result, {"price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -274,7 +274,7 @@ async def test_without_its_meter_an_ocpp_charge_point_takes_its_session_counter(
     entry = await add_hub(hass)
 
     result = await pick(hass, entry, charger.device.id)
-    assert fields(result) == ["price", "price_entity"]
+    assert fields(result) == ["price", "price_entity", "pick_another_device"]
     data = await quick_start(hass, entry, charger.device.id, price=0.3)
     assert data["consumption"]["entity_id"] == charger["energy_session"]
 
