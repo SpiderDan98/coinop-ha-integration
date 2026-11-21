@@ -10,7 +10,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.coinop.const import DOMAIN
@@ -233,13 +233,16 @@ async def add_basic_device(
     """Walk Add Device to the end for a Device Type with only the sections every
     Device has: HA device and name, Status, mapping, electricity source and price.
 
-    `source` is "energy" or "power", read from `meter`.
+    `source` is "energy" or "power", the only ones offered, read from `meter`.
     """
     result = await walk_to_mapping(
         hass, entry, name=name, status=status, device_type=device_type
     )
     result = await configure(hass, result, mapping)
-    assert result["step_id"] == "consumption", result.get("errors")
+    assert (result["step_id"], result["menu_options"]) == (
+        "consumption",
+        ["energy", "power"],
+    ), result.get("errors")
     result = await configure(hass, result, {"next_step_id": source})
     result = await configure(hass, result, meter)
     assert result["step_id"] == "price", result.get("errors")
@@ -250,6 +253,43 @@ async def add_basic_device(
     subentry = list(entry.subentries.values())[-1]
     assert subentry.title == name
     return subentry
+
+
+# What a Device with only the sections every Device has stores.
+BASIC_DATA = [
+    "consumption",
+    "device_type",
+    "mapping",
+    "price",
+    "printer_device_id",
+    "status",
+]
+
+
+def basic_entities(slug: str) -> list[str]:
+    """The entities every Device has, of the Device whose entity ids start with
+    `slug`: none for water or Material used."""
+    sensors = (
+        "current_run_cost",
+        "electricity_cost",
+        "energy_in_runs",
+        "flagged_runs",
+        "last_run_cost",
+        "material_cost",
+        "other_cost",
+        "running_time",
+        "runs",
+        "total_cost",
+    )
+    return [f"event.{slug}_run", *(f"sensor.{slug}_{key}" for key in sensors)]
+
+
+def coinop_entities(entity_registry: er.EntityRegistry) -> list[str]:
+    return sorted(
+        entity.entity_id
+        for entity in entity_registry.entities.values()
+        if entity.platform == "coinop"
+    )
 
 
 async def add_washing_machine(

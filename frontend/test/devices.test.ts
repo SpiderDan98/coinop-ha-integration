@@ -339,35 +339,25 @@ describe("Devices tab", () => {
     expect(queryAll(dialog, ".new-run-tags, .automatic-templates")).toHaveLength(2);
   });
 
-  it.each([
-    ["en", ["Washing machines", "Dishwashers"]],
-    ["de", ["Waschmaschinen", "Spülmaschinen"]],
-  ])("lists a dishwasher under its own heading (%s)", async (language, headings) => {
-    const backend = recordedBackend({ language }).reply(LIST, () => ({
-      devices: [recorded.washer, recorded.dishwasher],
-    }));
-
-    const panel = await mountPanel(backend, { path: "/devices" });
-
-    expect(
-      queryAll(panel, ".device-type").map((section) => [
-        text(query(section, "h2")),
-        ...queryAll(section, ".device h3").map(text),
-      ]),
-    ).toEqual([
-      [headings[0], "Washer"],
-      [headings[1], "Dishwasher"],
-    ]);
-  });
+  // A recorded Device of each Device Type: its name, then its heading in English and German.
+  const HEADINGS = [
+    [recorded.washer, "Washer", "Washing machines", "Waschmaschinen"],
+    [recorded.dishwasher, "Dishwasher", "Dishwashers", "Spülmaschinen"],
+    [recorded.tumbleDryer, "Tumble dryer", "Tumble dryers", "Trockner"],
+    [recorded.oven, "Oven", "Ovens", "Backöfen"],
+    [recorded.coffeeMachine, "Coffee machine", "Coffee machines", "Kaffeemaschinen"],
+    [recorded.wallbox, "Wallbox", "EV chargers", "Wallboxen"],
+    [recorded.mower, "Mower", "Robotic mowers", "Mähroboter"],
+  ] as const;
 
   it.each([
-    ["en", ["Tumble dryers", "Ovens"]],
-    ["de", ["Trockner", "Backöfen"]],
-  ])(
-    "lists a tumble dryer and an oven under their own headings (%s)",
-    async (language, headings) => {
+    ["en", 2],
+    ["de", 3],
+  ] as const)(
+    "lists each Device under its Device Type's heading (%s)",
+    async (language, column) => {
       const backend = recordedBackend({ language }).reply(LIST, () => ({
-        devices: [recorded.tumbleDryer, recorded.oven],
+        devices: HEADINGS.map(([device]) => device),
       }));
 
       const panel = await mountPanel(backend, { path: "/devices" });
@@ -377,30 +367,9 @@ describe("Devices tab", () => {
           text(query(section, "h2")),
           ...queryAll(section, ".device h3").map(text),
         ]),
-      ).toEqual([
-        [headings[0], "Tumble dryer"],
-        [headings[1], "Oven"],
-      ]);
+      ).toEqual(HEADINGS.map((row) => [row[column], row[1]]));
     },
   );
-
-  it.each([
-    ["en", "Coffee machines"],
-    ["de", "Kaffeemaschinen"],
-  ])("lists a coffee machine under its own heading (%s)", async (language, heading) => {
-    const backend = recordedBackend({ language }).reply(LIST, () => ({
-      devices: [recorded.coffeeMachine],
-    }));
-
-    const panel = await mountPanel(backend, { path: "/devices" });
-
-    expect(
-      queryAll(panel, ".device-type").map((section) => [
-        text(query(section, "h2")),
-        ...queryAll(section, ".device h3").map(text),
-      ]),
-    ).toEqual([[heading, "Coffee machine"]]);
-  });
 
   it("shows a dishwasher with a washing machine's parts", async () => {
     const backend = recordedBackend()
@@ -426,30 +395,6 @@ describe("Devices tab", () => {
         "Automatic templates None",
     ]);
   });
-
-  it.each([
-    ["en", ["EV chargers", "Robotic mowers"]],
-    ["de", ["Wallboxen", "Mähroboter"]],
-  ])(
-    "lists an EV charger and a robotic mower under their own headings (%s)",
-    async (language, headings) => {
-      const backend = recordedBackend({ language }).reply(LIST, () => ({
-        devices: [recorded.wallbox, recorded.mower],
-      }));
-
-      const panel = await mountPanel(backend, { path: "/devices" });
-
-      expect(
-        queryAll(panel, ".device-type").map((section) => [
-          text(query(section, "h2")),
-          ...queryAll(section, ".device h3").map(text),
-        ]),
-      ).toEqual([
-        [headings[0], "Wallbox"],
-        [headings[1], "Mower"],
-      ]);
-    },
-  );
 
   it("shows a robotic mower, a Device without Capabilities, with what every Device has", async () => {
     const backend = recordedBackend().reply(LIST, () => ({ devices: [recorded.mower] }));

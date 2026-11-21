@@ -5,14 +5,16 @@ from typing import Any
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .clock import Clock
 from .devices import (
+    BASIC_DATA,
     add_basic_device,
     add_hub,
+    basic_entities,
+    coinop_entities,
     configure,
     start_reconfigure,
     walk_to_mapping,
@@ -70,34 +72,10 @@ async def add_mower(
 async def test_a_robotic_mower_asks_only_for_what_every_device_has(
     hass: HomeAssistant,
 ) -> None:
-    await set_station(hass, 50)
-    entry = await add_hub(hass)
+    mower = await add_mower(hass)
 
-    result = await walk_to_mapping(
-        hass, entry, name="Mower", status=MOWER_STATUS, device_type="robotic_mower"
-    )
-    result = await configure(hass, result, MOWER_MAPPING)
-    assert (result["step_id"], result["menu_options"]) == (
-        "consumption",
-        ["energy", "power"],
-    )
-    result = await configure(hass, result, {"next_step_id": "energy"})
-    result = await configure(hass, result, {"entity_id": STATION_ENERGY})
-    assert result["step_id"] == "price"
-    result = await configure(hass, result, {"next_step_id": "fixed_price"})
-    result = await configure(hass, result, {"price": 0.30})
-
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    [mower] = entry.subentries.values()
     assert mower.data["device_type"] == "robotic_mower"
-    assert sorted(mower.data) == [
-        "consumption",
-        "device_type",
-        "mapping",
-        "price",
-        "printer_device_id",
-        "status",
-    ]
+    assert sorted(mower.data) == BASIC_DATA
 
 
 async def test_a_robotic_mowers_power_sensor_has_no_average_power_for_gaps(
@@ -257,23 +235,7 @@ async def test_a_robotic_mower_has_no_water_sensors_and_its_ended_event_no_progr
 
     await mow(hass, clock)
 
-    assert sorted(
-        entity.entity_id
-        for entity in entity_registry.entities.values()
-        if entity.platform == "coinop"
-    ) == [
-        "event.mower_run",
-        "sensor.mower_current_run_cost",
-        "sensor.mower_electricity_cost",
-        "sensor.mower_energy_in_runs",
-        "sensor.mower_flagged_runs",
-        "sensor.mower_last_run_cost",
-        "sensor.mower_material_cost",
-        "sensor.mower_other_cost",
-        "sensor.mower_running_time",
-        "sensor.mower_runs",
-        "sensor.mower_total_cost",
-    ]
+    assert coinop_entities(entity_registry) == basic_entities("mower")
     [_, ended] = fired
     assert (ended["event_type"], ended["outcome"]) == ("ended", "unknown")
     assert ended["energy_kwh"] == pytest.approx(0.25)

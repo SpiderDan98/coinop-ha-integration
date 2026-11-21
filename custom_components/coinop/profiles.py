@@ -353,6 +353,14 @@ def _home_connect_kind(
     )
 
 
+# The Device Types an appliance of WashData, Miele or Home Connect can be.
+APPLIANCE_DEVICE_TYPES = (
+    DEVICE_TYPE_WASHING_MACHINE,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_TUMBLE_DRYER,
+    DEVICE_TYPE_COFFEE_MACHINE,
+    DEVICE_TYPE_OVEN,
+)
 # By integration domain, in the order Quick Start and the HA device step list them.
 INTEGRATIONS = {
     "anycubic": Integration(
@@ -368,40 +376,11 @@ INTEGRATIONS = {
         _always(DEVICE_TYPE_3D_PRINTER),
     ),
     "ha_washdata": Integration(
-        "WashData",
-        _washdata,
-        (
-            DEVICE_TYPE_WASHING_MACHINE,
-            DEVICE_TYPE_DISHWASHER,
-            DEVICE_TYPE_TUMBLE_DRYER,
-            DEVICE_TYPE_COFFEE_MACHINE,
-            DEVICE_TYPE_OVEN,
-        ),
-        _washdata_kind,
+        "WashData", _washdata, APPLIANCE_DEVICE_TYPES, _washdata_kind
     ),
-    "miele": Integration(
-        "Miele",
-        _miele,
-        (
-            DEVICE_TYPE_WASHING_MACHINE,
-            DEVICE_TYPE_DISHWASHER,
-            DEVICE_TYPE_TUMBLE_DRYER,
-            DEVICE_TYPE_COFFEE_MACHINE,
-            DEVICE_TYPE_OVEN,
-        ),
-        _miele_kind,
-    ),
+    "miele": Integration("Miele", _miele, APPLIANCE_DEVICE_TYPES, _miele_kind),
     "home_connect": Integration(
-        "Home Connect",
-        _home_connect,
-        (
-            DEVICE_TYPE_WASHING_MACHINE,
-            DEVICE_TYPE_DISHWASHER,
-            DEVICE_TYPE_TUMBLE_DRYER,
-            DEVICE_TYPE_COFFEE_MACHINE,
-            DEVICE_TYPE_OVEN,
-        ),
-        _home_connect_kind,
+        "Home Connect", _home_connect, APPLIANCE_DEVICE_TYPES, _home_connect_kind
     ),
 }
 
