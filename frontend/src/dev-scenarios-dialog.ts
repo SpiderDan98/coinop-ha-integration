@@ -72,11 +72,35 @@ export class DevScenariosDialog extends LitElement {
       content: html`<p class="muted small">${t("dev.hint")}</p>
         ${this.list?.groups.map((group) => this.renderGroup(group, t))}`,
       error: this.failed && t("dev.failed"),
-      submit: t("dev.load"),
+      action: "load",
+      submit: this.loading ? t("dev.loading") : t("dev.load"),
       busy: this.loading,
+      disabled: !this.list,
       onCancel: () => !this.loading && this.dispatchEvent(new Event("close")),
-      onSubmit: () => {},
+      onSubmit: () => this.load(),
     });
+  }
+
+  private async load() {
+    if (!this.list) return;
+    const pieces = this.list.groups.flatMap((group) =>
+      group.pieces.map(({ name }) => name).filter((name) => this.picked.has(name)),
+    );
+    this.loading = true;
+    this.failed = false;
+    try {
+      await this.hass.callWS({
+        type: "call_service",
+        domain: DEV_INTEGRATION,
+        service: "load",
+        service_data: { pieces } satisfies Selection,
+      });
+    } catch {
+      this.loading = false;
+      this.failed = true;
+      return;
+    }
+    location.assign(this.basePath);
   }
 
   private renderGroup(

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { recordedBackend } from "./fake-hass";
+import { WsError, recordedBackend } from "./fake-hass";
 import { click, iconButton, mountPanel, query, queryAll, text } from "./render";
 
 const SCENARIOS = {
@@ -95,6 +95,14 @@ const pieces = (root: HTMLElement) =>
     box: query(piece, "input") as HTMLInputElement,
   }));
 
+const piece = (dialog: HTMLElement, title: string) => {
+  const found = pieces(dialog).find((candidate) => candidate.title === title);
+  if (!found) throw new Error(`no Piece "${title}"`);
+  return found.box;
+};
+
+const loadButton = (dialog: HTMLElement) => query(dialog, "ha-button.load");
+
 const selected = (dialog: HTMLElement) =>
   pieces(dialog)
     .filter(({ box }) => box.checked)
@@ -172,6 +180,51 @@ describe("Test data", () => {
 
     expect(selected(dialog)).toEqual([]);
     expect(groupBox(dialog, "3D printers")).toMatchObject({ checked: false, indeterminate: false });
+  });
+
+  it("loads the Pieces picked and opens the panel afresh", async () => {
+    let answer = () => {};
+    const backend = devBackend().reply(
+      "call_service",
+      () => new Promise<void>((resolve) => (answer = resolve)),
+    );
+    const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
+    const panel = await mountPanel(backend);
+    const dialog = await open(panel);
+    await click(panel, piece(dialog, "Washing machine"));
+    await click(panel, piece(dialog, "Bambu Lab X1C"));
+
+    await click(panel, loadButton(dialog));
+
+    expect(backend.calls.at(-1)).toMatchObject({
+      type: "call_service",
+      domain: "coinop_dev",
+      service: "load",
+      service_data: { pieces: ["prusa", "bambu", "washer"] },
+    });
+    expect(loadButton(dialog)).toMatchObject({ loading: true });
+    expect(text(loadButton(dialog))).toBe("Loading…");
+    expect(assign).not.toHaveBeenCalled();
+
+    answer();
+    await click(panel, dialog);
+
+    expect(assign).toHaveBeenCalledWith("/coinop");
+  });
+
+  it("keeps the Pieces picked and says so when loading fails", async () => {
+    const backend = devBackend().reply("call_service", () => {
+      throw new WsError("home_assistant_error");
+    });
+    const panel = await mountPanel(backend);
+    const dialog = await open(panel);
+    await click(panel, piece(dialog, "Garden valve"));
+
+    await click(panel, loadButton(dialog));
+
+    expect(text(dialog)).toContain("The Scenario could not be loaded");
+    expect(selected(dialog)).toEqual(["Prusa MK4", "Garden valve"]);
+    expect(loadButton(dialog)).toMatchObject({ loading: false, disabled: false });
   });
 
   it("starts with the groups expanded that have a picked Piece", async () => {
