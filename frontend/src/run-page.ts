@@ -509,7 +509,6 @@ export class RunPage extends LitElement {
     const devices = this.devices?.filter(({ id }) => id === run.device_id);
     const water = devices?.some(({ capabilities }) => capabilities.includes("water"));
     const electricity = run.line_items.some(({ kind }) => kind === "electricity");
-    // Unlike Water's, Electricity's card only shows with its Line Item.
     const kinds = shownKinds(devices, run.line_items).filter(
       (kind) => kind !== "electricity" || electricity,
     );
