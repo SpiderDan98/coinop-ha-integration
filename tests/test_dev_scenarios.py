@@ -183,6 +183,38 @@ async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
 
 
 @pytest.mark.usefixtures("helpers")
+async def test_the_load_service_fills_coinop_when_its_executor_jobs_are_done_at_once(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Awaiting an executor job that is done already doesn't suspend, so the load can
+    reach its first report before Home Assistant tracks the tasks running it."""
+
+    def done_at_once(executor: Any, job: Any, *args: Any) -> asyncio.Future[Any]:
+        future = hass.loop.create_future()
+        future.set_result(job(*args))
+        return future
+
+    assert await async_setup(hass, {})
+    monkeypatch.setattr(hass.loop, "run_in_executor", done_at_once)
+    call = hass.services.async_call(
+        "coinop_dev",
+        "load",
+        {"scenario": "washing-machine"},
+        blocking=True,
+        context=Context(user_id=hass_admin_user.id),
+    )
+
+    async with asyncio.timeout(10):
+        await hass.async_create_task(call)
+
+    assert await counts(panel) == (1, 4, 10, 0)
+
+
+@pytest.mark.usefixtures("helpers")
 async def test_quick_start_adds_the_washing_machine_washdata_follows(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
