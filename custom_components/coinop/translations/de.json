@@ -449,7 +449,7 @@
           "markup": "Standard-Aufschlag"
         },
         "data_description": {
-          "spoolman_url": "Optional. Die Adresse deines Spoolman-Servers, z. B. http://192.168.1.20:7912. Materialien, die mit einem Spoolman-Filament verknüpft sind, beziehen ihren Preis pro Gramm von dort. Leer lassen, um Spoolman nicht mehr zu lesen: Verknüpfte Materialien behalten den zuletzt gelesenen Preis.",
+          "spoolman_url": "Optional. Die Adresse deines Spoolman-Servers, z. B. http://192.168.1.20:7912. Jedes Spoolman-Filament wird dann ein Material, das seinen Preis aus Spoolman bezieht. Leer lassen, um Spoolman nicht mehr zu lesen: Diese Materialien behalten den zuletzt gelesenen Preis.",
           "markup": "Der Aufschlag, mit dem eine neue Kostenaufstellung beginnt: ein Prozentsatz auf ihre Zwischensumme. Du kannst ihn bei jedem Export ändern."
         }
       }
@@ -558,7 +558,7 @@
         "step": {
           "confirm": {
             "title": "Spoolman verbinden",
-            "description": "Coin-op hat Spoolman unter {url} gefunden, in den Coin-op-Optionen ist aber keine Spoolman-URL eingetragen. Verbinde Spoolman, um Materialien mit Spoolman-Filamenten zu verknüpfen, damit ihr Preis pro Gramm aus Spoolman kommt. Verknüpft wird erst, wenn du das im Reiter Materialien tust.\n\nIgnoriere diesen Hinweis, wenn Coin-op Spoolman nicht lesen soll."
+            "description": "Coin-op hat Spoolman unter {url} gefunden, in den Coin-op-Optionen ist aber keine Spoolman-URL eingetragen. Verbinde Spoolman, damit jedes Spoolman-Filament ein Material wird, dessen Preis aus Spoolman kommt. Deine eigenen Materialien, die zu einem Filament passen, werden erst zusammengeführt, wenn du das im Reiter Materialien entscheidest.\n\nIgnoriere diesen Hinweis, wenn Coin-op Spoolman nicht lesen soll."
           }
         },
         "abort": {

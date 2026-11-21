@@ -485,34 +485,41 @@ export interface MaterialFields {
   price: { source: "fixed"; pack_price: number; pack_size: number; pack_unit: PackUnit };
 }
 
-/** Linking to a Spoolman Filament; Spoolman then supplies the price and the details. */
-export type SpoolmanLink = { source: "spoolman"; filament_id: number };
-
 export interface Material extends Omit<MaterialFields, "price"> {
   id: string;
   archived: boolean;
-  /** A linked Material keeps the last price per gram read from Spoolman. */
-  price: MaterialFields["price"] | (SpoolmanLink & { per_gram: number | null });
+  /** A Material from Spoolman keeps the last price per gram read; `pack_price` per
+   * `pack_weight` g is what Spoolman prices it by now (null while it has no price). */
+  price:
+    | MaterialFields["price"]
+    | {
+        source: "spoolman";
+        filament_id: number;
+        per_gram: number | null;
+        pack_price: number | null;
+        pack_weight: number | null;
+      };
   /** Exactly one is set: per piece when bought by the piece, else per gram. */
   price_per_gram: number | null;
   price_per_piece: number | null;
 }
 
+/** A Spoolman Filament an own Material can be merged into; `name` is the Material's
+ * name it would give. */
 export interface Filament {
   id: number;
-  name: string | null;
+  name: string;
   vendor: string | null;
   type: string | null;
-  density: number;
-  diameter: number;
   colour: string | null;
   price_per_gram: number | null;
 }
 
-/** Reading the Filaments also brings the linked Materials up to date. */
-export type Filaments = {
+/** Reading Spoolman brings the Materials up to date; `merges` are the own Materials with
+ * the Filaments waiting to be merged into them, best match first. */
+export type SpoolmanState = {
   status: "ok" | "unreachable" | "not_configured";
-  filaments: Filament[];
+  merges: { material_id: string; candidates: Filament[] }[];
 };
 
 export interface MaterialType {
@@ -547,22 +554,21 @@ export const getMaterialTypes = async (hass: HomeAssistant) =>
 export const createMaterial = (hass: HomeAssistant, material: MaterialFields) =>
   hass.callWS<{ material: Material }>({ type: "coinop/materials/create", material });
 
-export const listFilaments = (hass: HomeAssistant) =>
-  hass.callWS<Filaments>({ type: "coinop/spoolman/filaments" });
+export const readSpoolman = (hass: HomeAssistant) =>
+  hass.callWS<SpoolmanState>({ type: "coinop/spoolman/read" });
 
-export const createMaterialFromSpoolman = (hass: HomeAssistant, filamentId: number) =>
-  hass.callWS<{ material: Material }>({
-    type: "coinop/materials/create_from_spoolman",
-    filament_id: filamentId,
-  });
+/** Each pick merges its Material into the Filament, or keeps it own (null). Answers
+ * `not_allowed` when a pick no longer waits, `spoolman_unreachable` without Spoolman. */
+export const mergeSpoolman = (
+  hass: HomeAssistant,
+  picks: { material_id: string; filament_id: number | null }[],
+) => hass.callWS<SpoolmanState>({ type: "coinop/spoolman/merge", picks });
 
-/** Answers the error code `spoolman_unreachable` when linking while Spoolman is away. */
+/** A Material from Spoolman takes only `default_for_type`. */
 export const updateMaterial = (
   hass: HomeAssistant,
   materialId: string,
-  material: Partial<Omit<MaterialFields, "price">> & {
-    price?: MaterialFields["price"] | SpoolmanLink;
-  },
+  material: Partial<MaterialFields>,
 ) =>
   hass.callWS<{ material: Material }>({
     type: "coinop/materials/update",

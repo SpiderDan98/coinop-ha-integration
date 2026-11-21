@@ -113,6 +113,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoinOpConfigEntry) -> bo
     entry.async_create_background_task(
         hass, async_offer(hass, wanted), "coinop_spoolman_offer"
     )
+    if spoolman.url is not None:
+        entry.async_create_background_task(
+            hass, spoolman.async_refresh(), "coinop_spoolman_read"
+        )
     entry.async_on_unload(ha_device.async_track_renames(hass, entry))
     return True
 

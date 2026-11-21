@@ -92,7 +92,7 @@ class Seed:
         # Each Device with history's subentry id, by its Piece's name.
         self.devices = devices
         self.history = history
-        # The Spoolman Filament each Material is linked to, by its name.
+        # The Spoolman Filament each Material comes from, by its name.
         self.filaments = filaments
         self.random = random.Random(42)
         self.now = dt_util.now().replace(second=0, microsecond=0)
@@ -102,6 +102,9 @@ class Seed:
         self.retired: set[str] = set()
 
     async def add_filaments(self) -> None:
+        if self.filaments:
+            await self.add_spoolman_filaments()
+            return
         for name, type_, colour, vendor, pack_price in MATERIALS:
             material = {
                 "name": name,
@@ -118,15 +121,19 @@ class Seed:
                 "diameter": 1.75,
             }
             created = await self.api.call("coinop/materials/create", material=material)
-            if (filament_id := self.filaments.get(name)) is not None:
-                created = await self.api.call(
-                    "coinop/materials/update",
-                    material_id=created["material"]["id"],
-                    material={
-                        "price": {"source": "spoolman", "filament_id": filament_id}
-                    },
-                )
             self.materials[name] = created["material"]
+
+    async def add_spoolman_filaments(self) -> None:
+        """Reading Spoolman gives each of its Filaments a Material."""
+        await self.api.call("coinop/spoolman/read")
+        listed = (await self.api.call("coinop/materials/list"))["materials"]
+        by_filament = {
+            material["price"]["filament_id"]: material
+            for material in listed
+            if material["price"]["source"] == "spoolman"
+        }
+        for name, *_ in MATERIALS:
+            self.materials[name] = by_filament[self.filaments[name]]
 
     async def add_products(self, products: Iterable[Product]) -> None:
         for product in products:

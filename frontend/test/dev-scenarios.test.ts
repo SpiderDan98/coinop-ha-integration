@@ -207,7 +207,7 @@ describe("Test data", () => {
       "Two years",
     ]);
     expect(text(query(dialog, ".options"))).toContain("An open Run on each Device with history");
-    expect(text(query(dialog, ".options"))).toContain("The filaments linked to the dev Spoolman");
+    expect(text(query(dialog, ".options"))).toContain("The dev Spoolman's filaments as Materials");
     expect(
       historySelect(dialog).compareDocumentPosition(groups(dialog)[0]) &
         Node.DOCUMENT_POSITION_FOLLOWING,

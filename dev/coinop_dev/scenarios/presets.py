@@ -66,7 +66,7 @@ PRESETS = {
     ),
     "spoolman": Preset(
         "3D printer on Spoolman",
-        "Like a few Runs, with the 8 filaments linked to Spoolman, which prices them.",
+        "Like a few Runs, with Spoolman's 12 filaments as Materials it prices.",
         ("prusa",),
         {"spoolman": True},
     ),

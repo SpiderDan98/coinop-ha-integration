@@ -356,7 +356,9 @@
         "price": {
           "source": "spoolman",
           "filament_id": 7,
-          "per_gram": 0.027
+          "per_gram": 0.027,
+          "pack_price": null,
+          "pack_weight": null
         }
       }
     ],

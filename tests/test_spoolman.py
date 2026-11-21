@@ -51,7 +51,8 @@ async def set_options(hass: HomeAssistant, entry: ConfigEntry, **options: Any) -
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], options
     )
-    await hass.async_block_till_done()
+    # Setting up again reads Spoolman in the background.
+    await hass.async_block_till_done(wait_background_tasks=True)
     return result
 
 
@@ -65,8 +66,9 @@ async def test_the_spoolman_url_is_checked_on_save(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {"spoolman_url": SPOOLMAN}
+    # Saving checks the URL, and the hub set up again reads Spoolman.
     assert [str(url) for _, url, *_ in aioclient_mock.mock_calls] == [
-        f"{SPOOLMAN}/api/v1/info"
+        f"{SPOOLMAN}/api/v1/{path}" for path in ("info", "filament", "spool")
     ]
 
 
@@ -139,44 +141,91 @@ async def add_spoolman_hub(
     return entry
 
 
-async def link(
-    panel: PanelClient, material_id: str, filament_id: int, **changes: Any
-) -> dict[str, Any]:
-    result = await panel.call(
-        "coinop/materials/update",
-        material_id=material_id,
-        material=changes
-        | {"price": {"source": "spoolman", "filament_id": filament_id}},
-    )
-    linked: dict[str, Any] = result["material"]
-    return linked
+async def read(panel: PanelClient) -> dict[str, Any]:
+    answer: dict[str, Any] = await panel.call("coinop/spoolman/read")
+    return answer
 
 
-async def test_a_linked_material_is_priced_per_gram_from_its_filament(
+async def materials(panel: PanelClient) -> list[dict[str, Any]]:
+    listed: list[dict[str, Any]] = (await panel.call("coinop/materials/list"))[
+        "materials"
+    ]
+    return listed
+
+
+async def of_filament(panel: PanelClient, filament_id: int) -> dict[str, Any]:
+    """The Material linked to the Filament."""
+    [material] = [
+        m
+        for m in await materials(panel)
+        if m["price"]["source"] == "spoolman"
+        and m["price"]["filament_id"] == filament_id
+    ]
+    return material
+
+
+def merges(answer: dict[str, Any]) -> dict[str, list[int]]:
+    """The candidates' ids, by own Material."""
+    return {
+        merge["material_id"]: [f["id"] for f in merge["candidates"]]
+        for merge in answer["merges"]
+    }
+
+
+async def test_reading_spoolman_gives_each_filament_a_linked_material(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
-    hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla", name="Black PLA"))
+    await add_spoolman_hub(hass, aioclient_mock)
+    serve_spoolman(aioclient_mock, filaments=[filament(7)])
+
+    assert await read(panel) == {"status": "ok", "merges": []}
+
+    [created] = await materials(panel)
+    assert created == {
+        "id": created["id"],
+        "name": "eSun PLA+ black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": True,
+        "archived": False,
+        "price": {
+            "source": "spoolman",
+            "filament_id": 7,
+            "per_gram": 0.02,
+            "pack_price": 20.0,
+            "pack_weight": 1000.0,
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": None,
+    }
+    await read(panel)
+    assert await materials(panel) == [created]
+
+
+async def test_starting_with_spoolman_set_reads_it(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
     await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
 
-    linked = await link(panel, "pla", 7)
-
-    assert linked["price"] == {"source": "spoolman", "filament_id": 7, "per_gram": 0.02}
-    assert linked["price_per_gram"] == pytest.approx(0.02)
-    assert linked["name"] == "Black PLA"
+    assert [m["name"] for m in await materials(panel)] == ["eSun PLA+ black"]
 
 
 async def test_without_a_filament_price_the_newest_priced_spool_counts(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
-    hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla"))
     unpriced = filament(7, price=None)
     await add_spoolman_hub(
         hass,
@@ -204,19 +253,21 @@ async def test_without_a_filament_price_the_newest_priced_spool_counts(
         ],
     )
 
-    linked = await link(panel, "pla", 7)
+    material = await of_filament(panel, 7)
 
-    assert linked["price_per_gram"] == pytest.approx(0.03)
+    assert material["price_per_gram"] == pytest.approx(0.03)
+    assert (material["price"]["pack_price"], material["price"]["pack_weight"]) == (
+        22.5,
+        750.0,
+    )
 
 
 async def test_a_spool_without_its_own_weight_counts_the_filament_weight(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
-    hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla"))
     unpriced = filament(7, price=None, weight=500.0)
     await add_spoolman_hub(
         hass,
@@ -225,23 +276,16 @@ async def test_a_spool_without_its_own_weight_counts_the_filament_weight(
         spools=[spool(1, unpriced, price=15)],
     )
 
-    linked = await link(panel, "pla", 7)
-
-    assert linked["price_per_gram"] == pytest.approx(0.03)
+    assert (await of_filament(panel, 7))["price_per_gram"] == pytest.approx(0.03)
 
 
-async def filaments(panel: PanelClient) -> dict[str, Any]:
-    listed: dict[str, Any] = await panel.call("coinop/spoolman/filaments")
-    return listed
-
-
-async def test_the_materials_tab_lists_the_spoolman_filaments(
+async def test_a_filament_without_a_price_or_a_name_still_gets_a_material(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    unpriced = filament(
+    bare = filament(
         8,
         name=None,
         vendor=None,
@@ -250,94 +294,95 @@ async def test_the_materials_tab_lists_the_spoolman_filaments(
         color_hex=None,
         multi_color_hexes="FF0000,00ff00",
     )
-    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7), unpriced])
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[bare])
 
-    assert await filaments(panel) == {
-        "status": "ok",
-        "filaments": [
-            {
-                "id": 7,
-                "name": "PLA+ black",
-                "vendor": "eSun",
-                "type": "PLA",
-                "density": 1.24,
-                "diameter": 1.75,
-                "colour": "#1a1a1a",
-                "price_per_gram": 0.02,
-            },
-            {
-                "id": 8,
-                "name": None,
-                "vendor": None,
-                "type": None,
-                "density": 1.24,
-                "diameter": 1.75,
-                "colour": "#ff0000",
-                "price_per_gram": None,
-            },
-        ],
+    material = await of_filament(panel, 8)
+
+    assert {k: material[k] for k in ("name", "type", "colour", "vendor")} == {
+        "name": "8",
+        "type": "8",
+        "colour": "#ff0000",
+        "vendor": None,
+    }
+    assert material["price"] == {
+        "source": "spoolman",
+        "filament_id": 8,
+        "per_gram": None,
+        "pack_price": None,
+        "pack_weight": None,
     }
 
 
-async def test_the_list_says_when_spoolman_is_not_set_up_or_unreachable(
-    hass: HomeAssistant,
-    clock: Clock,
-    panel: PanelClient,
-    aioclient_mock: AiohttpClientMocker,
-) -> None:
-    entry = await add_hub(hass)
-    assert await filaments(panel) == {"status": "not_configured", "filaments": []}
-
-    serve_spoolman(aioclient_mock)
-    await set_options(hass, entry, spoolman_url=SPOOLMAN)
-    spoolman_down(aioclient_mock)
-    assert await filaments(panel) == {"status": "unreachable", "filaments": []}
-
-    aioclient_mock.clear_requests()
-    aioclient_mock.get(f"{SPOOLMAN}/api/v1/filament", json={"detail": "not a list"})
-    aioclient_mock.get(f"{SPOOLMAN}/api/v1/spool", json=[])
-    assert await filaments(panel) == {"status": "unreachable", "filaments": []}
-
-
-async def test_a_material_created_from_a_filament_takes_over_its_details(
-    hass: HomeAssistant,
-    clock: Clock,
-    panel: PanelClient,
-    aioclient_mock: AiohttpClientMocker,
-) -> None:
-    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
-
-    result = await panel.call("coinop/materials/create_from_spoolman", filament_id=7)
-
-    created = result["material"]
-    assert created == {
-        "id": created["id"],
-        "name": "eSun PLA+ black",
-        "form": "filament",
-        "type": "PLA",
-        "density": 1.24,
-        "vendor": "eSun",
-        "colour": "#1a1a1a",
-        "diameter": 1.75,
-        "default_for_type": False,
-        "archived": False,
-        "price": {"source": "spoolman", "filament_id": 7, "per_gram": 0.02},
-        "price_per_gram": 0.02,
-        "price_per_piece": None,
-    }
-    assert (await panel.call("coinop/materials/list"))["materials"] == [created]
-
-
-async def test_linked_materials_follow_their_filament_when_the_tab_opens(
+async def test_a_new_material_is_default_only_while_its_type_has_none(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
     hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla", name="Black PLA"))
+    place_materials(
+        hass_storage,
+        stored_material("resin", form="resin", type="PETG", default_for_type=True),
+        stored_material("old-pla", type="pla", default_for_type=True, archived=True),
+    )
+    await add_spoolman_hub(
+        hass,
+        aioclient_mock,
+        filaments=[
+            filament(7),
+            filament(8, name="PLA red"),
+            filament(9, name="PETG grey", material="PETG"),
+        ],
+    )
+    first = await of_filament(panel, 7)
+    assert first["default_for_type"] is True
+    await panel.call(
+        "coinop/materials/update",
+        material_id=first["id"],
+        material={"default_for_type": False},
+    )
+
+    await read(panel)
+
+    assert {
+        m["name"]: m["default_for_type"]
+        for m in await materials(panel)
+        if m["price"]["source"] == "spoolman"
+    } == {"eSun PLA+ black": False, "eSun PLA red": False, "eSun PETG grey": False}
+
+
+async def test_a_filament_gone_from_spoolman_archives_its_material(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    await add_spoolman_hub(
+        hass, aioclient_mock, filaments=[filament(7), filament(8, name="PLA red")]
+    )
+    kept = await of_filament(panel, 8)
+    await panel.call("coinop/materials/archive", material_id=kept["id"])
+    serve_spoolman(aioclient_mock, filaments=[filament(8, name="PLA red")])
+
+    await read(panel)
+    await read(panel)
+
+    by_filament = {m["price"]["filament_id"]: m for m in await materials(panel)}
+    assert {
+        f: (m["archived"], m["default_for_type"]) for f, m in by_filament.items()
+    } == {
+        7: (True, False),
+        8: (True, False),
+    }
+
+
+async def test_linked_materials_follow_their_filament_when_the_tab_opens(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
     await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
-    await link(panel, "pla", 7, colour="#ffffff")
     await panel.subscribe("coinop/catalog/subscribe")
     await panel.event()
 
@@ -356,7 +401,7 @@ async def test_linked_materials_follow_their_filament_when_the_tab_opens(
             )
         ],
     )
-    await filaments(panel)
+    await read(panel)
 
     [material] = (await panel.event())["materials"]
     assert {
@@ -371,7 +416,7 @@ async def test_linked_materials_follow_their_filament_when_the_tab_opens(
             "price_per_gram",
         )
     } == {
-        "name": "Black PLA",
+        "name": "Prusament PETG blue",
         "type": "PETG",
         "density": 1.27,
         "diameter": 2.85,
@@ -381,126 +426,332 @@ async def test_linked_materials_follow_their_filament_when_the_tab_opens(
     }
 
 
-async def test_linking_needs_spoolman_and_the_filament(
+async def test_a_filament_that_lost_its_price_keeps_the_last_price_read(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+    serve_spoolman(aioclient_mock, filaments=[filament(7, price=None)])
+
+    await read(panel)
+
+    material = await of_filament(panel, 7)
+    assert material["price"] == {
+        "source": "spoolman",
+        "filament_id": 7,
+        "per_gram": 0.02,
+        "pack_price": None,
+        "pack_weight": None,
+    }
+
+
+async def test_the_read_says_when_spoolman_is_not_set_up_or_unreachable(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    entry = await add_hub(hass)
+    assert await read(panel) == {"status": "not_configured", "merges": []}
+
+    serve_spoolman(aioclient_mock)
+    await set_options(hass, entry, spoolman_url=SPOOLMAN)
+    spoolman_down(aioclient_mock)
+    assert await read(panel) == {"status": "unreachable", "merges": []}
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{SPOOLMAN}/api/v1/filament", json={"detail": "not a list"})
+    aioclient_mock.get(f"{SPOOLMAN}/api/v1/spool", json=[])
+    assert await read(panel) == {"status": "unreachable", "merges": []}
+
+
+async def test_clearing_the_url_keeps_linked_materials_and_their_last_price(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    entry = await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+    before = await of_filament(panel, 7)
+
+    await set_options(hass, entry)
+    await read(panel)
+
+    assert await materials(panel) == [before]
+
+
+def own(material_id: str, **fields: Any) -> dict[str, Any]:
+    """An own black eSun PLA at 0.025 per gram."""
+    return (
+        stored_material(
+            material_id,
+            name="My black PLA",
+            vendor="eSun",
+            colour="#1a1a1a",
+            price={
+                "source": "fixed",
+                "pack_price": 25.0,
+                "pack_size": 1000.0,
+                "pack_unit": "g",
+            },
+        )
+        | fields
+    )
+
+
+async def test_filaments_matching_an_own_material_wait_to_be_merged(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
     hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla"))
-    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
-    price = {"source": "spoolman", "filament_id": 9}
+    place_materials(
+        hass_storage,
+        own("black"),
+        own("any-pla", name="Any PLA", vendor="Prusament", colour=None),
+        own("archived", archived=True),
+        own("resin", form="resin"),
+        own(
+            "pods",
+            price={
+                "source": "fixed",
+                "pack_price": 1,
+                "pack_size": 10,
+                "pack_unit": "pcs",
+            },
+            density=None,
+        ),
+    )
+    await add_spoolman_hub(
+        hass,
+        aioclient_mock,
+        filaments=[
+            filament(7),
+            filament(
+                8,
+                name="PLA white",
+                color_hex="FFFFFF",
+                vendor={"id": 2, "name": "Prusament"},
+            ),
+            filament(
+                9, name="PLA+ black", material="pla", vendor={"id": 3, "name": "Sunlu"}
+            ),
+            filament(10, material="PETG"),
+            filament(11, material=None),
+        ],
+    )
 
-    missing = await panel.error(
-        "coinop/materials/update", material_id="pla", material={"price": price}
+    answer = await read(panel)
+
+    assert merges(answer) == {"black": [7, 9], "any-pla": [8, 7, 9]}
+    assert answer["merges"][0]["candidates"][0] == {
+        "id": 7,
+        "name": "eSun PLA+ black",
+        "vendor": "eSun",
+        "type": "PLA",
+        "colour": "#1a1a1a",
+        "price_per_gram": 0.02,
+    }
+    linked = [m for m in await materials(panel) if m["price"]["source"] == "spoolman"]
+    assert sorted(m["price"]["filament_id"] for m in linked) == [10, 11]
+
+
+async def test_merging_links_the_own_material_in_place(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    place_materials(
+        hass_storage,
+        own("black", default_for_type=True),
+        own("white", name="My white PLA", colour="#ffffff"),
     )
-    not_created = await panel.error(
-        "coinop/materials/create_from_spoolman", filament_id=9
+    await add_spoolman_hub(
+        hass,
+        aioclient_mock,
+        filaments=[
+            filament(7),
+            filament(8, name="PLA white", color_hex="FFFFFF", price=None),
+            filament(9, name="PLA+ black v2"),
+        ],
     )
+
+    answer = await panel.call(
+        "coinop/spoolman/merge",
+        picks=[
+            {"material_id": "black", "filament_id": 7},
+            {"material_id": "white", "filament_id": 8},
+        ],
+    )
+
+    assert answer == {"status": "ok", "merges": []}
+    by_id = {m["id"]: m for m in await materials(panel)}
+    assert by_id["black"] == {
+        "id": "black",
+        "name": "eSun PLA+ black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": True,
+        "archived": False,
+        "price": {
+            "source": "spoolman",
+            "filament_id": 7,
+            "per_gram": 0.02,
+            "pack_price": 20.0,
+            "pack_weight": 1000.0,
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": None,
+    }
+    # Without a price in Spoolman, its fixed price stays as the last price read.
+    assert by_id["white"]["price"] == {
+        "source": "spoolman",
+        "filament_id": 8,
+        "per_gram": 0.025,
+        "pack_price": None,
+        "pack_weight": None,
+    }
+    [new] = [m for m in by_id.values() if m["id"] not in ("black", "white")]
+    assert (new["price"]["filament_id"], new["default_for_type"]) == (9, False)
+
+
+async def test_keeping_own_gives_the_candidates_their_own_materials(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    place_materials(hass_storage, own("black"), own("any", name="Any PLA", colour=None))
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7), filament(8)])
+
+    kept = await panel.call(
+        "coinop/spoolman/merge", picks=[{"material_id": "black", "filament_id": None}]
+    )
+
+    # Both Filaments are candidates of Any PLA too, which wasn't decided.
+    assert merges(kept) == {"black": [7, 8], "any": [7, 8]}
+    assert await panel.call(
+        "coinop/spoolman/merge",
+        picks=[
+            {"material_id": "black", "filament_id": None},
+            {"material_id": "any", "filament_id": None},
+        ],
+    ) == {"status": "ok", "merges": []}
+    by_id = {m["id"]: m for m in await materials(panel)}
+    assert (
+        by_id["black"]["price"]["source"] == by_id["any"]["price"]["source"] == "fixed"
+    )
+    assert sorted(
+        m["price"]["filament_id"]
+        for m in by_id.values()
+        if m["price"]["source"] == "spoolman"
+    ) == [7, 8]
+    serve_spoolman(aioclient_mock, filaments=[filament(7), filament(8), filament(9)])
+    assert merges(await read(panel)) == {"black": [9], "any": [9]}
+
+
+async def test_a_merge_needs_spoolman_and_picks_still_waiting(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    place_materials(hass_storage, own("black"), own("other", name="Other black"))
+    await add_spoolman_hub(
+        hass, aioclient_mock, filaments=[filament(7), filament(8, material="PETG")]
+    )
+    MERGE = "coinop/spoolman/merge"
+
+    stale = [
+        await panel.error(MERGE, picks=[{"material_id": "black", "filament_id": 8}]),
+        await panel.error(MERGE, picks=[{"material_id": "gone", "filament_id": None}]),
+        await panel.error(
+            MERGE,
+            picks=[
+                {"material_id": "black", "filament_id": 7},
+                {"material_id": "other", "filament_id": 7},
+            ],
+        ),
+    ]
     spoolman_down(aioclient_mock)
     unreachable = await panel.error(
-        "coinop/materials/update",
-        material_id="pla",
-        material={"price": price | {"filament_id": 7}},
+        MERGE, picks=[{"material_id": "black", "filament_id": 7}]
     )
 
-    # A Material comes from a Filament only through create_from_spoolman.
-    by_hand = await panel.error(
+    assert [error["code"] for error in stale] == ["not_allowed"] * 3
+    assert unreachable["code"] == "spoolman_unreachable"
+    assert {m["id"]: m["price"]["source"] for m in await materials(panel)} == {
+        "black": "fixed",
+        "other": "fixed",
+        (await of_filament(panel, 8))["id"]: "spoolman",
+    }
+
+
+async def test_a_linked_material_only_changes_its_default_and_is_never_deleted(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+    material = await of_filament(panel, 7)
+    UPDATE = "coinop/materials/update"
+
+    renamed = await panel.error(
+        UPDATE, material_id=material["id"], material={"name": "Mine"}
+    )
+    fixed = await panel.error(
+        UPDATE,
+        material_id=material["id"],
+        material={"price": {"source": "fixed", "pack_price": 1, "pack_size": 1}},
+    )
+    relinked = await panel.error(
+        UPDATE,
+        material_id=material["id"],
+        material={"price": {"source": "spoolman", "filament_id": 7}},
+    )
+    deleted = await panel.error("coinop/materials/delete", material_id=material["id"])
+    unstarred = await panel.call(
+        UPDATE, material_id=material["id"], material={"default_for_type": False}
+    )
+
+    assert [renamed["code"], fixed["code"], deleted["code"]] == ["not_allowed"] * 3
+    assert relinked["code"] == "invalid_format"
+    assert unstarred["material"] == material | {"default_for_type": False}
+
+
+async def test_own_materials_of_every_form_can_still_be_created(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+
+    created = await panel.call(
         "coinop/materials/create",
         material={
-            "name": "PLA",
+            "name": "Cheap PLA",
             "form": "filament",
             "type": "PLA",
             "density": 1.24,
-            "price": price | {"filament_id": 7},
+            "price": {"source": "fixed", "pack_price": 15, "pack_size": 1000},
         },
     )
-    assert by_hand["code"] == "invalid_format"
-    assert (missing["code"], not_created["code"]) == ("not_found", "not_found")
-    assert unreachable["code"] == "spoolman_unreachable"
-    [material] = (await panel.call("coinop/materials/list"))["materials"]
-    assert material["price"]["source"] == "fixed"
 
-
-async def test_a_material_priced_per_piece_is_not_linked(
-    hass: HomeAssistant,
-    clock: Clock,
-    panel: PanelClient,
-    hass_storage: dict[str, Any],
-    aioclient_mock: AiohttpClientMocker,
-) -> None:
-    pods = stored_material(
-        "pods",
-        form="detergent",
-        type="Detergent pods",
-        density=None,
-        diameter=None,
-        price={
-            "source": "fixed",
-            "pack_price": 12,
-            "pack_size": 40,
-            "pack_unit": "pcs",
-        },
-    )
-    place_materials(hass_storage, pods)
-    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
-
-    error = await panel.error(
-        "coinop/materials/update",
-        material_id="pods",
-        material={"price": {"source": "spoolman", "filament_id": 7}},
-    )
-
-    assert error["code"] == "not_allowed"
-    [material] = (await panel.call("coinop/materials/list"))["materials"]
-    assert material["price"] == pods["price"]
-
-
-@pytest.mark.parametrize(
-    ("form", "type_", "pack_unit"),
-    [
-        ("dishwasher_product", "Dishwasher salt", "g"),
-        ("beverage_ingredient", "Milk", "ml"),
-        ("other", "Fertiliser", "g"),
-        ("other", "Fertiliser", "ml"),
-    ],
-)
-async def test_a_dishwasher_product_beverage_ingredient_or_other_material_is_not_linked(
-    hass: HomeAssistant,
-    clock: Clock,
-    panel: PanelClient,
-    hass_storage: dict[str, Any],
-    aioclient_mock: AiohttpClientMocker,
-    form: str,
-    type_: str,
-    pack_unit: str,
-) -> None:
-    stored = stored_material(
-        "product",
-        form=form,
-        type=type_,
-        density=1.1,
-        diameter=None,
-        price={
-            "source": "fixed",
-            "pack_price": 2,
-            "pack_size": 1000,
-            "pack_unit": pack_unit,
-        },
-    )
-    place_materials(hass_storage, stored)
-    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
-
-    error = await panel.error(
-        "coinop/materials/update",
-        material_id="product",
-        material={"price": {"source": "spoolman", "filament_id": 7}},
-    )
-
-    assert error["code"] == "not_allowed"
-    [material] = (await panel.call("coinop/materials/list"))["materials"]
-    assert (material["form"], material["price"]) == (form, stored["price"])
+    assert created["material"]["price"]["source"] == "fixed"
+    assert merges(await read(panel)) == {}
 
 
 def linked_material(material_id: str, per_gram: float, **fields: Any) -> dict[str, Any]:
@@ -552,7 +803,7 @@ async def test_without_spoolman_the_last_price_read_applies_and_the_run_is_flagg
     spoolman: str,
 ) -> None:
     place_materials(hass_storage, linked_material("pla", 0.025))
-    serve_spoolman(aioclient_mock)
+    serve_spoolman(aioclient_mock, filaments=[filament(7, price=25.0)])
     entry = await add_measuring_device(hass, panel)
     if spoolman == "unreachable":
         await set_options(hass, entry, spoolman_url=SPOOLMAN)

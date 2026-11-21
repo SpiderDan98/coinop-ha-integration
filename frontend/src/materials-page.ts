@@ -1,7 +1,8 @@
 // The Materials tab: the global catalogue, listed read-only and edited in a dialog. The
 // list itself comes from the panel's catalogue subscription, so every open panel shows
 // each change.
-// Opening the tab reads Spoolman's Filaments, which refreshes the linked Materials.
+// Opening the tab reads Spoolman, which creates, refreshes and archives the Materials from
+// it and tells which own Materials could be merged into its Filaments.
 import {
   mdiArchiveArrowUpOutline,
   mdiArchiveOutline,
@@ -18,21 +19,20 @@ import { customElement, property, state } from "lit/decorators.js";
 import {
   archiveMaterial,
   createMaterial,
-  createMaterialFromSpoolman,
   deleteMaterial,
   getMaterialTypes,
-  listFilaments,
+  mergeSpoolman,
+  readSpoolman,
   restoreMaterial,
   updateMaterial,
   MATERIAL_FORMS,
   PACK_UNITS,
-  type Filament,
-  type Filaments,
   type Material,
   type MaterialFields,
   type MaterialForm,
   type MaterialType,
   type PackUnit,
+  type SpoolmanState,
 } from "./api";
 import { confirmDialog, formDialog } from "./dialog";
 import { checkbox, field, input, numberInput, select, withUnit } from "./fields";
@@ -70,12 +70,14 @@ const blankDraft = () => ({
   pack_size: "1000",
   pack_unit: "g" as PackUnit,
   default_for_type: false,
-  price_source: "fixed" as Material["price"]["source"],
-  filament_id: "",
 });
 
 type Draft = ReturnType<typeof blankDraft>;
 
+const fromSpoolman = (material: Material) => material.price.source === "spoolman";
+
+/** A Material from Spoolman is copied at the price Spoolman has for it now, else at the
+ * last price read. */
 const draftOf = ({ price, ...material }: Material): Draft => ({
   ...blankDraft(),
   name: material.name,
@@ -86,40 +88,25 @@ const draftOf = ({ price, ...material }: Material): Draft => ({
   colour: material.colour ?? "",
   diameter: material.diameter === null ? DEFAULT_DIAMETER : String(material.diameter),
   default_for_type: material.default_for_type,
-  price_source: price.source,
   ...(price.source === "fixed"
     ? {
         pack_price: String(price.pack_price),
         pack_size: String(price.pack_size),
         pack_unit: price.pack_unit,
       }
-    : { pack_unit: usualUnit(material.form, "g"), filament_id: String(price.filament_id) }),
+    : price.pack_price !== null && price.pack_weight !== null
+      ? { pack_price: String(price.pack_price), pack_size: String(price.pack_weight) }
+      : { pack_price: price.per_gram === null ? "" : String(+(price.per_gram * 1000).toFixed(2)) }),
 });
 
-/** A copy leaves its type's default and a Spoolman link with the original. */
-const copyOf = (material: Material): Draft => ({
-  ...draftOf(material),
-  default_for_type: false,
-  price_source: "fixed",
-});
+/** A copy leaves its type's default with the original and is an own Material. */
+const copyOf = (material: Material): Draft => ({ ...draftOf(material), default_for_type: false });
 
-/** Spoolman supplies everything else of a linked Material. */
-const linkOf = (draft: Draft) => ({
-  name: draft.name,
-  default_for_type: draft.default_for_type,
-  price: { source: "spoolman" as const, filament_id: Number(draft.filament_id) },
-});
-
-const filamentName = (filament: Filament) =>
-  [filament.vendor, filament.name].filter(Boolean).join(" ") || filament.type || `#${filament.id}`;
+const ORIGINS = ["all", "spoolman", "own"] as const;
+type Origin = (typeof ORIGINS)[number];
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
 
-const UNLINKED_FORMS = new Set<MaterialForm>([
-  "dishwasher_product",
-  "beverage_ingredient",
-  "other",
-]);
 const hasBuiltInTypes = (form: MaterialForm) => form !== "other";
 const byPiece = (draft: Draft) => draft.pack_unit === "pcs";
 const hasDiameter = (draft: Draft) => draft.form === "filament" && !byPiece(draft);
@@ -127,11 +114,6 @@ const hasDiameter = (draft: Draft) => draft.form === "filament" && !byPiece(draf
 /** The fields of a draft that the backend would refuse, so they can be marked. */
 function problems(draft: Draft) {
   const positive = (value: string) => value.trim() !== "" && Number(value) > 0;
-  if (draft.price_source === "spoolman")
-    return new Set([
-      ...(draft.name.trim() ? [] : ["name"]),
-      ...(draft.filament_id ? [] : ["filament_id"]),
-    ]);
   const checks = {
     name: draft.name.trim() !== "",
     type: draft.type.trim() !== "",
@@ -180,12 +162,15 @@ export class MaterialsPage extends LitElement {
   @state() private deleting?: Material;
   @state() private notice?: string;
   /** Undefined until read, or when the backend couldn't answer. */
-  @state() private spoolman?: Filaments;
+  @state() private spoolman?: SpoolmanState;
+  @state() private origin: Origin = "all";
+  /** The merge dialog's pick per own Material: a Filament id, or "" to keep it own. */
+  @state() private picks?: Record<string, string>;
+  @state() private mergeFailure?: Key;
   private typesRequested = false;
   private readonly pages = {
     active: new Pagination(this),
     archived: new Pagination(this),
-    filaments: new Pagination(this),
   };
 
   protected override willUpdate(changed: PropertyValues<this>) {
@@ -195,32 +180,48 @@ export class MaterialsPage extends LitElement {
         (types) => (this.types = types),
         () => (this.typesRequested = false),
       );
-      listFilaments(this.hass).then(
-        (spoolman) => (this.spoolman = spoolman),
-        () => undefined,
-      );
+      this.readSpoolman();
     }
+  }
+
+  private readSpoolman() {
+    readSpoolman(this.hass).then(
+      (spoolman) => (this.spoolman = spoolman),
+      () => undefined,
+    );
+  }
+
+  private get connected() {
+    return !!this.spoolman && this.spoolman.status !== "not_configured";
   }
 
   override render() {
     const t = localize(this.hass);
     if (!this.materials) return html`<p class="muted">${t("materials.loading")}</p>`;
     const format = formatter(this.hass);
-    const active = this.materials.filter((material) => !material.archived);
-    const archived = this.materials.filter((material) => material.archived);
+    const origin = this.connected ? this.origin : "all";
+    const shown = this.materials.filter(
+      (material) => origin === "all" || fromSpoolman(material) === (origin === "spoolman"),
+    );
+    const active = shown.filter((material) => !material.archived);
+    const archived = shown.filter((material) => material.archived);
     return html`
       <ha-button class="new-material fab" @click=${() => this.open()}>
         <ha-svg-icon slot="start" .path=${mdiPlus}></ha-svg-icon>
         ${t("materials.new")}
       </ha-button>
+      ${this.renderSpoolmanNotices(t)}
       ${this.notice ? html`<p class="notice">${this.notice}</p>` : nothing}
+      ${this.connected ? this.renderOrigins(t) : nothing}
       ${
         this.materials.length
           ? html`
               ${
                 active.length
                   ? this.renderTable(active, "active", this.pages.active, t, format)
-                  : html`<p class="muted none-active">${t("materials.all_archived")}</p>`
+                  : html`<p class="muted none-active">
+                      ${t(origin === "all" ? "materials.all_archived" : "materials.none_shown")}
+                    </p>`
               }
               ${
                 archived.length
@@ -234,72 +235,70 @@ export class MaterialsPage extends LitElement {
             `
           : html`<p class="muted">${t("materials.empty")}</p>`
       }
-      ${this.renderSpoolman(t, format)} ${this.draft ? this.renderDialog(this.draft, t) : nothing}
+      ${this.draft ? this.renderDialog(this.draft, t, format) : nothing}
       ${this.deleting ? this.renderDeleteDialog(this.deleting, t) : nothing}
+      ${this.picks ? this.renderMergeDialog(this.picks, t) : nothing}
     `;
   }
 
-  private renderSpoolman(t: Localize, format: Format) {
-    const spoolman = this.spoolman;
-    if (!spoolman || spoolman.status === "not_configured") return nothing;
-    const linkedTo = (filament: Filament) =>
-      this.materials?.find(
-        (material) =>
-          !material.archived &&
-          material.price.source === "spoolman" &&
-          material.price.filament_id === filament.id,
-      );
-    const rows = this.pages.filaments.of(spoolman.filaments).map((filament) => {
-      const linked = linkedTo(filament);
-      return html`<tr class="filament">
-        <td class="name">
-          <div class="row">
-            <span class="swatch" style="background: ${filament.colour ?? "transparent"}"></span>
-            <span class="strong">${filamentName(filament)}</span>
-          </div>
-        </td>
-        <td>${filament.type ?? ""}</td>
-        <td class="num">
-          ${
-            filament.price_per_gram === null
-              ? html`<span class="muted">${t("spoolman.no_price")}</span>`
-              : `${format.money(filament.price_per_gram * 1000)} / kg`
-          }
-        </td>
-        <td class="actions">
-          ${
-            linked
-              ? html`<span class="muted">${t("spoolman.linked", { name: linked.name })}</span>`
-              : html`<ha-button
-                  class="small"
-                  appearance="plain"
-                  @click=${() => this.createFrom(filament)}
-                >
-                  ${t("spoolman.create")}
-                </ha-button>`
-          }
-        </td>
-      </tr>`;
-    });
-    return html`<section class="spoolman">
-      <h3>${t("spoolman.title")}</h3>
-      ${
-        spoolman.status === "unreachable"
-          ? html`<p class="muted">${t("spoolman.unreachable")}</p>`
-          : rows.length
-            ? table({
-                columns: [
-                  { label: t("spoolman.filament") },
-                  { label: t("materials.type") },
-                  { label: t("materials.price_per_kg"), num: true },
-                  {},
-                ],
-                rows,
-                pager: this.pages.filaments.controls(spoolman.filaments.length, t),
-              })
-            : html`<p class="muted">${t("spoolman.empty")}</p>`
-      }
-    </section>`;
+  private renderSpoolmanNotices(t: Localize) {
+    if (this.spoolman?.status === "unreachable")
+      return html`<p class="notice spoolman-notice">${t("spoolman.unreachable")}</p>`;
+    const count = this.spoolman?.merges.length ?? 0;
+    if (!count) return nothing;
+    return html`<p class="notice merge-notice row">
+      <span>
+        ${
+          count === 1
+            ? t("spoolman.merge_notice_one")
+            : t("spoolman.merge_notice", { count: count })
+        }
+      </span>
+      <ha-button class="small" appearance="plain" @click=${() => this.openMerge()}>
+        ${t("spoolman.review")}
+      </ha-button>
+    </p>`;
+  }
+
+  private renderOrigins(t: Localize) {
+    return html`<div class="origin" role="group" aria-label=${t("materials.origin")}>
+      ${ORIGINS.map(
+        (origin) =>
+          html`<button
+            aria-pressed=${this.origin === origin ? "true" : "false"}
+            @click=${() => {
+              this.origin = origin;
+              this.pages.active.reset();
+              this.pages.archived.reset();
+            }}
+          >
+            ${t(`materials.origin_${origin}`)}
+          </button>`,
+      )}
+    </div>`;
+  }
+
+  private properties(material: Material) {
+    const number = (value: number) => value.toLocaleString(this.hass.language);
+    return material.density === null
+      ? nothing
+      : `${number(material.density)} g/cm³${
+          material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`
+        }`;
+  }
+
+  private pack({ price }: Material, t: Localize, format: Format) {
+    if (price.source === "fixed")
+      return `${format.money(price.pack_price)} / ${format.quantity(price.pack_size, price.pack_unit)}`;
+    return html`<span class="badge">${t("spoolman.badge")}</span> ${
+        price.pack_price === null || price.pack_weight === null
+          ? html`<span class="no-price">${t("spoolman.no_price")}</span>`
+          : `${format.money(price.pack_price)} / ${
+              price.pack_weight >= 1000
+                ? format.quantity(price.pack_weight / 1000, "kg")
+                : format.quantity(price.pack_weight, "g")
+            }`
+      }`;
   }
 
   private renderTable(
@@ -309,7 +308,6 @@ export class MaterialsPage extends LitElement {
     t: Localize,
     format: Format,
   ) {
-    const number = (value: number) => value.toLocaleString(this.hass.language);
     return table({
       name,
       columns: [
@@ -335,30 +333,15 @@ export class MaterialsPage extends LitElement {
               </div>
             </td>
             <td>${t(`form.${material.form}`)} · ${material.type}</td>
-            <td class="small">
-              ${
-                material.density === null
-                  ? nothing
-                  : `${number(material.density)} g/cm³${
-                      material.diameter === null ? "" : ` · ⌀ ${number(material.diameter)} mm`
-                    }`
-              }
-            </td>
-            <td class="small">
-              ${
-                material.price.source === "fixed"
-                  ? `${format.money(material.price.pack_price)} / ${format.quantity(
-                      material.price.pack_size,
-                      material.price.pack_unit,
-                    )}`
-                  : t("materials.from_spoolman")
-              }
-            </td>
+            <td class="small">${this.properties(material)}</td>
+            <td class="small">${this.pack(material, t, format)}</td>
             <td class="num">
               ${
-                material.price_per_piece === null
-                  ? `${format.money((material.price_per_gram ?? 0) * 1000)} / kg`
-                  : `${format.money(material.price_per_piece)} / pcs`
+                material.price.source === "spoolman" && material.price.per_gram === null
+                  ? "—"
+                  : material.price_per_piece === null
+                    ? `${format.money((material.price_per_gram ?? 0) * 1000)} / kg`
+                    : `${format.money(material.price_per_piece)} / pcs`
               }
             </td>
             <td class="center">
@@ -393,9 +376,12 @@ export class MaterialsPage extends LitElement {
         .path=${path}
         @click=${run}
       ></ha-icon-button>`;
-    const remove = action("delete", t("materials.delete"), mdiDelete, () => {
-      this.deleting = material;
-    });
+    // A Material from Spoolman goes when its Filament does: it can only be archived.
+    const remove = fromSpoolman(material)
+      ? nothing
+      : action("delete", t("materials.delete"), mdiDelete, () => {
+          this.deleting = material;
+        });
     return material.archived
       ? html`${action("restore", t("materials.restore"), mdiArchiveArrowUpOutline, () =>
           this.act(() => restoreMaterial(this.hass, material.id)),
@@ -409,8 +395,10 @@ export class MaterialsPage extends LitElement {
         )}${remove}`;
   }
 
-  private renderDialog(draft: Draft, t: Localize) {
+  private renderDialog(draft: Draft, t: Localize, format: Format) {
     const set = (changes: Partial<Draft>) => (this.draft = { ...draft, ...changes });
+    const edited = this.materials?.find((material) => material.id === this.editing);
+    if (edited && fromSpoolman(edited)) return this.renderSyncedDialog(edited, draft, t, format);
     const wrong = this.checked ? problems(draft) : new Set<string>();
     const failure = this.failure ?? (wrong.size ? "materials.invalid" : undefined);
     const number = (name: "density" | "diameter" | "pack_price" | "pack_size", label?: string) =>
@@ -433,7 +421,6 @@ export class MaterialsPage extends LitElement {
           .map((material) => material.type),
       ]),
     ];
-    const linked = draft.price_source === "spoolman";
     const details = html`<div class="field-row">
         ${field(
           t("materials.form"),
@@ -546,63 +533,94 @@ export class MaterialsPage extends LitElement {
           onInput: (name) => set({ name }),
         }),
       )}
-      ${this.renderCostSource(draft, set, t)} ${linked ? nothing : details}
-      ${checkbox({
-        name: "default_for_type",
-        label: t("materials.default_for_type"),
-        checked: draft.default_for_type,
-        onChange: (default_for_type) => set({ default_for_type }),
-      })}
-      ${linked ? html`<p class="muted small">${t("materials.synced")}</p>` : nothing}`,
+      ${details} ${this.renderDefault(draft, t)}`,
     });
   }
 
-  /** Linking happens on existing Materials; new ones come from the Filament list.
-   * A Material bought by the piece or of a form in `UNLINKED_FORMS` is never linked. */
-  private renderCostSource(draft: Draft, set: (changes: Partial<Draft>) => void, t: Localize) {
-    const linked = draft.price_source === "spoolman";
-    const edited = this.materials?.find((material) => material.id === this.editing);
-    if (!edited || edited.price_per_piece !== null || byPiece(draft)) return nothing;
-    if (UNLINKED_FORMS.has(edited.form) || UNLINKED_FORMS.has(draft.form)) return nothing;
-    if (!linked && this.spoolman?.status !== "ok") return nothing;
-    const filaments = this.spoolman?.filaments ?? [];
-    const known = filaments.some((filament) => String(filament.id) === draft.filament_id);
-    return html`<div class="field-row">
-      ${field(
-        t("materials.price_source"),
-        select({
-          name: "price_source",
-          value: draft.price_source,
-          options: [
-            ["fixed", t("materials.price_fixed")],
-            ["spoolman", t("materials.price_spoolman")],
-          ],
-          onChange: (source) => set({ price_source: source as Draft["price_source"] }),
-        }),
-      )}
-      ${
-        linked
-          ? field(
-              t("materials.filament"),
-              select({
-                name: "filament_id",
-                value: draft.filament_id,
-                invalid: this.checked && !draft.filament_id,
-                options: [
-                  ["", t("materials.pick_filament"), true],
-                  ...(draft.filament_id && !known
-                    ? [[draft.filament_id, `#${draft.filament_id}`] as const]
-                    : []),
-                  ...filaments.map(
-                    (filament) => [String(filament.id), filamentName(filament)] as const,
-                  ),
-                ],
-                onChange: (filament_id) => set({ filament_id }),
-              }),
-            )
-          : nothing
-      }
-    </div>`;
+  private renderDefault(draft: Draft, t: Localize) {
+    return checkbox({
+      name: "default_for_type",
+      label: t("materials.default_for_type"),
+      checked: draft.default_for_type,
+      onChange: (default_for_type) => (this.draft = { ...draft, default_for_type }),
+    });
+  }
+
+  /** Spoolman supplies everything of its Materials but their default. */
+  private renderSyncedDialog(material: Material, draft: Draft, t: Localize, format: Format) {
+    const detail = (label: string, value: unknown) =>
+      html`<dt class="muted small">${label}</dt>
+        <dd>${value}</dd>`;
+    return formDialog({
+      t,
+      title: t("materials.edit_title"),
+      name: "material-dialog",
+      busy: this.saving,
+      error: this.failure && t(this.failure),
+      onCancel: () => this.close(),
+      onSubmit: () => this.save(draft),
+      content: html`<p class="strong synced-name">${material.name}</p>
+        <dl class="synced">
+          ${detail(t("materials.form_type"), `${t(`form.${material.form}`)} · ${material.type}`)}
+          ${detail(t("materials.properties"), this.properties(material))}
+          ${material.vendor ? detail(t("materials.vendor_name"), material.vendor) : nothing}
+          ${
+            material.colour
+              ? detail(
+                  t("materials.colour_name"),
+                  html`<span class="row">
+                    <span class="swatch" style="background: ${material.colour}"></span>
+                    ${material.colour}
+                  </span>`,
+                )
+              : nothing
+          }
+          ${detail(t("materials.pack"), this.pack(material, t, format))}
+        </dl>
+        ${this.renderDefault(draft, t)}
+        <p class="muted small">${t("materials.synced")}</p>`,
+    });
+  }
+
+  /** One picker per own Material with Filaments waiting; a Filament picked for one is
+   * taken for the others. */
+  private renderMergeDialog(picks: Record<string, string>, t: Localize) {
+    const merges = this.spoolman?.merges ?? [];
+    const taken = (materialId: string, filamentId: string) =>
+      Object.entries(picks).some(([other, pick]) => other !== materialId && pick === filamentId);
+    return formDialog({
+      t,
+      title: t("spoolman.merge_title"),
+      name: "merge-dialog",
+      submit: t("spoolman.merge_save"),
+      busy: this.saving,
+      error: this.mergeFailure && t(this.mergeFailure),
+      onCancel: () => (this.picks = undefined),
+      onSubmit: () => this.merge(picks),
+      content: html`<p class="muted small">${t("spoolman.merge_intro")}</p>
+        ${merges.map(({ material_id, candidates }) => {
+          const material = this.materials?.find((candidate) => candidate.id === material_id);
+          return field(
+            material ? `${material.name} · ${material.type}` : material_id,
+            select({
+              name: `merge-${material_id}`,
+              value: picks[material_id] ?? "",
+              options: [
+                ...candidates.map(
+                  (filament) =>
+                    [
+                      String(filament.id),
+                      filament.name,
+                      taken(material_id, String(filament.id)),
+                    ] as const,
+                ),
+                ["", t("spoolman.keep_own")],
+              ],
+              onChange: (pick) => (this.picks = { ...picks, [material_id]: pick }),
+            }),
+          );
+        })}`,
+    });
   }
 
   private renderDeleteDialog(material: Material, t: Localize) {
@@ -617,25 +635,43 @@ export class MaterialsPage extends LitElement {
     });
   }
 
-  private async createFrom(filament: Filament) {
-    this.notice = undefined;
-    try {
-      await createMaterialFromSpoolman(this.hass, filament.id);
-    } catch (error) {
-      const failure = this.spoolmanFailure(error);
-      if (failure) this.notice = localize(this.hass)(failure);
+  /** Each own Material starts at its best match not picked for an earlier one. */
+  private openMerge() {
+    const picks: Record<string, string> = {};
+    for (const { material_id, candidates } of this.spoolman?.merges ?? []) {
+      const free = candidates.find(
+        (filament) => !Object.values(picks).includes(String(filament.id)),
+      );
+      picks[material_id] = free ? String(free.id) : "";
     }
+    this.mergeFailure = undefined;
+    this.picks = picks;
   }
 
-  /** What to say when Spoolman went away; otherwise the list was stale, so it is read again. */
-  private spoolmanFailure(error: unknown) {
-    listFilaments(this.hass).then(
-      (spoolman) => (this.spoolman = spoolman),
-      () => undefined,
-    );
-    return (error as { code?: string }).code === "spoolman_unreachable"
-      ? "spoolman.unreachable"
-      : undefined;
+  private async merge(picks: Record<string, string>) {
+    this.saving = true;
+    this.mergeFailure = undefined;
+    try {
+      this.spoolman = await mergeSpoolman(
+        this.hass,
+        Object.entries(picks).map(([material_id, pick]) => ({
+          material_id,
+          filament_id: pick ? Number(pick) : null,
+        })),
+      );
+      this.picks = undefined;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      this.mergeFailure =
+        code === "not_allowed"
+          ? "spoolman.merge_stale"
+          : code === "spoolman_unreachable"
+            ? "spoolman.unreachable"
+            : "run.save_failed";
+      this.readSpoolman();
+    } finally {
+      this.saving = false;
+    }
   }
 
   /** A built-in type pre-fills its form, density and pack unit, except under a form without any. */
@@ -670,20 +706,23 @@ export class MaterialsPage extends LitElement {
   }
 
   private async save(draft: Draft) {
-    const linking = draft.price_source === "spoolman";
+    const edited = this.materials?.find((material) => material.id === this.editing);
+    const synced = !!edited && fromSpoolman(edited);
     this.checked = true;
     this.failure = undefined;
-    if (problems(draft).size) return;
+    if (!synced && problems(draft).size) return;
     this.saving = true;
     try {
       await (this.editing
-        ? updateMaterial(this.hass, this.editing, linking ? linkOf(draft) : fieldsOf(draft))
+        ? updateMaterial(
+            this.hass,
+            this.editing,
+            synced ? { default_for_type: draft.default_for_type } : fieldsOf(draft),
+          )
         : createMaterial(this.hass, fieldsOf(draft)));
       this.close();
-    } catch (error) {
-      this.failure = linking
-        ? (this.spoolmanFailure(error) ?? "run.save_failed")
-        : "materials.invalid";
+    } catch {
+      this.failure = synced ? "run.save_failed" : "materials.invalid";
     } finally {
       this.saving = false;
     }
@@ -745,11 +784,55 @@ export class MaterialsPage extends LitElement {
       .archived {
         margin-top: 12px;
       }
-      .spoolman {
-        margin-top: 20px;
+      .origin {
+        display: inline-flex;
+        margin-bottom: 12px;
+        border: 1px solid var(--outline-color, var(--divider-color, rgba(0, 0, 0, 0.12)));
+        border-radius: 10px;
+        overflow: hidden;
       }
-      .spoolman h3 {
+      .origin button {
+        padding: 6px 12px;
+        border: 0;
+        cursor: pointer;
+        font: inherit;
+        color: var(--secondary-text-color);
+        background: var(--card-background-color, #fff);
+      }
+      .origin button[aria-pressed="true"] {
+        color: var(--primary-color);
+        background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+      }
+      .origin button:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: -2px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0 6px;
+        border-radius: 6px;
+        font-size: 0.85em;
+        color: var(--primary-color);
+        background: color-mix(in srgb, var(--primary-color, #03a9f4) 12%, transparent);
+      }
+      .no-price {
+        color: var(--warning-color, #ffa600);
+      }
+      .merge-notice {
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .synced-name {
         margin: 0 0 8px;
+      }
+      .synced {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 6px 16px;
+        margin: 0 0 12px;
+      }
+      .synced dd {
+        margin: 0;
       }
       .archived summary {
         cursor: pointer;

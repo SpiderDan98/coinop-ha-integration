@@ -4,7 +4,7 @@ Every change is saved at once and announced with the name of the catalogue that
 changed, so open panels can refresh it.
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, callback
@@ -187,25 +187,75 @@ class Catalog:
         await self._save_materials()
         return True
 
-    async def async_sync_spoolman(self, synced: dict[int, dict[str, Any]]) -> None:
-        """Give each linked Material what Spoolman read for its Filament.
+    async def async_sync_spoolman(
+        self, read: dict[int, dict[str, Any]], waiting: Collection[int]
+    ) -> None:
+        """Bring the Materials in line with the Filaments Spoolman has, by Filament id.
 
-        Without a price in Spoolman the last price read stays.
+        A linked Material takes what was read for its Filament (without a price in
+        Spoolman its last price per gram stays) and is archived once its Filament
+        is gone; each other Filament gets a linked Material, except those `waiting`
+        for the user to merge them.
         """
         changed = False
         for material in self.materials():
-            price = material.price
-            if not isinstance(price, SpoolmanPrice) or price.filament_id not in synced:
+            if not isinstance(price := material.price, SpoolmanPrice):
                 continue
-            fields = synced[price.filament_id]
+            if price.filament_id not in read:
+                if not material.archived:
+                    material.archived = changed = True
+                    material.default_for_type = False
+                continue
+            fields = read[price.filament_id]
             if fields["price"]["per_gram"] is None:
-                fields = fields | {"price": price.as_dict()}
+                fields = fields | {
+                    "price": fields["price"] | {"per_gram": price.last_read}
+                }
             updated = _material(material.as_dict() | fields)
             if updated != material:
                 self._materials[material.id] = updated
                 changed = True
+        linked = self.linked_filaments()
+        for filament_id, fields in read.items():
+            if filament_id in linked or filament_id in waiting:
+                continue
+            material = _material(
+                fields
+                | {"id": ulid_now(), "default_for_type": not self._has_default(fields)}
+            )
+            self._materials[material.id] = material
+            changed = True
         if changed:
             await self._save_materials()
+
+    async def async_link_spoolman(
+        self, material: Material, fields: dict[str, Any]
+    ) -> Material:
+        """Link the Material to the Filament `fields` were read for, keeping its id
+        and its default; without a price in Spoolman its price per gram stays."""
+        if fields["price"]["per_gram"] is None:
+            per_gram = material.price_per_gram
+            fields = fields | {"price": fields["price"] | {"per_gram": per_gram}}
+        updated = _material(material.as_dict() | fields)
+        self._materials[material.id] = updated
+        await self._save_materials()
+        return updated
+
+    def linked_filaments(self) -> set[int]:
+        """The ids of the Filaments a Material links to, archived ones included."""
+        return {
+            m.price.filament_id
+            for m in self.materials()
+            if isinstance(m.price, SpoolmanPrice)
+        }
+
+    def _has_default(self, fields: dict[str, Any]) -> bool:
+        return any(
+            m.default_for_type
+            and not m.archived
+            and m.type.casefold() == fields["type"].casefold()
+            for m in self.materials()
+        )
 
     async def _save_materials(self, changed: Material | None = None) -> None:
         if changed is not None and changed.default_for_type:

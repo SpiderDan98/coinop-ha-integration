@@ -1,10 +1,10 @@
 [
   {
     "status": "not_configured",
-    "filaments": []
+    "merges": []
   },
   {
     "status": "unreachable",
-    "filaments": []
+    "merges": []
   }
 ]

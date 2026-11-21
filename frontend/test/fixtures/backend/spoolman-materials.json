@@ -1,0 +1,196 @@
+[
+  {
+    "materials": [
+      {
+        "id": "pla-black",
+        "name": "PLA black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 20.0,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": null
+      },
+      {
+        "id": "pla-any",
+        "name": "Any PLA",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": null,
+        "colour": null,
+        "diameter": 1.75,
+        "default_for_type": false,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 20.0,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": null
+      },
+      {
+        "id": "material-filament-8",
+        "name": "Prusament PETG Galaxy Black",
+        "form": "filament",
+        "type": "PETG",
+        "density": 1.27,
+        "vendor": "Prusament",
+        "colour": "#2b2b33",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 8,
+          "per_gram": 0.02999,
+          "pack_price": 29.99,
+          "pack_weight": 1000.0
+        },
+        "price_per_gram": 0.02999,
+        "price_per_piece": null
+      },
+      {
+        "id": "material-filament-9",
+        "name": "eSun TPU clear",
+        "form": "filament",
+        "type": "TPU",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": null,
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 9,
+          "per_gram": null,
+          "pack_price": null,
+          "pack_weight": null
+        },
+        "price_per_gram": 0.0,
+        "price_per_piece": null
+      }
+    ]
+  },
+  {
+    "materials": [
+      {
+        "id": "pla-black",
+        "name": "eSun PLA+ black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": "#1a1a1a",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 7,
+          "per_gram": 0.02,
+          "pack_price": 20.0,
+          "pack_weight": 1000.0
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": null
+      },
+      {
+        "id": "pla-any",
+        "name": "Any PLA",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": null,
+        "colour": null,
+        "diameter": 1.75,
+        "default_for_type": false,
+        "archived": false,
+        "price": {
+          "source": "fixed",
+          "pack_price": 20.0,
+          "pack_size": 1000.0,
+          "pack_unit": "g"
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": null
+      },
+      {
+        "id": "material-filament-8",
+        "name": "Prusament PETG Galaxy Black",
+        "form": "filament",
+        "type": "PETG",
+        "density": 1.27,
+        "vendor": "Prusament",
+        "colour": "#2b2b33",
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 8,
+          "per_gram": 0.02999,
+          "pack_price": 29.99,
+          "pack_weight": 1000.0
+        },
+        "price_per_gram": 0.02999,
+        "price_per_piece": null
+      },
+      {
+        "id": "material-filament-9",
+        "name": "eSun TPU clear",
+        "form": "filament",
+        "type": "TPU",
+        "density": 1.24,
+        "vendor": "eSun",
+        "colour": null,
+        "diameter": 1.75,
+        "default_for_type": true,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 9,
+          "per_gram": null,
+          "pack_price": null,
+          "pack_weight": null
+        },
+        "price_per_gram": 0.0,
+        "price_per_piece": null
+      },
+      {
+        "id": "material-filament-10",
+        "name": "Prusament PLA Galaxy Black",
+        "form": "filament",
+        "type": "PLA",
+        "density": 1.24,
+        "vendor": "Prusament",
+        "colour": "#2b2b33",
+        "diameter": 1.75,
+        "default_for_type": false,
+        "archived": false,
+        "price": {
+          "source": "spoolman",
+          "filament_id": 10,
+          "per_gram": 0.02,
+          "pack_price": 20.0,
+          "pack_weight": 1000.0
+        },
+        "price_per_gram": 0.02,
+        "price_per_piece": null
+      }
+    ]
+  }
+]

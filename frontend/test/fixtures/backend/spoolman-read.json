@@ -1,0 +1,39 @@
+{
+  "status": "ok",
+  "merges": [
+    {
+      "material_id": "pla-black",
+      "candidates": [
+        {
+          "id": 7,
+          "name": "eSun PLA+ black",
+          "vendor": "eSun",
+          "type": "PLA",
+          "colour": "#1a1a1a",
+          "price_per_gram": 0.02
+        }
+      ]
+    },
+    {
+      "material_id": "pla-any",
+      "candidates": [
+        {
+          "id": 7,
+          "name": "eSun PLA+ black",
+          "vendor": "eSun",
+          "type": "PLA",
+          "colour": "#1a1a1a",
+          "price_per_gram": 0.02
+        },
+        {
+          "id": 10,
+          "name": "Prusament PLA Galaxy Black",
+          "vendor": "Prusament",
+          "type": "PLA",
+          "colour": "#2b2b33",
+          "price_per_gram": 0.02
+        }
+      ]
+    }
+  ]
+}

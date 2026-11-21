@@ -95,7 +95,7 @@ _Avoid_: Preset, Vorlage
 _German UI_: Postenvorlage
 
 **Cost Source**:
-Where a Line Item's unit price comes from: a fixed value, or a live value read from Home Assistant or Spoolman.
+Where a Line Item's unit price comes from: a fixed value, or a live value read from Home Assistant or Spoolman. A Material's Cost Source follows from where it comes from: fixed for an own Material, Spoolman for one from a Spoolman Filament; the user never picks it.
 _Avoid_: Price provider, input
 _German UI_: Preisquelle
 
@@ -115,7 +115,7 @@ _Avoid_: Filament (as the generic term), consumable
 _German UI_: Material
 
 **Spoolman Filament**:
-A filament product in Spoolman, not a single spool, that a Material links to; the Material then takes its price per gram and its type, density, diameter, colour and vendor from it, so a new spool needs no relinking.
+A filament product in Spoolman, not a single spool. While Spoolman is connected, each one is a Material on its own, created when Coin-op reads Spoolman and archived when the Filament is deleted there; it takes its name, price, type, density, diameter, colour and vendor from the Filament, so a new spool changes nothing. An own Material of the same type (and colour) can be merged into one, keeping its id and its Runs.
 _Avoid_: Spool (as what a Material links to)
 _German UI_: Spoolman-Filament
 

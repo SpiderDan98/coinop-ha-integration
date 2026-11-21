@@ -1526,11 +1526,22 @@ async def test_record_what_spoolman_answers(
     hass_storage: dict[str, Any],
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
-    place_materials(hass_storage, stored_material("pla-black", name="PLA black"))
+    place_materials(
+        hass_storage,
+        stored_material(
+            "pla-black",
+            name="PLA black",
+            vendor="eSun",
+            colour="#1a1a1a",
+            default_for_type=True,
+        ),
+        stored_material("pla-any", name="Any PLA"),
+    )
+    prusament = {"id": 2, "name": "Prusament"}
     petg = filament(
         8,
         name="PETG Galaxy Black",
-        vendor={"id": 2, "name": "Prusament"},
+        vendor=prusament,
         material="PETG",
         price=None,
         density=1.27,
@@ -1543,27 +1554,35 @@ async def test_record_what_spoolman_answers(
             filament(7),
             petg,
             filament(9, name="TPU clear", material="TPU", price=None, color_hex=None),
+            filament(10, name="PLA Galaxy Black", vendor=prusament, color_hex="2B2B33"),
         ],
         spools=[spool(1, petg, price=29.99, initial_weight=1000.0)],
     )
 
-    listed = await panel.call("coinop/spoolman/filaments")
-    created = await panel.call("coinop/materials/create_from_spoolman", filament_id=8)
-    linked = await panel.call(
-        "coinop/materials/update",
-        material_id="pla-black",
-        material={"price": {"source": "spoolman", "filament_id": 7}},
+    read = await panel.call("coinop/spoolman/read")
+    before = await panel.call("coinop/materials/list")
+    merged = await panel.call(
+        "coinop/spoolman/merge",
+        picks=[
+            {"material_id": "pla-black", "filament_id": 7},
+            {"material_id": "pla-any", "filament_id": None},
+        ],
     )
+    after = await panel.call("coinop/materials/list")
     spoolman_down(aioclient_mock)
-    unreachable = await panel.call("coinop/spoolman/filaments")
+    unreachable = await panel.call("coinop/spoolman/read")
     await set_options(hass, entry)
-    not_configured = await panel.call("coinop/spoolman/filaments")
+    not_configured = await panel.call("coinop/spoolman/read")
 
-    assert_recorded("spoolman-filaments", listed)
-    assert_recorded("spoolman-filaments-unavailable", [not_configured, unreachable])
-    ids = {created["material"]["id"]: "material-petg"}
-    assert_recorded("materials-create-from-spoolman", stable_ids(created, ids))
-    assert_recorded("materials-link-spoolman", linked)
+    ids = {
+        m["id"]: f"material-filament-{m['price']['filament_id']}"
+        for m in after["materials"]
+        if m["id"] not in ("pla-black", "pla-any")
+    }
+    assert_recorded("spoolman-read", read)
+    assert_recorded("spoolman-read-unavailable", [not_configured, unreachable])
+    assert_recorded("spoolman-merge", merged)
+    assert_recorded("spoolman-materials", stable_ids([before, after], ids))
 
 
 async def test_record_the_cost_statement_export(

@@ -893,7 +893,7 @@ class DeviceTracker:
 
     async def _async_finish(self, run: Run) -> None:
         """Freeze the Run's values, with Material prices as Spoolman has them now."""
-        read = await self._spoolman.async_update_prices()
+        read = await self._spoolman.async_refresh()
         assert run.ended is not None
         self._refresh(run, run.ended)
         self._settle_material(run)

@@ -1,5 +1,8 @@
 """The Materials catalogue for the panel: list, create, edit, archive, restore, delete.
 
+Materials linked to Spoolman come from reading it (`spoolman.py`); of them only
+the default can be changed, and they are archived, never deleted.
+
 Material fields travel nested under `material`, since `type` names the command.
 Changes reach open panels through the catalogue subscription (`catalog.py`).
 """
@@ -20,7 +23,6 @@ from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 
 from .command import command, found
-from .spoolman import spoolman_call
 
 _TEXT = vol.All(str, vol.Strip, vol.Length(min=1))
 _POSITIVE = vol.All(vol.Coerce(float), vol.Range(min=0, min_included=False))
@@ -30,9 +32,6 @@ _FIXED_PRICE = {
     vol.Required("pack_size"): _POSITIVE,
     vol.Optional("pack_unit"): vol.In([unit.value for unit in PackUnit]),
 }
-# Linking reads the price and the synced fields from Spoolman; a new Material
-# comes from a Filament through `create_from_spoolman`.
-_LINK = {vol.Required("source"): "spoolman", vol.Required("filament_id"): int}
 _FIELDS = {
     "name": _TEXT,
     "form": vol.In([form.value for form in MaterialForm]),
@@ -74,6 +73,14 @@ def _found(
 ) -> Material | None:
     return found(
         connection, msg, coinop.catalog.material(msg["material_id"]), "Material"
+    )
+
+
+def _linked(connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    connection.send_error(
+        msg["id"],
+        websocket_api.ERR_NOT_ALLOWED,
+        "This Material comes from Spoolman",
     )
 
 
@@ -151,10 +158,7 @@ async def _create(
         vol.Required("type"): "coinop/materials/update",
         _MATERIAL_ID: str,
         vol.Required("material"): {
-            vol.Optional(key): schema
-            for key, schema in (
-                _FIELDS | {"price": vol.Any(_FIXED_PRICE, _LINK)}
-            ).items()
+            vol.Optional(key): schema for key, schema in _FIELDS.items()
         },
     }
 )
@@ -164,28 +168,16 @@ async def _update(
     msg: dict[str, Any],
     coinop: CoinOp,
 ) -> None:
+    """A linked Material takes everything but its default from Spoolman."""
     if not (material := _found(connection, msg, coinop)):
         return
     changes = msg["material"]
-    if changes.get("price", {}).get("source") == "spoolman":
-        if not material.linkable:
-            connection.send_error(
-                msg["id"],
-                websocket_api.ERR_NOT_ALLOWED,
-                "This Material can't be linked to Spoolman",
-            )
-            return
-        filament_id = changes["price"]["filament_id"]
-        updated = await spoolman_call(
-            connection,
-            msg,
-            coinop.spoolman.async_link(material, filament_id, changes),
-        )
-    else:
-        updated = await _saved(
-            connection, msg, coinop.catalog.async_update_material(material, changes)
-        )
-    if updated:
+    if material.linked and changes.keys() - {"default_for_type"}:
+        _linked(connection, msg)
+        return
+    if updated := await _saved(
+        connection, msg, coinop.catalog.async_update_material(material, changes)
+    ):
         connection.send_result(msg["id"], {"material": material_dict(updated)})
 
 
@@ -220,37 +212,19 @@ async def _delete(
     msg: dict[str, Any],
     coinop: CoinOp,
 ) -> None:
-    """Answers `{"deleted": false}` when a Run uses the Material: it is archived."""
-    if material := _found(connection, msg, coinop):
+    """Answers `{"deleted": false}` when a Run uses the Material: it is archived.
+    A linked Material can only be archived."""
+    if (material := _found(connection, msg, coinop)) and material.linked:
+        _linked(connection, msg)
+    elif material:
         deleted = await coinop.catalog.async_delete_material(material)
         connection.send_result(msg["id"], {"deleted": deleted})
-
-
-@command(
-    {
-        vol.Required("type"): "coinop/materials/create_from_spoolman",
-        vol.Required("filament_id"): int,
-    }
-)
-async def _create_from_spoolman(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-    coinop: CoinOp,
-) -> None:
-    """A Material linked to the Filament, named and filled in from it."""
-    material = await spoolman_call(
-        connection, msg, coinop.spoolman.async_create_material(msg["filament_id"])
-    )
-    if material:
-        connection.send_result(msg["id"], {"material": material_dict(material)})
 
 
 COMMANDS = (
     _list,
     _types,
     _create,
-    _create_from_spoolman,
     _update,
     _archive,
     _restore,

@@ -9,7 +9,7 @@ import type {
   Dimension,
   Group,
   Totals,
-  Filaments,
+  SpoolmanState,
   getMeasuredSuggestions,
   LineItemTemplate,
   Material,
@@ -62,10 +62,8 @@ import lineItemsSplit from "./fixtures/backend/line-items-split.json";
 import lineItemsSaveAsTemplate from "./fixtures/backend/line-items-save-as-template.json";
 import lineItemsUpdate from "./fixtures/backend/line-items-update.json";
 import materialsCreateDishwasherAndBeverage from "./fixtures/backend/materials-create-dishwasher-and-beverage.json";
-import materialsCreateFromSpoolman from "./fixtures/backend/materials-create-from-spoolman.json";
 import materialsCreateLaundry from "./fixtures/backend/materials-create-laundry.json";
 import materialsCreateOther from "./fixtures/backend/materials-create-other.json";
-import materialsLinkSpoolman from "./fixtures/backend/materials-link-spoolman.json";
 import materialsTypes from "./fixtures/backend/materials-types.json";
 import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
@@ -83,8 +81,10 @@ import runsGetRoboticMower from "./fixtures/backend/runs-get-robotic-mower.json"
 import runsGetWashingMachine from "./fixtures/backend/runs-get-washing-machine.json";
 import runsGetWater from "./fixtures/backend/runs-get-water.json";
 import runsSubscribe from "./fixtures/backend/runs-subscribe.json";
-import spoolmanFilamentsUnavailable from "./fixtures/backend/spoolman-filaments-unavailable.json";
-import spoolmanFilaments from "./fixtures/backend/spoolman-filaments.json";
+import spoolmanMaterials from "./fixtures/backend/spoolman-materials.json";
+import spoolmanMerge from "./fixtures/backend/spoolman-merge.json";
+import spoolmanReadUnavailable from "./fixtures/backend/spoolman-read-unavailable.json";
+import spoolmanRead from "./fixtures/backend/spoolman-read.json";
 import tagsRename from "./fixtures/backend/tags-rename.json";
 import templatesUpdate from "./fixtures/backend/templates-update.json";
 
@@ -300,18 +300,22 @@ export const recorded = {
   },
   /** `coinop/tags/rename` of "Spare" to "Spare parts". */
   tagRename: tagsRename,
-  /** `coinop/spoolman/filaments`: 7 eSun PLA+ black (0.02 / g), 8 Prusament PETG Galaxy
-   * Black (priced from its spool), 9 eSun TPU clear (no price); then with Spoolman not set
-   * up and unreachable. */
+  /** Spoolman with the Filaments 7 eSun PLA+ black (20.00 / 1,000 g), 8 Prusament PETG
+   * Galaxy Black (29.99 / 1,000 g from its spool), 9 eSun TPU clear (no price) and 10
+   * Prusament PLA Galaxy Black, next to the own Materials "pla-black" (eSun, #1a1a1a,
+   * default for PLA) and "pla-any" (PLA). */
   spoolman: {
-    filaments: spoolmanFilaments as Filaments,
-    notConfigured: spoolmanFilamentsUnavailable[0] as Filaments,
-    unreachable: spoolmanFilamentsUnavailable[1] as Filaments,
+    /** `coinop/spoolman/read`: 7 waits for "pla-black" and "pla-any", 10 for "pla-any". */
+    read: spoolmanRead as SpoolmanState,
+    notConfigured: spoolmanReadUnavailable[0] as SpoolmanState,
+    unreachable: spoolmanReadUnavailable[1] as SpoolmanState,
+    /** `coinop/spoolman/merge` of "pla-black" into 7, keeping "pla-any" own. */
+    merged: spoolmanMerge as SpoolmanState,
+    /** `coinop/materials/list` after that read: the own two, "material-filament-8" and
+     * "material-filament-9"; then after the merge, also "material-filament-10". */
+    materials: spoolmanMaterials[0].materials as Material[],
+    mergedMaterials: spoolmanMaterials[1].materials as Material[],
   },
-  /** `coinop/materials/create_from_spoolman` of Filament 8 ("material-petg"). */
-  createFromSpoolman: materialsCreateFromSpoolman as { material: Material },
-  /** `coinop/materials/update`: "pla-black" linked to Filament 7. */
-  linkSpoolman: materialsLinkSpoolman as { material: Material },
   /** `coinop/materials/types`: the built-in types for pre-filling. */
   materialTypes: materialsTypes as { types: MaterialType[] },
   /** `coinop/materials/create` of "material-detergent" (1,500 ml for 7.80) and

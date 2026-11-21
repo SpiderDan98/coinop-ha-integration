@@ -1,12 +1,16 @@
-"""Spoolman, read directly over its REST API: Filaments priced per gram.
+"""Spoolman, read directly over its REST API: every Filament is a linked Material.
 
-Linked Materials take their price and their type, density, diameter, colour and
-vendor from their Filament every time Coin-op reads Spoolman; between reads,
-and while Spoolman is unreachable, the last price read applies.
+Every read (Materials tab, Run end, start) gives each Filament without one a
+linked Material, unless it waits for the user to merge it into an own Material
+of its type (and colour); a linked Material takes its name, price and details
+from its Filament and is archived once the Filament is gone. Between reads, and
+while Spoolman is unreachable, the last price read applies.
 """
 
+import asyncio
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 from aiohttp import ClientError, ClientTimeout
 from homeassistant.core import HomeAssistant
@@ -32,6 +36,10 @@ class SpoolmanUnreachable(Exception):
     """Spoolman isn't set up, didn't answer, or answered with something else."""
 
 
+class StaleMerge(Exception):
+    """A merge picked a Material or Filament that isn't waiting for it (any more)."""
+
+
 @dataclass(frozen=True)
 class Filament:
     id: int
@@ -41,45 +49,77 @@ class Filament:
     density: float
     diameter: float
     colour: str | None
-    price_per_gram: float | None
+    # The price and weight Spoolman prices it by; None without a price.
+    pack: tuple[float, float] | None
+
+    @property
+    def material_name(self) -> str:
+        return (
+            " ".join(filter(None, (self.vendor, self.name)))
+            or self.type
+            or str(self.id)
+        )
+
+    @property
+    def price_per_gram(self) -> float | None:
+        return None if self.pack is None else self.pack[0] / self.pack[1]
 
     def material_fields(self) -> dict[str, Any]:
         """What a linked Material takes over from its Filament, its price included."""
+        price, weight = self.pack or (None, None)
         return {
-            "price": SpoolmanPrice(self.id, self.price_per_gram).as_dict(),
+            "name": self.material_name,
             "form": MaterialForm.FILAMENT,
+            "type": self.type or self.name or str(self.id),
             "density": self.density,
             "diameter": self.diameter,
             "colour": self.colour,
             "vendor": self.vendor,
-        } | ({"type": self.type} if self.type else {})
+            "price": SpoolmanPrice(
+                self.id, self.price_per_gram, price, weight
+            ).as_dict(),
+        }
+
+    def matches(self, material: Material) -> bool:
+        """Whether the Filament is a candidate for merging the (own) Material."""
+        return (
+            self.type is not None
+            and self.type.casefold() == material.type.casefold()
+            and material.colour in (None, self.colour)
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
-            "name": self.name,
+            "name": self.material_name,
             "vendor": self.vendor,
             "type": self.type,
-            "density": self.density,
-            "diameter": self.diameter,
             "colour": self.colour,
             "price_per_gram": self.price_per_gram,
         }
 
 
-def _price_per_gram(
+class Merge(NamedTuple):
+    """An own filament Material and the Filaments it could be merged into, best first
+    (same vendor)."""
+
+    material: Material
+    candidates: list[Filament]
+
+
+def _pack(
     filament: dict[str, Any], spools: list[dict[str, Any]]
-) -> float | None:
-    """`filament.price ÷ filament.weight`, else the newest priced spool's
-    `spool.price ÷ initial_weight` (both are prices of a whole spool)."""
+) -> tuple[float, float] | None:
+    """`filament.price` per `filament.weight`, else the newest priced spool's
+    `spool.price` per its `initial_weight` (both are prices of a whole spool)."""
     if (price := filament.get("price")) is not None and filament.get("weight"):
-        return float(price) / float(filament["weight"])
+        return float(price), float(filament["weight"])
     for spool in sorted(
         spools, key=lambda spool: (spool.get("registered") or "", spool["id"])
     )[::-1]:
         weight = spool.get("initial_weight") or filament.get("weight")
         if not spool.get("archived") and spool.get("price") is not None and weight:
-            return float(spool["price"]) / float(weight)
+            return float(spool["price"]), float(weight)
     return None
 
 
@@ -99,7 +139,7 @@ def _filament(data: dict[str, Any], spools: list[dict[str, Any]]) -> Filament:
         density=data["density"],
         diameter=data["diameter"],
         colour=_colour(data),
-        price_per_gram=_price_per_gram(data, spools),
+        pack=_pack(data, spools),
     )
 
 
@@ -194,15 +234,59 @@ class Spoolman:
         self._hass = hass
         self.url = url
         self._catalog = catalog
+        # One read at a time, so no Filament gets two Materials.
+        self._lock = asyncio.Lock()
 
-    async def async_filaments(self) -> list[Filament]:
-        """Read every Filament and bring the linked Materials up to date."""
+    async def async_read(self) -> list[Merge]:
+        """Read every Filament and bring the Materials up to date; returns the own
+        Materials with the Filaments waiting to be merged into them."""
+        async with self._lock:
+            filaments = await self._async_filaments()
+            await self._async_sync(filaments)
+            return self._merges(filaments)
+
+    async def async_refresh(self) -> bool:
+        """Read Spoolman; False if that failed."""
+        try:
+            await self.async_read()
+        except SpoolmanUnreachable:
+            return False
+        return True
+
+    async def async_merge(self, picks: dict[str, int | None]) -> list[Merge]:
+        """Link each own Material to the Filament picked for it, or keep it (None)
+        and give its candidates their own Materials; returns what still waits.
+
+        Raises StaleMerge unless every pick is a candidate of its Material.
+        """
+        async with self._lock:
+            filaments = await self._async_filaments()
+            merges = {merge.material.id: merge for merge in self._merges(filaments)}
+            picked = [f for f in picks.values() if f is not None]
+            if len(set(picked)) < len(picked) or any(
+                material_id not in merges
+                or filament_id
+                not in (None, *(f.id for f in merges[material_id].candidates))
+                for material_id, filament_id in picks.items()
+            ):
+                raise StaleMerge
+            by_id = {filament.id: filament for filament in filaments}
+            for material_id, filament_id in picks.items():
+                if filament_id is not None:
+                    await self._catalog.async_link_spoolman(
+                        merges[material_id].material,
+                        by_id[filament_id].material_fields(),
+                    )
+            await self._async_sync(filaments, kept=picks.keys())
+            return self._merges(filaments)
+
+    async def _async_filaments(self) -> list[Filament]:
         if self.url is None:
             raise SpoolmanUnreachable
         try:
             filaments = await _async_get(self._hass, self.url, "filament")
             spools = await _async_get(self._hass, self.url, "spool")
-            read = [
+            return [
                 _filament(
                     filament,
                     [s for s in spools if s["filament"]["id"] == filament["id"]],
@@ -211,47 +295,38 @@ class Spoolman:
             ]
         except (KeyError, TypeError, AttributeError) as err:
             raise SpoolmanUnreachable from err
+
+    async def _async_sync(
+        self, filaments: list[Filament], kept: Collection[str] = ()
+    ) -> None:
+        waiting = {
+            filament.id
+            for merge in self._merges(filaments)
+            if merge.material.id not in kept
+            for filament in merge.candidates
+        }
         await self._catalog.async_sync_spoolman(
-            {filament.id: filament.material_fields() for filament in read}
-        )
-        return read
-
-    async def async_update_prices(self) -> bool:
-        """Read Spoolman if a Material is linked to it; False if that failed."""
-        if not any(
-            isinstance(m.price, SpoolmanPrice) for m in self._catalog.materials()
-        ):
-            return True
-        try:
-            await self.async_filaments()
-        except SpoolmanUnreachable:
-            return False
-        return True
-
-    async def _async_filament(self, filament_id: int) -> Filament | None:
-        return next(
-            (f for f in await self.async_filaments() if f.id == filament_id), None
+            {filament.id: filament.material_fields() for filament in filaments},
+            waiting,
         )
 
-    async def async_create_material(self, filament_id: int) -> Material | None:
-        """A new Material linked to the Filament; None if Spoolman has no such Filament."""
-        if (filament := await self._async_filament(filament_id)) is None:
-            return None
-        name = " ".join(filter(None, (filament.vendor, filament.name)))
-        return await self._catalog.async_create_material(
-            {
-                "name": name or filament.type or str(filament.id),
-                "type": filament.name or str(filament.id),
-            }
-            | filament.material_fields()
-        )
-
-    async def async_link(
-        self, material: Material, filament_id: int, changes: dict[str, Any]
-    ) -> Material | None:
-        """Link the Material to the Filament along with `changes`; None if there is no such Filament."""
-        if (filament := await self._async_filament(filament_id)) is None:
-            return None
-        return await self._catalog.async_update_material(
-            material, changes | filament.material_fields()
-        )
+    def _merges(self, filaments: list[Filament]) -> list[Merge]:
+        linked = self._catalog.linked_filaments()
+        unlinked = [f for f in filaments if f.id not in linked]
+        merges = []
+        for material in self._catalog.materials():
+            if (
+                material.linked
+                or material.archived
+                or material.form is not MaterialForm.FILAMENT
+                or material.by_piece
+            ):
+                continue
+            same_vendor = (material.vendor or "").casefold()
+            candidates = sorted(
+                (f for f in unlinked if f.matches(material)),
+                key=lambda f: (f.vendor or "").casefold() != same_vendor,
+            )
+            if candidates:
+                merges.append(Merge(material, candidates))
+        return merges

@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import { WsError, recorded, recordedBackend } from "./fake-hass";
 import { change, click, fill, mountPanel, query, queryAll, text } from "./render";
 
-const FILAMENTS = "coinop/spoolman/filaments";
+const READ = "coinop/spoolman/read";
+const MERGE = "coinop/spoolman/merge";
 const CATALOG = "coinop/catalog/subscribe";
-const linked = recorded.linkSpoolman.material;
-const withLinked = {
+const UPDATE = "coinop/materials/update";
+const CREATE = "coinop/materials/create";
+const DIALOG = ".material-dialog";
+const MERGE_DIALOG = ".merge-dialog";
+const withMaterials = (materials = recorded.spoolman.materials) => ({
   ...recorded.catalog.filled,
-  materials: [...recorded.catalog.filled.materials, linked],
-};
-const filamentRows = (panel: Element) => queryAll(panel, "tr.filament").map(text);
+  materials,
+});
 const button = (root: Element, label: string) => {
   const found = queryAll(root, "ha-button, ha-icon-button, button").find(
     (candidate) => text(candidate) === label || (candidate as { label?: string }).label === label,
@@ -17,289 +20,212 @@ const button = (root: Element, label: string) => {
   if (!found) throw new Error(`no button "${label}"`);
   return found;
 };
-const row = (panel: Element, selector: string, name: string) => {
-  const found = queryAll(panel, selector).find((candidate) => text(candidate).includes(name));
+const labels = (root: Element) =>
+  queryAll(root, "ha-icon-button").map((candidate) => (candidate as { label?: string }).label);
+const row = (panel: Element, name: string) => {
+  const found = queryAll(panel, "tr.material").find((candidate) =>
+    text(query(candidate, ".strong")).startsWith(name),
+  );
   if (!found) throw new Error(`no row "${name}"`);
   return found;
 };
-const DIALOG = ".material-dialog";
-const UPDATE = "coinop/materials/update";
-const field = (panel: Element, name: string) => query(panel, `${DIALOG} [name=${name}]`);
-const save = (panel: Element) => click(panel, query(panel, `${DIALOG} ha-button.save`));
+const names = (panel: Element, selector = "") =>
+  queryAll(panel, `${selector} tr.material .strong`).map(text);
+const field = (panel: Element, name: string) => query(panel, `[name=${name}]`) as HTMLInputElement;
 
-function spoolmanBackend(filaments = recorded.spoolman.filaments) {
+function spoolmanBackend(read = recorded.spoolman.read, materials = recorded.spoolman.materials) {
   return recordedBackend()
-    .subscription(CATALOG, () => [withLinked])
-    .reply(FILAMENTS, () => filaments)
-    .reply("coinop/materials/create_from_spoolman", () => recorded.createFromSpoolman)
-    .reply(UPDATE, () => recorded.linkSpoolman);
+    .subscription(CATALOG, () => [withMaterials(materials)])
+    .reply(READ, () => read)
+    .reply(MERGE, () => recorded.spoolman.merged)
+    .reply(UPDATE, () => ({ material: materials[0] }))
+    .reply(CREATE, () => ({ material: materials[0] }));
 }
 
+const open = (backend = spoolmanBackend()) => mountPanel(backend, { path: "/materials" });
+
 describe("Spoolman in the Materials tab", () => {
-  it("reads the Filaments every time the tab opens", async () => {
+  it("reads Spoolman every time the tab opens", async () => {
     const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
+    const panel = await open(backend);
     await click(panel, query(panel, `a.tab[href$="/tags"]`));
     await click(panel, query(panel, `a.tab[href$="/materials"]`));
 
-    expect(backend.calls.filter((call) => call.type === FILAMENTS)).toHaveLength(2);
+    expect(backend.sent(READ)).toHaveLength(2);
   });
 
-  it("lists the Filaments, marking those a Material is linked to", async () => {
-    const panel = await mountPanel(spoolmanBackend(), { path: "/materials" });
+  it("shows a Material from Spoolman with its pack, a badge and a missing price", async () => {
+    const panel = await open();
 
-    expect(text(query(panel, ".spoolman h3"))).toBe("Spoolman Filaments");
-    expect(filamentRows(panel)).toEqual([
-      "eSun PLA+ black PLA €20.00 / kg Linked to PLA black",
-      "Prusament PETG Galaxy Black PETG €29.99 / kg Create Material",
-      "eSun TPU clear TPU No price in Spoolman Create Material",
-    ]);
-  });
-
-  it("creates a Material from a Filament", async () => {
-    const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
-
-    await click(panel, button(row(panel, "tr.filament", "PETG"), "Create Material"));
-
-    expect(backend.calls.at(-1)).toEqual({
-      type: "coinop/materials/create_from_spoolman",
-      filament_id: 8,
-    });
-  });
-
-  it("shows a linked Material's price as coming from Spoolman", async () => {
-    const panel = await mountPanel(spoolmanBackend(), { path: "/materials" });
-
-    expect(text(row(panel, "tr.material", "PLA black"))).toBe(
-      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm From Spoolman €20.00 / kg",
+    expect(queryAll(panel, ".spoolman, tr.filament")).toEqual([]);
+    expect(text(row(panel, "Prusament PETG Galaxy Black"))).toBe(
+      "Prusament PETG Galaxy Black Prusament Filament · PETG 1.27 g/cm³ · ⌀ 1.75 mm Spoolman €29.99 / 1 kg €29.99 / kg",
+    );
+    expect(text(row(panel, "eSun TPU clear"))).toBe(
+      "eSun TPU clear eSun Filament · TPU 1.24 g/cm³ · ⌀ 1.75 mm Spoolman No price in Spoolman —",
+    );
+    expect(text(row(panel, "PLA black"))).toBe(
+      "PLA black eSun Filament · PLA 1.24 g/cm³ · ⌀ 1.75 mm €20.00 / 1,000 g €20.00 / kg",
     );
   });
 
-  it("links a Material to a Filament, which then supplies its details", async () => {
-    const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
+  it("says at the top when Spoolman can't be reached", async () => {
+    const panel = await open(spoolmanBackend(recorded.spoolman.unreachable));
 
-    await change(panel, field(panel, "price_source"), "spoolman");
-    expect(queryAll(panel, "[name=pack_price], [name=density], [name=type]")).toHaveLength(0);
+    expect(text(query(panel, ".spoolman-notice"))).toBe(
+      "Spoolman can't be reached right now. Materials from Spoolman keep the last price read.",
+    );
+    expect(queryAll(panel, ".merge-notice")).toEqual([]);
+  });
+
+  it("offers a linked Material no delete and its details read-only", async () => {
+    const backend = spoolmanBackend();
+    const panel = await open(backend);
+    const linked = row(panel, "Prusament PETG Galaxy Black");
+
+    expect(labels(linked)).toEqual(["Default Material for PETG", "Edit", "Duplicate", "Archive"]);
+    await click(panel, button(linked, "Edit"));
+    expect(queryAll(panel, `${DIALOG} input:not([type=checkbox]), ${DIALOG} select`)).toEqual([]);
     expect(text(query(panel, DIALOG))).toContain(
-      "Type, density, diameter, colour and vendor come from the Spoolman Filament",
+      "Prusament PETG Galaxy Black Form · Type Filament · PETG Density · Diameter 1.27 g/cm³ · ⌀ 1.75 mm Vendor Prusament Colour #2b2b33 Pack Spoolman €29.99 / 1 kg",
     );
-    await change(panel, field(panel, "filament_id"), "7");
-    expect(backend.sent(UPDATE)).toEqual([]);
-    await save(panel);
+    await fill(panel, field(panel, "default_for_type"), "off");
+    await click(panel, query(panel, `${DIALOG} ha-button.save`));
 
     expect(backend.sent(UPDATE)).toEqual([
       {
         type: UPDATE,
-        material_id: "material-1",
-        material: {
-          name: "eSun PLA+ black",
-          default_for_type: true,
-          price: { source: "spoolman", filament_id: 7 },
-        },
-      },
-    ]);
-    expect(queryAll(panel, DIALOG)).toEqual([]);
-  });
-
-  it("asks for the Filament before linking", async () => {
-    const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-    await change(panel, field(panel, "price_source"), "spoolman");
-
-    await save(panel);
-
-    expect(backend.sent(UPDATE)).toEqual([]);
-    expect(field(panel, "filament_id").getAttribute("aria-invalid")).toBe("true");
-  });
-
-  it("links nothing when the dialog is cancelled", async () => {
-    const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-    await change(panel, field(panel, "price_source"), "spoolman");
-    await change(panel, field(panel, "filament_id"), "7");
-
-    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
-
-    expect(queryAll(panel, DIALOG)).toEqual([]);
-    expect(backend.sent(UPDATE)).toEqual([]);
-  });
-
-  it("keeps the dialog open and says so when Spoolman went away while linking", async () => {
-    const backend = spoolmanBackend().reply(UPDATE, () => {
-      throw new WsError("spoolman_unreachable");
-    });
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-    await change(panel, field(panel, "price_source"), "spoolman");
-    await change(panel, field(panel, "filament_id"), "7");
-
-    await save(panel);
-
-    expect(text(query(panel, `${DIALOG} .error`))).toBe(
-      "Spoolman can't be reached right now. Linked Materials keep the last price read.",
-    );
-    expect(backend.sent(FILAMENTS)).toHaveLength(2);
-  });
-
-  it("edits a linked Material's own fields and can unlink it", async () => {
-    const backend = spoolmanBackend();
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "PLA black"), "Edit"));
-    expect((field(panel, "filament_id") as HTMLSelectElement).value).toBe("7");
-
-    await change(panel, field(panel, "price_source"), "fixed");
-    expect((field(panel, "type") as HTMLInputElement).value).toBe("PLA");
-    await fill(panel, field(panel, "pack_price"), "24");
-    await save(panel);
-
-    expect(backend.sent(UPDATE)).toMatchObject([
-      {
-        type: UPDATE,
-        material_id: "pla-black",
-        material: {
-          type: "PLA",
-          price: { source: "fixed", pack_price: 24, pack_size: 1000, pack_unit: "g" },
-        },
+        material_id: "material-filament-8",
+        material: { default_for_type: false },
       },
     ]);
   });
 
-  it("duplicates a linked Material as one with a pack price of its own", async () => {
-    const CREATE = "coinop/materials/create";
-    const backend = spoolmanBackend().reply(CREATE, () => recorded.linkSpoolman);
-    const panel = await mountPanel(backend, { path: "/materials" });
+  it("restores an archived linked Material but never deletes it", async () => {
+    const [own, ...rest] = recorded.spoolman.materials;
+    const archived = rest.map((material) => ({ ...material, archived: true }));
+    const panel = await open(spoolmanBackend(undefined, [own, ...archived]));
 
-    await click(panel, button(row(panel, "tr.material", "PLA black"), "Duplicate"));
-    expect(queryAll(panel, `${DIALOG} [name=price_source]`)).toHaveLength(0);
-    expect((field(panel, "type") as HTMLInputElement).value).toBe("PLA");
-    await save(panel);
-    expect(backend.sent(CREATE)).toEqual([]);
-    await fill(panel, field(panel, "pack_price"), "24");
-    await save(panel);
+    expect(labels(row(panel, "eSun TPU clear"))).toEqual(["Restore"]);
+  });
+
+  it("duplicates a linked Material as an own one at the current Spoolman price", async () => {
+    const backend = spoolmanBackend();
+    const panel = await open(backend);
+
+    await click(panel, button(row(panel, "Prusament PETG Galaxy Black"), "Duplicate"));
+    expect(field(panel, "pack_price").value).toBe("29.99");
+    expect(field(panel, "pack_size").value).toBe("1000");
+    await click(panel, query(panel, `${DIALOG} ha-button.save`));
 
     expect(backend.sent(CREATE)).toMatchObject([
       {
-        type: CREATE,
         material: {
-          name: "PLA black",
-          price: { source: "fixed", pack_price: 24, pack_size: 1000, pack_unit: "g" },
+          name: "Prusament PETG Galaxy Black",
+          type: "PETG",
+          default_for_type: false,
+          price: { source: "fixed", pack_price: 29.99, pack_size: 1000, pack_unit: "g" },
         },
       },
     ]);
   });
 
-  it("creates linked Materials only from the Filament list", async () => {
-    const panel = await mountPanel(spoolmanBackend(), { path: "/materials" });
+  it("asks for a price when duplicating a Material Spoolman has none for", async () => {
+    const panel = await open();
 
+    await click(panel, button(row(panel, "eSun TPU clear"), "Duplicate"));
+
+    expect(field(panel, "pack_price").value).toBe("");
+  });
+
+  it("filters both tables by where the Materials come from", async () => {
+    const [last, ...others] = [...recorded.spoolman.mergedMaterials].reverse();
+    const materials = [...others.reverse(), { ...last, archived: true }];
+    const panel = await open(spoolmanBackend(recorded.spoolman.merged, materials));
+
+    expect(names(panel, ".archived")).toEqual(["Prusament PLA Galaxy Black"]);
+    await click(panel, button(panel, "Own"));
+    expect(names(panel)).toEqual(["Any PLA"]);
+    await click(panel, button(panel, "From Spoolman"));
+    expect(names(panel)).toEqual([
+      "eSun PLA+ black",
+      "Prusament PETG Galaxy Black",
+      "eSun TPU clear",
+      "Prusament PLA Galaxy Black",
+    ]);
+    await click(panel, button(panel, "All"));
+    expect(names(panel)).toHaveLength(5);
+  });
+
+  it("shows no filter and nothing of Spoolman while it isn't set up", async () => {
+    const panel = await open(spoolmanBackend(recorded.spoolman.notConfigured));
+
+    expect(queryAll(panel, ".origin, .spoolman-notice, .merge-notice")).toEqual([]);
     await click(panel, button(panel, "New Material"));
-
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+    expect(queryAll(panel, "[name=price_source]")).toEqual([]);
   });
 
-  it("offers no link for a Material bought by the piece", async () => {
-    const backend = spoolmanBackend().subscription(CATALOG, () => [
-      { ...withLinked, materials: recorded.laundry },
+  it("merges own Materials into the Filaments picked for them", async () => {
+    const backend = spoolmanBackend();
+    const panel = await open(backend);
+
+    expect(text(query(panel, ".merge-notice"))).toBe(
+      "2 of your Materials match Spoolman Filaments. Review",
+    );
+    await click(panel, button(query(panel, ".merge-notice"), "Review"));
+    const dialog = query(panel, MERGE_DIALOG);
+    // The best match first; a Filament picked for one Material can't be picked for another.
+    expect(field(dialog, "merge-pla-black").value).toBe("7");
+    expect(field(dialog, "merge-pla-any").value).toBe("10");
+    const options = (name: string) =>
+      [...(field(dialog, name) as unknown as HTMLSelectElement).options].map(
+        (option) => `${option.text.trim()}${option.disabled ? " (taken)" : ""}`,
+      );
+    expect(options("merge-pla-any")).toEqual([
+      "eSun PLA+ black (taken)",
+      "Prusament PLA Galaxy Black",
+      "Keep own",
     ]);
-    const panel = await mountPanel(backend, { path: "/materials" });
+    await change(panel, field(dialog, "merge-pla-any"), "");
+    await click(panel, query(dialog, "ha-button.save"));
 
-    await click(panel, button(row(panel, "tr.material", "Liquid detergent"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
-    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
-    await click(panel, button(row(panel, "tr.material", "Colour pods"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-    await change(panel, field(panel, "pack_unit"), "g");
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-  });
-
-  it("offers no link for a dishwasher product or a beverage ingredient", async () => {
-    const backend = spoolmanBackend().subscription(CATALOG, () => [
+    expect(backend.sent(MERGE)).toEqual([
       {
-        ...withLinked,
-        materials: [...recorded.catalog.filled.materials, ...recorded.dishwasherAndBeverage],
+        type: MERGE,
+        picks: [
+          { material_id: "pla-black", filament_id: 7 },
+          { material_id: "pla-any", filament_id: null },
+        ],
       },
     ]);
-    const panel = await mountPanel(backend, { path: "/materials" });
-
-    await click(panel, button(row(panel, "tr.material", "Espresso beans"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-    await change(panel, field(panel, "form"), "filament");
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
-    await change(panel, field(panel, "form"), "dishwasher_product");
-    await change(panel, field(panel, "pack_unit"), "g");
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
+    expect(queryAll(panel, `${MERGE_DIALOG}, .merge-notice`)).toEqual([]);
   });
 
-  it("offers no link for a Material of the form Other", async () => {
-    const backend = spoolmanBackend().subscription(CATALOG, () => [
-      {
-        ...withLinked,
-        materials: [...recorded.catalog.filled.materials, recorded.otherMaterial],
-      },
-    ]);
-    const panel = await mountPanel(backend, { path: "/materials" });
-
-    await click(panel, button(row(panel, "tr.material", "Liquid fertiliser"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-    await change(panel, field(panel, "form"), "filament");
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-    await click(panel, query(panel, `${DIALOG} ha-button.cancel`));
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(1);
-    await change(panel, field(panel, "form"), "other");
-    expect(queryAll(panel, "[name=price_source]")).toHaveLength(0);
-  });
-
-  it("shows nothing of Spoolman while it isn't set up", async () => {
-    const backend = spoolmanBackend(recorded.spoolman.notConfigured);
-    const panel = await mountPanel(backend, { path: "/materials" });
-    await click(panel, button(row(panel, "tr.material", "eSun PLA+ black"), "Edit"));
-
-    expect(queryAll(panel, DIALOG)).toHaveLength(1);
-    expect(queryAll(panel, ".spoolman, [name=price_source]")).toHaveLength(0);
-  });
-
-  it("says when Spoolman can't be reached", async () => {
-    const panel = await mountPanel(spoolmanBackend(recorded.spoolman.unreachable), {
-      path: "/materials",
+  it("reads again and says so when the merge no longer fits Spoolman", async () => {
+    const backend = spoolmanBackend().reply(MERGE, () => {
+      throw new WsError("not_allowed");
     });
+    const panel = await open(backend);
+    await click(panel, button(query(panel, ".merge-notice"), "Review"));
 
-    expect(text(query(panel, ".spoolman"))).toBe(
-      "Spoolman Filaments Spoolman can't be reached right now. Linked Materials keep the last price read.",
+    await click(panel, query(panel, `${MERGE_DIALOG} ha-button.save`));
+
+    expect(text(query(panel, `${MERGE_DIALOG} .error`))).toBe(
+      "Spoolman changed meanwhile: check the picks again.",
     );
-  });
-
-  it("says when creating from Spoolman fails because it went away", async () => {
-    const backend = spoolmanBackend().reply("coinop/materials/create_from_spoolman", () => {
-      throw new WsError("spoolman_unreachable");
-    });
-    const panel = await mountPanel(backend, { path: "/materials" });
-
-    await click(panel, button(row(panel, "tr.filament", "PETG"), "Create Material"));
-
-    expect(text(query(panel, ".notice"))).toBe(
-      "Spoolman can't be reached right now. Linked Materials keep the last price read.",
-    );
+    expect(backend.sent(READ)).toHaveLength(2);
   });
 
   it("is in German when Home Assistant is", async () => {
     const backend = recordedBackend({ language: "de" })
-      .subscription(CATALOG, () => [withLinked])
-      .reply(FILAMENTS, () => recorded.spoolman.filaments);
-    const panel = await mountPanel(backend, { path: "/materials" });
+      .subscription(CATALOG, () => [withMaterials()])
+      .reply(READ, () => recorded.spoolman.read);
+    const panel = await open(backend);
 
-    expect(text(query(panel, ".spoolman h3"))).toBe("Spoolman-Filamente");
-    expect(filamentRows(panel)).toEqual([
-      "eSun PLA+ black PLA 20,00 € / kg Verknüpft mit PLA black",
-      "Prusament PETG Galaxy Black PETG 29,99 € / kg Material erstellen",
-      "eSun TPU clear TPU Kein Preis in Spoolman Material erstellen",
-    ]);
+    expect(text(query(panel, ".merge-notice"))).toBe(
+      "2 deiner Materialien passen zu Spoolman-Filamenten. Prüfen",
+    );
+    expect(text(row(panel, "eSun TPU clear"))).toContain("Spoolman Kein Preis in Spoolman");
+    expect(text(query(panel, ".origin"))).toBe("Alle Aus Spoolman Eigene");
   });
 });

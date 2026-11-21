@@ -2,7 +2,8 @@
 
 Free of Home Assistant types; `as_dict` / `from_dict` give the catalog Store's
 JSON shape. A Cost Source is one entry of `PRICE_SOURCES` ("fixed" or
-"spoolman") with a `per_gram(density)` and a `per_piece()` price. A Material
+"spoolman", whose Materials Coin-op creates from Spoolman's Filaments) with a
+`per_gram(density)` and a `per_piece()` price. A Material
 bought by the piece (pods, sheets) has no density and no price per gram.
 """
 
@@ -35,15 +36,6 @@ USUAL_UNITS = {
     MaterialForm.RESIN: PackUnit.MILLILITRE,
     MaterialForm.DISHWASHER_PRODUCT: PackUnit.PIECE,
 }
-# Forms whose Materials are never linked to a Spoolman Filament.
-UNLINKED_FORMS = frozenset(
-    {
-        MaterialForm.DISHWASHER_PRODUCT,
-        MaterialForm.BEVERAGE_INGREDIENT,
-        MaterialForm.OTHER,
-    }
-)
-
 DEFAULT_DIAMETER = 1.75
 
 # Built-in types with their usual form, density (g/cm³) and pack unit, for pre-filling.
@@ -126,10 +118,13 @@ class FixedPrice:
 
 @dataclass
 class SpoolmanPrice:
-    """Spoolman Cost Source: the linked Filament and the last price per gram read."""
+    """Spoolman Cost Source: the linked Filament, the last price per gram read and
+    the price and weight Spoolman prices it by (None while Spoolman has no price)."""
 
     filament_id: int
     last_read: float | None = None
+    pack_price: float | None = None
+    pack_weight: float | None = None
     pack_unit = PackUnit.GRAM
 
     def per_gram(self, density: float | None) -> float:
@@ -143,11 +138,18 @@ class SpoolmanPrice:
             "source": "spoolman",
             "filament_id": self.filament_id,
             "per_gram": self.last_read,
+            "pack_price": self.pack_price,
+            "pack_weight": self.pack_weight,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SpoolmanPrice:
-        return cls(data["filament_id"], data.get("per_gram"))
+        return cls(
+            data["filament_id"],
+            data.get("per_gram"),
+            data.get("pack_price"),
+            data.get("pack_weight"),
+        )
 
 
 PRICE_SOURCES: dict[str, type[FixedPrice] | type[SpoolmanPrice]] = {
@@ -182,9 +184,9 @@ class Material:
         return self.price.pack_unit is PackUnit.PIECE
 
     @property
-    def linkable(self) -> bool:
-        """Whether the Material can be linked to a Spoolman Filament."""
-        return not self.by_piece and self.form not in UNLINKED_FORMS
+    def linked(self) -> bool:
+        """Whether Spoolman supplies the Material: its Cost Source and its details."""
+        return isinstance(self.price, SpoolmanPrice)
 
     @property
     def price_per_gram(self) -> float | None:

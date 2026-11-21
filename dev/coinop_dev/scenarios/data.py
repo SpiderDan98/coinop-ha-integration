@@ -5,23 +5,24 @@ from typing import NamedTuple
 # Each Device's inputs are helpers from the dev configuration.yaml.
 PRINTERS = {"prusa": 120.0, "bambu": 150.0}
 
+# A Material's name is its vendor's followed by its Spoolman Filament's.
 MATERIALS = [
-    ("Prusament PLA Galaxy Black", "PLA", "#1d1d24", "Prusa", 29.99),
+    ("Prusament PLA Galaxy Black", "PLA", "#1d1d24", "Prusament", 29.99),
     ("Extrudr PETG White", "PETG", "#f3f3f3", "Extrudr", 24.90),
     ("Polymaker ASA Red", "ASA", "#c0262d", "Polymaker", 32.50),
     ("eSun PLA+ Blue", "PLA", "#1f5fbf", "eSun", 19.99),
-    ("Bambu PLA Matte Ivory", "PLA", "#e9e3d3", "Bambu Lab", 22.99),
-    ("Prusament PETG Orange", "PETG", "#f26b1d", "Prusa", 29.99),
+    ("Bambu Lab PLA Matte Ivory", "PLA", "#e9e3d3", "Bambu Lab", 22.99),
+    ("Prusament PETG Orange", "PETG", "#f26b1d", "Prusament", 29.99),
     ("Polymaker PC Grey", "PC", "#8a8d91", "Polymaker", 39.00),
     ("Sunlu TPU Clear", "TPU", "#d8e6ea", "Sunlu", 27.00),
 ]
 DENSITY = {"PLA": 1.24, "PETG": 1.27, "ASA": 1.07, "PC": 1.20, "TPU": 1.21}
-# Spoolman's Filaments besides the Materials', for Create from Spoolman to offer: the
-# rainbow has three colours, the natural PLA no price.
+# Spoolman's Filaments besides the Materials', which only the Spoolman option makes
+# Materials of: the rainbow has three colours, the natural PLA no price.
 SPOOLMAN_ONLY = [
-    ("Prusament PETG Jet Black", "PETG", "#16161a", "Prusa", 29.99),
-    ("PolyTerra PLA Forest Green", "PLA", "#2f6b3a", "Polymaker", 21.99),
-    ("Silk PLA Rainbow", "PLA", "#e53935,#fdd835,#1e88e5", "Eryone", 26.99),
+    ("Prusament PETG Jet Black", "PETG", "#16161a", "Prusament", 29.99),
+    ("Polymaker PolyTerra PLA Forest Green", "PLA", "#2f6b3a", "Polymaker", 21.99),
+    ("Eryone Silk PLA Rainbow", "PLA", "#e53935,#fdd835,#1e88e5", "Eryone", 26.99),
     ("PLA Natural", "PLA", "#f5f1e6", None, None),
 ]
 
@@ -43,7 +44,7 @@ SPOOLS = {
         Spool(1000, "Shelf"),
         Spool(1000, "Shelf"),
     ],
-    "Bambu PLA Matte Ivory": [Spool(530, "AMS")],
+    "Bambu Lab PLA Matte Ivory": [Spool(530, "AMS")],
     "Prusament PETG Orange": [Spool(760, "AMS")],
     "Polymaker PC Grey": [Spool(1000, "Shelf")],
     "Sunlu TPU Clear": [
@@ -51,7 +52,7 @@ SPOOLS = {
         Spool(905, "Dry box", price=27.00),
     ],
     "Prusament PETG Jet Black": [Spool(1000, "Shelf")],
-    "Silk PLA Rainbow": [Spool(470, "Dry box")],
+    "Eryone Silk PLA Rainbow": [Spool(470, "Dry box")],
 }
 
 PARTS = [

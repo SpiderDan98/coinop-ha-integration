@@ -692,8 +692,10 @@ async def test_an_other_device_with_what_a_printer_has_costs_a_run_like_one(
     place_materials(hass_storage, *materials)
     entry = await add_hub(hass)
     if spoolman is not None:
-        # Filament 7 at 0.03 per g, which the linked Material last read cheaper.
-        serve_spoolman(aioclient_mock, [filament(7, price=30.0)])
+        # Filament 7 at 0.03 per g, which the linked Material last read cheaper;
+        # the hub reads it on setup, so Spoolman going down after keeps 0.025.
+        price = 25.0 if spoolman == "down" else 30.0
+        serve_spoolman(aioclient_mock, [filament(7, price=price)])
         await set_options(hass, entry, spoolman_url=SPOOLMAN)
     if spoolman == "down":
         spoolman_down(aioclient_mock)

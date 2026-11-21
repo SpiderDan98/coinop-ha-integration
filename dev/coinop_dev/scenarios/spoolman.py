@@ -16,7 +16,7 @@ _TIMEOUT = ClientTimeout(total=10)
 
 async def async_fill(hass: HomeAssistant) -> dict[str, int]:
     """Replace whatever Spoolman holds by the test data; returns each Filament's id
-    by its name."""
+    by its Material's name."""
     session = async_get_clientsession(hass)
 
     async def call(method: str, path: str, **kwargs: Any) -> Any:
@@ -52,7 +52,7 @@ async def async_fill(hass: HomeAssistant) -> dict[str, int]:
             else {"color_hex": hexes[0]}
         )
         filament = {
-            "name": name,
+            "name": name.removeprefix(f"{vendor} ") if vendor else name,
             "vendor_id": vendors[vendor] if vendor else None,
             "material": type_,
             "price": None if any(s.price for s in spools) else price,

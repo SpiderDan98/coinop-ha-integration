@@ -33,6 +33,7 @@ from dev.coinop_dev.scenarios import (
     ScenarioError,
     async_load,
 )
+from dev.coinop_dev.scenarios.data import MATERIALS, SPOOLMAN_ONLY
 from dev.coinop_dev.scenarios.spoolman import URL as SPOOLMAN_URL
 
 from .clock import Clock
@@ -281,7 +282,7 @@ async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
         ("few-runs", (1, 8, 7, 0)),
         ("printing-now", (1, 8, 8, 1)),
         ("two-printers", (2, 8, 17, 0)),
-        ("spoolman", (1, 8, 7, 0)),
+        ("spoolman", (1, 12, 7, 0)),
         ("washing-machine", (1, 4, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
@@ -666,9 +667,9 @@ async def test_every_load_fills_spoolman_afresh_whatever_the_option(
     assert len(spoolman.records["vendor"]) == 7
     assert len(filaments) == 12
     assert (len(spoolman.spools()), len(spoolman.spools(archived=True))) == (13, 14)
-    assert filaments["Polymaker PC Grey"]["price"] == 39.0
+    assert filaments["PC Grey"]["price"] == 39.0
     # Priced by its spool.
-    assert filaments["Sunlu TPU Clear"]["price"] is None
+    assert filaments["TPU Clear"]["price"] is None
     assert filaments["Silk PLA Rainbow"]["multi_color_hexes"] == "e53935,fdd835,1e88e5"
     assert (filaments["PLA Natural"]["vendor"], filaments["PLA Natural"]["price"]) == (
         None,
@@ -678,7 +679,7 @@ async def test_every_load_fills_spoolman_afresh_whatever_the_option(
 
 
 @pytest.mark.usefixtures("helpers")
-async def test_the_spoolman_option_links_the_filaments_to_spoolman_which_prices_them(
+async def test_the_spoolman_option_makes_every_filament_a_material_spoolman_prices(
     hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
 ) -> None:
     await async_load(hass, "spoolman", hass_admin_user)
@@ -689,25 +690,17 @@ async def test_the_spoolman_option_links_the_filaments_to_spoolman_which_prices_
         material["name"]: material
         for material in (await panel.call("coinop/materials/list"))["materials"]
     }
-    spoolman = await panel.call("coinop/spoolman/filaments")
-    linked = {material["price"]["filament_id"] for material in materials.values()}
     assert entry.options == {"spoolman_url": SPOOLMAN_URL}
-    assert len(materials) == 8
+    assert (await panel.call("coinop/spoolman/read"))["status"] == "ok"
     assert {material["price"]["source"] for material in materials.values()} == {
         "spoolman"
     }
+    assert sorted(materials) == sorted(name for name, *_ in MATERIALS + SPOOLMAN_ONLY)
     assert materials["Polymaker PC Grey"]["price_per_gram"] == pytest.approx(0.039)
     assert materials["Sunlu TPU Clear"]["price_per_gram"] == pytest.approx(0.027)
-    assert spoolman["status"] == "ok"
-    assert sorted(
-        f["name"] for f in spoolman["filaments"] if f["id"] not in linked
-    ) == [
-        "PLA Natural",
-        "PolyTerra PLA Forest Green",
-        "Prusament PETG Jet Black",
-        "Silk PLA Rainbow",
-    ]
-    assert await counts(panel) == (1, 8, 7, 0)
+    assert materials["Sunlu TPU Clear"]["price"]["pack_price"] == 27.0
+    assert materials["PLA Natural"]["price"]["pack_price"] is None
+    assert await counts(panel) == (1, 12, 7, 0)
 
 
 @pytest.mark.usefixtures("helpers")
