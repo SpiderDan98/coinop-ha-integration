@@ -64,3 +64,51 @@ def tesla_wall_connector(find: Find) -> dict[str, Any]:
             find, lifetime="-energy_kWh", session="-session_energy_wh"
         ),
     }
+
+
+def evcc(find: Find) -> dict[str, Any]:
+    """HACS `evcc_intg`: unique ids `evcc_intg.<system id>_<loadpoint>_<key>`, from the
+    slugified titles of the config entry and the loadpoint.
+
+    Its Status is a binary sensor without "plugged in, not charging", so a session
+    that evcc interrupts is several Runs. `charge_total_import` is registered and
+    enabled even for a charger without a meter, which never reports it, so the session
+    counter comes first.
+    """
+    status = find("binary_sensor", "_charging")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(status, **mapping(running=["on"], finished=["off"])),
+        "consumption": energy_meter(
+            find,
+            lifetime="_charge_total_import",
+            session="_charged_energy",
+            session_first=True,
+        ),
+    }
+
+
+def ocpp(find: Find) -> dict[str, Any]:
+    """HACS `ocpp`: unique ids `ocpp.<cpid>[.conn<n>].<metric>.sensor`.
+
+    Its states are OCPP 1.6's connector statuses, which it also reports for OCPP 2.0.1.
+    """
+    status = find("sensor", ".status_connector.sensor")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["Charging"],
+                paused=["Preparing", "SuspendedEV", "SuspendedEVSE", "Finishing"],
+                finished=["Available"],
+                fault=["Faulted"],
+                ignored=["Unavailable", "Reserved"],
+            ),
+        ),
+        "consumption": energy_meter(
+            find,
+            lifetime=".energy_active_import_register.sensor",
+            session=".energy_session.sensor",
+        ),
+    }

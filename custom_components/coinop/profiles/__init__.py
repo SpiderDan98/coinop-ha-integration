@@ -90,6 +90,17 @@ INTEGRATIONS = {
         ev_chargers.DEVICE_TYPES,
         ev_chargers.KIND,
     ),
+    "evcc_intg": Integration(
+        "evcc", ev_chargers.evcc, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
+    ),
+    # Each connector of a charge point with several is an HA device linked to it.
+    "ocpp": Integration(
+        "OCPP",
+        ev_chargers.ocpp,
+        ev_chargers.DEVICE_TYPES,
+        ev_chargers.KIND,
+        linked_devices=False,
+    ),
 }
 
 
@@ -107,14 +118,16 @@ def known_integrations(device_type: str) -> str:
 
 
 def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:
-    """Finds the integration's entities of the HA device and the devices linked to it."""
+    """Finds the integration's entities of the HA device and, unless its integration
+    says otherwise, the devices linked to it."""
     # A multi-material unit is its own HA device, linked to the printer's.
+    linked = INTEGRATIONS[config_entry.domain].linked_devices
     device_ids = [
         device.id
         for device in dr.async_entries_for_config_entry(
             dr.async_get(hass), config_entry.entry_id
         )
-        if device_id in (device.id, device.via_device_id)
+        if device.id == device_id or (linked and device.via_device_id == device_id)
     ]
     entities = er.async_get(hass)
     candidates = [
