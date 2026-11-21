@@ -57,6 +57,9 @@ input_select:
   kitchen_oven_program:
     name: Kitchen oven program
     options: ["Fan plus 180°", "Top/bottom heat 200°", Grill, "Pizza 220°"]
+  carport_charger_status:
+    name: Carport charger status
+    options: [disconnected, connected, charging, error]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -122,6 +125,14 @@ input_number:
     name: Dishwasher energy
     min: 0
     max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # Counts each charging session from 0.
+  carport_charger_session:
+    name: Carport charger session energy
+    min: 0
+    max: 200
     step: 0.001
     mode: box
     unit_of_measurement: kWh

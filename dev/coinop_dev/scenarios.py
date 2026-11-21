@@ -140,6 +140,20 @@ OVEN_PROGRAMS = {
     "Grill": 0.9,
     "Pizza 220°": 0.8,
 }
+# Days ago, hour the car is plugged in, minutes charging, minutes it stays plugged in
+# once full, kWh.
+SESSIONS = [
+    (25, 19, 240, 600, 38.5),
+    (22, 18, 95, 0, 14.2),
+    (19, 20, 180, 540, 29.0),
+    (16, 19, 60, 0, 9.8),
+    (13, 18, 300, 480, 47.6),
+    (11, 21, 120, 420, 19.3),
+    (8, 19, 75, 0, 11.9),
+    (6, 18, 210, 600, 33.4),
+    (3, 20, 140, 300, 22.7),
+    (1, 19, 90, 0, 14.6),
+]
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -658,6 +672,55 @@ async def _oven_start(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.kitchen_oven_status", "running")
 
 
+async def _charger_short(seed: Seed) -> None:
+    await _charge(seed, SESSIONS)
+
+
+async def _charger_long(seed: Seed) -> None:
+    """A charge every few days for two years, then the short level's."""
+    rng = seed.random
+    sessions, day = [], 730
+    while day > 30:
+        kwh = round(rng.uniform(8, 48), 1)
+        # 11 kW, a little less at the end.
+        charging = round(kwh / 10 * 60)
+        full = rng.choice([0, 0, 240, 480, 600])
+        sessions.append((day, rng.choice([18, 19, 20, 21]), charging, full, kwh))
+        day -= rng.randrange(2, 7)
+    await _charge(seed, [*sessions, *SESSIONS])
+
+
+async def _charge(seed: Seed, sessions: list[tuple[int, int, int, int, float]]) -> None:
+    """Each session counted from 0, as a session energy sensor counts it; the
+    sensor drops back to 0 five minutes after the car is unplugged."""
+    hass = seed.hass
+    status, session = (
+        "input_select.carport_charger_status",
+        "input_number.carport_charger_session",
+    )
+    for days, hour, charging, full, kwh in sessions:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        await _replay(hass, session, 0, start)
+        await _replay(hass, status, "charging", start)
+        halfway = start + timedelta(minutes=charging // 2)
+        await _replay(hass, session, round(kwh / 2, 1), halfway)
+        charged = start + timedelta(minutes=charging)
+        await _replay(hass, session, kwh, charged)
+        if full:
+            await _replay(hass, status, "connected", charged)
+        end = charged + timedelta(minutes=full)
+        await _replay(hass, status, "disconnected", end)
+        # A report after the end spares the wait for it.
+        await _replay(hass, session, kwh, end + timedelta(minutes=1))
+        await _replay(hass, session, 0, end + timedelta(minutes=5))
+    await _async_set(hass, session, 0)
+    await _async_set(hass, status, "disconnected")
+
+
+async def _charger_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.carport_charger_status", "charging")
+
+
 async def _irrigation_short(seed: Seed) -> None:
     await _water(seed, WATERINGS)
 
@@ -810,6 +873,36 @@ def _oven() -> dict[str, Any]:
             "attribute": None,
         },
         "consumption": {"source": "per_program"},
+        "price": {"source": "fixed", "value": 0.32},
+    }
+
+
+def _charger() -> dict[str, Any]:
+    """A charger on its session energy sensor, which counts each session from 0;
+    a car left plugged in once full is Paused."""
+    return {
+        "device_type": "ev_charger",
+        "printer_device_id": None,
+        "status": {
+            "entity_id": "input_select.carport_charger_status",
+            "attribute": None,
+        },
+        "mapping": {
+            "running": ["charging"],
+            "paused": ["connected"],
+            "finished": ["disconnected"],
+            "cancelled": [],
+            "ended": [],
+            "fault": ["error"],
+            "ignored": [],
+        },
+        "consumption": {
+            "source": "energy",
+            "entity_id": "input_number.carport_charger_session",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        },
         "price": {"source": "fixed", "value": 0.32},
     }
 
@@ -1061,6 +1154,21 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         long=_oven_long,
         start=_oven_start,
         setup=_oven_settings,
+    ),
+    "charger": DeviceWithHistory(
+        "ev_charger",
+        "Carport charger",
+        "A session energy sensor that counts each charge from 0; a car left plugged "
+        "in once full is Paused. Short history: 10 charges over four weeks; long: a "
+        "charge every few days for two years.",
+        {
+            "input_select.carport_charger_status": "disconnected",
+            "input_number.carport_charger_session": 0,
+        },
+        device=_charger(),
+        short=_charger_short,
+        long=_charger_long,
+        start=_charger_start,
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",

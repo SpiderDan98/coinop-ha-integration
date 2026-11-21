@@ -244,6 +244,7 @@ async def test_a_preset_fills_coinop_from_scratch(
         ("bambu", (1, 8, 10, 0)),
         ("washer", (1, 4, 10, 0)),
         ("oven", (1, 0, 10, 0)),
+        ("charger", (1, 0, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
 )
@@ -308,7 +309,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
     await hass.async_block_till_done()
 
-    assert await counts(panel) == (5, 12, 43, 0)
+    assert await counts(panel) == (6, 12, 53, 0)
     await panel.subscribe("coinop/catalog/subscribe")
     catalog = await panel.event()
     assert len(catalog["tags"]) == 6
@@ -342,6 +343,7 @@ async def test_without_history_every_device_with_history_exists_without_a_run(
         "Bambu Lab X1C",
         "Washing machine",
         "Kitchen oven",
+        "Carport charger",
         "Garden valve",
     ]
     assert (await panel.call("coinop/runs/list"))["runs"] == []
@@ -375,6 +377,7 @@ async def test_a_device_with_long_history_has_runs_from_up_to_two_years_ago(
             {("electricity", "program_default")},
             {"Fan plus 180°", "Top/bottom heat 200°", "Grill", "Pizza 220°", None},
         ),
+        ("charger", {("electricity", "measured")}, {None}),
     ],
 )
 async def test_a_device_with_history_has_the_line_items_and_programs_of_its_type(
@@ -400,12 +403,34 @@ async def test_a_device_with_history_has_the_line_items_and_programs_of_its_type
     assert all(run["finalised"] and run["total"] > 0 for run in runs)
 
 
+@pytest.mark.usefixtures("helpers")
+async def test_the_charger_counts_each_charge_from_0_and_pauses_while_the_car_is_full(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, {"pieces": ["charger"]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    runs = [
+        (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+        for run in (await panel.call("coinop/runs/list"))["runs"]
+    ]
+    assert sorted(run["line_items"][0]["quantity"] for run in runs) == pytest.approx(
+        [9.8, 11.9, 14.2, 14.6, 19.3, 22.7, 29.0, 33.4, 38.5, 47.6]
+    )
+    assert sum(bool(run["pauses"]) for run in runs) == 6
+    assert {(run["outcome"], *run["flags"]) for run in runs} == {("completed",)}
+
+
 # What ends each Device with history's open Run, set as its integration would.
 ENDS = {
     "prusa": {"input_select.prusa_status": "finished"},
     "bambu": {"input_select.bambu_status": "finished"},
     "washer": {"input_select.washer_status": "finished"},
     "oven": {"input_select.kitchen_oven_status": "finished"},
+    "charger": {
+        "input_number.carport_charger_session": 7.4,
+        "input_select.carport_charger_status": "disconnected",
+    },
     "irrigation": {"input_select.irrigation_status": "off"},
 }
 
@@ -438,6 +463,7 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     assert list(ENDS) == DEVICES_WITH_HISTORY
     assert sorted(running.values()) == [
         "Bambu Lab X1C",
+        "Carport charger",
         "Garden valve",
         "Kitchen oven",
         "Prusa MK4",
@@ -446,7 +472,7 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     runs = (await panel.call("coinop/runs/list"))["runs"]
     assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
     assert not [run for run in runs if run["ended"] is None]
-    assert len(runs) == (5 if history == "none" else 43 + 5)
+    assert len(runs) == (6 if history == "none" else 53 + 6)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -634,7 +660,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
         ("dishwasher", ["ha_washdata.dishwasher"]),
         ("oven", ["oven"]),
-        ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
+        ("ev_charger", ["charger", "tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
     prusa, _, _, kobra, *_ = before["groups"][0]["pieces"]
