@@ -8,14 +8,22 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfMass, UnitOfTime, UnitOfVolume
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    Platform,
+    UnitOfEnergy,
+    UnitOfMass,
+    UnitOfTime,
+    UnitOfVolume,
+)
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from .const import DOMAIN
 from .cost.totals import run_totals
 from .device_config import Capability, DeviceConfig
-from .entity import DeviceEntity
+from .entity import DeviceEntity, unique_id
 from .models import Run
 from .run_book import RunBook
 from .runtime import CoinOpConfigEntry
@@ -118,6 +126,21 @@ async def async_setup_entry(
             ],
             config_subentry_id=device.device_id,
         )
+
+
+@callback
+def async_remove_lost(
+    hass: HomeAssistant, device_id: str, lost: frozenset[Capability]
+) -> None:
+    """Take the sensors a Device had only for the Capabilities it `lost` out of the
+    entity registry: exactly those registered here, by their unique id."""
+    registry = er.async_get(hass)
+    for key, capability in NEEDS.items():
+        entity_id = registry.async_get_entity_id(
+            Platform.SENSOR, DOMAIN, unique_id(device_id, key)
+        )
+        if capability in lost and entity_id is not None:
+            registry.async_remove(entity_id)
 
 
 class DeviceSensor(DeviceEntity, SensorEntity):
