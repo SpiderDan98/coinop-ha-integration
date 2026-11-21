@@ -14,6 +14,7 @@ from custom_components.coinop.const import DOMAIN
 from .clock import Clock
 from .devices import (
     ENERGY,
+    POWER,
     WASHER_WATER,
     add_device,
     add_hub,
@@ -32,7 +33,7 @@ from .test_doses import doses
 from .test_integration_profiles import accepted
 from .test_manual_runs import create
 from .test_manual_washes import ROWS
-from .test_measured import electricity
+from .test_measured import add_metered_device, electricity, set_meter
 from .test_program_consumption import approx, consumed
 from .test_robotic_mowers import add_mower, set_mower
 from .test_run_event import record_events
@@ -107,12 +108,17 @@ async def test_reconfigure_offers_the_electricity_source_but_not_its_price(
 
 @pytest.mark.parametrize(
     ("source", "source_input"),
-    [("energy", {"entity_id": ENERGY}), ("estimate", {"running_power": 100})],
+    [
+        ("energy", {"entity_id": ENERGY}),
+        ("power", {"entity_id": POWER}),
+        ("estimate", {"running_power": 100}),
+    ],
 )
 async def test_a_source_picked_in_reconfigure_walks_on_to_the_missing_price(
     hass: HomeAssistant, source: str, source_input: dict[str, Any]
 ) -> None:
-    hass.states.async_set(ENERGY, "10", {"unit_of_measurement": "kWh"})
+    await set_meter(hass, 10)
+    await set_meter(hass, 100, entity=POWER, unit="W")
     entry = await add_hub(hass)
     subentry = await add_device(hass, entry, source="none")
     result = await start_reconfigure(hass, entry, subentry)
@@ -135,6 +141,26 @@ async def test_a_source_picked_in_reconfigure_walks_on_to_the_missing_price(
     await configure(hass, result, {"next_step_id": "save"})
     assert subentry.data["consumption"]["source"] == source
     assert subentry.data["price"] == {"source": "fixed", "value": 0.32}
+
+
+async def test_per_program_picked_in_reconfigure_walks_on_to_the_missing_price(
+    hass: HomeAssistant,
+) -> None:
+    """No step of the source's own lies between its menu and the price."""
+    washer = await add_washer(hass, source="none")
+    [entry] = hass.config_entries.async_entries(DOMAIN)
+    result = await start_reconfigure(hass, entry, washer)
+    result = await configure(hass, result, {"next_step_id": "consumption"})
+
+    result = await configure(hass, result, {"next_step_id": "per_program"})
+
+    assert result["step_id"] == "price"
+    result = await configure(hass, result, {"next_step_id": "fixed_price"})
+    result = await configure(hass, result, {"price": 0.32})
+    assert "price" in result["menu_options"]
+    await configure(hass, result, {"next_step_id": "save"})
+    assert washer.data["consumption"] == {"source": "per_program"}
+    assert washer.data["price"] == {"source": "fixed", "value": 0.32}
 
 
 async def test_a_price_entered_before_is_kept_while_the_source_is_none(
@@ -294,6 +320,45 @@ async def test_switching_to_none_applies_from_the_next_run(
     assert kinds(following) == ["material"]
 
 
+async def test_a_run_open_at_the_switch_to_none_still_ends_measured_by_its_meter(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    await set_meter(hass, 10.0)
+    entry = await add_metered_device(hass)
+    [subentry] = entry.subentries.values()
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_meter(hass, 10.2)
+
+    await reconfigure(
+        hass, entry, subentry, {"next_step_id": "consumption"}, {"next_step_id": "none"}
+    )
+    await clock.advance(minutes=30)
+    await set_status(hass, "finished")
+    assert stored_runs(hass_storage) == []
+    await clock.advance(minutes=2)
+    await set_meter(hass, 10.52)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    was_open, following = stored_runs(hass_storage)
+    assert electricity(was_open)["method"] == "measured"
+    assert electricity(was_open)["quantity"] == pytest.approx(0.5)
+    assert was_open["flags"] == NO_MATERIAL
+    assert kinds(following) == ["material"]
+
+
+# Reconfigure's inputs from source none to an estimate of 100 W at 0.30 per kWh.
+TO_ESTIMATE = (
+    {"next_step_id": "consumption"},
+    {"next_step_id": "estimate"},
+    {"running_power": 100},
+    {"next_step_id": "fixed_price"},
+    {"price": 0.30},
+)
+
+
 async def test_switching_from_none_applies_from_the_next_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
@@ -302,16 +367,7 @@ async def test_switching_from_none_applies_from_the_next_run(
     await set_status(hass, "printing")
     await clock.advance(hours=1)
 
-    await reconfigure(
-        hass,
-        entry,
-        subentry,
-        {"next_step_id": "consumption"},
-        {"next_step_id": "estimate"},
-        {"running_power": 100},
-        {"next_step_id": "fixed_price"},
-        {"price": 0.30},
-    )
+    await reconfigure(hass, entry, subentry, *TO_ESTIMATE)
     await clock.advance(hours=1)
     await set_status(hass, "finished")
     await set_status(hass, "printing")
@@ -515,6 +571,70 @@ async def test_electricity_is_added_by_hand_to_an_open_run_and_stays(
     [stored] = stored_runs(hass_storage)
     assert electricity(stored)["quantity"] == 0.25
     assert electricity(stored)["method"] == "entered"
+
+
+def entered_electricity(run: dict[str, Any]) -> tuple[Any, ...]:
+    """The method, kWh and amount of the Run's one Electricity Line Item."""
+    [item] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    return item["method"], item["quantity"], item["amount"]
+
+
+async def test_electricity_is_added_by_hand_whatever_the_devices_source_is_now(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A Run that started while the source was none has no Electricity Line Item."""
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, source="none")
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await reconfigure(hass, entry, subentry, *TO_ESTIMATE)
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    assert sorted(run["ended"] is None for run in runs) == [False, True]
+
+    for run in runs:
+        await panel.call(
+            "coinop/line_items/add",
+            run_id=run["id"],
+            kind="electricity",
+            quantity=0.2,
+            unit_price=0.25,
+        )
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    ended, was_open = stored_runs(hass_storage)
+    by_hand = ("entered", 0.2, pytest.approx(0.05))
+    assert (entered_electricity(ended), entered_electricity(was_open)) == (
+        by_hand,
+        by_hand,
+    )
+
+
+async def test_electricity_added_by_hand_survives_a_switch_to_another_source(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, source="none")
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    await panel.call(
+        "coinop/line_items/add",
+        run_id=summary["id"],
+        kind="electricity",
+        quantity=0.2,
+        unit_price=0.25,
+    )
+
+    await reconfigure(hass, entry, subentry, *TO_ESTIMATE)
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+
+    [run] = stored_runs(hass_storage)
+    assert entered_electricity(run) == ("entered", 0.2, pytest.approx(0.05))
 
 
 async def test_a_run_that_has_its_electricity_takes_no_second_one(
