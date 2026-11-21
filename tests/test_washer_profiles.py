@@ -636,7 +636,10 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
 @pytest.mark.parametrize(
     ("device_type", "integrations"),
     [
-        ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
+        (
+            "3d_printer",
+            "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab",
+        ),
         ("washing_machine", "WashData, Miele, Home Connect"),
         ("dishwasher", "WashData, Miele, Home Connect"),
         ("tumble_dryer", "WashData, Miele, Home Connect"),
