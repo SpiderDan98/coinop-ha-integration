@@ -45,3 +45,19 @@ load:
             - goecharger_api2.ev_charger
             - wallbox.ev_charger
             - irrigation
+    history:
+      name: History
+      description: How much history the Devices with history get.
+      default: short
+      selector:
+        select:
+          options:
+            - none
+            - short
+            - long
+    open_run:
+      name: Open Run
+      description: Whether each Device with history gets an open Run, which its helpers end.
+      default: false
+      selector:
+        boolean:

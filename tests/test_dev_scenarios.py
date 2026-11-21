@@ -1,6 +1,7 @@
 """The dev container's Scenarios load through today's websocket API."""
 
 import asyncio
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,13 @@ from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
 from dev.coinop_dev import async_setup
-from dev.coinop_dev.scenarios import PIECES, PRESETS, async_load
+from dev.coinop_dev.scenarios import (
+    HISTORIES,
+    PIECES,
+    PRESETS,
+    DeviceWithHistory,
+    async_load,
+)
 
 from .clock import Clock
 from .devices import configure
@@ -181,11 +188,13 @@ async def helpers(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
         assert await async_setup_component(hass, domain, {domain: config[domain]})
 
 
-def test_the_load_service_offers_every_preset_and_piece() -> None:
+def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     fields = load_yaml_dict(DEV / "coinop_dev" / "services.yaml")["load"]["fields"]
 
     assert fields["preset"]["selector"]["select"]["options"] == list(PRESETS)
     assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
+    assert fields["history"]["selector"]["select"]["options"] == list(HISTORIES)
+    assert "boolean" in fields["open_run"]["selector"]
 
 
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
@@ -308,6 +317,98 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
     assert all(hass.states.get(status) for _, status, _ in EV_CHARGER_DEVICES)
+
+
+DEVICES_WITH_HISTORY = [
+    n for n, p in PIECES.items() if isinstance(p, DeviceWithHistory)
+]
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_without_history_every_device_with_history_exists_without_a_run(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(
+        hass,
+        {"pieces": DEVICES_WITH_HISTORY, "history": "none", "open_run": False},
+        hass_admin_user,
+    )
+    await hass.async_block_till_done()
+
+    devices = (await panel.call("coinop/devices/list"))["devices"]
+    assert [device["name"] for device in devices] == [
+        "Prusa MK4",
+        "Bambu Lab X1C",
+        "Washing machine",
+        "Garden valve",
+    ]
+    assert (await panel.call("coinop/runs/list"))["runs"] == []
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("piece", DEVICES_WITH_HISTORY)
+async def test_a_device_with_long_history_has_runs_from_up_to_two_years_ago(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+) -> None:
+    await async_load(hass, {"pieces": [piece], "history": "long"}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    oldest = min(datetime.fromisoformat(run["started"]) for run in runs)
+    assert len(runs) > 50
+    assert timedelta(days=365) < dt_util.now() - oldest < timedelta(days=731)
+    assert all(run["ended"] for run in runs)
+
+
+# What ends each Device with history's open Run, set as its integration would.
+ENDS = {
+    "prusa": {"input_select.prusa_status": "finished"},
+    "bambu": {"input_select.bambu_status": "finished"},
+    "washer": {"input_select.washer_status": "finished"},
+    "irrigation": {"input_select.irrigation_status": "off"},
+}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("history", ["none", "short"])
+async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_end(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+    history: str,
+) -> None:
+    await async_load(
+        hass,
+        {"pieces": list(PIECES), "history": history, "open_run": True},
+        hass_admin_user,
+    )
+    await hass.async_block_till_done()
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    running = {run["id"]: run["device_name"] for run in runs if run["ended"] is None}
+
+    await clock.advance(minutes=30)
+    for helpers in ENDS.values():
+        for entity_id, value in helpers.items():
+            await set_helper(hass, entity_id, value)
+    await clock.advance(minutes=10)
+
+    assert list(ENDS) == DEVICES_WITH_HISTORY
+    assert sorted(running.values()) == [
+        "Bambu Lab X1C",
+        "Garden valve",
+        "Prusa MK4",
+        "Washing machine",
+    ]
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
+    assert not [run for run in runs if run["ended"] is None]
+    assert len(runs) == (4 if history == "none" else 33 + 4)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -465,7 +566,11 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
 
     await load(hass, hass_admin_user, {"preset": "two-printers"})
     from_preset = await panel.call("coinop_dev/scenarios")
-    await load(hass, hass_admin_user, {"pieces": ["irrigation", "washer"]})
+    await load(
+        hass,
+        hass_admin_user,
+        {"pieces": ["irrigation", "washer"], "history": "none", "open_run": True},
+    )
     picked = await panel.call("coinop_dev/scenarios")
 
     assert (before["preset"], before["selection"]) == (None, None)
@@ -512,7 +617,14 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "irrigation",
     ]
     assert presets["two-printers"]["title"] == "Two printers"
-    assert presets["two-printers"]["selection"] == {"pieces": ["prusa", "bambu"]}
+    assert before["options"] == {"history": ["none", "short", "long"]}
+    assert presets["two-printers"]["selection"] == {
+        "pieces": ["prusa", "bambu"],
+        "history": "short",
+        "open_run": False,
+    }
+    assert presets["long-history"]["selection"]["history"] == "long"
+    assert presets["printing-now"]["selection"]["open_run"] is True
     assert presets["quick-start"]["selection"]["pieces"] == [
         "anycubic.3d_printer",
         "anycubic_cloud.3d_printer",
@@ -529,11 +641,11 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     ]
     assert (from_preset["preset"], from_preset["selection"]) == (
         "two-printers",
-        {"pieces": ["prusa", "bambu"]},
+        {"pieces": ["prusa", "bambu"], "history": "short", "open_run": False},
     )
     assert (picked["preset"], picked["selection"]) == (
         None,
-        {"pieces": ["washer", "irrigation"]},
+        {"pieces": ["washer", "irrigation"], "history": "none", "open_run": True},
     )
 
 

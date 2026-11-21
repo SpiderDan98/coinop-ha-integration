@@ -6,7 +6,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Device } from "./api";
 import { formDialog } from "./dialog";
-import { checkbox } from "./fields";
+import { checkbox, field, select } from "./fields";
 import type { HomeAssistant } from "./hass";
 import { type Localize, localize } from "./localize";
 import { shared } from "./styles";
@@ -18,7 +18,7 @@ const SECTIONS = [
   ["quick_start", "dev.quick_start"],
 ] as const;
 
-type Selection = { pieces: string[] };
+type Selection = { pieces: string[]; history: "none" | "short" | "long"; open_run: boolean };
 
 const listScenarios = (hass: HomeAssistant) =>
   hass.callWS<{
@@ -31,6 +31,7 @@ const listScenarios = (hass: HomeAssistant) =>
         section: (typeof SECTIONS)[number][0];
       }[];
     }[];
+    options: { history: Selection["history"][] };
     presets: { name: string; title: string; description: string; selection: Selection }[];
     preset: string | null;
     selection: Selection | null;
@@ -43,6 +44,8 @@ export class DevScenariosDialog extends LitElement {
 
   @state() private list?: Awaited<ReturnType<typeof listScenarios>>;
   @state() private picked = new Set<string>();
+  @state() private history: Selection["history"] = "short";
+  @state() private openRun = false;
   @state() private preset = "";
   @state() private loading = false;
   @state() private failed = false;
@@ -53,7 +56,7 @@ export class DevScenariosDialog extends LitElement {
     super.connectedCallback();
     listScenarios(this.hass).then(
       (list) => {
-        this.pick(list.selection?.pieces ?? [], list.preset ?? "");
+        this.pick(list.selection ?? { pieces: [] }, list.preset ?? "");
         this.expanded = new Set(
           list.groups
             .filter(({ pieces }) => pieces.some(({ name }) => this.picked.has(name)))
@@ -77,17 +80,18 @@ export class DevScenariosDialog extends LitElement {
             class="all small"
             appearance="plain"
             ?disabled=${this.loading}
-            @click=${() => this.pick(this.names())}
+            @click=${() => this.pick({ pieces: this.names() })}
             >${t("dev.all")}</ha-button
           >
           <ha-button
             class="none small"
             appearance="plain"
             ?disabled=${this.loading}
-            @click=${() => this.pick([])}
+            @click=${() => this.pick({ pieces: [] })}
             >${t("dev.none")}</ha-button
           >
         </div>
+        ${this.list ? this.renderOptionFields(this.list.options, t) : nothing}
         ${this.list?.groups.map((group) => this.renderGroup(group, t))}`,
       error: this.failed && t("dev.failed"),
       action: "load",
@@ -110,7 +114,7 @@ export class DevScenariosDialog extends LitElement {
               class="preset small"
               appearance=${name === this.preset ? "filled" : "plain"}
               ?disabled=${this.loading}
-              @click=${() => this.pick(selection.pieces, name)}
+              @click=${() => this.pick(selection, name)}
               >${title}</ha-button
             >`,
         )}
@@ -119,9 +123,41 @@ export class DevScenariosDialog extends LitElement {
     </div>`;
   }
 
-  /** Picks exactly `names`, as the Preset `preset` does or as the user's own selection. */
-  private pick(names: Iterable<string>, preset = "") {
-    this.picked = new Set(names);
+  private renderOptionFields({ history }: NonNullable<typeof this.list>["options"], t: Localize) {
+    return html`<div class="options">
+      ${field(
+        t("dev.history"),
+        select({
+          name: "history",
+          value: this.history,
+          options: history.map((value) => [value, t(`dev.history_${value}`)] as const),
+          disabled: this.loading,
+          onChange: (value) => this.pick({ history: value as Selection["history"] }),
+        }),
+      )}
+      ${checkbox({
+        name: "open_run",
+        label: t("dev.open_run"),
+        checked: this.openRun,
+        disabled: this.loading,
+        onChange: (open_run) => this.pick({ open_run }),
+      })}
+    </div>`;
+  }
+
+  /** Picks `selection`, keeping what it leaves out, as the Preset `preset` does or as the
+   * user's own selection. */
+  private pick(
+    {
+      pieces = this.picked,
+      history = this.history,
+      open_run = this.openRun,
+    }: Partial<Omit<Selection, "pieces">> & { pieces?: Iterable<string> },
+    preset = "",
+  ) {
+    this.picked = new Set(pieces);
+    this.history = history;
+    this.openRun = open_run;
     this.preset = preset;
   }
 
@@ -139,8 +175,10 @@ export class DevScenariosDialog extends LitElement {
         type: "call_service",
         domain: DEV_INTEGRATION,
         service: "load",
-        // By name, a Preset is stored as loaded and keeps contents of its own.
-        service_data: this.preset ? { preset: this.preset } : ({ pieces } satisfies Selection),
+        // By name, a Preset is stored as loaded.
+        service_data: this.preset
+          ? { preset: this.preset }
+          : ({ pieces, history: this.history, open_run: this.openRun } satisfies Selection),
       });
     } catch {
       this.loading = false;
@@ -198,13 +236,14 @@ export class DevScenariosDialog extends LitElement {
       if (pick) picked.add(name);
       else picked.delete(name);
     }
-    this.pick(picked);
+    this.pick({ pieces: picked });
   }
 
   static override styles = [
     shared,
     css`
-      .presets {
+      .presets,
+      .options {
         display: flex;
         flex-direction: column;
         gap: 4px;
