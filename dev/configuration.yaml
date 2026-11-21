@@ -46,10 +46,10 @@ input_select:
     name: Washing machine program
     options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
   dishwasher_status:
-    name: Dishwasher status
+    name: Kitchen dishwasher status
     options: ["off", running, paused, finished, cancelled]
   dishwasher_program:
-    name: Dishwasher program
+    name: Kitchen dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
   # The devices of the WashData stand-in in dev/ha_washdata.
   washdata_washer_status:
@@ -126,12 +126,19 @@ input_number:
     mode: box
     unit_of_measurement: g
   dishwasher_energy:
-    name: Dishwasher energy
+    name: Kitchen dishwasher energy
     min: 0
     max: 100000
     step: 0.001
     mode: box
     unit_of_measurement: kWh
+  dishwasher_water:
+    name: Kitchen dishwasher water
+    min: 0
+    max: 1000000
+    step: 0.1
+    mode: box
+    unit_of_measurement: L
   washdata_washer_energy:
     name: WashData washing machine energy
     min: 0

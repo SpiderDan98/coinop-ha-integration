@@ -128,6 +128,34 @@ WATERINGS = [
     (1, 20, 15, 133.5),
 ]
 IRRIGATION_WATER = 48200.0
+# Name, type, form, density, pack unit, pack price, pack size.
+DISHWASHER_PRODUCTS = [
+    ("All-in-one tabs", "Dishwasher tabs", "dishwasher_product", None, "pcs", 8.99, 60),
+    ("Dishwasher salt", "Dishwasher salt", "dishwasher_product", 1.2, "g", 1.49, 2000),
+    ("Rinse aid Shine", "Rinse aid", "dishwasher_product", 1.02, "ml", 2.95, 750),
+]
+# Days ago, hour it starts at, Program, minutes, Outcome, then what each of the
+# Device's meters counts, in their order.
+DISHES = [
+    (27, 20, "Eco 50°", 225, "finished", 0.78, 9.5),
+    (24, 21, "Auto 45-65°", 150, "finished", 1.05, 11.0),
+    (21, 20, "Eco 50°", 228, "finished", 0.8, 9.6),
+    (18, 13, "Quick 45°", 58, "finished", 0.82, 10.5),
+    (15, 20, "Intensive 70°", 170, "finished", 1.45, 14.5),
+    (12, 20, "Eco 50°", 224, "finished", 0.77, 9.4),
+    (9, 19, "Auto 45-65°", 40, "cancelled", 0.31, 4.0),
+    (6, 20, "Eco 50°", 226, "finished", 0.79, 9.5),
+    (3, 21, "Auto 45-65°", 148, "finished", 1.02, 10.8),
+    (1, 20, "Eco 50°", 225, "finished", 0.78, 9.5),
+]
+# A Program's minutes, then what each meter counts, for the long history.
+TYPICAL_DISHES = {
+    "Eco 50°": (225, 0.78, 9.5),
+    "Auto 45-65°": (150, 1.05, 11.0),
+    "Intensive 70°": (170, 1.45, 14.5),
+    "Quick 45°": (58, 0.82, 10.5),
+}
+DISHWASHER_METERS = {"dishwasher_energy": 286.4, "dishwasher_water": 3140.0}
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -210,8 +238,10 @@ class Seed:
             created = await self.api.call("coinop/materials/create", material=material)
             self.materials[name] = created["material"]
 
-    async def add_laundry(self) -> None:
-        for name, type_, form, density, pack_unit, pack_price, pack_size in LAUNDRY:
+    async def add_products(
+        self, products: Iterable[tuple[str, str, str, float | None, str, float, int]]
+    ) -> None:
+        for name, type_, form, density, pack_unit, pack_price, pack_size in products:
             material = {
                 "name": name,
                 "form": form,
@@ -302,7 +332,8 @@ class Seed:
 # The shared data a Piece can need, each created once per load, in this order.
 SHARED: dict[str, Callable[[Seed], Awaitable[None]]] = {
     "filaments": Seed.add_filaments,
-    "laundry": Seed.add_laundry,
+    "laundry": partial(Seed.add_products, products=LAUNDRY),
+    "dishwasher": partial(Seed.add_products, products=DISHWASHER_PRODUCTS),
     "tags": Seed.add_tags,
     "template": Seed.add_template,
 }
@@ -629,6 +660,96 @@ async def _irrigation_start(seed: Seed) -> None:
     await _async_set(seed.hass, "input_select.irrigation_status", "watering")
 
 
+def _years_of(
+    seed: Seed,
+    typical: Mapping[str, tuple[float, ...]],
+    gaps: range,
+    hours: tuple[int, ...],
+) -> list[tuple[Any, ...]]:
+    """A cycle every few days from two years ago to a month ago, in the shape of
+    `DISHES`, on `typical`'s Programs; a few are cancelled part of the way."""
+    rng = seed.random
+    cycles, day = [], 730
+    while day > 30:
+        program = rng.choice(list(typical))
+        minutes, *counted = typical[program]
+        outcome = rng.choices(["finished", "cancelled"], [95, 5])[0]
+        share = rng.uniform(0.2, 0.6) if outcome == "cancelled" else 1
+        cycles.append(
+            (
+                day,
+                rng.choice(hours),
+                program,
+                round(minutes * share * rng.uniform(0.95, 1.05), 1),
+                outcome,
+                *(
+                    round(amount * share * rng.uniform(0.9, 1.1), 3)
+                    for amount in counted
+                ),
+            )
+        )
+        day -= rng.choice(gaps)
+    return cycles
+
+
+async def _replay_cycles(
+    seed: Seed,
+    key: str,
+    meters: Mapping[str, float],
+    cycles: Iterable[tuple[Any, ...]],
+) -> None:
+    """Replays each cycle of the shape of `DISHES` on the helpers named `key`: its
+    Program, its Status from running to its Outcome and its meters counting."""
+    hass, readings = seed.hass, dict(meters)
+    for days, hour, program, minutes, outcome, *counted in cycles:
+        start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
+        length = timedelta(minutes=minutes)
+        await _replay(hass, f"input_select.{key}_program", program, start)
+        await _replay_meters(hass, readings, start)
+        await _replay(hass, f"input_select.{key}_status", "running", start)
+        for meter, amount in zip(readings, counted, strict=True):
+            readings[meter] = round(readings[meter] + amount, 3)
+        await _replay_meters(hass, readings, start + length * 0.9)
+        await _replay(hass, f"input_select.{key}_status", outcome, start + length)
+        # A report after the end spares the wait for it.
+        await _replay_meters(hass, readings, start + length + timedelta(minutes=1))
+    for meter, value in readings.items():
+        await _async_set(hass, f"input_number.{meter}", value)
+    await _async_set(hass, f"input_select.{key}_status", "off")
+
+
+async def _start_cycle(seed: Seed, key: str, program: str) -> None:
+    await _async_set(seed.hass, f"input_select.{key}_program", program)
+    await _async_set(seed.hass, f"input_select.{key}_status", "running")
+
+
+async def _set_doses(
+    seed: Seed, device: str, doses: Mapping[str, str], defaults: Mapping[str, Any]
+) -> None:
+    """Gives `device` a Dose of each Material named in `doses`, by Dose id, and the
+    Program Defaults `defaults`."""
+    await seed.api.call(
+        "coinop/devices/update_settings",
+        device_id=seed.devices[device],
+        settings={
+            "doses": [
+                {"id": dose, "material_id": seed.materials[name]["id"]}
+                for dose, name in doses.items()
+            ],
+            "program_defaults": defaults,
+        },
+    )
+
+
+async def _dishwasher_short(seed: Seed) -> None:
+    await _replay_cycles(seed, "dishwasher", DISHWASHER_METERS, DISHES)
+
+
+async def _dishwasher_long(seed: Seed) -> None:
+    long = _years_of(seed, TYPICAL_DISHES, range(3, 8), (13, 20, 21))
+    await _replay_cycles(seed, "dishwasher", DISHWASHER_METERS, [*long, *DISHES])
+
+
 async def _replay_meters(
     hass: HomeAssistant, meters: dict[str, float], at: datetime
 ) -> None:
@@ -719,6 +840,52 @@ def _washer() -> dict[str, Any]:
         # Per m³, wastewater included.
         "water_price": {"source": "fixed", "value": 4.2},
     }
+
+
+def _appliance(
+    device_type: str, key: str, *, metered: bool = True, water: str | None = "meter"
+) -> dict[str, Any]:
+    """An appliance's subentry data on the helpers named `key`: an energy meter
+    unless `metered` is false (then electricity per Program), and water from a
+    meter, per Program or, with None, none, as its Device Type has no water."""
+    data: dict[str, Any] = {
+        "device_type": device_type,
+        "printer_device_id": None,
+        "status": {"entity_id": f"input_select.{key}_status", "attribute": None},
+        "mapping": {
+            "running": ["running"],
+            "paused": ["paused"],
+            "finished": ["finished"],
+            "cancelled": ["cancelled"],
+            "ended": [],
+            "fault": [],
+            "ignored": ["off"],
+        },
+        "program": {"entity_id": f"input_select.{key}_program", "attribute": None},
+        "consumption": {
+            "source": "energy",
+            "entity_id": f"input_number.{key}_energy",
+            "attribute": None,
+            "unit": "kWh",
+            "factor": None,
+        }
+        if metered
+        else {"source": "per_program"},
+        "price": {"source": "fixed", "value": 0.32},
+    }
+    if water == "meter":
+        data["water"] = {
+            "source": "meter",
+            "entity_id": f"input_number.{key}_water",
+            "attribute": None,
+            "unit": "L",
+            "factor": None,
+        }
+    elif water:
+        data["water"] = {"source": water}
+    if water:
+        data["water_price"] = {"source": "fixed", "value": 4.2}
+    return data
 
 
 def _garden_valve() -> dict[str, Any]:
@@ -958,6 +1125,53 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "washing machine's helpers run it.",
         _washdata_helpers("washdata_washer", "Cotton 60°"),
         domain="ha_washdata",
+    ),
+    "dishwasher": DeviceWithHistory(
+        "dishwasher",
+        "Kitchen dishwasher",
+        "Energy and water meters, tabs, salt and rinse aid as Doses and Program "
+        "Defaults. Short history: 10 cycles over four weeks; long: a cycle every few "
+        "days for two years.",
+        {
+            "input_select.dishwasher_status": "off",
+            "input_select.dishwasher_program": "Eco 50°",
+            **{
+                f"input_number.{key}": value for key, value in DISHWASHER_METERS.items()
+            },
+        },
+        device=_appliance("dishwasher", "dishwasher"),
+        short=_dishwasher_short,
+        long=_dishwasher_long,
+        start=partial(_start_cycle, key="dishwasher", program="Eco 50°"),
+        needs=("dishwasher",),
+        setup=partial(
+            _set_doses,
+            device="dishwasher",
+            doses={
+                "tabs": "All-in-one tabs",
+                "salt": "Dishwasher salt",
+                "rinse_aid": "Rinse aid Shine",
+            },
+            defaults={
+                "default": {
+                    "kwh": 0.9,
+                    "litres": 10,
+                    "doses": {"tabs": 1, "salt": 15, "rinse_aid": 3},
+                },
+                "programs": {
+                    "Eco 50°": {
+                        "kwh": 0.8,
+                        "litres": 9.5,
+                        "doses": {"tabs": 1, "salt": 12, "rinse_aid": 3},
+                    },
+                    "Intensive 70°": {
+                        "kwh": 1.45,
+                        "litres": 14.5,
+                        "doses": {"tabs": 1, "salt": 20, "rinse_aid": 4},
+                    },
+                },
+            },
+        ),
     ),
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",

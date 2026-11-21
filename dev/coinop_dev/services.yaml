@@ -35,6 +35,7 @@ load:
             - moonraker.3d_printer
             - washer
             - ha_washdata.washing_machine
+            - dishwasher
             - ha_washdata.dishwasher
             - tesla_wall_connector.ev_charger
             - evcc_intg.ev_charger

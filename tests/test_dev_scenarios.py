@@ -261,6 +261,7 @@ async def test_a_preset_fills_coinop_from_scratch(
         ("prusa", (1, 8, 7, 0)),
         ("bambu", (1, 8, 10, 0)),
         ("washer", (1, 4, 10, 0)),
+        ("dishwasher", (1, 3, 10, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
 )
@@ -325,7 +326,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
     await hass.async_block_till_done()
 
-    assert await counts(panel) == (4, 12, 33, 0)
+    assert await counts(panel) == (5, 15, 43, 0)
     await panel.subscribe("coinop/catalog/subscribe")
     catalog = await panel.event()
     assert len(catalog["tags"]) == 6
@@ -358,6 +359,7 @@ async def test_without_history_every_device_with_history_exists_without_a_run(
         "Prusa MK4",
         "Bambu Lab X1C",
         "Washing machine",
+        "Kitchen dishwasher",
         "Garden valve",
     ]
     assert (await panel.call("coinop/runs/list"))["runs"] == []
@@ -387,6 +389,7 @@ ENDS = {
     "prusa": {"input_select.prusa_status": "finished"},
     "bambu": {"input_select.bambu_status": "finished"},
     "washer": {"input_select.washer_status": "finished"},
+    "dishwasher": {"input_select.dishwasher_status": "finished"},
     "irrigation": {"input_select.irrigation_status": "off"},
 }
 
@@ -420,13 +423,14 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     assert sorted(running.values()) == [
         "Bambu Lab X1C",
         "Garden valve",
+        "Kitchen dishwasher",
         "Prusa MK4",
         "Washing machine",
     ]
     runs = (await panel.call("coinop/runs/list"))["runs"]
     assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
     assert not [run for run in runs if run["ended"] is None]
-    assert len(runs) == (4 if history == "none" else 33 + 4)
+    assert len(runs) == (5 if history == "none" else 43 + 5)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -481,6 +485,53 @@ async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
         None,
     }
     assert any("ended_early_defaults" in run["flags"] for run in runs)
+
+
+# An appliance Device with history's Device Type, its Runs' Line Items by kind and
+# how each was got, and their Programs.
+APPLIANCES_WITH_HISTORY = {
+    "dishwasher": (
+        "dishwasher",
+        {
+            ("electricity", "measured"),
+            ("water", "measured"),
+            ("material", "program_default"),
+            ("material", "default_row"),
+        },
+        {"Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"},
+    ),
+}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("history", ["short", "long"])
+@pytest.mark.parametrize("piece", APPLIANCES_WITH_HISTORY)
+async def test_an_appliance_with_history_has_its_device_types_line_items_and_programs(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    history: str,
+) -> None:
+    device_type, line_items, programs = APPLIANCES_WITH_HISTORY[piece]
+    await async_load(hass, {"pieces": [piece], "history": history}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    runs = [
+        (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+        for run in (await panel.call("coinop/runs/list"))["runs"]
+    ]
+    assert device["type"] == device_type
+    assert {
+        (item["kind"], item.get("method") or item.get("dose_source"))
+        for run in runs
+        for item in run["line_items"]
+    } == line_items
+    assert {run["program"] for run in runs} == programs
+    assert {run["outcome"] for run in runs} == {"completed", "cancelled"}
+    assert all(run["finalised"] for run in runs)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -612,7 +663,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
             ],
         ),
         ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
-        ("dishwasher", ["ha_washdata.dishwasher"]),
+        ("dishwasher", ["dishwasher", "ha_washdata.dishwasher"]),
         ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
@@ -990,6 +1041,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.voron_filament": 3.2,
         "input_number.p1s_power": 120,
         "input_select.washer_status": "running",
+        "input_select.dishwasher_status": "running",
         "input_select.washdata_dishwasher_status": "running",
         "input_select.irrigation_status": "watering",
         "input_select.wall_connector_status": "charging",
@@ -1008,6 +1060,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.voron_filament": "0.0",
         "input_number.p1s_power": "0.0",
         "input_select.washer_status": "off",
+        "input_select.dishwasher_status": "off",
         "input_select.washdata_dishwasher_status": "off",
         "input_select.irrigation_status": "off",
         "input_select.wall_connector_status": "not_connected",
