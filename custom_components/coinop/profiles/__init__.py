@@ -1,0 +1,226 @@
+"""Integration Profiles: Device Input defaults for known integrations.
+
+A profile only pre-fills the Add Device and Detect again steps; the Device stores the
+concrete entities it found, so nothing stays coupled to the profile (ADR 0004).
+
+Each group's profiles and kind checks live in its own module (`printers`,
+`appliances`, `ev_chargers`); the registry and how its entries are used live here.
+"""
+
+from dataclasses import dataclass
+from functools import partial
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+from custom_components.coinop.quantities import ELECTRICITY, WATER
+
+from . import appliances, ev_chargers, printers
+from .base import Find, Integration, NoDeviceType
+
+# Sections a profile pre-fills only in Add Device: Detect again leaves them alone.
+METERS = (ELECTRICITY.source_key, WATER.source_key)
+
+_printer = partial(Integration, device_types=printers.DEVICE_TYPES, kind=printers.KIND)
+_ev_charger = partial(
+    Integration, device_types=ev_chargers.DEVICE_TYPES, kind=ev_chargers.KIND
+)
+
+# By integration domain, in the order Quick Start and the HA device step list them.
+INTEGRATIONS = {
+    # 3D printers
+    "anycubic": _printer("Anycubic 3D Printer - Local Control", printers.anycubic),
+    "anycubic_cloud": _printer("Anycubic Cloud & LAN", printers.anycubic_cloud),
+    "bambu_lab": _printer("Bambu Lab", printers.bambu_lab),
+    "prusalink": _printer("PrusaLink", printers.prusalink),
+    "octoprint": _printer("OctoPrint", printers.octoprint),
+    "ha_creality_ws": _printer("Creality", printers.creality),
+    "elegoo_printer": _printer("Elegoo", printers.elegoo),
+    "moonraker": _printer("Moonraker", printers.moonraker),
+    # Appliances
+    "ha_washdata": Integration(
+        "WashData",
+        appliances.washdata,
+        appliances.DEVICE_TYPES,
+        appliances.washdata_kind,
+    ),
+    "miele": Integration(
+        "Miele", appliances.miele, appliances.DEVICE_TYPES, appliances.miele_kind
+    ),
+    "home_connect": Integration(
+        "Home Connect",
+        appliances.home_connect,
+        appliances.DEVICE_TYPES,
+        appliances.home_connect_kind,
+    ),
+    "homeconnect_ws": Integration(
+        "Home Connect Local",
+        appliances.home_connect_local,
+        appliances.DEVICE_TYPES,
+        appliances.cant_tell,
+    ),
+    "home_connect_alt": Integration(
+        "Home Connect Alt",
+        appliances.home_connect_alt,
+        appliances.DEVICE_TYPES,
+        appliances.cant_tell,
+    ),
+    "lg_thinq": Integration(
+        "LG ThinQ",
+        appliances.lg_thinq,
+        appliances.LG_THINQ_DEVICE_TYPES,
+        appliances.lg_thinq_kind,
+    ),
+    "smartthings": Integration(
+        "SmartThings",
+        appliances.smartthings,
+        appliances.SMARTTHINGS_DEVICE_TYPES,
+        appliances.smartthings_kind,
+    ),
+    # EV chargers
+    "tesla_wall_connector": _ev_charger(
+        "Tesla Wall Connector", ev_chargers.tesla_wall_connector
+    ),
+    "evcc_intg": _ev_charger("evcc", ev_chargers.evcc),
+    "ocpp": _ev_charger("OCPP", ev_chargers.ocpp, linked_devices=False),
+    "easee": _ev_charger("Easee", ev_chargers.easee),
+    "zaptec": _ev_charger("Zaptec", ev_chargers.zaptec, kind=ev_chargers.zaptec_kind),
+    "goecharger_mqtt": _ev_charger("go-e Charger MQTT", ev_chargers.goe_mqtt),
+    "goecharger_api2": _ev_charger("go-e Charger API v2", ev_chargers.goe_api2),
+    "wallbox": _ev_charger("Wallbox", ev_chargers.wallbox),
+}
+
+
+def _serving(device_type: str) -> dict[str, Integration]:
+    return {
+        domain: integration
+        for domain, integration in INTEGRATIONS.items()
+        if device_type in integration.device_types
+    }
+
+
+def known_integrations(device_type: str) -> str:
+    """The names of the integrations with a profile for the Device Type."""
+    return ", ".join(integration.name for integration in _serving(device_type).values())
+
+
+def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:
+    """Finds the integration's entities of the HA device (and its linked devices)."""
+    linked = INTEGRATIONS[config_entry.domain].linked_devices
+    device_ids = [
+        device.id
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), config_entry.entry_id
+        )
+        if device.id == device_id or (linked and device.via_device_id == device_id)
+    ]
+    entities = er.async_get(hass)
+    candidates = [
+        entity
+        for device in device_ids
+        for entity in er.async_entries_for_device(
+            entities, device, include_disabled_entities=True
+        )
+        if entity.platform == config_entry.domain
+    ]
+
+    def find(
+        platform: str,
+        *keys: str,
+        start: bool = False,
+        disabled: bool = False,
+        exclude: str | None = None,
+    ) -> str | None:
+        return next(
+            (
+                entity.entity_id
+                for key in keys
+                for entity in candidates
+                if entity.domain == platform
+                and (
+                    entity.unique_id.startswith(key)
+                    if start
+                    else entity.unique_id.endswith(key)
+                )
+                and not (exclude and entity.unique_id.endswith(exclude))
+                and (disabled or not entity.disabled)
+            ),
+            None,
+        )
+
+    return find
+
+
+def detect(
+    hass: HomeAssistant, device_type: str, device_id: str | None
+) -> dict[str, Any] | None:
+    """The Device Input sections the HA device's profile fills in.
+
+    None if the device belongs to no integration that serves the Device Type; what
+    kind of device it is isn't asked. Inputs the profile can't find are left out of
+    their section, and the mapping with the Status.
+    """
+    serving = _serving(device_type)
+    ha_device = dr.async_get(hass).async_get(device_id) if device_id else None
+    if ha_device is None:
+        return None
+    config_entry = next(
+        (
+            config_entry
+            for entry_id in ha_device.config_entries
+            if (config_entry := hass.config_entries.async_get_entry(entry_id))
+            and config_entry.domain in serving
+        ),
+        None,
+    )
+    if config_entry is None:
+        return None
+    return serving[config_entry.domain].profile(
+        _finder(hass, ha_device.id, config_entry)
+    )
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """An HA device Quick Start can add: the Device Types it can be added as (one
+    where its integration tells its kind, else those the integration serves), its
+    integration's name and the sections its profile fills in."""
+
+    device_types: tuple[str, ...]
+    integration: str
+    sections: dict[str, Any]
+
+
+def candidates(hass: HomeAssistant) -> dict[str, Candidate]:
+    """The HA devices Quick Start can add, by device id.
+
+    Those are the devices a profile finds a Status for, so not a multi-material unit,
+    and whose kind is a Device Type or can't be told.
+    """
+    devices = dr.async_get(hass)
+    found: dict[str, Candidate] = {}
+    for domain, integration in INTEGRATIONS.items():
+        for config_entry in hass.config_entries.async_entries(
+            domain, include_ignore=False, include_disabled=False
+        ):
+            for device in dr.async_entries_for_config_entry(
+                devices, config_entry.entry_id
+            ):
+                find = _finder(hass, device.id, config_entry)
+                sections = integration.profile(find)
+                if not sections["status"]:
+                    continue
+                kind = integration.kind(find, device, config_entry)
+                if kind is NoDeviceType.NOT_A_DEVICE:
+                    continue
+                device_types = (
+                    integration.device_types
+                    if kind is NoDeviceType.CANT_TELL
+                    else (kind,)
+                )
+                found.setdefault(
+                    device.id, Candidate(device_types, integration.name, sections)
+                )
+    return found

@@ -189,7 +189,7 @@
             "snapshot": "Kamerabild am Ende eines Laufs aufnehmen"
           },
           "data_description": {
-            "thumbnail": "Eine Bild-Entität, die zeigt, was der Lauf herstellt, z. B. die Vorschau des 3D-Modells aus der Integration des Geräts.",
+            "thumbnail": "Eine Bild-Entität oder eine Kamera, die zeigt, was der Lauf herstellt, z. B. die Vorschau des 3D-Modells aus der Integration des Geräts. Eine Bild-Entität wird bei jeder Änderung kopiert; eine Kamera wird nach ihrem Bild gefragt, solange der Lauf läuft, nie nach seinem Ende.",
             "snapshot": "Nur mit Kamera. Bis zu drei Versuche; keins, wenn das Ende eines Laufs erst später bemerkt wird, z. B. nach einem Ausfall."
           }
         },

@@ -843,7 +843,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         schema = vol.Schema(
             {
                 vol.Optional("thumbnail"): EntitySelector(
-                    EntitySelectorConfig(domain="image")
+                    EntitySelectorConfig(domain=["image", "camera"])
                 ),
                 vol.Optional("camera"): EntitySelector(
                     EntitySelectorConfig(domain="camera")

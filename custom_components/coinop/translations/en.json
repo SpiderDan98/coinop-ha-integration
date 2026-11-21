@@ -184,12 +184,12 @@
           "title": "Images",
           "description": "Optionally pick where a Run's images come from. The Thumbnail is copied while the Run is open; the camera takes the Snapshot when the Run ends. Images are stored downscaled and without metadata.",
           "data": {
-            "thumbnail": "Thumbnail image entity (optional)",
+            "thumbnail": "Thumbnail entity (optional)",
             "camera": "Camera (optional)",
             "snapshot": "Take a Snapshot when a Run ends"
           },
           "data_description": {
-            "thumbnail": "An image entity that shows what the Run makes, e.g. the preview of the 3D model from the Device's integration.",
+            "thumbnail": "An image entity or a camera that shows what the Run makes, e.g. the preview of the 3D model from the Device's integration. An image entity is copied whenever it changes; a camera is asked for its picture while the Run runs, never after it ended.",
             "snapshot": "Only with a camera. Up to three attempts; none when the end of a Run is only noticed later, e.g. after an outage."
           }
         },

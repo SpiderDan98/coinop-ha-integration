@@ -35,9 +35,13 @@ IRRIGATION = "irrigation"
 # What each stand-in's config flow in dev/ is started with, per device it registers.
 STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
     "anycubic_cloud": (None,),
+    "moonraker": (None,),
     "ha_washdata": (None, {"name": "Dishwasher", "device_type": "dishwasher"}),
+    "tesla_wall_connector": (None,),
 }
 KOBRA = "kobra"
+# The Moonraker stand-in's printer, whose idle print state is `standby`.
+VORON = "voron"
 TITLES = {key: name for key, (name, _) in PRINTERS.items()} | {
     WASHER: "Washing machine",
     IRRIGATION: "Garden valve",
@@ -593,8 +597,8 @@ async def _nothing(seed: Seed) -> None:
 
 
 async def _quick_start(seed: Seed) -> None:
-    """A printer, a washing machine and a dishwasher of known integrations, for Add
-    Device's Quick Start to offer."""
+    """Two printers, a washing machine, a dishwasher and an EV charger of known
+    integrations, for Add Device's Quick Start to offer."""
     for domain, devices in STAND_INS.items():
         for device in devices:
             await seed.hass.config_entries.flow.async_init(
@@ -614,10 +618,13 @@ SCENARIOS = {
     "empty": Scenario("Empty", "The hub without any Device.", (), _nothing),
     "quick-start": Scenario(
         "Quick Start",
-        "The hub without any Device, an Anycubic printer, and a washing machine and "
-        "a dishwasher WashData follows: Add Device offers all three in Quick Start, "
-        "each as its Device Type, with their plug sensors as meters. The Kobra's, "
-        "the washing machine's and the dishwasher's helpers run them.",
+        "The hub without any Device, an Anycubic printer, a Moonraker printer "
+        "with its preview camera and a webcam, a washing machine and a dishwasher "
+        "WashData follows, and a Tesla Wall Connector: Add Device offers all five "
+        "in Quick Start, each as its Device Type, with their plug sensors as "
+        "meters and the Wall Connector with its own. The Kobra's, the Voron's, "
+        "the washing machine's, the dishwasher's and the Wall Connector's helpers "
+        "run them.",
         (),
         _quick_start,
     ),
@@ -782,6 +789,14 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
             await _async_set_appliance(hass, key, "off", program.state)
     if hass.states.get("input_select.irrigation_status"):
         await _async_select(hass, "input_select.irrigation_status", "off")
+    if hass.states.get(f"input_select.{VORON}_status"):
+        await _async_set_printer(hass, VORON, "standby")
+        await hass.services.async_call(
+            "input_number",
+            "set_value",
+            {"entity_id": f"input_number.{VORON}_filament", "value": 0},
+            blocking=True,
+        )
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
     for key in scenario.devices:

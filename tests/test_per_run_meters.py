@@ -9,13 +9,14 @@ import pytest
 
 from .clock import Clock
 from .devices import add_basic_device, add_hub
+from .registry import HaDevice
 from .test_ev_chargers import CHARGER_MAPPING, CHARGER_STATUS, set_charger
 from .test_measured import electricity, set_meter
 from .test_quick_start import quick_start
 from .test_robotic_mowers import STATION_ENERGY, add_mower, set_mower
 from .test_runs import stored_runs
 from .test_water import water
-from .washers import Appliance, add_miele
+from .washers import add_miele
 
 COUNTERS = {
     "current_energy_consumption": "kWh",
@@ -27,7 +28,7 @@ CHARGER_POWER = "sensor.wallbox_power"
 
 async def report(
     hass: HomeAssistant,
-    appliance: Appliance,
+    appliance: HaDevice,
     status: str,
     kwh: float | str,
     litres: float | str,
@@ -45,7 +46,7 @@ async def report(
     await hass.async_block_till_done()
 
 
-async def add_miele_washer(hass: HomeAssistant, **written: Any) -> Appliance:
+async def add_miele_washer(hass: HomeAssistant, **written: Any) -> HaDevice:
     """A Miele washing machine, off, its counters without a value, added by Quick
     Start on those counters."""
     washer = add_miele(hass)

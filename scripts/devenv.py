@@ -94,6 +94,10 @@ def start() -> None:
         ROOT / "dev" / "coinop_dev": "/config/custom_components/coinop_dev:ro",
         ROOT / "dev" / "ha_washdata": "/config/custom_components/ha_washdata:ro",
         ROOT / "dev" / "anycubic_cloud": "/config/custom_components/anycubic_cloud:ro",
+        ROOT / "dev" / "moonraker": "/config/custom_components/moonraker:ro",
+        ROOT
+        / "dev"
+        / "tesla_wall_connector": "/config/custom_components/tesla_wall_connector:ro",
     }
     run(
         "docker",

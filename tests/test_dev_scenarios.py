@@ -27,6 +27,7 @@ CONFIG = DEV / "configuration.yaml"
 PLUG_ENERGY = "sensor.washing_machine_plug_energy"
 DISHWASHER_PLUG_ENERGY = "sensor.dishwasher_plug_energy"
 PLUG_POWER = "sensor.kobra_s1_plug_power"
+VORON_PLUG_POWER = "sensor.voron_2_4_plug_power"
 
 
 @pytest.fixture
@@ -310,15 +311,85 @@ async def test_quick_start_adds_the_printer_of_the_anycubic_stand_in(
     assert electricity["quantity"] == pytest.approx(0.12)
 
 
+@pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_moonraker_printer_with_its_preview_as_thumbnail(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await hass.async_block_till_done()
+
+    await quick_start(hass, "Voron 2.4 · Moonraker", meter=VORON_PLUG_POWER, price=0.32)
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert device["type"] == "3d_printer"
+    await set_helper(hass, "input_number.voron_power", 150)
+    await set_helper(hass, "input_text.voron_job", "Benchy.gcode")
+    await set_helper(hass, "input_select.voron_status", "printing")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.voron_filament", 3.2)
+    await set_helper(hass, "input_select.voron_status", "complete")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (run["name"], run["outcome"]) == ("Benchy", "completed")
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    assert [image["kind"] for image in run["images"]] == ["thumbnail"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(0.15)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_quick_start_adds_the_wall_connector_with_its_own_meter(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    await hass.async_block_till_done()
+    await set_helper(hass, "input_number.wall_connector_energy", 1200)
+
+    await quick_start(hass, "Tesla Wall Connector · Tesla Wall Connector", price=0.32)
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    assert device["type"] == "ev_charger"
+    await set_helper(hass, "input_select.wall_connector_status", "charging")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.wall_connector_energy", 1207)
+    await set_helper(hass, "input_select.wall_connector_status", "waiting_car")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_select.wall_connector_status", "charging")
+    await clock.advance(hours=1)
+    await set_helper(hass, "input_number.wall_connector_energy", 1211)
+    await set_helper(hass, "input_select.wall_connector_status", "not_connected")
+    await clock.advance(minutes=10)
+
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    assert run["outcome"] == "completed"
+    run = (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+    [electricity] = [i for i in run["line_items"] if i["kind"] == "electricity"]
+    assert electricity["quantity"] == pytest.approx(11)
+
+
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     hass: HomeAssistant,
     hass_admin_user: MockUser,
     helpers: None,
     files: Path,
 ) -> None:
-    stand_ins = ("anycubic_cloud", "ha_washdata")
+    stand_ins = ("anycubic_cloud", "moonraker", "ha_washdata", "tesla_wall_connector")
     await async_load(hass, "quick-start", hass_admin_user)
-    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [1, 2]
+    assert [len(hass.config_entries.async_entries(d)) for d in stand_ins] == [
+        1,
+        1,
+        2,
+        1,
+    ]
 
     await async_load(hass, "empty", hass_admin_user)
 
@@ -335,8 +406,10 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     devices = {option["label"]: option["value"] for option in offered(result)}
     assert list(devices) == [
         "Kobra S1 · Anycubic Cloud & LAN",
+        "Voron 2.4 · Moonraker",
         "Washing machine · WashData",
         "Dishwasher · WashData",
+        "Tesla Wall Connector · Tesla Wall Connector",
         "manual",
     ]
     result = await configure(hass, result, {"device": devices[label]})

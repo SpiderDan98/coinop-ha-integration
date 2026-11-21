@@ -18,11 +18,12 @@ from .devices import (
     start_add_device,
     start_reconfigure,
 )
+from .registry import HaDevice
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
 from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
-from .washers import Appliance, add_home_connect, add_miele, add_washdata
+from .washers import add_home_connect, add_miele, add_washdata
 from .websocket import PanelClient
 
 # What WashData's program sensor reports while no program is recognised.
@@ -49,7 +50,7 @@ ANSWERS = {
 async def walk_pre_filled(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    washer: Appliance,
+    washer: HaDevice,
     device_type: str = "washing_machine",
     **answers: Any,
 ) -> tuple[list[str], ConfigSubentry]:
@@ -635,12 +636,35 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
 @pytest.mark.parametrize(
     ("device_type", "integrations"),
     [
-        ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
-        ("washing_machine", "WashData, Miele, Home Connect"),
-        ("dishwasher", "WashData, Miele, Home Connect"),
-        ("tumble_dryer", "WashData, Miele, Home Connect"),
-        ("coffee_machine", "WashData, Miele, Home Connect"),
-        ("oven", "WashData, Miele, Home Connect"),
+        (
+            "3d_printer",
+            "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab, "
+            "PrusaLink, OctoPrint, Creality, Elegoo, Moonraker",
+        ),
+        (
+            "washing_machine",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
+        ),
+        (
+            "dishwasher",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
+        ),
+        (
+            "tumble_dryer",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
+        ),
+        (
+            "coffee_machine",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+        ),
+        (
+            "oven",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
+        ),
     ],
 )
 async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(

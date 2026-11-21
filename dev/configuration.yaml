@@ -35,6 +35,10 @@ input_select:
   kobra_status:
     name: Kobra S1 status
     options: [idle, printing, paused, finished, cancelled]
+  # Klipper's print states, for the Moonraker stand-in in dev/moonraker.
+  voron_status:
+    name: Voron 2.4 print state
+    options: [standby, printing, paused, complete, cancelled, error]
   washer_status:
     name: Washing machine status
     options: ["off", running, paused, finished, cancelled]
@@ -50,6 +54,10 @@ input_select:
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
+  # The Tesla Wall Connector's states, for the stand-in in dev/tesla_wall_connector.
+  wall_connector_status:
+    name: Wall Connector status
+    options: [not_connected, connected, charging, waiting_car, charging_finished, error]
 
 input_text:
   prusa_job:
@@ -58,6 +66,8 @@ input_text:
     name: Bambu Lab X1C job
   kobra_job:
     name: Kobra S1 job
+  voron_job:
+    name: Voron 2.4 file
 
 input_number:
   kobra_power:
@@ -67,6 +77,20 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
+  voron_power:
+    name: Voron 2.4 power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  voron_filament:
+    name: Voron 2.4 filament used
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: m
   washer_energy:
     name: Washing machine energy
     min: 0
@@ -102,6 +126,13 @@ input_number:
     step: 0.1
     mode: box
     unit_of_measurement: L
+  wall_connector_energy:
+    name: Wall Connector energy
+    min: 0
+    max: 1000000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -109,6 +140,12 @@ template:
       - name: Kobra S1 plug power
         unique_id: kobra_plug_power
         state: "{{ states('input_number.kobra_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Voron 2.4 plug power
+        unique_id: voron_plug_power
+        state: "{{ states('input_number.voron_power') }}"
         unit_of_measurement: W
         device_class: power
         state_class: measurement

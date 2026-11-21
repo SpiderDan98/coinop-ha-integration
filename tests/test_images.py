@@ -213,6 +213,55 @@ async def test_a_run_started_without_a_thumbnail_gets_the_first_one_shown(
     assert await thumbnail_colour(panel, http) == "blue"
 
 
+async def test_an_image_entity_nothing_has_fetched_yet_is_asked_when_a_run_starts(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture("red"), fetched=False)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+
+    await set_status(hass, "printing")
+
+    assert await thumbnail_colour(panel, http) == "red"
+
+
+async def test_an_unfetched_image_entity_without_a_picture_yet_is_asked_again(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    thumbnail = await add_thumbnail(hass, fetched=False)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+    assert await thumbnail_colour(panel, http) is None
+
+    # The picture is there to be fetched, but nothing tells about it.
+    thumbnail.content = picture("green")
+    await clock.advance(minutes=5)
+    await set_status(hass, "finished")
+    thumbnail.content = picture("blue")
+    await clock.advance(minutes=5)
+
+    assert await thumbnail_colour(panel, http) == "green"
+
+
+async def test_an_unfetched_image_entity_is_asked_again_while_the_run_runs(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    """Creality's preview answers with a placeholder until the print's is there."""
+    thumbnail = await add_thumbnail(hass, picture("red"), fetched=False)
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL)
+    await set_status(hass, "printing")
+
+    thumbnail.content = picture("green")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    thumbnail.content = picture("blue")
+    await clock.advance(hours=1)
+
+    assert await thumbnail_colour(panel, http) == "green"
+
+
 async def test_an_unavailable_or_empty_thumbnail_never_replaces_the_stored_one(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
