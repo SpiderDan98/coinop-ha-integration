@@ -191,6 +191,41 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
+  siemens_washer_power:
+    name: Siemens washer power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  siemens_dishwasher_power:
+    name: Siemens dishwasher power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  siemens_dryer_power:
+    name: Siemens dryer power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  siemens_coffee_maker_power:
+    name: Siemens coffee maker power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  siemens_oven_power:
+    name: Siemens oven power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -264,6 +299,36 @@ template:
       - name: Miele oven plug power
         unique_id: miele_oven_plug_power
         state: "{{ states('input_number.miele_oven_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Siemens washer plug power
+        unique_id: siemens_washer_plug_power
+        state: "{{ states('input_number.siemens_washer_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Siemens dishwasher plug power
+        unique_id: siemens_dishwasher_plug_power
+        state: "{{ states('input_number.siemens_dishwasher_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Siemens dryer plug power
+        unique_id: siemens_dryer_plug_power
+        state: "{{ states('input_number.siemens_dryer_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Siemens coffee maker plug power
+        unique_id: siemens_coffee_maker_plug_power
+        state: "{{ states('input_number.siemens_coffee_maker_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Siemens oven plug power
+        unique_id: siemens_oven_plug_power
+        state: "{{ states('input_number.siemens_oven_power') }}"
         unit_of_measurement: W
         device_class: power
         state_class: measurement

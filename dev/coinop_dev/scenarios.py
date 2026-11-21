@@ -849,6 +849,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             appliances.miele, serial="000111000001", name="Miele washing machine"
         ),
     ),
+    "home_connect.washing_machine": StaticPiece(
+        "washing_machine",
+        "Siemens washer · Home Connect",
+        "A washer with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_washer_power": 0},
+        registration=partial(appliances.home_connect, "Washer", name="Siemens washer"),
+    ),
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",
         "Dishwasher · WashData",
@@ -871,6 +879,16 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             name="Miele dishwasher",
         ),
     ),
+    "home_connect.dishwasher": StaticPiece(
+        "dishwasher",
+        "Siemens dishwasher · Home Connect",
+        "A dishwasher with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_dishwasher_power": 0},
+        registration=partial(
+            appliances.home_connect, "Dishwasher", name="Siemens dishwasher"
+        ),
+    ),
     "miele.tumble_dryer": StaticPiece(
         "tumble_dryer",
         "Miele tumble dryer · Miele",
@@ -883,6 +901,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             serial="000111000003",
             name="Miele tumble dryer",
         ),
+    ),
+    "home_connect.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "Siemens dryer · Home Connect",
+        "A dryer with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_dryer_power": 0},
+        registration=partial(appliances.home_connect, "Dryer", name="Siemens dryer"),
     ),
     "miele.coffee_machine": StaticPiece(
         "coffee_machine",
@@ -897,6 +923,16 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
             name="Miele coffee system",
         ),
     ),
+    "home_connect.coffee_machine": StaticPiece(
+        "coffee_machine",
+        "Siemens coffee maker · Home Connect",
+        "A coffee maker with its plug sensor as meter; set its operation state in "
+        "the developer tools to run it.",
+        {"input_number.siemens_coffee_maker_power": 0},
+        registration=partial(
+            appliances.home_connect, "CoffeeMaker", name="Siemens coffee maker"
+        ),
+    ),
     "miele.oven": StaticPiece(
         "oven",
         "Miele oven · Miele",
@@ -906,6 +942,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         registration=partial(
             appliances.miele, "Oven", serial="000111000005", name="Miele oven"
         ),
+    ),
+    "home_connect.oven": StaticPiece(
+        "oven",
+        "Siemens oven · Home Connect",
+        "An oven with its plug sensor as meter; set its operation state in the "
+        "developer tools to run it.",
+        {"input_number.siemens_oven_power": 0},
+        registration=partial(appliances.home_connect, "Oven", name="Siemens oven"),
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",

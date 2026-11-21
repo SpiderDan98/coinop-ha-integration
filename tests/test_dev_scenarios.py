@@ -186,11 +186,16 @@ async def test_a_device_with_history_loads_alone(
         ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
         ("ha_washdata.washing_machine", "Washing machine · WashData"),
         ("miele.washing_machine", "Miele washing machine · Miele"),
+        ("home_connect.washing_machine", "Siemens washer · Home Connect"),
         ("ha_washdata.dishwasher", "Dishwasher · WashData"),
         ("miele.dishwasher", "Miele dishwasher · Miele"),
+        ("home_connect.dishwasher", "Siemens dishwasher · Home Connect"),
         ("miele.tumble_dryer", "Miele tumble dryer · Miele"),
+        ("home_connect.tumble_dryer", "Siemens dryer · Home Connect"),
         ("miele.coffee_machine", "Miele coffee system · Miele"),
+        ("home_connect.coffee_machine", "Siemens coffee maker · Home Connect"),
         ("miele.oven", "Miele oven · Miele"),
+        ("home_connect.oven", "Siemens oven · Home Connect"),
         (
             "tesla_wall_connector.ev_charger",
             "Tesla Wall Connector · Tesla Wall Connector",
@@ -227,7 +232,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     assert len(catalog["tags"]) == 6
     assert len(catalog["templates"]) == 1
     [entry] = hass.config_entries.async_entries("coinop")
-    assert len(offered(await open_add_device(hass, entry))) == 17
+    assert len(offered(await open_add_device(hass, entry))) == 22
     # Under its own id: a Status shared with another Piece's would have a suffix.
     assert all(hass.states.get(status) for _, _, _, status, *_ in STATIC.values())
     assert all(hass.states.get(row[5]) for row in APPLIANCES.values())
@@ -413,12 +418,20 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         ),
         (
             "washing_machine",
-            ["washer", "ha_washdata.washing_machine", "miele.washing_machine"],
+            [
+                "washer",
+                "ha_washdata.washing_machine",
+                "miele.washing_machine",
+                "home_connect.washing_machine",
+            ],
         ),
-        ("dishwasher", ["ha_washdata.dishwasher", "miele.dishwasher"]),
-        ("tumble_dryer", ["miele.tumble_dryer"]),
-        ("coffee_machine", ["miele.coffee_machine"]),
-        ("oven", ["miele.oven"]),
+        (
+            "dishwasher",
+            ["ha_washdata.dishwasher", "miele.dishwasher", "home_connect.dishwasher"],
+        ),
+        ("tumble_dryer", ["miele.tumble_dryer", "home_connect.tumble_dryer"]),
+        ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
+        ("oven", ["miele.oven", "home_connect.oven"]),
         ("ev_charger", ["tesla_wall_connector.ev_charger"]),
         ("other", ["irrigation"]),
     ]
@@ -453,11 +466,16 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         "moonraker.3d_printer",
         "ha_washdata.washing_machine",
         "miele.washing_machine",
+        "home_connect.washing_machine",
         "ha_washdata.dishwasher",
         "miele.dishwasher",
+        "home_connect.dishwasher",
         "miele.tumble_dryer",
+        "home_connect.tumble_dryer",
         "miele.coffee_machine",
+        "home_connect.coffee_machine",
         "miele.oven",
+        "home_connect.oven",
         "tesla_wall_connector.ev_charger",
     ]
     assert (from_preset["preset"], from_preset["selection"]) == (
@@ -737,6 +755,56 @@ APPLIANCES: dict[str, tuple[str, str, bool, str | None, str | None, str, str, st
         "in_use",
         "program_ended",
     ),
+    "home_connect.washing_machine": (
+        "Siemens washer · Home Connect",
+        "washing_machine",
+        False,
+        "input_number.siemens_washer_power",
+        "sensor.siemens_washer_plug_power",
+        "sensor.siemens_washer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.dishwasher": (
+        "Siemens dishwasher · Home Connect",
+        "dishwasher",
+        False,
+        "input_number.siemens_dishwasher_power",
+        "sensor.siemens_dishwasher_plug_power",
+        "sensor.siemens_dishwasher_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.tumble_dryer": (
+        "Siemens dryer · Home Connect",
+        "tumble_dryer",
+        False,
+        "input_number.siemens_dryer_power",
+        "sensor.siemens_dryer_plug_power",
+        "sensor.siemens_dryer_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.coffee_machine": (
+        "Siemens coffee maker · Home Connect",
+        "coffee_machine",
+        False,
+        "input_number.siemens_coffee_maker_power",
+        "sensor.siemens_coffee_maker_plug_power",
+        "sensor.siemens_coffee_maker_operation_state",
+        "run",
+        "finished",
+    ),
+    "home_connect.oven": (
+        "Siemens oven · Home Connect",
+        "oven",
+        False,
+        "input_number.siemens_oven_power",
+        "sensor.siemens_oven_plug_power",
+        "sensor.siemens_oven_operation_state",
+        "run",
+        "finished",
+    ),
 }
 
 
@@ -807,23 +875,21 @@ async def test_quick_start_adds_a_static_stand_ins_appliance_run_through_its_sta
 
 
 @pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("domain", ["miele", "home_connect"])
 async def test_two_pieces_of_an_account_integration_load_under_one_config_entry(
-    hass: HomeAssistant, hass_admin_user: MockUser, files: Path
+    hass: HomeAssistant, hass_admin_user: MockUser, files: Path, domain: str
 ) -> None:
-    await async_load(
-        hass, {"pieces": ["miele.washing_machine", "miele.oven"]}, hass_admin_user
-    )
+    pieces = [f"{domain}.washing_machine", f"{domain}.oven"]
+    await async_load(hass, {"pieces": pieces}, hass_admin_user)
     await hass.async_block_till_done()
 
-    assert len(hass.config_entries.async_entries("miele")) == 1
+    assert len(hass.config_entries.async_entries(domain)) == 1
     [entry] = hass.config_entries.async_entries("coinop")
     assert [o["label"] for o in offered(await open_add_device(hass, entry))] == [
-        "Miele washing machine · Miele",
-        "Miele oven · Miele",
+        *(APPLIANCES[piece][0] for piece in pieces),
         "manual",
     ]
-    assert state(hass, "sensor.miele_washing_machine_status") == "off"
-    assert state(hass, "sensor.miele_oven_status") == "off"
+    assert all(hass.states.get(APPLIANCES[piece][5]) for piece in pieces)
 
 
 async def test_the_next_scenario_takes_the_stand_ins_devices_away(
@@ -843,6 +909,7 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
         "moonraker": 1,
         "ha_washdata": 2,
         "miele": 1,
+        "home_connect": 1,
         "tesla_wall_connector": 1,
     }
     await async_load(hass, "quick-start", hass_admin_user)
@@ -930,6 +997,11 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
         "Miele tumble dryer · Miele",
         "Miele coffee system · Miele",
         "Miele oven · Miele",
+        "Siemens washer · Home Connect",
+        "Siemens dishwasher · Home Connect",
+        "Siemens dryer · Home Connect",
+        "Siemens coffee maker · Home Connect",
+        "Siemens oven · Home Connect",
         "Tesla Wall Connector · Tesla Wall Connector",
         "manual",
     ]
