@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 from homeassistant.config_entries import SOURCE_USER
 
+from custom_components.coinop.const import DOMAIN as COINOP
 from custom_components.coinop.device_config import DEVICE_TYPES
 
 from ..stand_ins import Registration, appliances, ev_chargers, printers
@@ -42,6 +43,8 @@ class DeviceWithHistory(Piece):
     """A Device set up as Add Device sets one up, named as the Piece, with Runs."""
 
     section: ClassVar[str] = "device"
+    # Its Device is a subentry of Coin-op's own config entry.
+    domain: ClassVar[str] = COINOP
     device: Mapping[str, Any]
     # The Runs of each history level but none, which leaves the Device alone.
     short: Callable[[Seed], Awaitable[None]]
@@ -53,11 +56,11 @@ class DeviceWithHistory(Piece):
     # The panel settings it gets whatever its history, before its Runs.
     setup: Callable[[Seed], Awaitable[None]] | None = None
 
-    async def fill(self, seed: Seed, history: str) -> None:
+    async def fill(self, seed: Seed) -> None:
         if self.setup:
             await self.setup(seed)
-        if history != "none":
-            await (self.short if history == "short" else self.long)(seed)
+        if seed.history != "none":
+            await (self.short if seed.history == "short" else self.long)(seed)
 
     async def open_run(self, seed: Seed) -> None:
         for entity_id, value in self.start.items():

@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
 
-from .pieces import PIECES, DeviceWithHistory, QuickStartPiece, ordered
+from .pieces import PIECES, DeviceWithHistory, ordered
 from .presets import PRESETS
 from .seed import SHARED, Api, ScenarioError, Seed, async_set
 
@@ -27,8 +27,7 @@ async def async_load(
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
-    stand_ins = {p.domain for p in PIECES.values() if isinstance(p, QuickStartPiece)}
-    for domain in (COINOP, *stand_ins):
+    for domain in dict.fromkeys([COINOP, *(p.domain for p in PIECES.values())]):
         for old in hass.config_entries.async_entries(domain):
             await hass.config_entries.async_remove(old.entry_id)
     for piece in PIECES.values():
@@ -53,16 +52,13 @@ async def async_load(
         hass.config_entries.async_add_subentry(entry, subentry)
         devices[name] = subentry.subentry_id
     await hass.config_entries.async_setup(entry.entry_id)
-    seed = Seed(hass, Api(hass, user), entry, devices)
+    seed = Seed(hass, Api(hass, user), entry, devices, history)
     needs = {need for piece in with_history.values() for need in piece.needs}
     for need, add in SHARED.items():
         if need in needs:
             await add(seed)
-    for piece in (PIECES[name] for name in pieces):
-        if isinstance(piece, DeviceWithHistory):
-            await piece.fill(seed, history)
-        else:
-            await piece.fill(seed)
+    for name in pieces:
+        await PIECES[name].fill(seed)
     for name in seed.retired:
         await seed.api.call(
             "coinop/materials/archive", material_id=seed.materials[name]["id"]

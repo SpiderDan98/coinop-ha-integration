@@ -81,12 +81,14 @@ class Seed:
         api: Api,
         entry: CoinOpConfigEntry,
         devices: Mapping[str, str],
+        history: str,
     ) -> None:
         self.hass = hass
         self.api = api
         self.entry = entry
         # Each Device with history's subentry id, by its Piece's name.
         self.devices = devices
+        self.history = history
         self.random = random.Random(42)
         self.now = dt_util.now().replace(second=0, microsecond=0)
         self.materials: dict[str, dict[str, Any]] = {}

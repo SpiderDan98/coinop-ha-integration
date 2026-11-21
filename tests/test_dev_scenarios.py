@@ -321,9 +321,7 @@ async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_i
     pieces = [
         (name, piece)
         for name, piece in PIECES.items()
-        if not isinstance(piece, DeviceWithHistory)
-        and piece.domain == domain
-        and device_type in (None, piece.group)
+        if piece.domain == domain and device_type in (None, piece.group)
     ]
     assert pieces, f"no Quick Start Piece of {domain} for {device_type or 'any kind'}"
     [(name, piece), *_] = pieces

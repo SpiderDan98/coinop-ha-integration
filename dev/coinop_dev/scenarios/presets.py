@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .pieces import PIECES, ordered
+from .pieces import PIECES, QuickStartPiece, ordered
 
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
@@ -32,7 +32,7 @@ PRESETS = {
         "Quick Start",
         "The hub without any Device, and every Quick Start Piece: Add Device offers "
         "each HA device in Quick Start as its Device Type.",
-        tuple(n for n, p in PIECES.items() if p.section == "quick_start"),
+        tuple(n for n, p in PIECES.items() if isinstance(p, QuickStartPiece)),
     ),
     "few-runs": Preset(
         "3D printer, a few Runs", "The Prusa with its 7 Runs.", ("prusa",)
