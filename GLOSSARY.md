@@ -10,9 +10,14 @@ _Avoid_: Machine, appliance, printer (as the generic term)
 _German UI_: Gerät
 
 **Device Type**:
-The kind of Device (3D printer, washing machine, dishwasher, …), chosen when it is added and fixed afterwards. It determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has.
+The kind of Device (3D printer, washing machine, dishwasher, …, or Other), chosen when it is added and fixed afterwards. A shipped Device Type determines which Device Inputs, computed Line Items (such as electricity and material), entities and panel parts the Device has. Other is for a Device Coin-op ships no Device Type for: the user gives it a Type Name and picks what it has from those same parts.
 _Avoid_: Category, device class
-_German UI_: Gerätetyp
+_German UI_: Gerätetyp (Other: Sonstiges)
+
+**Type Name**:
+The user's own name for what kind of Device an Other Device is, such as "Kiln" or "Pool pump"; the panel lists the Devices that share one under it as their heading. Only Other Devices have one. It is not a Device Type: one that reads like a shipped Device Type's name is still a group of its own.
+_Avoid_: Custom type, type label, category
+_German UI_: Typbezeichnung
 
 **Device Input**:
 A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
