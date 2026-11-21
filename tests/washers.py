@@ -10,6 +10,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.util import slugify
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
@@ -154,36 +155,236 @@ def add_miele(hass: HomeAssistant, *, consumption: bool = True) -> Washer:
     return washer
 
 
-def add_home_connect(hass: HomeAssistant) -> Washer:
-    """HA core `home_connect`: unique ids `<haId>-<BSH key>`."""
-    config_entry, washer = _washer(
-        hass, "home_connect", "SIEMENS-WM14T6H0-0123", "Washer"
-    )
+# The API's appliance types HA core `home_connect` fetches programs for
+# (`APPLIANCES_WITH_PROGRAMS` in its const.py).
+HOME_CONNECT_WITH_PROGRAMS = (
+    "AirConditioner",
+    "CleaningRobot",
+    "CoffeeMaker",
+    "Dishwasher",
+    "Dryer",
+    "Hood",
+    "Microwave",
+    "Oven",
+    "WarmingDrawer",
+    "Washer",
+    "WasherDryer",
+)
+# What it registers for an appliance type alone, whatever the appliance reports
+# (`EVENT_SENSORS` and `BSH_PROGRAM_SENSORS` in its sensor.py): by BSH key, the
+# translation key and the types. A coffee maker has 17 more event sensors.
+HOME_CONNECT_EVENT_SENSORS = {
+    "BSH.Common.Event.ProgramAborted": (
+        "program_aborted",
+        ("Dishwasher", "Microwave", "CleaningRobot", "CookProcessor"),
+    ),
+    "BSH.Common.Event.ProgramFinished": (
+        "program_finished",
+        (
+            "Oven",
+            "Dishwasher",
+            "Washer",
+            "Dryer",
+            "Microwave",
+            "WasherDryer",
+            "CleaningRobot",
+            "CookProcessor",
+        ),
+    ),
+    "BSH.Common.Event.AlarmClockElapsed": (
+        "alarm_clock_elapsed",
+        ("Oven", "Cooktop", "Hob"),
+    ),
+    "BSH.Common.Event.Favorite.001.ExternalTrigger": (
+        "favorite_short_press",
+        ("Hood", "Cooktop", "Hob"),
+    ),
+    "BSH.Common.Event.Favorite.002.ExternalTrigger": (
+        "favorite_long_press",
+        ("Hood", "Cooktop", "Hob"),
+    ),
+    "Cooking.Oven.Event.PreheatFinished": (
+        "preheat_finished",
+        ("Oven", "Cooktop", "Hob"),
+    ),
+    "Cooking.Oven.Event.RegularPreheatFinished": (
+        "regular_preheat_finished",
+        ("Oven",),
+    ),
+    "LaundryCare.Dryer.Event.DryingProcessFinished": (
+        "drying_process_finished",
+        ("Dryer",),
+    ),
+    "Dishcare.Dishwasher.Event.MachineCareAndFilterCleaningReminder": (
+        "machine_care_and_filter_cleaning_reminder",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.MachineCareAndLowMaintenanceFilterCleaningReminder": (
+        "machine_care_and_low_maintenance_filter_cleaning_reminder",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.MachineCareReminder": (
+        "machine_care_reminder",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.ProgramBlockedSaltLack": (
+        "program_blocked_salt_lack",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.SaltLack": ("salt_lack", ("Dishwasher",)),
+    "Dishcare.Dishwasher.Event.SaltNearlyEmpty": (
+        "salt_nearly_empty",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.RinseAidLack": ("rinse_aid_lack", ("Dishwasher",)),
+    "Dishcare.Dishwasher.Event.RinseAidNearlyEmpty": (
+        "rinse_aid_nearly_empty",
+        ("Dishwasher",),
+    ),
+    "Dishcare.Dishwasher.Event.SmartFilterCleaningReminder": (
+        "smart_filter_cleaning_reminder",
+        ("Dishwasher",),
+    ),
+    "ConsumerProducts.CoffeeMaker.Event.BeanContainerEmpty": (
+        "bean_container_empty",
+        ("CoffeeMaker",),
+    ),
+    "ConsumerProducts.CoffeeMaker.Event.WaterTankEmpty": (
+        "water_tank_empty",
+        ("CoffeeMaker",),
+    ),
+    "ConsumerProducts.CoffeeMaker.Event.DripTrayFull": (
+        "drip_tray_full",
+        ("CoffeeMaker",),
+    ),
+    "Refrigeration.FridgeFreezer.Event.DoorAlarmFreezer": (
+        "freezer_door_alarm",
+        ("FridgeFreezer", "Freezer"),
+    ),
+    "Refrigeration.FridgeFreezer.Event.DoorAlarmRefrigerator": (
+        "refrigerator_door_alarm",
+        ("FridgeFreezer", "Refrigerator"),
+    ),
+    "Refrigeration.FridgeFreezer.Event.TemperatureAlarmFreezer": (
+        "freezer_temperature_alarm",
+        ("FridgeFreezer", "Freezer"),
+    ),
+    "ConsumerProducts.CleaningRobot.Event.EmptyDustBoxAndCleanFilter": (
+        "empty_dust_box_and_clean_filter",
+        ("CleaningRobot",),
+    ),
+    "ConsumerProducts.CleaningRobot.Event.RobotIsStuck": (
+        "robot_is_stuck",
+        ("CleaningRobot",),
+    ),
+    "ConsumerProducts.CleaningRobot.Event.DockingStationNotFound": (
+        "docking_station_not_found",
+        ("CleaningRobot",),
+    ),
+    "LaundryCare.Washer.Event.IDos1FillLevelPoor": (
+        "poor_i_dos_1_fill_level",
+        ("Washer", "WasherDryer"),
+    ),
+    "LaundryCare.Washer.Event.IDos2FillLevelPoor": (
+        "poor_i_dos_2_fill_level",
+        ("Washer", "WasherDryer"),
+    ),
+    "Cooking.Common.Event.Hood.GreaseFilterMaxSaturationNearlyReached": (
+        "grease_filter_max_saturation_nearly_reached",
+        ("Hood",),
+    ),
+    "Cooking.Common.Event.Hood.GreaseFilterMaxSaturationReached": (
+        "grease_filter_max_saturation_reached",
+        ("Hood",),
+    ),
+}
+HOME_CONNECT_PROGRAM_SENSORS = {
+    "BSH.Common.Option.RemainingProgramTime": (
+        "program_finish_time",
+        (
+            "CoffeeMaker",
+            "CookProcessor",
+            "Dishwasher",
+            "Dryer",
+            "Microwave",
+            "Hood",
+            "Oven",
+            "Washer",
+            "WasherDryer",
+        ),
+    ),
+    "BSH.Common.Option.ProgramProgress": (
+        "program_progress",
+        HOME_CONNECT_WITH_PROGRAMS,
+    ),
+}
+# The event sensors Home Assistant 2026.5, Coin-op's minimum, registers for fewer
+# types: it knows no `Hob` and lacks the favorite buttons and most dishwasher events.
+HOME_CONNECT_MINIMUM_HA: dict[str, tuple[str, ...]] = {
+    "BSH.Common.Event.AlarmClockElapsed": ("Oven", "Cooktop"),
+    "BSH.Common.Event.Favorite.001.ExternalTrigger": (),
+    "BSH.Common.Event.Favorite.002.ExternalTrigger": (),
+    "Cooking.Oven.Event.PreheatFinished": ("Oven", "Cooktop"),
+    "Dishcare.Dishwasher.Event.MachineCareAndFilterCleaningReminder": (),
+    "Dishcare.Dishwasher.Event.MachineCareAndLowMaintenanceFilterCleaningReminder": (),
+    "Dishcare.Dishwasher.Event.MachineCareReminder": (),
+    "Dishcare.Dishwasher.Event.ProgramBlockedSaltLack": (),
+    "Dishcare.Dishwasher.Event.SaltLack": (),
+    "Dishcare.Dishwasher.Event.RinseAidLack": (),
+    "Dishcare.Dishwasher.Event.SmartFilterCleaningReminder": (),
+}
 
-    def add(platform: str, key: str, object_id: str, translation_key: str) -> None:
+
+def add_home_connect(
+    hass: HomeAssistant,
+    appliance_type: str = "Washer",
+    *,
+    name: str = "Washer",
+    minimum_ha: bool = False,
+) -> Washer:
+    """HA core `home_connect`: unique ids `<haId>-<BSH key>`.
+
+    `appliance_type` is the API's type of the appliance, which is on no registry
+    entry. It only decides what the integration registers: the event sensors of the
+    type, disabled by default, and the program sensors, both even for an appliance
+    that reports nothing, here as the locked Home Assistant does or, with
+    `minimum_ha`, as Coin-op's minimum does. The operation state comes from what the
+    appliance reports; every stand-in has one, so that it is its kind that decides
+    whether Quick Start offers it. Each call is a config entry and device of its own.
+    """
+    object_id = slugify(name)
+    ha_id = f"SIEMENS-{object_id.upper()}-0123"
+    config_entry, washer = _washer(hass, "home_connect", ha_id, name)
+
+    def add(platform: str, key: str, translation_key: str, **kwargs: Any) -> None:
         _add(
             hass,
             washer,
             config_entry,
             platform,
             key,
-            f"SIEMENS-WM14T6H0-0123-{key}",
-            f"washer_{object_id}",
+            f"{ha_id}-{key}",
+            f"{object_id}_{translation_key}",
             translation_key=translation_key,
+            **kwargs,
         )
 
-    add(
-        "sensor",
-        "BSH.Common.Status.OperationState",
-        "operation_state",
-        "operation_state",
-    )
-    add("sensor", "BSH.Common.Status.DoorState", "door", "door")
-    add(
-        "select",
-        "BSH.Common.Root.SelectedProgram",
-        "selected_program",
-        "selected_program",
-    )
-    add("select", "BSH.Common.Root.ActiveProgram", "active_program", "active_program")
+    for key, (translation_key, types) in HOME_CONNECT_EVENT_SENSORS.items():
+        if appliance_type in (
+            HOME_CONNECT_MINIMUM_HA.get(key, types) if minimum_ha else types
+        ):
+            add(
+                "sensor",
+                key,
+                translation_key,
+                disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+            )
+    for key, (translation_key, types) in HOME_CONNECT_PROGRAM_SENSORS.items():
+        if appliance_type in types:
+            add("sensor", key, translation_key)
+    add("sensor", "BSH.Common.Status.OperationState", "operation_state")
+    if appliance_type in HOME_CONNECT_WITH_PROGRAMS:
+        add("sensor", "BSH.Common.Status.DoorState", "door")
+        add("select", "BSH.Common.Root.SelectedProgram", "selected_program")
+        add("select", "BSH.Common.Root.ActiveProgram", "active_program")
     return washer

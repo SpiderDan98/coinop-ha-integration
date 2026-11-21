@@ -264,6 +264,82 @@ async def test_home_connect_fills_status_mapping_and_program(
     }
 
 
+@pytest.mark.parametrize(
+    ("appliance_type", "device_type"),
+    [
+        ("Dishwasher", "dishwasher"),
+        ("Dryer", "tumble_dryer"),
+        ("CoffeeMaker", "coffee_machine"),
+        ("Oven", "oven"),
+        # The kind the integration's entities tell isn't asked: a washer as an
+        # oven, and a hood, which Quick Start doesn't offer.
+        ("Washer", "oven"),
+        ("Hood", "washing_machine"),
+    ],
+)
+async def test_manual_setup_pre_fills_every_device_type_home_connect_serves(
+    hass: HomeAssistant, appliance_type: str, device_type: str
+) -> None:
+    appliance = add_home_connect(hass, appliance_type, name="Appliance")
+    entry = await add_hub(hass)
+
+    _, subentry = await walk_pre_filled(
+        hass, entry, appliance, device_type, consumption={"next_step_id": "per_program"}
+    )
+
+    data = subentry.data
+    assert data["device_type"] == device_type
+    assert data["status"] == {
+        "entity_id": "sensor.appliance_operation_state",
+        "attribute": None,
+    }
+    assert data["mapping"]["running"] == ["run"]
+    assert data["mapping"]["ignored"] == ["inactive", "ready", "delayedstart"]
+    assert data["program"] == {
+        "entity_id": "select.appliance_active_program",
+        "attribute": None,
+    }
+
+
+async def test_detect_again_works_on_a_dishwasher_added_from_home_connect(
+    hass: HomeAssistant, entity_registry: er.EntityRegistry
+) -> None:
+    dishwasher = add_home_connect(hass, "Dishwasher", name="Dishwasher")
+    entry = await add_hub(hass)
+    before = await quick_start(
+        hass, entry, dishwasher.device.id, price=0.3, water_price=4.0
+    )
+    [subentry] = entry.subentries.values()
+    # An update of the integration renamed its entities.
+    renamed = {
+        key: entity_registry.async_update_entity(
+            dishwasher[key], new_entity_id=dishwasher[key].replace("dishwasher", "dw")
+        ).entity_id
+        for key in (
+            "BSH.Common.Status.OperationState",
+            "BSH.Common.Root.ActiveProgram",
+        )
+    }
+
+    result = await configure(
+        hass, await start_reconfigure(hass, entry, subentry), {"next_step_id": "detect"}
+    )
+    shown = []
+    while result["type"] is FlowResultType.FORM:
+        shown.append(result["step_id"])
+        result = await configure(hass, result, accepted(result))
+    assert shown == ["status", "mapping", "program"]
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["device_type"] == "dishwasher"
+    assert data["status"]["entity_id"] == renamed["BSH.Common.Status.OperationState"]
+    assert data["program"]["entity_id"] == renamed["BSH.Common.Root.ActiveProgram"]
+    for section in ("consumption", "price", "water", "water_price"):
+        assert data[section] == before[section]
+
+
 async def test_detect_again_leaves_electricity_water_and_prices_alone(
     hass: HomeAssistant, entity_registry: er.EntityRegistry
 ) -> None:
@@ -434,10 +510,10 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
     [
         ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
         ("washing_machine", "WashData, Miele, Home Connect"),
-        ("dishwasher", "WashData"),
-        ("tumble_dryer", "WashData"),
-        ("coffee_machine", "WashData"),
-        ("oven", "WashData"),
+        ("dishwasher", "WashData, Home Connect"),
+        ("tumble_dryer", "WashData, Home Connect"),
+        ("coffee_machine", "WashData, Home Connect"),
+        ("oven", "WashData, Home Connect"),
     ],
 )
 async def test_the_ha_device_step_names_the_integrations_known_for_the_device_type(
