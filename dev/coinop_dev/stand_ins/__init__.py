@@ -9,6 +9,9 @@ entities are registered follow each integration's source.
 from dataclasses import KW_ONLY, dataclass, field, replace
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
 
 # Stands in for the config entry's id, which only exists once the entry does.
@@ -84,3 +87,60 @@ class Registration:
                 for device in self.devices
             ),
         )
+
+
+@dataclass
+class HaDevice:
+    device: dr.DeviceEntry
+    # A second HA device linked to `device` with `via_device_id`, such as an ACE unit.
+    linked: dr.DeviceEntry | None
+    # Entity ids by the integration's entity key.
+    entities: dict[str, str]
+
+    def __getitem__(self, key: str) -> str:
+        return self.entities[key]
+
+
+def register(
+    hass: HomeAssistant, entry: ConfigEntry, registration: Registration
+) -> list[HaDevice]:
+    """The registration's HA devices and entities, on `entry`, in the registries."""
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+
+    def create(fields: dict[str, Any], parent: dr.DeviceEntry | None) -> dr.DeviceEntry:
+        created = devices.async_get_or_create(config_entry_id=entry.entry_id, **fields)
+        if parent is None:
+            return created
+        # HA 2026.5 has no `via_device_id` on create and later releases refuse `via_device`.
+        updated = devices.async_update_device(created.id, via_device_id=parent.id)
+        assert updated is not None
+        return updated
+
+    added: list[HaDevice] = []
+    for shape in registration.of_entry(entry.entry_id).devices:
+        device = create(
+            shape.fields, None if shape.via is None else added[shape.via].device
+        )
+        linked = None if shape.linked is None else create(shape.linked, device)
+        assert linked or not any(spec.linked for spec in shape.entities.values()), (
+            "a linked entity needs a linked HA device"
+        )
+        ids = {
+            key: entities.async_get_or_create(
+                spec.platform,
+                registration.domain,
+                spec.unique_id,
+                config_entry=entry,
+                device_id=(linked if spec.linked and linked else device).id,
+                suggested_object_id=shape.suggested_object_id(key),
+                unit_of_measurement=spec.unit,
+                capabilities=spec.capabilities,
+                disabled_by=er.RegistryEntryDisabler.INTEGRATION
+                if spec.disabled
+                else None,
+            ).entity_id
+            for key, spec in shape.entities.items()
+        }
+        added.append(HaDevice(device, linked, ids))
+    return added
