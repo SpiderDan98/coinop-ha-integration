@@ -46,11 +46,55 @@ input_select:
     name: Washing machine program
     options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
   dishwasher_status:
-    name: Dishwasher status
+    name: Kitchen dishwasher status
     options: ["off", running, paused, finished, cancelled]
   dishwasher_program:
-    name: Dishwasher program
+    name: Kitchen dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  dryer_status:
+    name: Heat pump dryer status
+    options: ["off", running, paused, finished, cancelled]
+  dryer_program:
+    name: Heat pump dryer program
+    options: [Cotton cupboard dry, Cotton iron dry, Synthetics, Wool finish]
+  coffee_status:
+    name: Espresso machine status
+    options: ["off", running, finished, cancelled]
+  coffee_program:
+    name: Espresso machine program
+    options: [Espresso, Lungo, Cappuccino, Latte macchiato]
+  # The devices of the WashData stand-in in dev/ha_washdata.
+  washdata_washer_status:
+    name: WashData washing machine status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_washer_program:
+    name: WashData washing machine program
+    options: ["Cotton 60°", "Eco 40-60", Wool, Quick 30]
+  washdata_dishwasher_status:
+    name: WashData dishwasher status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_dishwasher_program:
+    name: WashData dishwasher program
+    options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  # The tumble dryer WashData follows, for the stand-in in dev/ha_washdata.
+  washdata_dryer_status:
+    name: WashData dryer status
+    options: ["off", running, paused, finished, cancelled]
+  washdata_dryer_program:
+    name: WashData dryer program
+    options: [Cotton dry, Easy care, Wool finish]
+  kitchen_oven_status:
+    name: Kitchen oven status
+    options: ["off", running, paused, finished, cancelled]
+  kitchen_oven_program:
+    name: Kitchen oven program
+    options: ["Fan plus 180°", "Top/bottom heat 200°", Grill, "Pizza 220°"]
+  carport_charger_status:
+    name: Carport charger status
+    options: [disconnected, connected, charging, error]
+  robotic_mower_status:
+    name: Robotic mower status
+    options: [parked, mowing, returning, charging, error]
   irrigation_status:
     name: Garden valve status
     options: ["off", watering]
@@ -113,7 +157,58 @@ input_number:
     mode: box
     unit_of_measurement: g
   dishwasher_energy:
-    name: Dishwasher energy
+    name: Kitchen dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  dishwasher_water:
+    name: Kitchen dishwasher water
+    min: 0
+    max: 1000000
+    step: 0.1
+    mode: box
+    unit_of_measurement: L
+  dryer_energy:
+    name: Heat pump dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_washer_energy:
+    name: WashData washing machine energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_dishwasher_energy:
+    name: WashData dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washdata_dryer_energy:
+    name: WashData dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # Counts each charging session from 0.
+  carport_charger_session:
+    name: Carport charger session energy
+    min: 0
+    max: 200
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # The plug of the mower's charging station.
+  robotic_mower_station_energy:
+    name: Robotic mower station energy
     min: 0
     max: 100000
     step: 0.001
@@ -130,6 +225,141 @@ input_number:
     name: Wall Connector energy
     min: 0
     max: 1000000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  # The plugs of the static stand-ins' printers.
+  anycubic_kobra_power:
+    name: Anycubic Kobra S1 power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  p1s_power:
+    name: P1S power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  core_one_power:
+    name: Prusa Core One power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  octoprint_power:
+    name: OctoPrint power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  k1c_power:
+    name: K1C power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  centauri_carbon_power:
+    name: Centauri Carbon power
+    min: 0
+    max: 2000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  # The plugs of the static stand-ins' appliances whose integration brings no meter.
+  miele_coffee_system_energy:
+    name: Miele coffee system energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  miele_oven_energy:
+    name: Miele oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_washer_energy:
+    name: Siemens washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_dishwasher_energy:
+    name: Siemens dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_dryer_energy:
+    name: Siemens dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_coffee_maker_energy:
+    name: Siemens coffee maker energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  siemens_oven_energy:
+    name: Siemens oven energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  bosch_dishwasher_energy:
+    name: Bosch Dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  bosch_washer_energy:
+    name: Bosch washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washtower_washer_energy:
+    name: WashTower washer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_dishwasher_energy:
+    name: LG dishwasher energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  washtower_dryer_energy:
+    name: WashTower dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
+  lg_oven_energy:
+    name: LG oven energy
+    min: 0
+    max: 100000
     step: 0.001
     mode: box
     unit_of_measurement: kWh
@@ -151,13 +381,133 @@ template:
         state_class: measurement
       - name: Washing machine plug energy
         unique_id: washer_plug_energy
-        state: "{{ states('input_number.washer_energy') }}"
+        state: "{{ states('input_number.washdata_washer_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing
       - name: Dishwasher plug energy
         unique_id: dishwasher_plug_energy
-        state: "{{ states('input_number.dishwasher_energy') }}"
+        state: "{{ states('input_number.washdata_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashData dryer plug energy
+        unique_id: washdata_dryer_plug_energy
+        state: "{{ states('input_number.washdata_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Anycubic Kobra S1 plug power
+        unique_id: anycubic_kobra_plug_power
+        state: "{{ states('input_number.anycubic_kobra_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: P1S plug power
+        unique_id: p1s_plug_power
+        state: "{{ states('input_number.p1s_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Prusa Core One plug power
+        unique_id: core_one_plug_power
+        state: "{{ states('input_number.core_one_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: OctoPrint plug power
+        unique_id: octoprint_plug_power
+        state: "{{ states('input_number.octoprint_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: K1C plug power
+        unique_id: k1c_plug_power
+        state: "{{ states('input_number.k1c_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Centauri Carbon plug power
+        unique_id: centauri_carbon_plug_power
+        state: "{{ states('input_number.centauri_carbon_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Miele coffee system plug energy
+        unique_id: miele_coffee_system_plug_energy
+        state: "{{ states('input_number.miele_coffee_system_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Miele oven plug energy
+        unique_id: miele_oven_plug_energy
+        state: "{{ states('input_number.miele_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens washer plug energy
+        unique_id: siemens_washer_plug_energy
+        state: "{{ states('input_number.siemens_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dishwasher plug energy
+        unique_id: siemens_dishwasher_plug_energy
+        state: "{{ states('input_number.siemens_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens dryer plug energy
+        unique_id: siemens_dryer_plug_energy
+        state: "{{ states('input_number.siemens_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens coffee maker plug energy
+        unique_id: siemens_coffee_maker_plug_energy
+        state: "{{ states('input_number.siemens_coffee_maker_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Siemens oven plug energy
+        unique_id: siemens_oven_plug_energy
+        state: "{{ states('input_number.siemens_oven_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch Dishwasher plug energy
+        unique_id: bosch_dishwasher_plug_energy
+        state: "{{ states('input_number.bosch_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: Bosch washer plug energy
+        unique_id: bosch_washer_plug_energy
+        state: "{{ states('input_number.bosch_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashTower washer plug energy
+        unique_id: washtower_washer_plug_energy
+        state: "{{ states('input_number.washtower_washer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG dishwasher plug energy
+        unique_id: lg_dishwasher_plug_energy
+        state: "{{ states('input_number.lg_dishwasher_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: WashTower dryer plug energy
+        unique_id: washtower_dryer_plug_energy
+        state: "{{ states('input_number.washtower_dryer_energy') }}"
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total_increasing
+      - name: LG oven plug energy
+        unique_id: lg_oven_plug_energy
+        state: "{{ states('input_number.lg_oven_energy') }}"
         unit_of_measurement: kWh
         device_class: energy
         state_class: total_increasing

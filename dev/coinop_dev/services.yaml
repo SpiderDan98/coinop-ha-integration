@@ -1,10 +1,11 @@
 load:
   name: Load Scenario
-  description: Replaces everything Coin-op holds by a Scenario of test data.
+  description: >-
+    Replaces everything Coin-op holds by a Scenario of test data: a Preset, or the
+    Pieces picked.
   fields:
-    scenario:
-      name: Scenario
-      required: true
+    preset:
+      name: Preset
       selector:
         select:
           options:
@@ -16,3 +17,74 @@ load:
             - long-history
             - washing-machine
             - irrigation
+    pieces:
+      name: Pieces
+      selector:
+        select:
+          multiple: true
+          options:
+            - prusa
+            - bambu
+            - anycubic.3d_printer
+            - anycubic_cloud.3d_printer
+            - bambu_lab.3d_printer
+            - prusalink.3d_printer
+            - octoprint.3d_printer
+            - ha_creality_ws.3d_printer
+            - elegoo_printer.3d_printer
+            - moonraker.3d_printer
+            - washer
+            - ha_washdata.washing_machine
+            - miele.washing_machine
+            - home_connect.washing_machine
+            - home_connect_alt.washing_machine
+            - lg_thinq.washing_machine
+            - smartthings.washing_machine
+            - dishwasher
+            - ha_washdata.dishwasher
+            - miele.dishwasher
+            - home_connect.dishwasher
+            - homeconnect_ws.dishwasher
+            - lg_thinq.dishwasher
+            - smartthings.dishwasher
+            - dryer
+            - ha_washdata.tumble_dryer
+            - miele.tumble_dryer
+            - home_connect.tumble_dryer
+            - lg_thinq.tumble_dryer
+            - smartthings.tumble_dryer
+            - coffee
+            - miele.coffee_machine
+            - home_connect.coffee_machine
+            - oven
+            - miele.oven
+            - home_connect.oven
+            - lg_thinq.oven
+            - smartthings.oven
+            - charger
+            - tesla_wall_connector.ev_charger
+            - evcc_intg.ev_charger
+            - ocpp.ev_charger
+            - easee.ev_charger
+            - zaptec.ev_charger
+            - goecharger_mqtt.ev_charger
+            - goecharger_api2.ev_charger
+            - wallbox.ev_charger
+            - mower
+            - irrigation
+    history:
+      name: History
+      description: How much history the Devices with history get.
+      default: short
+      selector:
+        select:
+          options:
+            - none
+            - short
+            - long
+    open_run:
+      name: Open Run
+      description: Whether each Device with history gets an open Run, which its helpers end.
+      default: false
+      selector:
+        boolean:

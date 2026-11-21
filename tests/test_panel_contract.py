@@ -27,6 +27,7 @@ from .devices import (
 )
 from .http import HttpClient
 from .images import picture
+from .registry import add_miele
 from .stored import (
     electricity,
     line_item,
@@ -57,7 +58,6 @@ from .test_spoolman import (
     spoolman_down,
 )
 from .test_washer_profiles import walk_pre_filled
-from .washers import add_miele
 from .websocket import PanelClient
 
 DAY = timedelta(days=1)
