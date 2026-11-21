@@ -1,0 +1,122 @@
+{
+  "run": {
+    "id": "bottle",
+    "device_id": "device-soda-maker",
+    "device_name": "Soda maker",
+    "name": null,
+    "job_name": null,
+    "started": "2026-01-15T10:00:00+00:00",
+    "last_seen": "2026-01-15T10:01:00+00:00",
+    "ended": "2026-01-15T10:01:00+00:00",
+    "outcome": "unknown",
+    "end_reconstructed": false,
+    "finalised": true,
+    "pauses": [],
+    "flags": [],
+    "part_count": null,
+    "note": null,
+    "tags": [],
+    "timelines": {
+      "electricity": {
+        "source": {
+          "source": "none"
+        },
+        "cost_source": null,
+        "prices": []
+      }
+    },
+    "average_powers": [
+      [
+        "2026-01-15T10:00:00+00:00",
+        null,
+        null
+      ]
+    ],
+    "usage": null,
+    "loaded_slots": [],
+    "line_items": [
+      {
+        "id": "bottle-co2",
+        "kind": "material",
+        "label": null,
+        "material_id": "co2",
+        "material": {
+          "name": "CO₂",
+          "type": "CO₂",
+          "density": 0.77,
+          "diameter": null,
+          "price_per_gram": 0.02
+        },
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "dose_id": "dose-co2",
+        "dose_source": "default_row",
+        "quantity": 8.0,
+        "unit": "g",
+        "unit_price": 0.02,
+        "amount": 0.16,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      },
+      {
+        "id": "bottle-syrup",
+        "kind": "material",
+        "label": null,
+        "material_id": "syrup",
+        "material": {
+          "name": "Cola syrup",
+          "type": "Cola syrup",
+          "density": 1.3,
+          "diameter": null,
+          "price_per_gram": 0.007692307692307693
+        },
+        "measured": false,
+        "length": null,
+        "slots": [],
+        "share": null,
+        "template_id": null,
+        "basis": null,
+        "dose_id": "dose-syrup",
+        "dose_source": "default_row",
+        "quantity": 40.0,
+        "unit": "ml",
+        "unit_price": 0.01,
+        "amount": 0.4,
+        "method": null,
+        "segments": [],
+        "computed": null,
+        "locked": false,
+        "deletable": true
+      }
+    ],
+    "images": [],
+    "cover_id": null,
+    "program": null,
+    "running_seconds": 60,
+    "total": 0.56,
+    "cost_per_part": null,
+    "cover": null,
+    "uploads": {
+      "limit": 10,
+      "types": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ],
+      "max_bytes": 20971520
+    },
+    "subtotals": {
+      "electricity": 0.0,
+      "water": 0.0,
+      "material": 0.56,
+      "other": 0.0
+    }
+  }
+}
