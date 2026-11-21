@@ -45,4 +45,11 @@ load:
             - lg_thinq.oven
             - smartthings.oven
             - tesla_wall_connector.ev_charger
+            - evcc_intg.ev_charger
+            - ocpp.ev_charger
+            - easee.ev_charger
+            - zaptec.ev_charger
+            - goecharger_mqtt.ev_charger
+            - goecharger_api2.ev_charger
+            - wallbox.ev_charger
             - irrigation

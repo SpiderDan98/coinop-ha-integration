@@ -27,7 +27,7 @@ from custom_components.coinop.device_config import DEVICE_TYPES, stored_capabili
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
-from .stand_ins import Registration, appliances, printers
+from .stand_ins import Registration, appliances, ev_chargers, printers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -960,6 +960,63 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "run it.",
         {"input_select.wall_connector_status": "not_connected"},
         domain="tesla_wall_connector",
+    ),
+    "evcc_intg.ev_charger": StaticPiece(
+        "ev_charger",
+        "evcc ☀️🚘 Solar Charging [evcc] · evcc",
+        "A site with one loadpoint, metered by its session counter, and a vehicle; "
+        "set its charging state to `on` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.evcc_site,
+    ),
+    "ocpp.ev_charger": StaticPiece(
+        "ev_charger",
+        "charger Connector 1 and 2 · OCPP",
+        "A charge point with two connectors, each a Device of its own with its "
+        "energy meter; set a connector's status to `Charging` in the developer "
+        "tools to run it.",
+        {},
+        registration=partial(ev_chargers.charge_point, connectors=2),
+    ),
+    "easee.ev_charger": StaticPiece(
+        "ev_charger",
+        "Garage · Easee",
+        "A charger with its lifetime energy counter; set its status to `charging` "
+        "in the developer tools to run it.",
+        {},
+        registration=ev_chargers.easee,
+    ),
+    "zaptec.ev_charger": StaticPiece(
+        "ev_charger",
+        "Driveway · Zaptec",
+        "A charger in its installation, metered by its session counter; set its "
+        "operation mode to `connected_charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.zaptec,
+    ),
+    "goecharger_mqtt.ev_charger": StaticPiece(
+        "ev_charger",
+        "go-eCharger · go-e Charger MQTT",
+        "A charger with its lifetime energy counter in Wh; set its car state to "
+        "`charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.goe_mqtt,
+    ),
+    "goecharger_api2.ev_charger": StaticPiece(
+        "ev_charger",
+        "go-e Charger · go-e Charger API v2",
+        "A charger with its lifetime energy counter; set its car state to "
+        "`Charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.goe_api2,
+    ),
+    "wallbox.ev_charger": StaticPiece(
+        "ev_charger",
+        "Wallbox Garage · Wallbox",
+        "A charger with its session energy counter; set its status description "
+        "to `Charging` in the developer tools to run it.",
+        {},
+        registration=ev_chargers.wallbox,
     ),
     "irrigation": DeviceWithHistory(
         "other",

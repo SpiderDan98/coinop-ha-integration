@@ -1,0 +1,11 @@
+{
+  "domain": "goecharger_mqtt",
+  "name": "go-e Charger MQTT (Coin-op dev stand-in)",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/SpiderDan98/coinop-ha-integration/blob/main/CONTRIBUTING.md",
+  "iot_class": "calculated",
+  "requirements": [],
+  "version": "0.0.0"
+}
