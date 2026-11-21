@@ -25,9 +25,7 @@ from .const import (
 from .device_config import ConsumptionSource, Target, WaterSource
 from .quantities import ELECTRICITY, WATER
 
-# Finds the entity of a platform whose unique id ends in one of the suffixes, in order.
-# A Device Input must be enabled; `disabled=True` also finds a disabled entity, which
-# still tells a kind check that the integration registered it.
+# `disabled=True` also finds a disabled entity: a kind check reads what is registered.
 Find = Callable[..., str | None]
 
 
@@ -299,9 +297,7 @@ def _miele_kind(
     return MIELE_KINDS.get(device.model or "", NoDeviceType.NOT_A_DEVICE)
 
 
-# Event sensors `home_connect` registers for an appliance's type alone (`EVENT_SENSORS`
-# in its sensor.py), by unique id suffix; the first one found tells the kind. Each
-# is registered since Home Assistant 2026.5, the minimum.
+# From `EVENT_SENSORS` in its sensor.py as Home Assistant 2026.5, the minimum, has them.
 HOME_CONNECT_KINDS: dict[str, str | NoDeviceType] = {
     "-LaundryCare.Washer.Event.IDos1FillLevelPoor": DEVICE_TYPE_WASHING_MACHINE,
     "-LaundryCare.Dryer.Event.DryingProcessFinished": DEVICE_TYPE_TUMBLE_DRYER,

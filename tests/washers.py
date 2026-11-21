@@ -132,9 +132,7 @@ _STATUS = ("state_status",)
 _PROGRAM = (*_STATUS, "state_program_id", "state_program_phase")
 _ENERGY = (*_PROGRAM, "current_energy_consumption")
 _WATER = (*_ENERGY, "current_water_consumption")
-# The sensors it registers for an appliance, by the model it gives the HA device: the
-# appliance type's tag (`DEVICE_TYPE_TAGS` in its const.py), capitalised, and the
-# `types` of each sensor description in its sensor.py.
+# By the HA device's model (`DEVICE_TYPE_TAGS` in its const.py), its sensors' `types`.
 MIELE_MODELS = {
     "Washing machine": _WATER,
     "Washer dryer": _WATER,
@@ -198,8 +196,7 @@ def add_miele(
     return washer
 
 
-# The API's appliance types HA core `home_connect` fetches programs for
-# (`APPLIANCES_WITH_PROGRAMS` in its const.py).
+# `APPLIANCES_WITH_PROGRAMS` in HA core `home_connect`'s const.py.
 HOME_CONNECT_WITH_PROGRAMS = (
     "AirConditioner",
     "CleaningRobot",
@@ -213,9 +210,7 @@ HOME_CONNECT_WITH_PROGRAMS = (
     "Washer",
     "WasherDryer",
 )
-# What it registers for an appliance type alone, whatever the appliance reports
-# (`EVENT_SENSORS` and `BSH_PROGRAM_SENSORS` in its sensor.py): by BSH key, the
-# translation key and the types. A coffee maker has 17 more event sensors.
+# `EVENT_SENSORS` in its sensor.py, without 17 more of a coffee maker.
 HOME_CONNECT_EVENT_SENSORS = {
     "BSH.Common.Event.ProgramAborted": (
         "program_aborted",
@@ -341,6 +336,7 @@ HOME_CONNECT_EVENT_SENSORS = {
         ("Hood",),
     ),
 }
+# `BSH_PROGRAM_SENSORS` in its sensor.py.
 HOME_CONNECT_PROGRAM_SENSORS = {
     "BSH.Common.Option.RemainingProgramTime": (
         "program_finish_time",
@@ -361,8 +357,7 @@ HOME_CONNECT_PROGRAM_SENSORS = {
         HOME_CONNECT_WITH_PROGRAMS,
     ),
 }
-# The event sensors Home Assistant 2026.5, Coin-op's minimum, registers for fewer
-# types: it knows no `Hob` and lacks the favorite buttons and most dishwasher events.
+# The types Home Assistant 2026.5, Coin-op's minimum, registers fewer event sensors for.
 HOME_CONNECT_MINIMUM_HA: dict[str, tuple[str, ...]] = {
     "BSH.Common.Event.AlarmClockElapsed": ("Oven", "Cooktop"),
     "BSH.Common.Event.Favorite.001.ExternalTrigger": (),
