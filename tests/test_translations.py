@@ -92,20 +92,29 @@ async def test_add_device_texts_load_in_home_assistant(
     )
 
 
-# The steps only a 3D printer has; every other step is shared between Device Types.
-PRINTER_STEPS = {"job", "material_unit", "estimate"}
+# Still worded for a 3D printer, though an Other Device without a Program sees it
+# too; every other step is shared between Device Types and held to the rule.
+PRINTER_STEPS = {"estimate"}
 
 
 @pytest.mark.parametrize(
-    ("language", "words"),
+    ("language", "words", "device_inputs"),
     [
-        ("en", ("print", "wash", "laundry", "load", "machine")),
-        ("de", ("druck", "wasch", "wäsche", "maschine")),
+        # "Loaded slot" names a Device Input of the job step, not a load of laundry.
+        ("en", ("print", "wash", "laundry", "load", "machine"), ("loaded slot",)),
+        ("de", ("druck", "wasch", "wäsche", "maschine"), ()),
     ],
 )
 def test_steps_shared_between_device_types_speak_of_none_of_them(
-    language: str, words: tuple[str, ...]
+    language: str, words: tuple[str, ...], device_inputs: tuple[str, ...]
 ) -> None:
+    def plain(text: str) -> str:
+        """`text` in lower case, without the Device Inputs' names."""
+        lowered = text.lower()
+        for name in device_inputs:
+            lowered = lowered.replace(name, "")
+        return lowered
+
     def texts(tree: dict[str, Any]) -> list[str]:
         return [
             text
@@ -121,9 +130,7 @@ def test_steps_shared_between_device_types_speak_of_none_of_them(
         for text in texts(step)
     ]
 
-    assert [
-        text for text in shared if any(word in text.lower() for word in words)
-    ] == []
+    assert [text for text in shared if any(word in plain(text) for word in words)] == []
 
 
 @pytest.mark.parametrize(
