@@ -78,6 +78,7 @@
           "data": {
             "type_name": "Type Name",
             "program": "Program",
+            "doses": "Doses",
             "water": "Water",
             "images": "Images",
             "part_count": "Part Count",
@@ -86,6 +87,7 @@
           "data_description": {
             "type_name": "What kind of Device it is, such as “Kiln” or “Pool pump”: the heading the panel lists it under. Devices with the same Type Name share a heading.",
             "program": "It reports which program it runs: a Run records its Program and is named after it. Its electricity can then come per Program, from the kWh in the Program Defaults, which replaces the estimate from average power.",
+            "doses": "Products it uses up in a Run, such as a soda maker's CO₂ or a bread maker's flour: you list them as Doses on its card in the panel's Devices tab, each with its amount per Run, or per Program if it has one. Each Dose a Run uses becomes a Material Line Item.",
             "water": "A water source (a water meter or a flow sensor) and a water price: each Run gets a Water Line Item for the water it used.",
             "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
             "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",

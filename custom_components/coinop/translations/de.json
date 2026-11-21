@@ -78,6 +78,7 @@
           "data": {
             "type_name": "Typbezeichnung",
             "program": "Programm",
+            "doses": "Dosierungen",
             "water": "Wasser",
             "images": "Bilder",
             "part_count": "Teileanzahl",
@@ -86,6 +87,7 @@
           "data_description": {
             "type_name": "Was für ein Gerät es ist, etwa „Brennofen“ oder „Poolpumpe“: die Überschrift, unter der das Panel es aufführt. Geräte mit derselben Typbezeichnung teilen sich eine Überschrift.",
             "program": "Es meldet, welches Programm es ausführt: Ein Lauf speichert sein Programm und wird danach benannt. Sein Strom kann dann je Programm kommen, aus den kWh in den Programmvorgaben; das ersetzt die Schätzung aus der Durchschnittsleistung.",
+            "doses": "Produkte, die es in einem Lauf verbraucht, etwa das CO₂ eines Wassersprudlers oder das Mehl eines Brotbackautomaten: Du trägst sie auf seiner Karte im Geräte-Tab des Panels als Dosierungen ein, jede mit ihrer Menge pro Lauf, oder pro Programm, wenn es eines hat. Jede Dosierung, die ein Lauf verwendet, wird zu einem Material-Posten.",
             "water": "Eine Wasserquelle (Wasserzähler oder Durchflusssensor) und ein Wasserpreis: Jeder Lauf bekommt einen Wasser-Posten für das Wasser, das er verbraucht hat.",
             "images": "Seine Läufe bekommen ein Vorschaubild aus einer Bild-Entität und an ihrem Ende ein Kamerabild, damit du siehst, was ein Lauf hergestellt hat.",
             "part_count": "Seine Läufe bekommen eine Teileanzahl, die Zahl der brauchbaren Teile eines Laufs, und damit die Kosten pro Teil, sodass eine Charge pro Stück gerechnet wird.",

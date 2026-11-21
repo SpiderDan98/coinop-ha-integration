@@ -335,8 +335,9 @@ async def add_other_device(
     `program` is the Program step's input (no Program input without it). `source` is
     "estimate" (from `running_power`), "energy" or "power" (read from `meter`),
     "per_program" or "none", which takes no price. With the choice "water", `water`
-    is its source: "meter" or "flow" (read from `water_meter`) or "none"; a fixed
-    `water_price` is per m³. It fails on any step beyond those the choices bring.
+    is its source: "meter" or "flow" (read from `water_meter`), "per_program" or
+    "none"; a fixed `water_price` is per m³. The choice "doses" brings no step. It
+    fails on any step beyond those the choices bring.
     """
     has = list(has)
     result = await walk_to_mapping(
