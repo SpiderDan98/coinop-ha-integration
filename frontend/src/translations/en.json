@@ -122,6 +122,7 @@
   "device_type.oven": "Ovens",
   "device_type.ev_charger": "EV chargers",
   "device_type.robotic_mower": "Robotic mowers",
+  "device_type.other": "Other",
   "device.none": "None",
   "device.edit": "Edit settings of {device}",
   "device.settings_title": "Settings of {device}",

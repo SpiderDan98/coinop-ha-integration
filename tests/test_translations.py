@@ -11,8 +11,8 @@ import pytest
 from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
-from .devices import add_device, add_hub
-from .test_device_flow import offered
+from .devices import add_device, add_hub, configure
+from .test_device_flow import fields, offered
 
 TRANSLATIONS = Path(__file__).parents[1] / "custom_components" / DOMAIN / "translations"
 STATEMENT = TRANSLATIONS.parent / "statement" / "strings"
@@ -161,6 +161,39 @@ async def test_every_device_type_add_device_offers_is_named(
 
     assert list(named) == offered(result, "device_type")
     assert all(named.values())
+
+
+@pytest.mark.parametrize(
+    ("language", "other", "type_name", "unseen"),
+    [
+        ("en", "Other", "Type Name", "capabilit"),
+        ("de", "Sonstiges", "Typbezeichnung", "fähigkeit"),
+    ],
+)
+async def test_what_an_other_device_can_have_is_named_and_explained(
+    hass: HomeAssistant, language: str, other: str, type_name: str, unseen: str
+) -> None:
+    entry = await add_hub(hass)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": "user"}
+    )
+    result = await configure(hass, result, {"device_type": "other"})
+
+    texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])
+    names = await async_get_translations(hass, language, "selector", [DOMAIN])
+
+    assert names[f"component.{DOMAIN}.selector.device_type.options.other"] == other
+    prefix = f"component.{DOMAIN}.config_subentries.device"
+    step = f"{prefix}.step.{result['step_id']}"
+    assert texts[f"{step}.title"]
+    assert texts[f"{step}.description"]
+    assert texts[f"{step}.data.type_name"] == type_name
+    for field in fields(result):
+        assert texts[f"{step}.data.{field}"], field
+        assert texts[f"{step}.data_description.{field}"], field
+    assert texts[f"{prefix}.error.type_name_required"]
+    shown = [text for key, text in texts.items() if key.startswith(step)]
+    assert [text for text in shown if unseen in text.lower()] == []
 
 
 async def test_entities_are_named_in_the_configured_language(

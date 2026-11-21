@@ -27,13 +27,17 @@ from homeassistant.helpers.translation import async_get_translations
 
 from .const import DOMAIN, SUBENTRY_DEVICE
 from .device_config import (
-    CAPABILITIES,
+    CHOICES,
+    DEVICE_TYPES,
     ENDING_TARGETS,
     NO_SOURCE,
     Capability,
     ConsumptionSource,
     Target,
     WaterSource,
+    capabilities_of,
+    chosen_capabilities,
+    picks_capabilities,
 )
 from .device_inputs import (
     entity_unit,
@@ -72,7 +76,7 @@ UNUSED: dict[str, dict[str, Any]] = {
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
 }
-# The sections only a Device Type with the Capability has.
+# The sections only a Device with the Capability has.
 NEEDS = {
     "job": Capability.JOB,
     "images": Capability.IMAGES,
@@ -140,10 +144,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._candidate: Candidate | None = None
 
     def _capabilities(self) -> frozenset[Capability]:
-        return CAPABILITIES[self._data["device_type"]]
+        return capabilities_of(self._data)
 
     def _sections(self) -> dict[str, Callable[[], Awaitable[SubentryFlowResult]]]:
-        """Each section's first step, in Add Device order, as the Device Type has them."""
+        """Each section's first step, in Add Device order, as the Device has them."""
         sections = {
             "status": self.async_step_status,
             "job": self.async_step_job,
@@ -161,7 +165,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         return self._fitting(sections)
 
     def _fitting[T](self, sections: Mapping[str, T]) -> dict[str, T]:
-        """Those of the sections the Device Type has: a profile also finds a washing
+        """Those of the sections the Device has: a profile also finds a washing
         machine's water meter for a Device added as a tumble dryer."""
         capabilities = self._capabilities()
         return {
@@ -227,6 +231,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         where it has a device to offer."""
         if user_input is not None:
             self._data["device_type"] = user_input["device_type"]
+            if picks_capabilities(self._data["device_type"]):
+                return await self.async_step_other()
             return await self.async_step_device()
         if self._quick_start_devices():
             return await self.async_step_quick_start()
@@ -234,7 +240,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     def _device_type_form(self) -> SubentryFlowResult:
         return self.async_show_form(
-            step_id="user", data_schema=self._device_type_schema(list(CAPABILITIES))
+            step_id="user", data_schema=self._device_type_schema(list(DEVICE_TYPES))
         )
 
     @staticmethod
@@ -249,6 +255,50 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                     )
                 )
             }
+        )
+
+    async def async_step_other(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """What a shipped Device Type answers by itself: the Type Name the Device is
+        listed under and what it has."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if type_name := user_input["type_name"].strip():
+                self._data["type_name"] = type_name
+                self._data["capabilities"] = sorted(
+                    capability.value
+                    for capability in chosen_capabilities(
+                        choice for choice in CHOICES if user_input[choice]
+                    )
+                )
+                return await self.async_step_device()
+            errors["type_name"] = "type_name_required"
+        known = list(
+            dict.fromkeys(
+                type_name
+                for subentry in self._get_entry().subentries.values()
+                if (type_name := subentry.data.get("type_name"))
+            )
+        )
+        schema = vol.Schema(
+            {
+                # A picker without anything to pick would only hide the text field.
+                vol.Required("type_name"): SelectSelector(
+                    SelectSelectorConfig(options=known, custom_value=True)
+                )
+                if known
+                else TextSelector(),
+                **{
+                    vol.Optional(choice, default=False): BooleanSelector()
+                    for choice in CHOICES
+                },
+            }
+        )
+        return self.async_show_form(
+            step_id="other",
+            data_schema=self.add_suggested_values_to_schema(schema, user_input),
+            errors=errors,
         )
 
     def _quick_start_devices(self) -> dict[str, Candidate]:
@@ -319,7 +369,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         """The Device Type of a device whose kind its integration doesn't tell, among
         those the integration serves; a device whose kind is told isn't asked."""
         candidate = self._picked()
-        device_types = [t for t in CAPABILITIES if t in candidate.device_types]
+        device_types = [t for t in DEVICE_TYPES if t in candidate.device_types]
         if user_input is None and len(device_types) > 1:
             return self.async_show_form(
                 step_id="quick_start_device_type",

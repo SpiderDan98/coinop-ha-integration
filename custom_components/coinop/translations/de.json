@@ -72,6 +72,18 @@
             "water_price": "Was du pro m³ zahlst, in {currency}, einschließlich Abwasser. Das Wasser kommt vom Zähler des Geräts, wenn es einen hat, sonst je Programm aus den Programmvorgaben. Leer lassen, um kein Wasser zu erfassen."
           }
         },
+        "other": {
+          "title": "Typbezeichnung & was das Gerät hat",
+          "description": "Für dieses Gerät bringt Coin-op keinen Gerätetyp mit, also beschreibst du es selbst. Gib ihm eine Typbezeichnung und schalte ein, was es hat. Ist nichts eingeschaltet, erfasst ein Lauf seine Laufzeit und seinen Strom.",
+          "data": {
+            "type_name": "Typbezeichnung",
+            "per_run_meters": "Zähler zählen jeden Lauf ab 0"
+          },
+          "data_description": {
+            "type_name": "Was für ein Gerät es ist, etwa „Brennofen“ oder „Poolpumpe“: die Überschrift, unter der das Panel es aufführt. Geräte mit derselben Typbezeichnung teilen sich eine Überschrift.",
+            "per_run_meters": "Seine Zähler beginnen mit jedem Lauf neu, wie ein Sitzungs- oder Zykluszähler. Steht ein Zähler wieder bei 0, gibt es dann keinen Hinweis auf einen zurückgesetzten Zähler."
+          }
+        },
         "device": {
           "title": "Home-Assistant-Gerät",
           "description": "Wähle das Home-Assistant-Gerät des Geräts, um seinen Namen zu übernehmen, oder lass das Feld leer. Bei einer Integration, die Coin-op für diesen Gerätetyp kennt ({integrations}), sind die nächsten Schritte aus ihren Entitäten vorausgefüllt; prüfe und ändere sie nach Belieben.",
@@ -395,6 +407,7 @@
         }
       },
       "error": {
+        "type_name_required": "Gib eine Typbezeichnung ein.",
         "no_running_value": "Ordne mindestens einen Wert „Läuft“ zu, sonst beginnen Läufe nie.",
         "no_ending_value": "Ordne mindestens einen Wert „Fertig“, „Abgebrochen“ oder „Beendet“ zu, sonst enden Läufe nie.",
         "value_mapped_twice": "Jeder Wert kann nur einem Ziel zugeordnet werden.",
@@ -538,7 +551,8 @@
         "coffee_machine": "Kaffeemaschine",
         "oven": "Backofen",
         "ev_charger": "Wallbox",
-        "robotic_mower": "Mähroboter"
+        "robotic_mower": "Mähroboter",
+        "other": "Sonstiges"
       }
     }
   }

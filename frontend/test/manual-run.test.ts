@@ -158,6 +158,7 @@ describe("A manual Run", () => {
   it.each([
     ["an EV charger", recorded.wallbox],
     ["a robotic mower", recorded.mower],
+    ["an Other Device that has nothing", recorded.others[0]],
   ])("asks %s for no Program", async (_, device) => {
     const backend = creating().reply("coinop/devices/list", () => ({ devices: [device] }));
     const panel = await mountPanel(backend, RUNS);

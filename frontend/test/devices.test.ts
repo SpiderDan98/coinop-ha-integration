@@ -371,6 +371,76 @@ describe("Devices tab", () => {
     },
   );
 
+  it.each(["en", "de"] as const)(
+    "lists Other Devices under their Type Name, one heading for each (%s)",
+    async (language) => {
+      const backend = recordedBackend({ language }).reply(LIST, () => ({
+        devices: [recorded.wallbox, ...recorded.others, recorded.mower],
+      }));
+
+      const panel = await mountPanel(backend, { path: "/devices" });
+
+      expect(
+        queryAll(panel, ".device-type").map((section) => [
+          text(query(section, "h2")),
+          ...queryAll(section, ".device h3").map(text),
+        ]),
+      ).toEqual([
+        [language === "en" ? "EV chargers" : "Wallboxen", "Wallbox"],
+        ["Kiln", "Kiln"],
+        ["Pump", "Pool pump", "Pond pump"],
+        [language === "en" ? "Robotic mowers" : "Mähroboter", "Mower"],
+      ]);
+    },
+  );
+
+  it("keeps a Type Name that reads like a Device Type's heading a group of its own", async () => {
+    const [kiln, pump] = recorded.others;
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [
+        recorded.mower,
+        { ...kiln, type_name: "Robotic mowers" },
+        { ...pump, type_name: "other" },
+        { ...recorded.mower, id: "device-second-mower", name: "Second mower" },
+      ],
+    }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(
+      queryAll(panel, ".device-type").map((section) => [
+        text(query(section, "h2")),
+        ...queryAll(section, ".device h3").map(text),
+      ]),
+    ).toEqual([
+      ["Robotic mowers", "Mower", "Second mower"],
+      ["Robotic mowers", "Kiln"],
+      ["other", "Pool pump"],
+    ]);
+  });
+
+  it("shows an Other Device that has nothing with what every Device has", async () => {
+    const [kiln] = recorded.others;
+    const backend = recordedBackend().reply(LIST, () => ({ devices: [kiln] }));
+
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    expect(cards(panel)).toEqual([
+      "Kiln " +
+        "Status sensor.kiln_status " +
+        "Consumption source Estimate from average power 2,000 W running " +
+        "Electricity price €0.30 per kWh " +
+        "Reconfigure in Home Assistant " +
+        "Tags for new Runs None " +
+        "Automatic templates None",
+    ]);
+    await click(panel, iconButton(panel, "Edit settings of Kiln"));
+    expect(queryAll(panel, ".settings-dialog .field .label").map(text)).toEqual([
+      "Tags for new Runs",
+      "Automatic templates",
+    ]);
+  });
+
   it("shows a dishwasher with a washing machine's parts", async () => {
     const backend = recordedBackend()
       .reply(LIST, () => ({ devices: [recorded.dishwasher] }))

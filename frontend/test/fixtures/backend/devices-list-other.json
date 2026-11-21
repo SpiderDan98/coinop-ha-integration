@@ -1,0 +1,163 @@
+{
+  "devices": [
+    {
+      "id": "device-kiln",
+      "name": "Kiln",
+      "type": "other",
+      "type_name": "Kiln",
+      "capabilities": [
+        "average_power"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.kiln_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "on"
+          ],
+          "paused": [],
+          "finished": [],
+          "cancelled": [],
+          "ended": [
+            "off"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "consumption": {
+          "source": "estimate",
+          "running_power": 2000.0,
+          "paused_power": null
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    },
+    {
+      "id": "device-pool-pump",
+      "name": "Pool pump",
+      "type": "other",
+      "type_name": "Pump",
+      "capabilities": [
+        "average_power",
+        "per_run_meters"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.pool_pump_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "on"
+          ],
+          "paused": [],
+          "finished": [],
+          "cancelled": [],
+          "ended": [
+            "off"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "consumption": {
+          "source": "energy",
+          "entity_id": "sensor.pool_pump_cycle_energy",
+          "attribute": null,
+          "unit": "kWh",
+          "factor": null
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    },
+    {
+      "id": "device-pond-pump",
+      "name": "Pond pump",
+      "type": "other",
+      "type_name": "Pump",
+      "capabilities": [
+        "average_power",
+        "per_run_meters"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.pond_pump_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "on"
+          ],
+          "paused": [],
+          "finished": [],
+          "cancelled": [],
+          "ended": [
+            "off"
+          ],
+          "fault": [],
+          "ignored": []
+        },
+        "consumption": {
+          "source": "energy",
+          "entity_id": "sensor.pool_pump_cycle_energy",
+          "attribute": null,
+          "unit": "kWh",
+          "factor": null
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    }
+  ]
+}

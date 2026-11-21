@@ -9,7 +9,11 @@ from typing import Any
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
 
-from custom_components.coinop.device_config import Capability, DeviceConfig
+from custom_components.coinop.device_config import (
+    TYPE_KEYS,
+    Capability,
+    DeviceConfig,
+)
 from custom_components.coinop.device_inputs import offered_values
 from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
@@ -68,11 +72,16 @@ def _list(
                     "id": device.device_id,
                     "name": device.name,
                     "type": device.device_type,
+                    **(
+                        {"type_name": device.type_name}
+                        if device.type_name is not None
+                        else {}
+                    ),
                     "capabilities": sorted(device.capabilities),
                     "ha_settings": {
                         key: value
                         for key, value in device.flow_data.items()
-                        if key != "device_type"
+                        if key not in TYPE_KEYS
                     },
                     "settings": coinop.settings.get(device.device_id),
                     "known_programs": _known_programs(hass, coinop, device),
