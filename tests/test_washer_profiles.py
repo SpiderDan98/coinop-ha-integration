@@ -22,7 +22,7 @@ from .test_device_flow import suggested
 from .test_integration_profiles import accepted
 from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
-from .washers import Washer, add_home_connect, add_miele, add_washdata
+from .washers import Appliance, add_home_connect, add_miele, add_washdata
 from .websocket import PanelClient
 
 # What WashData's program sensor reports while no program is recognised.
@@ -49,7 +49,7 @@ ANSWERS = {
 async def walk_pre_filled(
     hass: HomeAssistant,
     entry: ConfigEntry,
-    washer: Washer,
+    washer: Appliance,
     device_type: str = "washing_machine",
     **answers: Any,
 ) -> tuple[list[str], ConfigSubentry]:

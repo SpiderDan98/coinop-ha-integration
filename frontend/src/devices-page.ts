@@ -394,11 +394,11 @@ export class DevicesPage extends LitElement {
     const change = (changes: Partial<Device["settings"]>) =>
       (this.editing = { device, draft: { ...draft, ...changes } });
     const dosed = device.capabilities.includes("doses");
-    const tabled = dosed || device.capabilities.includes("program");
+    const withProgramDefaults = dosed || device.capabilities.includes("program");
     return formDialog({
       t,
       title: t("device.settings_title", { device: device.name }),
-      name: `settings-dialog ${tabled ? "wide" : ""}`,
+      name: `settings-dialog ${withProgramDefaults ? "wide" : ""}`,
       busy: this.saving,
       error: this.failed && t("run.save_failed"),
       onCancel: () => this.close(),
@@ -421,7 +421,7 @@ export class DevicesPage extends LitElement {
           { name: "new-run-tags", group: true, hint: t("device.tags_hint") },
         )}
         ${dosed ? this.renderDoses(draft, change, t) : nothing}
-        ${tabled ? this.renderProgramDefaults(device, draft, change, t) : nothing}
+        ${withProgramDefaults ? this.renderProgramDefaults(device, draft, change, t) : nothing}
         ${this.renderAutomatic(
           draft.automatic_templates,
           (ids) => change({ automatic_templates: ids }),
