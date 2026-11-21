@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Coin-op records what each Run of your Devices costs, such as each print of a 3D printer or each load of a washing machine. After setup, add each of them as a Device."
+        "description": "Coin-op records what each Run of your Devices costs, for 3D printers, washing machines and other household appliances. After setup, add each of them as a Device."
       }
     },
     "abort": {
@@ -68,6 +68,16 @@
         "device": {
           "title": "Home Assistant device",
           "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. For an integration Coin-op knows for this Device Type ({integrations}), the next steps come pre-filled from its entities; check and change them as you like.",
+          "data": {
+            "device": "The Device's Home Assistant device (optional)"
+          },
+          "data_description": {
+            "device": "Coin-op's own device for this Device is linked to it. Entity pickers in the next steps still offer every entity."
+          }
+        },
+        "device_without_profile": {
+          "title": "Home Assistant device",
+          "description": "Pick the Device's Home Assistant device to take over its name, or leave it empty. Coin-op knows no integration for this Device Type yet, so you pick the entities in the next steps yourself.",
           "data": {
             "device": "The Device's Home Assistant device (optional)"
           },
@@ -153,7 +163,7 @@
         },
         "program": {
           "title": "Program",
-          "description": "Optionally pick the entity that reports which program the machine runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
+          "description": "Optionally pick the entity that reports which program the Device runs. A Run records its Program and is named after it until you rename it. The Program follows the input while the Run is open, so a late or corrected recognition is picked up; a change of Program never ends the Run.",
           "data": {
             "entity_id": "Program entity (optional)",
             "attribute": "Attribute (optional)",
@@ -288,7 +298,7 @@
         },
         "water_meter": {
           "title": "Water meter",
-          "description": "Pick the entity that counts the Device's water, e.g. the machine's water consumption sensor or a water meter on its supply. It does not need to be available now.",
+          "description": "Pick the entity that counts the Device's water, e.g. its own water consumption sensor or a water meter on its supply. It does not need to be available now.",
           "data": {
             "entity_id": "Water entity",
             "attribute": "Attribute (optional)",
@@ -336,7 +346,7 @@
         },
         "water_price": {
           "title": "Water price",
-          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so the cost per load is realistic.",
+          "description": "Do you pay a fixed price per m³, or does an entity report the current price? Include the wastewater charge, so a Run's water cost is realistic.",
           "menu_options": {
             "water_fixed_price": "Fixed price",
             "water_price_entity": "Price entity"
@@ -514,7 +524,8 @@
     "device_type": {
       "options": {
         "3d_printer": "3D printer",
-        "washing_machine": "Washing machine"
+        "washing_machine": "Washing machine",
+        "dishwasher": "Dishwasher"
       }
     }
   }

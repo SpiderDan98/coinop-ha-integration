@@ -8,8 +8,6 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from custom_components.coinop.device_config import CAPABILITIES
-
 from .anycubic import add_anycubic_local
 from .clock import Clock
 from .devices import (
@@ -356,9 +354,8 @@ async def test_the_ha_device_step_names_the_integrations_known_for_the_device_ty
 
 
 async def test_a_device_type_no_integration_serves_names_none_and_pre_fills_nothing(
-    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+    hass: HomeAssistant,
 ) -> None:
-    monkeypatch.setitem(CAPABILITIES, "kiln", frozenset())
     washer = add_miele(hass)
     entry = await add_hub(hass)
     result = await hass.config_entries.subentries.async_init(
@@ -366,12 +363,13 @@ async def test_a_device_type_no_integration_serves_names_none_and_pre_fills_noth
     )
     result = await configure(hass, result, {"device": "manual"})
 
-    result = await configure(hass, result, {"device_type": "kiln"})
+    result = await configure(hass, result, {"device_type": "dishwasher"})
 
-    assert result["step_id"] == "device"
-    assert result["description_placeholders"] == {"integrations": ""}
+    assert result["step_id"] == "device_without_profile"
+    assert not result["description_placeholders"]
     result = await configure(hass, result, {"device": washer.device.id})
-    result = await configure(hass, result, {"name": "Kiln"})
+    assert result["step_id"] == "name"
+    result = await configure(hass, result, {"name": "Dishwasher"})
     assert result["step_id"] == "status"
     assert suggested(result, "entity_id") is None
 

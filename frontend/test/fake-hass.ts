@@ -25,6 +25,7 @@ import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
+import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
@@ -126,6 +127,9 @@ export const recorded = {
   devices: devicesList.devices as Device[],
   /** `coinop/devices/list` with only "device-washer", a washing machine on an energy meter. */
   washer: devicesListWashingMachine.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
+   * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
+  dishwasher: devicesListDishwasher.devices[0] as Device,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,

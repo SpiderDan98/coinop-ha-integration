@@ -455,13 +455,17 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             self._data["printer_device_id"] = user_input.get("device")
             self._data |= self._detected() or {}
             return await self.async_step_name()
+        integrations = known_integrations(self._data["device_type"])
         return self.async_show_form(
-            step_id="device",
+            # A step has one text, so the one that names no integration is its own.
+            step_id="device" if integrations else "device_without_profile",
             data_schema=vol.Schema({vol.Optional("device"): DeviceSelector()}),
-            description_placeholders={
-                "integrations": known_integrations(self._data["device_type"])
-            },
+            description_placeholders=(
+                {"integrations": integrations} if integrations else None
+            ),
         )
+
+    async_step_device_without_profile = async_step_device
 
     async def async_step_name(
         self, user_input: dict[str, Any] | None = None

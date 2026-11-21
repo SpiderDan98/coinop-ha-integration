@@ -7,7 +7,11 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
 
-from .const import DEVICE_TYPE_3D_PRINTER, DEVICE_TYPE_WASHING_MACHINE
+from .const import (
+    DEVICE_TYPE_3D_PRINTER,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_WASHING_MACHINE,
+)
 
 
 class Target(StrEnum):
@@ -61,6 +65,7 @@ class Capability(StrEnum):
     PER_RUN_METERS = "per_run_meters"
 
 
+# Every Device Type, in the order Add Device lists them.
 CAPABILITIES = {
     DEVICE_TYPE_3D_PRINTER: frozenset(
         {
@@ -72,6 +77,15 @@ CAPABILITIES = {
         }
     ),
     DEVICE_TYPE_WASHING_MACHINE: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.WATER,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_DISHWASHER: frozenset(
         {
             Capability.PROGRAM,
             Capability.DOSES,

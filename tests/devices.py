@@ -75,7 +75,9 @@ async def start_add_device(
         result = await configure(hass, result, {"device": "manual"})
     assert result["step_id"] == "user"
     result = await configure(hass, result, {"device_type": device_type})
-    assert result["step_id"] == "device", result.get("errors")
+    assert result["step_id"] in ("device", "device_without_profile"), result.get(
+        "errors"
+    )
     result = await configure(
         hass, result, {} if printer is None else {"device": printer}
     )
@@ -231,9 +233,11 @@ async def add_washing_machine(
     water: str = "none",
     water_meter: dict[str, Any] | None = None,
     water_price: float | dict[str, Any] = 4.0,
+    device_type: str = "washing_machine",
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
-    energy meter, no Program input and no water source.
+    energy meter, no Program input and no water source. `device_type` walks it for
+    another Device Type with the washing machine's steps.
 
     `source` "per_program" takes no `meter`. `water` is "meter" (on `WASHER_WATER`
     unless `water_meter` gives the input), "flow", "per_program" or "none"; a fixed
@@ -245,7 +249,7 @@ async def add_washing_machine(
         name=name,
         printer=device,
         status=status,
-        device_type="washing_machine",
+        device_type=device_type,
     )
     result = await configure(hass, result, mapping)
     assert result["step_id"] == "program", result.get("errors")

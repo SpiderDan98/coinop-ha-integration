@@ -115,6 +115,7 @@
   "device.reconfigure": "In Home Assistant neu konfigurieren",
   "device_type.3d_printer": "3D-Drucker",
   "device_type.washing_machine": "Waschmaschinen",
+  "device_type.dishwasher": "Spülmaschinen",
   "device.none": "Keine",
   "device.edit": "Einstellungen von {device} bearbeiten",
   "device.settings_title": "Einstellungen von {device}",
