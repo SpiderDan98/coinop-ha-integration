@@ -422,7 +422,7 @@ async def test_the_charger_counts_each_charge_from_0_and_pauses_while_the_car_is
 
 
 # What ends each Device with history's open Run, set as its integration would.
-ENDS = {
+ENDS: dict[str, dict[str, str | float]] = {
     "prusa": {"input_select.prusa_status": "finished"},
     "bambu": {"input_select.bambu_status": "finished"},
     "washer": {"input_select.washer_status": "finished"},
