@@ -1,7 +1,7 @@
 {
   "domain": "ha_washdata",
   "name": "WashData (Coin-op dev stand-in)",
-  "after_dependencies": ["input_select"],
+  "after_dependencies": ["input_select", "coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

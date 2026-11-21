@@ -1,7 +1,7 @@
 {
   "domain": "tesla_wall_connector",
   "name": "Tesla Wall Connector (Coin-op dev stand-in)",
-  "after_dependencies": ["input_number", "input_select"],
+  "after_dependencies": ["input_number", "input_select", "coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],

@@ -1,6 +1,7 @@
 {
   "domain": "zaptec",
   "name": "Zaptec (Coin-op dev stand-in)",
+  "after_dependencies": ["coinop"],
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],
