@@ -21,6 +21,11 @@ const DIALOGS: [name: string, path: string, open: (panel: Element) => HTMLElemen
   ["a new Material Line Item", "/run/benchy", (panel) => query(panel, "ha-button.add-material")],
   ["a new Other Line Item", "/run/benchy", (panel) => query(panel, "ha-button.add-other")],
   ["a Line Item from a template", "/run/benchy", (panel) => query(panel, ".add-template")],
+  [
+    "a new Electricity Line Item",
+    "/run/unpowered",
+    (panel) => query(panel, "ha-button.add-electricity"),
+  ],
   ["a Device's settings", "/devices", (panel) => iconButton(panel, "Edit settings of Kobra")],
   ["a new Material", "/materials", (panel) => query(panel, "ha-button.new-material")],
   ["a Material", "/materials", (panel) => query(panel, ".material ha-icon-button.edit")],
