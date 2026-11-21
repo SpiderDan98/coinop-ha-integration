@@ -638,7 +638,8 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
     [
         (
             "3d_printer",
-            "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab",
+            "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab, "
+            "PrusaLink",
         ),
         (
             "washing_machine",
