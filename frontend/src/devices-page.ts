@@ -46,26 +46,27 @@ const consumptionDetails = (
 ) => {
   const running = (power: number | null) =>
     power !== null && t("consumption.running", { power: format.quantity(power, "W") });
-  if (consumption.source === "per_program") return nothing;
-  if (consumption.source !== "estimate")
-    return html`<div>
-      ${entity(hass, consumption.entity_id, [
-        consumption.attribute,
-        consumption.source === "power" && running(consumption.running_power),
-      ])}
-    </div>`;
-  const details = [
-    running(consumption.running_power),
-    consumption.paused_power !== null &&
-      t("consumption.paused", { power: format.quantity(consumption.paused_power, "W") }),
-  ];
-  return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
+  if (consumption.source === "estimate") {
+    const details = [
+      running(consumption.running_power),
+      consumption.paused_power !== null &&
+        t("consumption.paused", { power: format.quantity(consumption.paused_power, "W") }),
+    ];
+    return html`<div class="muted small">${details.filter(Boolean).join(" · ")}</div>`;
+  }
+  if (!("entity_id" in consumption)) return nothing;
+  return html`<div>
+    ${entity(hass, consumption.entity_id, [
+      consumption.attribute,
+      consumption.source === "power" && running(consumption.running_power),
+    ])}
+  </div>`;
 };
 
 /** A price section: fixed per `unit`, or the entity it follows. */
 const priceOf = (
   hass: HomeAssistant,
-  price: Device["ha_settings"]["price"],
+  price: NonNullable<Device["ha_settings"]["price"]>,
   unit: string,
   t: Localize,
   format: Format,
@@ -243,8 +244,12 @@ export class DevicesPage extends LitElement {
           <div>${t(`consumption.${ha.consumption.source}`)}</div>
           ${consumptionDetails(this.hass, ha, t, format)}
         </dd>
-        <dt>${t("device.price")}</dt>
-        <dd class="price">${priceOf(this.hass, ha.price, "kWh", t, format)}</dd>
+        ${
+          ha.consumption.source !== "none" && ha.price
+            ? html`<dt>${t("device.price")}</dt>
+                <dd class="price">${priceOf(this.hass, ha.price, "kWh", t, format)}</dd>`
+            : nothing
+        }
         ${waterOf(this.hass, device, t, format)}
       </dl>
       <a class="reconfigure small" href=${RECONFIGURE} @click=${followLink}
@@ -573,7 +578,8 @@ export class DevicesPage extends LitElement {
   }
 
   /** The Program Defaults: the Default row, then a row per Program; a kWh and a litres
-   * column where they can come per Program, and a column per Dose of a Device with Doses.
+   * column where they can come per Program and the Device has a source for them, and a
+   * column per Dose of a Device with Doses. Stored values of a hidden column are kept.
    * Known Programs without a row are suggested; a value stores their row. */
   private renderProgramDefaults(
     device: Device,
@@ -589,7 +595,7 @@ export class DevicesPage extends LitElement {
     const perProgram = capabilities.includes("program_consumption");
     const water = waterSource(device);
     const consumed = [
-      ...(perProgram ? (["kwh"] as const) : []),
+      ...(perProgram && device.ha_settings.consumption.source !== "none" ? (["kwh"] as const) : []),
       ...(perProgram && water && water.source !== "none" ? (["litres"] as const) : []),
     ];
     if (!doses.length && !consumed.length) return nothing;
@@ -690,6 +696,9 @@ export class DevicesPage extends LitElement {
             })}
           </td>`,
       );
+    const [kwh, litres] = (["kwh", "litres"] as const).map((key) => consumed.includes(key));
+    const beside = kwh ? (litres ? "" : "_unwatered") : litres ? "_unpowered" : "_doses";
+    const hint = dosed ? beside : "_undosed";
     const hasPrograms = capabilities.includes("program");
     const programNames = hasPrograms
       ? [...new Set([...known_programs, ...Object.keys(programs)])]
@@ -752,11 +761,7 @@ export class DevicesPage extends LitElement {
       {
         name: "program-defaults",
         group: true,
-        hint: t(
-          dosed
-            ? `device.program_defaults_hint${consumed.includes("litres") ? "" : "_unwatered"}`
-            : "device.program_defaults_hint_undosed",
-        ),
+        hint: t(`device.program_defaults_hint${hint}`),
       },
     );
   }

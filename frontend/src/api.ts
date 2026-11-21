@@ -136,8 +136,8 @@ export interface Device {
     images?: { thumbnail: string | null; camera: string | null; snapshot: boolean };
     consumption:
       | { source: "estimate"; running_power: number; paused_power: number | null }
-      /** From the Program Defaults' kWh. */
-      | { source: "per_program" }
+      /** From the Program Defaults' kWh; with none, its Runs get no Electricity Line Item. */
+      | { source: "per_program" | "none" }
       | { source: "energy"; entity_id: string; attribute: string | null }
       | {
           source: "power";
@@ -152,7 +152,8 @@ export interface Device {
     water?:
       | { source: "per_program" | "none" }
       | { source: "meter" | "flow"; entity_id: string; attribute: string | null };
-    price: NonNullable<Device["ha_settings"]["water_price"]>;
+    /** Per kWh; missing for a Device added with electricity source none. */
+    price?: NonNullable<Device["ha_settings"]["water_price"]>;
     /** Per m³; missing without water. */
     water_price?:
       | { source: "fixed"; value: number }
@@ -339,12 +340,10 @@ export const resetLineItem = (hass: HomeAssistant, runId: string, lineItemId: st
   runResult(hass, { type: "coinop/line_items/reset", run_id: runId, line_item_id: lineItemId });
 
 /** A Material Line Item names its Material and counts g or ml (pcs for one bought by
- * the piece) at its current price. */
-export const addLineItem = (
-  hass: HomeAssistant,
-  runId: string,
-  item: Entered & { kind: Exclude<Kind, "electricity"> },
-) => runResult(hass, { type: "coinop/line_items/add", run_id: runId, ...item });
+ * the piece) at its current price; an Electricity one counts kWh and a Water one litres,
+ * one of each per Run. */
+export const addLineItem = (hass: HomeAssistant, runId: string, item: Entered & { kind: Kind }) =>
+  runResult(hass, { type: "coinop/line_items/add", run_id: runId, ...item });
 
 /** A copy of the template; `quantity` replaces an entered default quantity. */
 export const addTemplateLineItem = (

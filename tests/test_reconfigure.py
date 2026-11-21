@@ -398,7 +398,7 @@ async def test_energy_and_power_are_offered_and_pre_filled(
 
     result = await start_reconfigure(hass, entry, subentry)
     result = await configure(hass, result, {"next_step_id": "consumption"})
-    assert result["menu_options"] == ["energy", "power", "estimate"]
+    assert result["menu_options"] == ["energy", "power", "estimate", "none"]
     result = await configure(hass, result, {"next_step_id": "energy"})
 
     assert suggested(result, "entity_id") == ENERGY
