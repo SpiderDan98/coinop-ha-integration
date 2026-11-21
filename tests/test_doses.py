@@ -222,8 +222,8 @@ async def test_doses_count_as_material_costs(
     ]
     [run] = (await panel.call("coinop/runs/list"))["runs"]
     statement = await export(panel, browser, run_ids=[run["id"]])
-    assert "LIQUID 75 ml €0.006 €0.45" in statement.lines
-    assert "PODS 1 pcs €0.30 €0.30" in statement.lines
+    assert "LIQUID 75 ml × €0.006 €0.45" in statement.lines  # noqa: RUF001
+    assert "PODS 1 pcs × €0.30 €0.30" in statement.lines  # noqa: RUF001
 
 
 SCALE = "sensor.whitener_scale"

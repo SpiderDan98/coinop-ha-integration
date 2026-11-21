@@ -17,11 +17,13 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import CLOCK_START, Clock
 from .devices import add_hub
 from .http import HttpClient
-from .images import colour, picture
+from .images import colour, opened, picture
 from .stored import electricity, line_item, place_runs, stored_run
 from .test_spoolman import set_options
 from .websocket import PanelClient
 
+LOGO = Path(__file__).parents[1] / "custom_components/coinop/brand/icon.png"
+LOGO_SIZE = (256, 256)
 DAY = timedelta(days=1)
 BENCHY = CLOCK_START - 3 * DAY
 HELMET = CLOCK_START - 2 * DAY
@@ -67,14 +69,23 @@ async def export(panel: PanelClient, browser: HttpClient, **options: Any) -> Sta
     return Statement(filename.strip('"'), *read(body), body)
 
 
-def pictures(pdf: bytes) -> list[tuple[int, str, tuple[int, int]]]:
-    """Each image in the PDF: its page (from 0), colour and size in pixels."""
+def images(pdf: bytes) -> list[tuple[int, bytes, tuple[int, int]]]:
+    """Each image in the PDF: its page (from 0), data and size in pixels."""
     found = []
     for number, page in enumerate(PdfReader(BytesIO(pdf)).pages):
         for image in page.images:
             assert image.image is not None
-            found.append((number, colour(image.data), image.image.size))
+            found.append((number, image.data, image.image.size))
     return found
+
+
+def pictures(pdf: bytes) -> list[tuple[int, str, tuple[int, int]]]:
+    """Each Cover Image in the PDF: its page (from 0), colour and size in pixels."""
+    return [
+        (page, colour(data), size)
+        for page, data, size in images(pdf)
+        if size != LOGO_SIZE
+    ]
 
 
 async def upload(http: HttpClient, run_id: str, *photos: bytes) -> list[str]:
@@ -165,30 +176,91 @@ async def test_a_detailed_statement_shows_each_run_with_its_line_items_and_total
     statement = await export(panel, browser, run_ids=["helmet", "benchy"])
 
     assert statement.filename == "cost-statement-2026-01-15.pdf"
-    assert statement.lines[:3] == [
+    assert statement.lines[:4] == [
+        "Coin-op Created Jan 15, 2026",
         "Cost Statement",
-        "Created Jan 15, 2026",
-        "Period Jan 12, 2026 – Jan 13, 2026",  # noqa: RUF001
+        "€0.31",
+        "2 Runs · Jan 12, 2026 – Jan 13, 2026 · Running time 6 h 30 min",  # noqa: RUF001
     ]
     text = "\n".join(statement.lines)
     for expected in [
-        "Benchy",
+        "Benchy €1.11",
         "Kobra · Jan 12, 2026 · Running time 2 h 0 min · 2 parts · €0.56 per part",
-        "Line Item Quantity Unit price Amount",
-        "Electricity 0.4 kWh €0.25 €0.10",
-        "PLA Black 20.2 g €0.025 €0.51",
-        "Nozzle wear 2 h €0.25 €0.50",
-        "Run total €1.11",
-        "Helmet",
-        "Outcome: Failed",
-        "Refund 1 pcs -€1.00 -€1.00",
-        "Run total -€0.80",
-        "Subtotal €0.31",
-        "Total €0.31",
+        "Electricity 0.4 kWh × €0.25 €0.10",  # noqa: RUF001
+        "PLA Black 20.2 g × €0.025 €0.51",  # noqa: RUF001
+        "Nozzle wear 2 h × €0.25 €0.50",  # noqa: RUF001
+        "Helmet -€0.80",
+        "Kobra · Jan 13, 2026 · Running time 4 h 30 min · Failed",
+        "Refund 1 pcs × -€1.00 -€1.00",  # noqa: RUF001
     ]:
         assert expected in text
     assert text.index("Benchy") < text.index("Helmet")
-    assert "Completed" not in text
+    for absent in ["Completed", "1 part", "Subtotal"]:
+        assert absent not in text
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_the_statement_opens_with_what_the_total_is_made_of(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(panel, browser, run_ids=["benchy"], markup=10)
+
+    assert statement.lines[2:12] == [
+        "€1.22",
+        "1 Run · Jan 12, 2026 · Running time 2 h 0 min",
+        "Material",
+        "€0.51 42%",
+        "Other",
+        "€0.50 41%",
+        "Electricity",
+        "€0.10 8%",
+        "Markup 10%",
+        "€0.11",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_a_negative_amount_leaves_the_shares_out(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(panel, browser, run_ids=["benchy", "helmet"])
+
+    assert statement.lines[4:10] == [
+        "Material",
+        "€0.51",
+        "Electricity",
+        "€0.30",
+        "Other",
+        "-€0.50",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_one_kind_of_cost_needs_no_breakdown(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    await panel.call("coinop/line_items/delete", run_id="helmet", line_item_id="refund")
+
+    statement = await export(panel, browser, run_ids=["helmet"])
+
+    assert statement.lines[2:5] == [
+        "€0.20",
+        "1 Run · Jan 13, 2026 · Running time 4 h 30 min",
+        "Helmet €0.20",
+    ]
+
+
+@pytest.mark.usefixtures("two_runs")
+async def test_the_first_page_carries_the_logo(
+    clock: Clock, panel: PanelClient, browser: HttpClient
+) -> None:
+    statement = await export(panel, browser, run_ids=["benchy"], detail="compact")
+
+    [(page, data, size)] = images(statement.pdf)
+    assert (page, size) == (0, LOGO_SIZE)
+    assert opened(data).convert("RGB").tobytes() == (
+        opened(LOGO.read_bytes()).convert("RGB").tobytes()
+    )
 
 
 @pytest.mark.usefixtures("two_runs")
@@ -197,9 +269,9 @@ async def test_markup_is_its_own_line_and_never_in_the_runs(
 ) -> None:
     statement = await export(panel, browser, run_ids=["benchy", "helmet"], markup=12.5)
 
-    text = "\n".join(statement.lines)
-    assert "Run total €1.11" in text
-    assert "Run total -€0.80" in text
+    assert statement.lines[2] == "€0.35"
+    assert "Benchy €1.11" in statement.lines
+    assert "Helmet -€0.80" in statement.lines
     assert statement.lines[-4:-1] == [
         "Subtotal €0.31",
         "Markup 12.5% €0.04",
@@ -269,7 +341,10 @@ async def test_without_markup_there_is_no_markup_line(
 
     statement = await export(panel, browser, run_ids=["benchy", "helmet"], markup=0)
 
-    assert statement.lines[-3:-1] == ["Subtotal €0.31", "Total €0.31"]
+    assert statement.lines[2] == "€0.31"
+    text = "\n".join(statement.lines)
+    for absent in ["Markup", "Subtotal", "Total"]:
+        assert absent not in text
 
 
 async def test_markup_cannot_be_negative(
@@ -294,12 +369,10 @@ async def test_a_compact_statement_has_one_row_per_run(
         panel, browser, run_ids=["benchy", "helmet"], detail="compact"
     )
 
-    assert statement.lines[3:-1] == [
+    assert statement.lines[10:-1] == [
         "Run Device Start Parts Per part Total",
         "Benchy Kobra Jan 12, 2026 2 €0.56 €1.11",
         "Helmet (Failed) Kobra Jan 13, 2026 1 -€0.80 -€0.80",
-        "Subtotal €0.31",
-        "Total €0.31",
     ]
 
 
@@ -316,10 +389,11 @@ async def test_title_and_note_head_the_statement_and_name_the_file(
     )
 
     assert statement.filename == "gifts-for-unal-2026-01-15.pdf"
-    assert statement.lines[:4] == [
+    assert statement.lines[:5] == [
+        "Coin-op Created Jan 15, 2026",
         "Gifts for Ünal",
-        "Created Jan 15, 2026",
-        "Period Jan 12, 2026",
+        "€1.11",
+        "1 Run · Jan 12, 2026 · Running time 2 h 0 min",
         "Printed for the school fair.",
     ]
 
@@ -341,22 +415,22 @@ async def test_a_german_statement_on_letter_paper_in_dollars(
 
     assert statement.filename == "kostenaufstellung-2026-01-15.pdf"
     assert statement.paper == (216, 279)
-    assert statement.lines[:3] == [
+    assert statement.lines[:4] == [
+        "Coin-op Erstellt am 15.01.2026",
         "Kostenaufstellung",
-        "Erstellt am 15.01.2026",
-        "Zeitraum 12.01.2026 – 13.01.2026",  # noqa: RUF001
+        "0,33 $",
+        "2 Läufe · 12.01.2026 – 13.01.2026 · Laufzeit 6 Std. 30 Min.",  # noqa: RUF001
     ]
     text = "\n".join(statement.lines)
     for expected in [
+        "Benchy 1,11 $",
         "Kobra · 12.01.2026 · Laufzeit 2 Std. 0 Min. · 2 Teile · 0,56 $ pro Teil",
-        "Posten Menge Stückpreis Betrag",
-        "Strom 0,4 kWh 0,25 $ 0,10 $",
-        "PLA Black 20,2 g 0,025 $ 0,51 $",
-        "Summe Lauf 1,11 $",
-        "Ausgang: Fehlgeschlagen",
+        "Strom 0,4 kWh × 0,25 $ 0,10 $",  # noqa: RUF001
+        "PLA Black 20,2 g × 0,025 $ 0,51 $",  # noqa: RUF001
+        "Kobra · 13.01.2026 · Laufzeit 4 Std. 30 Min. · Fehlgeschlagen",
         "Zwischensumme 0,31 $",
         "Aufschlag 7,5 % 0,02 $",
-        "Gesamtsumme 0,33 $",
+        "Zusammen 0,33 $",
     ]:
         assert expected in text
     assert statement.lines[-1] == (
@@ -377,7 +451,7 @@ async def test_the_language_defaults_to_home_assistants_and_a4_outside_us_and_ca
 
     statement = await export(panel, browser, run_ids=["benchy"])
 
-    assert statement.lines[0] == "Kostenaufstellung"
+    assert statement.lines[1] == "Kostenaufstellung"
     assert statement.paper == (210, 297)
 
 
@@ -415,7 +489,7 @@ async def test_internal_details_stay_off_the_statement(
     statement = await export(panel, browser, run_ids=["benchy"])
 
     text = "\n".join(statement.lines)
-    assert "Electricity 0.4 kWh €0.375 €0.15" in text
+    assert "Electricity 0.4 kWh × €0.375 €0.15" in text  # noqa: RUF001
     assert "Running time 1 h 40 min" in text
     for internal in ["Customer", "Gift", "fault", "Fault", "0.10", "↺", "Pause"]:
         assert internal not in text
@@ -449,10 +523,10 @@ async def test_every_page_has_the_footer_and_sections_stay_together(
     for n in range(20):
         [page] = [page for page in statement.pages if f"Print {n:02}" in page]
         section = page[page.index(f"Print {n:02}") :]
-        assert "Run total €1.11" in section, f"Print {n:02} breaks across pages"
+        assert "Nozzle wear" in section, f"Print {n:02} breaks across pages"
 
 
-async def test_a_run_longer_than_a_page_breaks_with_its_table_headings_repeated(
+async def test_a_run_longer_than_a_page_breaks_across_pages(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,
@@ -475,11 +549,12 @@ async def test_a_run_longer_than_a_page_breaks_with_its_table_headings_repeated(
 
     pages = statement.pages
     assert len(pages) == 3
-    assert "Benchy" in pages[0]
-    assert "Helmet" in pages[0]
-    assert all("Line Item Quantity Unit price Amount" in page for page in pages[1:])
-    assert "Run total €19.20" in pages[2]
-    assert "Subtotal €20.31" in pages[2]
+    assert "Benchy €1.11" in pages[0]
+    assert "Helmet €19.20" in pages[0]
+    assert [
+        next(n for n, page in enumerate(pages) if f"Part {part:02} " in page)
+        for part in (0, 79)
+    ] == [0, 2]
 
 
 @pytest.mark.usefixtures("photographed")
@@ -488,7 +563,7 @@ async def test_a_detailed_statement_shows_each_runs_cover_image_downscaled(
 ) -> None:
     statement = await export(panel, browser, run_ids=["helmet", "benchy"])
 
-    assert pictures(statement.pdf) == [(0, "red", (800, 600)), (0, "blue", (300, 200))]
+    assert pictures(statement.pdf) == [(0, "red", (300, 225)), (0, "blue", (300, 200))]
 
 
 @pytest.mark.usefixtures("photographed")
@@ -510,7 +585,7 @@ async def test_a_cover_image_missing_on_disk_is_left_out(
     statement = await export(panel, browser, run_ids=["benchy", "helmet"])
 
     assert pictures(statement.pdf) == [(0, "blue", (300, 200))]
-    assert "Benchy" in statement.lines
+    assert "Benchy €1.11" in statement.lines
 
 
 @pytest.mark.usefixtures("two_runs")
@@ -526,10 +601,10 @@ async def test_the_pdf_shows_the_runs_as_they_are_at_download(
     status, _, body = await browser.download(result["path"])
 
     assert status == 200
-    text = "\n".join(read(body)[0])
-    assert "Benchy v2" in text
-    assert "Helmet" not in text
-    assert "Total €1.11" in text
+    lines = "\n".join(read(body)[0]).splitlines()
+    assert lines[2] == "€1.11"
+    assert "Benchy v2 €1.11" in lines
+    assert "Helmet" not in "\n".join(lines)
 
 
 async def test_only_final_runs_can_be_exported(

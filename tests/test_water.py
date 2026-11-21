@@ -558,8 +558,8 @@ async def test_a_cost_statement_lists_water_in_litres_priced_per_m3(
     english = await export(panel, browser, run_ids=[run["id"]])
     german = await export(panel, browser, run_ids=[run["id"]], language="de")
 
-    assert "Water 52.5 L €4.00/m³ €0.21" in english.lines
-    assert "Wasser 52,5 L 4,00 €/m³ 0,21 €" in german.lines
+    assert "Water 52.5 L × €4.00/m³ €0.21" in english.lines  # noqa: RUF001
+    assert "Wasser 52,5 L × 4,00 €/m³ 0,21 €" in german.lines  # noqa: RUF001
 
 
 async def test_printers_have_no_water_entities_or_litres(
