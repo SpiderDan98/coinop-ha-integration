@@ -12,7 +12,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from dev.coinop_dev.stand_ins import Registration, printers
+from dev.coinop_dev.stand_ins import Registration, ev_chargers, printers
 
 
 @dataclass
@@ -102,6 +102,19 @@ add_octoprint = adding(printers.octoprint, first)
 add_creality = adding(printers.creality, first)
 add_elegoo = adding(printers.elegoo, first)
 add_moonraker = adding(printers.moonraker, first)
+add_wall_connector = adding(ev_chargers.wall_connector, first)
+# Each loadpoint's HA device, which with one loadpoint is the site's.
+add_evcc_site = adding(
+    ev_chargers.evcc_site, lambda devices: devices[2:] or devices[1:]
+)
+# The charger's HA device, then each connector's.
+add_charge_point = adding(ev_chargers.charge_point, lambda devices: devices)
+add_easee = adding(ev_chargers.easee, first)
+# The charger's HA device, not its installation's.
+add_zaptec = adding(ev_chargers.zaptec, lambda devices: devices[1])
+add_goe_mqtt = adding(ev_chargers.goe_mqtt, first)
+add_goe_api2 = adding(ev_chargers.goe_api2, first)
+add_wallbox = adding(ev_chargers.wallbox, first)
 
 
 def entity(

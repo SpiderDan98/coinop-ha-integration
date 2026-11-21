@@ -8,10 +8,9 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from .chargers import add_charge_point, add_evcc_site
 from .clock import Clock
 from .devices import add_hub, configure
-from .registry import HaDevice
+from .registry import HaDevice, add_charge_point, add_evcc_site
 from .test_device_flow import fields
 from .test_integration_profiles import accepted
 from .test_measured import electricity
