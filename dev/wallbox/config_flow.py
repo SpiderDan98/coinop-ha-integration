@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class WallboxStandInFlow(StaticStandInFlow, domain="wallbox"):
+class WallboxStandInFlow(StandInFlow, domain="wallbox"):
     pass

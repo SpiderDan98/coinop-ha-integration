@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class GoeApi2StandInFlow(StaticStandInFlow, domain="goecharger_api2"):
+class GoeApi2StandInFlow(StandInFlow, domain="goecharger_api2"):
     pass

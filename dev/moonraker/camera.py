@@ -1,5 +1,6 @@
 """Moonraker's preview camera, which shows a picture only while printing, and a webcam
-that shows the dev configuration's Workshop camera."""
+that shows the dev configuration's Workshop camera, under the description's unique
+ids."""
 
 from io import BytesIO
 
@@ -7,10 +8,12 @@ from homeassistant.components.camera import Camera, async_get_image
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from PIL import Image, ImageDraw
 
-from .sensor import device_info
+from ..coinop_dev.scenarios import KINDS
+from ..coinop_dev.stand_in import registrations
 
 WORKSHOP_CAMERA = "camera.workshop_camera"
 
@@ -20,24 +23,29 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    async_add_entities([PreviewCamera(entry), Webcam(entry)])
+    [registration] = registrations(entry.domain, entry.data[KINDS])
+    [shape] = registration.of_entry(entry.entry_id).devices
+    device = DeviceInfo(identifiers=shape.fields["identifiers"])
+    async_add_entities(
+        [
+            PreviewCamera(shape.entities["thumbnail"].unique_id, "Thumbnail", device),
+            Webcam(shape.entities["Chamber_0"].unique_id, "Chamber", device),
+        ]
+    )
 
 
 class StandInCamera(Camera):
     _attr_has_entity_name = True
     _attr_content_type = "image/jpeg"
 
-    def __init__(self, entry: ConfigEntry, key: str, name: str) -> None:
+    def __init__(self, unique_id: str, name: str, device: DeviceInfo) -> None:
         super().__init__()
-        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_unique_id = unique_id
         self._attr_name = name
-        self._attr_device_info = device_info(entry)
+        self._attr_device_info = device
 
 
 class PreviewCamera(StandInCamera):
-    def __init__(self, entry: ConfigEntry) -> None:
-        super().__init__(entry, "thumbnail", "Thumbnail")
-
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
@@ -48,10 +56,6 @@ class PreviewCamera(StandInCamera):
 
 
 class Webcam(StandInCamera):
-    def __init__(self, entry: ConfigEntry) -> None:
-        # Moonraker's webcams are `<entry id>_<webcam name>_<index>`.
-        super().__init__(entry, "Workshop_0", "Workshop")
-
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:

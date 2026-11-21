@@ -1,12 +1,5 @@
-from typing import Any
-
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-
-from . import DOMAIN
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class MoonrakerStandInFlow(ConfigFlow, domain=DOMAIN):
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        return self.async_create_entry(title="Voron 2.4", data={})
+class MoonrakerStandInFlow(StandInFlow, domain="moonraker"):
+    pass

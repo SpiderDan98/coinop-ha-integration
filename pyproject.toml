@@ -41,8 +41,8 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT", "TID"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-# A static stand-in imports its base from the sibling it is mounted next to.
-"dev/*/{__init__,config_flow}.py" = ["TID252"]
+# A stand-in imports its base from the sibling it is mounted next to.
+"dev/*/{__init__,config_flow,camera}.py" = ["TID252"]
 # Mounted under another name in the container, as is the package around it.
 "dev/coinop_dev/scenarios/*.py" = ["TID252"]
 

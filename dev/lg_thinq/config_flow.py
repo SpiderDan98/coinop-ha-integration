@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class LgThinqStandInFlow(StaticStandInFlow, domain="lg_thinq"):
+class LgThinqStandInFlow(StandInFlow, domain="lg_thinq"):
     pass

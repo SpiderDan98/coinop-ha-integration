@@ -10,6 +10,7 @@ from typing import Any
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
@@ -25,6 +26,7 @@ from dev.coinop_dev.scenarios import (
     PIECES,
     PRESETS,
     DeviceWithHistory,
+    QuickStartPiece,
     async_load,
 )
 
@@ -343,6 +345,42 @@ async def test_every_integration_profile_has_a_quick_start_piece_for_each_kind_i
         result = await configure(hass, result, answers)
         assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
         assert list(entry.subentries.values())[-1].data["device_type"] == piece.group
+
+
+QUICK_START = {n: p for n, p in PIECES.items() if isinstance(p, QuickStartPiece)}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("name", QUICK_START)
+async def test_a_quick_start_pieces_stand_in_registers_the_description_the_tests_use(
+    hass: HomeAssistant, hass_admin_user: MockUser, files: Path, name: str
+) -> None:
+    piece = QUICK_START[name]
+    await async_load(hass, {"pieces": [name]}, hass_admin_user)
+
+    [entry] = hass.config_entries.async_entries(piece.domain)
+    described = piece.registration().of_entry(entry.entry_id)
+    assert {
+        (entity.domain, entity.unique_id)
+        for entity in er.async_entries_for_config_entry(
+            er.async_get(hass), entry.entry_id
+        )
+    } == {
+        (spec.platform, spec.unique_id)
+        for shape in described.devices
+        for spec in shape.entities.values()
+    }
+    assert {
+        frozenset(device.identifiers)
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), entry.entry_id
+        )
+    } == {
+        frozenset(fields["identifiers"])
+        for shape in described.devices
+        for fields in (shape.fields, shape.linked)
+        if fields
+    }
 
 
 @pytest.mark.usefixtures("helpers")

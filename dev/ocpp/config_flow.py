@@ -1,5 +1,5 @@
-from ..coinop_dev.static import StaticStandInFlow
+from ..coinop_dev.stand_in import StandInFlow
 
 
-class OcppStandInFlow(StaticStandInFlow, domain="ocpp"):
+class OcppStandInFlow(StandInFlow, domain="ocpp"):
     pass
