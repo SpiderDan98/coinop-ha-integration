@@ -69,6 +69,8 @@ async def fire(hass: HomeAssistant, clock: Clock, *, minutes: float = 90) -> Non
     await set_kiln(hass, "on")
     await clock.advance(minutes=minutes)
     await set_kiln(hass, "off")
+    # Older Home Assistant needs a second pass for the Run event's listeners.
+    await hass.async_block_till_done()
 
 
 async def set_pump(hass: HomeAssistant, status: str) -> None:
