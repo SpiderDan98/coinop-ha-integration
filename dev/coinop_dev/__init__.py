@@ -13,7 +13,7 @@ from homeassistant.helpers.typing import ConfigType
 from custom_components.coinop.device_config import DEVICE_TYPES
 from custom_components.coinop.schema import vol
 
-from .scenarios import HISTORIES, PIECES, PRESETS, async_load, ordered
+from .scenarios import HISTORIES, PIECES, PRESETS, async_load
 
 DOMAIN = "coinop_dev"
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
@@ -58,10 +58,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                         "name": name,
                         "title": preset.title,
                         "description": preset.description,
-                        "selection": {
-                            "pieces": ordered(preset.pieces),
-                            "history": preset.history,
-                        },
+                        "selection": preset.selection,
                     }
                     for name, preset in PRESETS.items()
                 ],
@@ -90,6 +87,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 {
                     vol.Required("pieces"): [vol.In(list(PIECES))],
                     vol.Optional("history", default="short"): vol.In(HISTORIES),
+                    vol.Optional("open_run", default=False): bool,
                 },
             )
         ),

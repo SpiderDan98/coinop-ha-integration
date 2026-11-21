@@ -461,9 +461,12 @@ async def _bambu_long(seed: Seed) -> None:
     await _long_history(seed, "bambu", [3, 4, 5, 6, 7, 8, 9])
 
 
-async def _printing_now(seed: Seed) -> None:
-    await _prusa(seed)
+async def _prusa_start(seed: Seed) -> None:
     await seed.set_printer("prusa", "printing", "Gridfinity bins 3x2.gcode")
+
+
+async def _bambu_start(seed: Seed) -> None:
+    await seed.set_printer("bambu", "printing", "Spool holder.gcode")
 
 
 async def _washer_settings(seed: Seed) -> None:
@@ -571,6 +574,11 @@ async def _wash(seed: Seed, loads: list[tuple[Any, ...]]) -> None:
     await _async_set(seed.hass, "input_select.washer_status", "off")
 
 
+async def _washer_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.washer_program", "Cotton 60°")
+    await _async_set(seed.hass, "input_select.washer_status", "running")
+
+
 async def _irrigation_short(seed: Seed) -> None:
     await _water(seed, WATERINGS)
 
@@ -605,6 +613,10 @@ async def _water(seed: Seed, waterings: list[tuple[int, int, int, float]]) -> No
         seed.hass, "input_number.irrigation_water", meter["irrigation_water"]
     )
     await _async_set(seed.hass, "input_select.irrigation_status", "off")
+
+
+async def _irrigation_start(seed: Seed) -> None:
+    await _async_set(seed.hass, "input_select.irrigation_status", "watering")
 
 
 async def _replay_meters(
@@ -747,6 +759,8 @@ class DeviceWithHistory(Piece):
     # The Runs of each history level but none, which leaves the Device alone.
     short: Callable[[Seed], Awaitable[None]]
     long: Callable[[Seed], Awaitable[None]]
+    # Starts a Run through its helpers, as its integration would report one.
+    start: Callable[[Seed], Awaitable[None]]
     needs: tuple[str, ...] = ()
     # The panel settings it gets whatever its history, before its Runs.
     setup: Callable[[Seed], Awaitable[None]] | None = None
@@ -787,6 +801,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         device=_printer("prusa"),
         short=_prusa,
         long=_prusa_long,
+        start=_prusa_start,
         needs=("filaments", "tags", "template"),
     ),
     "bambu": DeviceWithHistory(
@@ -798,6 +813,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         device=_printer("bambu"),
         short=_bambu,
         long=_bambu_long,
+        start=_bambu_start,
         needs=("filaments", "tags", "template"),
     ),
     "anycubic_cloud.3d_printer": QuickStartPiece(
@@ -826,6 +842,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         device=_washer(),
         short=_washer_short,
         long=_washer_long,
+        start=_washer_start,
         needs=("laundry",),
         setup=_washer_settings,
     ),
@@ -864,6 +881,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         device=_garden_valve(),
         short=_irrigation_short,
         long=_irrigation_long,
+        start=_irrigation_start,
     ),
 }
 
@@ -874,8 +892,15 @@ class Preset:
     description: str
     pieces: tuple[str, ...]
     history: str = "short"
-    # Contents of its own in place of its Devices with history's.
-    fill: Callable[[Seed], Awaitable[None]] | None = None
+    open_run: bool = False
+
+    @property
+    def selection(self) -> dict[str, Any]:
+        return {
+            "pieces": ordered(self.pieces),
+            "history": self.history,
+            "open_run": self.open_run,
+        }
 
 
 PRESETS = {
@@ -893,7 +918,7 @@ PRESETS = {
         "3D printer, printing now",
         "Like a few Runs, with an open Run; the printer's helpers end it.",
         ("prusa",),
-        fill=_printing_now,
+        open_run=True,
     ),
     "two-printers": Preset(
         "Two printers", "The Prusa and the Bambu with their Runs.", ("prusa", "bambu")
@@ -930,12 +955,10 @@ async def async_load(
 ) -> dict[str, Any]:
     """Replace whatever Coin-op holds by a Preset or a selection of Pieces; returns
     the selection loaded."""
-    preset: Preset | None = None
     if isinstance(choice, str):
-        preset = PRESETS[choice]
-        pieces, history = ordered(preset.pieces), preset.history
-    else:
-        pieces, history = ordered(choice["pieces"]), choice.get("history", "short")
+        choice = PRESETS[choice].selection
+    pieces = ordered(choice["pieces"])
+    history, open_run = choice.get("history", "short"), choice.get("open_run", False)
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
@@ -969,15 +992,16 @@ async def async_load(
     for piece in (PIECES[name] for name in pieces):
         if isinstance(piece, QuickStartPiece):
             await piece.fill(seed)
-        elif not (preset and preset.fill):
+        else:
             await piece.fill(seed, history)
-    if preset and preset.fill:
-        await preset.fill(seed)
     for name in seed.retired:
         await seed.api.call(
             "coinop/materials/archive", material_id=seed.materials[name]["id"]
         )
-    return {"pieces": pieces, "history": history}
+    if open_run:
+        for piece in with_history:
+            await piece.start(seed)
+    return {"pieces": pieces, "history": history, "open_run": open_run}
 
 
 async def _async_add_hub(hass: HomeAssistant) -> ConfigEntry:
