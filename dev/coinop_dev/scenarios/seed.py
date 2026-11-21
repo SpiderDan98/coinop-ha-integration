@@ -4,7 +4,6 @@ import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from functools import partial
-from io import BytesIO
 import json
 import logging
 import random
@@ -16,7 +15,6 @@ from homeassistant.components.websocket_api.http import WebSocketAdapter
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
-from PIL import Image, ImageDraw
 
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
@@ -31,6 +29,7 @@ from .data import (
     TAGS,
     Product,
 )
+from .thumbnails import thumbnail
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -206,16 +205,16 @@ class Seed:
             )["run"]
         if thumbnail:
             colour = self.materials[material]["colour"] if material else "#9e9e9e"
-            await self._thumbnail(run["id"], colour)
+            await self._thumbnail(run["id"], name, colour)
         return run
 
-    async def _thumbnail(self, run_id: str, colour: str) -> None:
+    async def _thumbnail(self, run_id: str, name: str, colour: str) -> None:
         # The panel API has no command for a Thumbnail; the image entity hands it over.
         runtime = self.entry.runtime_data
+        # Drawn as before, so the Runs after it stay the same.
+        self.random.randrange(4)
         if run := runtime.book.run(run_id):
-            data = await self.hass.async_add_executor_job(
-                _picture, colour, self.random.randrange(4)
-            )
+            data = await self.hass.async_add_executor_job(thumbnail, name, colour)
             await runtime.images.async_add(run, ImageKind.THUMBNAIL, data)
 
 
@@ -241,27 +240,6 @@ async def async_set(hass: HomeAssistant, entity_id: str, value: str | float) -> 
     await hass.services.async_call(
         domain, service, {"entity_id": entity_id, key: value}, blocking=True
     )
-
-
-def _picture(colour: str, shape: int) -> bytes:
-    """A Thumbnail-like render: one part in the Material's colour."""
-    image = Image.new("RGB", (480, 480), "#eceff1")
-    draw = ImageDraw.Draw(image)
-    box = (110, 110, 370, 370)
-    outline = "#37474f"
-    if shape == 0:
-        draw.ellipse(box, fill=colour, outline=outline, width=6)
-    elif shape == 1:
-        draw.rounded_rectangle(box, 40, fill=colour, outline=outline, width=6)
-    elif shape == 2:
-        draw.polygon(
-            [(240, 90), (390, 370), (90, 370)], fill=colour, outline=outline, width=6
-        )
-    else:
-        draw.rectangle((150, 90, 330, 390), fill=colour, outline=outline, width=6)
-    buffer = BytesIO()
-    image.save(buffer, "PNG")
-    return buffer.getvalue()
 
 
 async def replay_meters(
