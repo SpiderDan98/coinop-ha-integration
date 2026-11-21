@@ -44,7 +44,7 @@ describe("An Other Device with images and a Part Count and no job", () => {
 
     const [card] = cards(panel);
     expect(card).toContain("Status sensor.kiln_status Not used Thumbnail, Camera Consumption");
-    expect(card).not.toMatch(/Print job|Material used|Slots/);
+    expect(card).not.toMatch(/Job name|Material used|Slots/);
   });
 
   it("shows its Run's Part Count, cost per part and images", async () => {

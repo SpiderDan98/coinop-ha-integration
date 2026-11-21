@@ -1,0 +1,82 @@
+{
+  "devices": [
+    {
+      "id": "device-cnc-router",
+      "name": "CNC router",
+      "type": "other",
+      "type_name": "CNC router",
+      "capabilities": [
+        "average_power",
+        "images",
+        "job",
+        "material",
+        "part_count"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.router_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "cutting"
+          ],
+          "paused": [
+            "paused"
+          ],
+          "finished": [
+            "done"
+          ],
+          "cancelled": [
+            "cancelled"
+          ],
+          "ended": [],
+          "fault": [],
+          "ignored": [
+            "idle"
+          ]
+        },
+        "job": {
+          "entity_id": "sensor.router_job",
+          "attribute": null,
+          "material": {
+            "entity_id": "sensor.router_stock_used",
+            "attribute": null,
+            "unit": "g"
+          },
+          "slots": [],
+          "colour_attribute": null,
+          "loaded_slot": null
+        },
+        "images": {
+          "thumbnail": null,
+          "camera": null,
+          "snapshot": false
+        },
+        "consumption": {
+          "source": "estimate",
+          "running_power": 300.0,
+          "paused_power": null
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": "mdf",
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {}
+          },
+          "programs": {}
+        }
+      },
+      "known_programs": []
+    }
+  ]
+}

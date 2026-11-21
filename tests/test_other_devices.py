@@ -138,6 +138,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
         "program",
         "doses",
         "water",
+        "job",
         "images",
         "part_count",
         "per_run_meters",

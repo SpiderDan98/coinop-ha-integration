@@ -92,20 +92,29 @@ async def test_add_device_texts_load_in_home_assistant(
     )
 
 
-# The steps only a 3D printer has; every other step is shared between Device Types.
-PRINTER_STEPS = {"job", "material_unit", "estimate"}
+# Still worded for a 3D printer, though an Other Device without a Program sees it
+# too; every other step is shared between Device Types and held to the rule.
+PRINTER_STEPS = {"estimate"}
 
 
 @pytest.mark.parametrize(
-    ("language", "words"),
+    ("language", "words", "device_inputs"),
     [
-        ("en", ("print", "wash", "laundry", "load", "machine")),
-        ("de", ("druck", "wasch", "wäsche", "maschine")),
+        # "Loaded slot" names a Device Input of the job step, not a load of laundry.
+        ("en", ("print", "wash", "laundry", "load", "machine"), ("loaded slot",)),
+        ("de", ("druck", "wasch", "wäsche", "maschine"), ()),
     ],
 )
 def test_steps_shared_between_device_types_speak_of_none_of_them(
-    language: str, words: tuple[str, ...]
+    language: str, words: tuple[str, ...], device_inputs: tuple[str, ...]
 ) -> None:
+    def plain(text: str) -> str:
+        """`text` in lower case, without the Device Inputs' names."""
+        lowered = text.lower()
+        for name in device_inputs:
+            lowered = lowered.replace(name, "")
+        return lowered
+
     def texts(tree: dict[str, Any]) -> list[str]:
         return [
             text
@@ -121,9 +130,7 @@ def test_steps_shared_between_device_types_speak_of_none_of_them(
         for text in texts(step)
     ]
 
-    assert [
-        text for text in shared if any(word in text.lower() for word in words)
-    ] == []
+    assert [text for text in shared if any(word in plain(text) for word in words)] == []
 
 
 @pytest.mark.parametrize(
@@ -194,6 +201,26 @@ async def test_what_an_other_device_can_have_is_named_and_explained(
     assert texts[f"{prefix}.error.type_name_required"]
     shown = [text for key, text in texts.items() if key.startswith(step)]
     assert [text for text in shown if unseen in text.lower()] == []
+
+
+@pytest.mark.parametrize(
+    ("language", "quoted", "by_hand"),
+    [("en", "“{}”", "by hand"), ("de", "„{}“", "von Hand")],
+)
+async def test_the_other_step_says_which_choices_cant_be_combined_and_what_to_do_instead(
+    hass: HomeAssistant, language: str, quoted: str, by_hand: str
+) -> None:
+    texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])
+
+    prefix = f"component.{DOMAIN}.config_subentries.device"
+    description = texts[f"{prefix}.step.other.description"]
+    refusal = texts[f"{prefix}.error.job_with_program_or_doses"]
+    # Stated before anything is picked, and again when the mix is refused.
+    for text in (description, refusal):
+        for choice in ("job", "program", "doses"):
+            name = texts[f"{prefix}.step.other.data.{choice}"]
+            assert quoted.format(name) in text, (choice, text)
+    assert by_hand in description
 
 
 async def test_entities_are_named_in_the_configured_language(

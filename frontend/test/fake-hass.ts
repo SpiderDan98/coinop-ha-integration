@@ -24,6 +24,7 @@ import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import aggregatesOtherProgram from "./fixtures/backend/aggregates-other-program.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
 import catalogSubscribeOtherDoses from "./fixtures/backend/catalog-subscribe-other-doses.json";
+import catalogSubscribeOtherJob from "./fixtures/backend/catalog-subscribe-other-job.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
@@ -34,6 +35,7 @@ import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.jso
 import devicesListOther from "./fixtures/backend/devices-list-other.json";
 import devicesListOtherDoses from "./fixtures/backend/devices-list-other-doses.json";
 import devicesListOtherImages from "./fixtures/backend/devices-list-other-images.json";
+import devicesListOtherJob from "./fixtures/backend/devices-list-other-job.json";
 import devicesListOtherProgram from "./fixtures/backend/devices-list-other-program.json";
 import devicesListOtherProgramDoses from "./fixtures/backend/devices-list-other-program-doses.json";
 import devicesListOtherWater from "./fixtures/backend/devices-list-other-water.json";
@@ -73,6 +75,7 @@ import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none
 import runsGetOther from "./fixtures/backend/runs-get-other.json";
 import runsGetOtherDoses from "./fixtures/backend/runs-get-other-doses.json";
 import runsGetOtherImages from "./fixtures/backend/runs-get-other-images.json";
+import runsGetOtherJob from "./fixtures/backend/runs-get-other-job.json";
 import runsGetOtherProgram from "./fixtures/backend/runs-get-other-program.json";
 import runsGetOtherWater from "./fixtures/backend/runs-get-other-water.json";
 import runsGetPerProgram from "./fixtures/backend/runs-get-per-program.json";
@@ -232,6 +235,17 @@ export const recorded = {
    * form Other: "co2" (CO₂, by g), "syrup" (Cola syrup, by ml), "malt" (Pale malt, by g) and
    * "hops" (Hop pellets, by g). */
   consumables: catalogSubscribeOtherDoses as Catalog,
+  /** `coinop/devices/list` with only "device-cnc-router", an Other Device under the Type
+   * Name "CNC router" with Job and Material, Images and a Part Count: its job name and
+   * Material used inputs (in g), no Slots and no image input, the default Material "mdf". */
+  cncRouter: devicesListOtherJob.devices[0] as Device,
+  /** `coinop/runs/get` of its Run "sign" ("Sign Oak", after its job) of 3 parts: 0.3 kWh
+   * estimated at 0.30 ("sign-electricity") and 120 g of MDF measured at 0.005
+   * ("sign-material"). */
+  sign: runsGetOtherJob.run as RunDetail,
+  /** `coinop/catalog/subscribe` with the Materials of the form Other it can charge: "mdf"
+   * (MDF, by g) and "plywood" (Plywood sheet, by piece). */
+  stock: catalogSubscribeOtherJob as Catalog,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,

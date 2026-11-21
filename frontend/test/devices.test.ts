@@ -34,7 +34,7 @@ describe("Devices tab", () => {
     expect(cards(panel)).toEqual([
       "Kobra " +
         "Status sensor.kobra_status " +
-        "Print job sensor.kobra_job " +
+        "Job name sensor.kobra_job " +
         "Material used sensor.kobra_filament_used · mm " +
         "Not used Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 120 W running · 8 W paused " +
@@ -84,7 +84,7 @@ describe("Devices tab", () => {
 
     expect(text(query(panel, ".device dl"))).toBe(
       "Status event.kobra_print · event_type " +
-        "Not used Print job, Material used, Slots, Thumbnail, Camera " +
+        "Not used Job name, Material used, Slots, Thumbnail, Camera " +
         "Consumption source Estimate from average power 95.5 W running " +
         "Electricity price €0.30 per kWh",
     );
@@ -553,7 +553,7 @@ describe("Devices tab", () => {
 
     expect(text(query(panel, ".device dl"))).toBe(
       "Status sensor.kobra_status " +
-        "Druckauftrag sensor.kobra_job " +
+        "Auftragsname sensor.kobra_job " +
         "Materialverbrauch sensor.kobra_filament_used · mm " +
         "Nicht verwendet Fächer, Vorschaubild, Kamera " +
         "Verbrauchsquelle Aus Durchschnittsleistung schätzen 120 W im Betrieb · 8 W in Pause " +

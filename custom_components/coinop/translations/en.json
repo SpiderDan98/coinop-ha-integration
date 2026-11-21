@@ -74,12 +74,13 @@
         },
         "other": {
           "title": "Type Name & what the Device has",
-          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.",
+          "description": "Coin-op ships no Device Type for this Device, so you describe it yourself. Give it a Type Name and switch on what it has. With nothing switched on, a Run records its running time and its electricity.\n\n“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Every other combination works.\n\nYou can add a Material Line Item by hand on any Run, whatever the Device has, so “Job and Material” isn't needed just to record a Material now and then.",
           "data": {
             "type_name": "Type Name",
             "program": "Program",
             "doses": "Doses",
             "water": "Water",
+            "job": "Job and Material",
             "images": "Images",
             "part_count": "Part Count",
             "per_run_meters": "Meters count each Run from 0"
@@ -89,6 +90,7 @@
             "program": "It reports which program it runs: a Run records its Program and is named after it. Its electricity can then come per Program, from the kWh in the Program Defaults, which replaces the estimate from average power.",
             "doses": "Products it uses up in a Run, such as a soda maker's CO₂ or a bread maker's flour: you list them as Doses on its card in the panel's Devices tab, each with its amount per Run, or per Program if it has one. Each Dose a Run uses becomes a Material Line Item.",
             "water": "A water source (a water meter or a flow sensor) and a water price: each Run gets a Water Line Item for the water it used.",
+            "job": "It works through one job at a time and uses up Material doing so, as a laser cutter or a CNC router does: a Run is named after its job and gets a Material Line Item, measured by the Device or left for you to fill in, priced from the Device's default Material or from the Material in a Slot. Not together with Program or Doses.",
             "images": "Its Runs get a Thumbnail from an image entity and, when they end, a Snapshot from a camera, so you can see what a Run made.",
             "part_count": "Its Runs get a Part Count, the number of usable parts a Run made, and with it a cost per part, so a batch is costed per piece.",
             "per_run_meters": "Its meters restart with every Run, as a session or per-cycle counter does. A meter back at 0 then raises no Flag for a meter reset."
@@ -150,7 +152,7 @@
         },
         "job": {
           "title": "Job & Material",
-          "description": "Optionally pick the entity that reports the name of the current print job, and the one that reports how much material the job used. A Run is named after its job, and a print that starts again with the same job name, e.g. after a power loss, continues the same Run.",
+          "description": "Optionally pick the entity that reports the name of the Device's current job, and the one that reports how much Material the job used. A Run is named after its job, and a job that starts again under the same name, e.g. after a power loss, continues the same Run.",
           "data": {
             "entity_id": "Job name entity (optional)",
             "attribute": "Attribute (optional)",
@@ -161,18 +163,18 @@
             "loaded_slot": "Loaded slot entity (optional)"
           },
           "data_description": {
-            "entity_id": "Without a job name, a print that starts again while a Run is open always continues that Run.",
-            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of a print event entity.",
-            "material_entity_id": "The printer's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
+            "entity_id": "Without a job name, a Device that starts again while a Run is open always continues that Run.",
+            "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of an event entity that fires for each job.",
+            "material_entity_id": "The Device's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
             "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor.",
-            "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material loaded in it (e.g. PLA) as its state.",
+            "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material in it (e.g. PLA) as its state.",
             "colour_attribute": "The attribute of the Slot entities that carries the Material's colour as a hex code, e.g. color_hex.",
-            "loaded_slot": "Reports the number of the Slot printing right now; any other value means no Slot. Each Slot loaded during a Run is matched to a Material by type and colour."
+            "loaded_slot": "Reports the number of the Slot the Device takes its Material from right now; any other value means no Slot. Each Slot reported during a Run is matched to a Material by type and colour."
           }
         },
         "material_unit": {
           "title": "Unit of the Material used attribute",
-          "description": "In which unit does the attribute report the material used? It must be a length or a mass.",
+          "description": "In which unit does the attribute report the Material used? It must be a length or a mass.",
           "data": {
             "unit": "Unit"
           }
@@ -418,6 +420,7 @@
       },
       "error": {
         "type_name_required": "Enter a Type Name.",
+        "job_with_program_or_doses": "“Job and Material” can't be combined with “Program” or “Doses”: the job and the Program would both name the Run, and a Dose's Material Line Item would take the place of the Run's own one and of its Flags. Switch off one of the two sides. A Material Line Item can still be added by hand on any Run.",
         "no_running_value": "Map at least one value to running, otherwise Runs never start.",
         "no_ending_value": "Map at least one value to finished, cancelled or ended, otherwise Runs never end.",
         "value_mapped_twice": "Each value can be mapped to one target only.",
