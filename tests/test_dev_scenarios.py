@@ -15,11 +15,11 @@ from pytest_homeassistant_custom_component.common import MockUser
 
 import custom_components
 from dev.coinop_dev import async_setup
-from dev.coinop_dev.scenarios import async_load
+from dev.coinop_dev.scenarios import PIECES, async_load
 
 from .clock import Clock
 from .devices import configure
-from .test_quick_start import offered
+from .test_quick_start import offered, open_add_device
 from .websocket import PanelClient
 
 DEV = Path(__file__).parents[1] / "dev"
@@ -105,6 +105,53 @@ async def test_a_device_with_history_loads_alone(
     await hass.async_block_till_done()
 
     assert await counts(panel) == expected
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize(
+    ("piece", "label"),
+    [
+        ("anycubic_cloud.3d_printer", "Kobra S1 · Anycubic Cloud & LAN"),
+        ("moonraker.3d_printer", "Voron 2.4 · Moonraker"),
+        ("ha_washdata.washing_machine", "Washing machine · WashData"),
+        ("ha_washdata.dishwasher", "Dishwasher · WashData"),
+        (
+            "tesla_wall_connector.ev_charger",
+            "Tesla Wall Connector · Tesla Wall Connector",
+        ),
+    ],
+)
+async def test_a_quick_start_piece_loads_alone(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    label: str,
+) -> None:
+    await async_load(hass, {"pieces": [piece]}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (0, 0, 0, 0)
+    [entry] = hass.config_entries.async_entries("coinop")
+    result = await open_add_device(hass, entry)
+    assert [option["label"] for option in offered(result)] == [label, "manual"]
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_all_pieces_load_together_with_their_shared_data_once(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    assert await counts(panel) == (4, 12, 33, 0)
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalog = await panel.event()
+    assert len(catalog["tags"]) == 6
+    assert len(catalog["templates"]) == 1
+    [entry] = hass.config_entries.async_entries("coinop")
+    assert len(offered(await open_add_device(hass, entry))) == 6
 
 
 @pytest.mark.usefixtures("helpers")
