@@ -51,6 +51,12 @@ input_select:
   dishwasher_program:
     name: Kitchen dishwasher program
     options: ["Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"]
+  dryer_status:
+    name: Heat pump dryer status
+    options: ["off", running, paused, finished, cancelled]
+  dryer_program:
+    name: Heat pump dryer program
+    options: [Cotton cupboard dry, Cotton iron dry, Synthetics, Wool finish]
   # The devices of the WashData stand-in in dev/ha_washdata.
   washdata_washer_status:
     name: WashData washing machine status
@@ -139,6 +145,13 @@ input_number:
     step: 0.1
     mode: box
     unit_of_measurement: L
+  dryer_energy:
+    name: Heat pump dryer energy
+    min: 0
+    max: 100000
+    step: 0.001
+    mode: box
+    unit_of_measurement: kWh
   washdata_washer_energy:
     name: WashData washing machine energy
     min: 0

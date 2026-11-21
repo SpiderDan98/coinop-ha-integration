@@ -262,6 +262,7 @@ async def test_a_preset_fills_coinop_from_scratch(
         ("bambu", (1, 8, 10, 0)),
         ("washer", (1, 4, 10, 0)),
         ("dishwasher", (1, 3, 10, 0)),
+        ("dryer", (1, 2, 9, 0)),
         ("irrigation", (1, 0, 6, 0)),
     ],
 )
@@ -326,7 +327,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
     await hass.async_block_till_done()
 
-    assert await counts(panel) == (5, 15, 43, 0)
+    assert await counts(panel) == (6, 17, 52, 0)
     await panel.subscribe("coinop/catalog/subscribe")
     catalog = await panel.event()
     assert len(catalog["tags"]) == 6
@@ -360,6 +361,7 @@ async def test_without_history_every_device_with_history_exists_without_a_run(
         "Bambu Lab X1C",
         "Washing machine",
         "Kitchen dishwasher",
+        "Heat pump dryer",
         "Garden valve",
     ]
     assert (await panel.call("coinop/runs/list"))["runs"] == []
@@ -390,6 +392,7 @@ ENDS = {
     "bambu": {"input_select.bambu_status": "finished"},
     "washer": {"input_select.washer_status": "finished"},
     "dishwasher": {"input_select.dishwasher_status": "finished"},
+    "dryer": {"input_select.dryer_status": "finished"},
     "irrigation": {"input_select.irrigation_status": "off"},
 }
 
@@ -423,6 +426,7 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     assert sorted(running.values()) == [
         "Bambu Lab X1C",
         "Garden valve",
+        "Heat pump dryer",
         "Kitchen dishwasher",
         "Prusa MK4",
         "Washing machine",
@@ -430,7 +434,7 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     runs = (await panel.call("coinop/runs/list"))["runs"]
     assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
     assert not [run for run in runs if run["ended"] is None]
-    assert len(runs) == (5 if history == "none" else 43 + 5)
+    assert len(runs) == (6 if history == "none" else 52 + 6)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -499,6 +503,15 @@ APPLIANCES_WITH_HISTORY = {
             ("material", "default_row"),
         },
         {"Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"},
+    ),
+    "dryer": (
+        "tumble_dryer",
+        {
+            ("electricity", "measured"),
+            ("material", "program_default"),
+            ("material", "default_row"),
+        },
+        {"Cotton cupboard dry", "Cotton iron dry", "Synthetics", "Wool finish"},
     ),
 }
 
@@ -664,6 +677,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         ),
         ("washing_machine", ["washer", "ha_washdata.washing_machine"]),
         ("dishwasher", ["dishwasher", "ha_washdata.dishwasher"]),
+        ("tumble_dryer", ["dryer"]),
         ("ev_charger", ["tesla_wall_connector.ev_charger", *EV_CHARGERS]),
         ("other", ["irrigation"]),
     ]
@@ -1042,6 +1056,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.p1s_power": 120,
         "input_select.washer_status": "running",
         "input_select.dishwasher_status": "running",
+        "input_select.dryer_status": "running",
         "input_select.washdata_dishwasher_status": "running",
         "input_select.irrigation_status": "watering",
         "input_select.wall_connector_status": "charging",
@@ -1061,6 +1076,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.p1s_power": "0.0",
         "input_select.washer_status": "off",
         "input_select.dishwasher_status": "off",
+        "input_select.dryer_status": "off",
         "input_select.washdata_dishwasher_status": "off",
         "input_select.irrigation_status": "off",
         "input_select.wall_connector_status": "not_connected",

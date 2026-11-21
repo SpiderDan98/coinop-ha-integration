@@ -37,6 +37,7 @@ load:
             - ha_washdata.washing_machine
             - dishwasher
             - ha_washdata.dishwasher
+            - dryer
             - tesla_wall_connector.ev_charger
             - evcc_intg.ev_charger
             - ocpp.ev_charger

@@ -156,6 +156,36 @@ TYPICAL_DISHES = {
     "Quick 45°": (58, 0.82, 10.5),
 }
 DISHWASHER_METERS = {"dishwasher_energy": 286.4, "dishwasher_water": 3140.0}
+DRYER_PRODUCTS = [
+    ("Dryer sheets Fresh", "Dryer sheets", "laundry_additive", None, "pcs", 3.99, 80),
+    (
+        "Dryer fragrance Lavender",
+        "Dryer fragrance",
+        "laundry_additive",
+        1.0,
+        "ml",
+        5.49,
+        250,
+    ),
+]
+TUMBLES = [
+    (25, 11, "Cotton cupboard dry", 165, "finished", 1.32),
+    (22, 18, "Synthetics", 95, "finished", 0.61),
+    (19, 11, "Cotton iron dry", 140, "finished", 1.08),
+    (16, 10, "Cotton cupboard dry", 170, "finished", 1.38),
+    (12, 19, "Wool finish", 12, "finished", 0.08),
+    (10, 11, "Cotton cupboard dry", 60, "cancelled", 0.45),
+    (7, 11, "Cotton cupboard dry", 162, "finished", 1.29),
+    (4, 18, "Synthetics", 92, "finished", 0.59),
+    (2, 11, "Cotton iron dry", 138, "finished", 1.05),
+]
+TYPICAL_TUMBLES = {
+    "Cotton cupboard dry": (165, 1.32),
+    "Cotton iron dry": (140, 1.08),
+    "Synthetics": (95, 0.61),
+    "Wool finish": (12, 0.08),
+}
+DRYER_METERS = {"dryer_energy": 734.2}
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -334,6 +364,7 @@ SHARED: dict[str, Callable[[Seed], Awaitable[None]]] = {
     "filaments": Seed.add_filaments,
     "laundry": partial(Seed.add_products, products=LAUNDRY),
     "dishwasher": partial(Seed.add_products, products=DISHWASHER_PRODUCTS),
+    "dryer": partial(Seed.add_products, products=DRYER_PRODUCTS),
     "tags": Seed.add_tags,
     "template": Seed.add_template,
 }
@@ -748,6 +779,15 @@ async def _dishwasher_short(seed: Seed) -> None:
 async def _dishwasher_long(seed: Seed) -> None:
     long = _years_of(seed, TYPICAL_DISHES, range(3, 8), (13, 20, 21))
     await _replay_cycles(seed, "dishwasher", DISHWASHER_METERS, [*long, *DISHES])
+
+
+async def _dryer_short(seed: Seed) -> None:
+    await _replay_cycles(seed, "dryer", DRYER_METERS, TUMBLES)
+
+
+async def _dryer_long(seed: Seed) -> None:
+    long = _years_of(seed, TYPICAL_TUMBLES, range(4, 11), (10, 11, 18))
+    await _replay_cycles(seed, "dryer", DRYER_METERS, [*long, *TUMBLES])
 
 
 async def _replay_meters(
@@ -1181,6 +1221,41 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         _washdata_helpers("washdata_dishwasher", "Eco 50°"),
         domain="ha_washdata",
         data={"name": "Dishwasher", "device_type": "dishwasher"},
+    ),
+    "dryer": DeviceWithHistory(
+        "tumble_dryer",
+        "Heat pump dryer",
+        "An energy meter, dryer sheets and fragrance as Doses and Program Defaults, "
+        "no water. Short history: 9 loads over four weeks; long: a load every week or "
+        "so for two years.",
+        {
+            "input_select.dryer_status": "off",
+            "input_select.dryer_program": "Cotton cupboard dry",
+            **{f"input_number.{key}": value for key, value in DRYER_METERS.items()},
+        },
+        device=_appliance("tumble_dryer", "dryer", water=None),
+        short=_dryer_short,
+        long=_dryer_long,
+        start=partial(_start_cycle, key="dryer", program="Cotton cupboard dry"),
+        needs=("dryer",),
+        setup=partial(
+            _set_doses,
+            device="dryer",
+            doses={
+                "sheets": "Dryer sheets Fresh",
+                "fragrance": "Dryer fragrance Lavender",
+            },
+            defaults={
+                "default": {"kwh": 1.2, "doses": {"sheets": 1}},
+                "programs": {
+                    "Cotton cupboard dry": {
+                        "kwh": 1.32,
+                        "doses": {"sheets": 1, "fragrance": 5},
+                    },
+                    "Wool finish": {"kwh": 0.08, "doses": {}},
+                },
+            },
+        ),
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",
