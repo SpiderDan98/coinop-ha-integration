@@ -8,11 +8,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .clock import Clock
 from .devices import WASHER_ENERGY, add_hub, configure, start_reconfigure
-from .registry import HaDevice, add_ha_device, entity
+from .registry import HaDevice, add_home_connect_alt, add_home_connect_local
 from .test_appliance_kinds import HOME_CONNECT_MAPPING
 from .test_integration_profiles import accepted
 from .test_lifecycle import at
@@ -38,81 +37,6 @@ HOME_CONNECT_ALT_MAPPING = {
     "fault": [f"{STATE}.Error"],
     "ignored": [f"{STATE}.Inactive", f"{STATE}.Ready", f"{STATE}.DelayedStart"],
 }
-
-
-def add_home_connect_local(
-    hass: HomeAssistant, appliance_type: str = "Dishwasher"
-) -> HaDevice:
-    """chris-mc1/homeconnect_local_hass: one appliance per config entry, unique ids
-    `<device id>-<key>`, the API's appliance type as the HA device's model."""
-    device_id = f"BOSCH-{appliance_type.upper()}-68A40E000000"
-    config_entry = MockConfigEntry(
-        domain="homeconnect_ws", title=appliance_type, unique_id=device_id
-    )
-    config_entry.add_to_hass(hass)
-    name = f"Bosch {appliance_type}"
-    keys = {
-        "sensor_operation_state": "sensor",
-        "sensor_active_program": "sensor",
-        "sensor_door_state": "sensor",
-        "select_program": "select",
-    }
-    return add_ha_device(
-        hass,
-        config_entry,
-        {
-            key: entity(
-                platform,
-                f"{device_id}-{key}",
-                object_id=f"{name} {key[len(platform) + 1 :]}",
-            )
-            for key, platform in keys.items()
-        },
-        identifiers={("homeconnect_ws", device_id)},
-        manufacturer="Bosch",
-        model=appliance_type,
-        name=name,
-    )
-
-
-def add_home_connect_alt(
-    hass: HomeAssistant, *, active_program: bool = True
-) -> HaDevice:
-    """ekutner/home-connect-hass: every appliance of an account on one config entry,
-    unique ids `<haId>_<BSH key in lower case, dots as underscores>`, the haId in lower
-    case with underscores. Its active program sensor is registered only once the
-    appliance has run a program while the integration was loaded."""
-    config_entry = next(
-        iter(hass.config_entries.async_entries("home_connect_alt")), "home_connect_alt"
-    )
-    ha_id = "BOSCH-WAT28400-68A40E000000"
-    safe_ha_id = ha_id.lower().replace("-", "_")
-    keys = {
-        "BSH.Common.Status.OperationState": ("sensor", "operation_state"),
-        "BSH.Common.Status.DoorState": ("sensor", "door_state"),
-        "BSH.Common.Option.RemainingProgramTime": ("sensor", "remaining_program_time"),
-        "selected_program": ("sensor", "selected_program"),
-        "active_program": ("sensor", "active_program"),
-        "programs": ("select", "programs"),
-    }
-    if not active_program:
-        del keys["active_program"]
-    return add_ha_device(
-        hass,
-        config_entry,
-        {
-            key: entity(
-                platform,
-                f"{safe_ha_id}_{key.lower().replace('.', '_')}",
-                object_id=f"Washer {suffix}",
-            )
-            for key, (platform, suffix) in keys.items()
-        },
-        identifiers={("home_connect_alt", safe_ha_id)},
-        manufacturer="Bosch",
-        model="WAT28400",
-        name="Washer",
-    )
 
 
 async def test_quick_start_asks_a_home_connect_local_appliance_its_device_type(

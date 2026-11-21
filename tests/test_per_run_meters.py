@@ -9,14 +9,13 @@ import pytest
 
 from .clock import Clock
 from .devices import add_basic_device, add_hub
-from .registry import HaDevice
+from .registry import HaDevice, add_miele
 from .test_ev_chargers import CHARGER_MAPPING, CHARGER_STATUS, set_charger
 from .test_measured import electricity, set_meter
 from .test_quick_start import quick_start
 from .test_robotic_mowers import STATION_ENERGY, add_mower, set_mower
 from .test_runs import stored_runs
 from .test_water import water
-from .washers import add_miele
 
 COUNTERS = {
     "current_energy_consumption": "kWh",

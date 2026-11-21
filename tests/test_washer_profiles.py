@@ -17,12 +17,17 @@ from .devices import (
     start_add_device,
     start_reconfigure,
 )
-from .registry import HaDevice, add_anycubic_local
+from .registry import (
+    HaDevice,
+    add_anycubic_local,
+    add_home_connect,
+    add_miele,
+    add_washdata,
+)
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
 from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
-from .washers import add_home_connect, add_miele, add_washdata
 from .websocket import PanelClient
 
 # What WashData's program sensor reports while no program is recognised.
