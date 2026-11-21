@@ -51,8 +51,10 @@ from .device_inputs import (
 )
 from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
+from .run_book import unfinalised
 from .schema import vol
 from .sensor import async_remove_lost
+from .store import async_stored_runs
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
 ATTRIBUTE_UNITS: dict[str, list[str]] = {
@@ -235,8 +237,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         subentry = self._get_reconfigure_subentry()
         had, has = capabilities_of(subentry.data), self._capabilities()
         # A Run may have started after the `other` step let the change through.
-        if has != had and self._recording():
-            return self.async_abort(reason="run_open")
+        if has != had and (refusal := await self._async_refusal()):
+            return self.async_abort(reason=refusal)
         # Only here: a setup or reload must never cost a Device an entity.
         async_remove_lost(self.hass, subentry.subentry_id, had - has)
         return self.async_update_and_abort(self._get_entry(), subentry, data=self._data)
@@ -279,8 +281,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """What a shipped Device Type answers by itself: the Type Name the Device is
         listed under and what it has."""
-        if self.source == SOURCE_RECONFIGURE and self._recording():
-            return self.async_abort(reason="run_open")
+        if self.source == SOURCE_RECONFIGURE and (
+            refusal := await self._async_refusal()
+        ):
+            return self.async_abort(reason=refusal)
         errors: dict[str, str] = {}
         if user_input is not None:
             type_name = user_input["type_name"].strip()
@@ -346,15 +350,18 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._walking = frozenset(sections) - self._data.keys()
         return await self._walk(sections)
 
-    def _recording(self) -> bool:
-        """Whether a Run of the Device being reconfigured can still change: an open
-        one, or an ended one that waits for its inputs' last reports."""
+    async def _async_refusal(self) -> str | None:
+        """Why what the Device being reconfigured has can't change now, as the abort
+        reason: a Run of it isn't final yet, or nothing can tell whether one is."""
         entry = self._get_entry()
         device_id = self._get_reconfigure_subentry().subentry_id
-        return entry.state is ConfigEntryState.LOADED and any(
-            run.device_id == device_id and not run.finalised
-            for run in entry.runtime_data.book.runs()
-        )
+        if entry.state is ConfigEntryState.LOADED:
+            changing = entry.runtime_data.book.unfinalised(device_id)
+            return "run_open" if changing else None
+        # A stored Run goes on once the hub entry is loaded again.
+        if (stored := await async_stored_runs(self.hass)) is None:
+            return "runs_unreadable"
+        return "run_open_not_loaded" if unfinalised(stored, device_id) else None
 
     def _stored_choices(self) -> dict[str, Any] | None:
         """The `other` step's input as the Device being reconfigured has it."""

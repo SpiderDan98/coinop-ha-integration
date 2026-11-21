@@ -508,6 +508,57 @@ async def test_a_run_that_starts_while_the_choices_are_changed_refuses_them(
     assert water(run)["quantity"] == pytest.approx(120)
 
 
+async def test_an_open_run_refuses_the_change_while_coinop_is_not_loaded_too(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    """The Run goes on when Coin-op loads again, so it must find its water."""
+    await set_valve_water(hass, 1000)
+    entry = await add_hub(hass)
+    valve = await add_irrigation(hass, entry)
+    stored = dict(valve.data)
+    menu = await configure(
+        hass, await open_other(hass, entry, valve), other_input("Irrigation")
+    )
+    await set_valve(hass, "on")
+    await clock.advance(minutes=20)
+    await hass.config_entries.async_unload(entry.entry_id)
+
+    opened = await open_other(hass, entry, valve)
+    saved = await configure(hass, menu, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    for refused in (opened, saved):
+        assert (refused["type"], refused["reason"]) == (
+            FlowResultType.ABORT,
+            "run_open_not_loaded",
+        )
+    assert entry.subentries[valve.subentry_id].data == stored
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await clock.advance(minutes=10)
+    await set_valve_water(hass, 1120)
+    await set_valve(hass, "off")
+    await set_valve_water(hass, 1120)
+    [run] = stored_runs(hass_storage)
+    assert water(run)["quantity"] == pytest.approx(120)
+
+
+async def test_without_readable_runs_an_unloaded_coinop_refuses_the_change_in_its_own_words(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    await set_valve_water(hass, 1000)
+    entry = await add_hub(hass)
+    valve = await add_irrigation(hass, entry)
+    await hass.config_entries.async_unload(entry.entry_id)
+    hass_storage["coinop.live"]["version"] += 1
+
+    refused = await open_other(hass, entry, valve)
+
+    assert (refused["type"], refused["reason"]) == (
+        FlowResultType.ABORT,
+        "runs_unreadable",
+    )
+
+
 async def test_leaving_halfway_through_the_sections_a_change_brings_changes_nothing(
     hass: HomeAssistant,
 ) -> None:

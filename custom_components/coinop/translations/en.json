@@ -434,7 +434,9 @@
       },
       "abort": {
         "reconfigure_successful": "The Device was saved.",
-        "run_open": "This Device has a Run that is still open, or that has just ended and waits for the last reports of its meters. What a Device has can't change until then, so that no Run changes what it records halfway. Nothing was saved. Try again once the Run has ended; it waits for its meters for five minutes at most."
+        "run_open": "This Device has a Run that is still open, or that has just ended and waits for the last reports of its meters. What a Device has can't change until then, so that no Run changes what it records halfway. Nothing was saved. Try again once the Run has ended; it waits for its meters for five minutes at most.",
+        "run_open_not_loaded": "Coin-op isn't loaded right now, and this Device has a Run that was still open when Coin-op stopped, or that had just ended and waited for the last reports of its meters. The Run goes on when Coin-op is loaded again. What a Device has can't change until the Run has ended, so that no Run changes what it records halfway. Nothing was saved. Try again once Coin-op is loaded and the Run has ended.",
+        "runs_unreadable": "Coin-op isn't loaded right now and can't read its stored Runs, so it can't tell whether this Device has a Run that is still open. What a Device has can't change while it has one, so that no Run changes what it records halfway. Nothing was saved. Try again once Coin-op is loaded; what keeps it from loading is shown with Coin-op under Settings > Devices & services."
       }
     }
   },

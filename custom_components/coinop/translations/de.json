@@ -434,7 +434,9 @@
       },
       "abort": {
         "reconfigure_successful": "Das Gerät wurde gespeichert.",
-        "run_open": "Dieses Gerät hat einen Lauf, der noch offen ist oder gerade beendet wurde und auf die letzten Meldungen seiner Zähler wartet. Was ein Gerät hat, lässt sich bis dahin nicht ändern, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn der Lauf beendet ist; auf seine Zähler wartet er höchstens fünf Minuten."
+        "run_open": "Dieses Gerät hat einen Lauf, der noch offen ist oder gerade beendet wurde und auf die letzten Meldungen seiner Zähler wartet. Was ein Gerät hat, lässt sich bis dahin nicht ändern, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn der Lauf beendet ist; auf seine Zähler wartet er höchstens fünf Minuten.",
+        "run_open_not_loaded": "Coin-op ist gerade nicht geladen, und dieses Gerät hat einen Lauf, der noch offen war, als Coin-op angehalten wurde, oder gerade beendet war und auf die letzten Meldungen seiner Zähler wartete. Der Lauf geht weiter, sobald Coin-op wieder geladen ist. Was ein Gerät hat, lässt sich nicht ändern, bis der Lauf beendet ist, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn Coin-op geladen und der Lauf beendet ist.",
+        "runs_unreadable": "Coin-op ist gerade nicht geladen und kann seine gespeicherten Läufe nicht lesen. Ob dieses Gerät einen noch offenen Lauf hat, lässt sich deshalb nicht sagen. Was ein Gerät hat, lässt sich nicht ändern, solange es einen hat, damit kein Lauf mittendrin ändert, was er erfasst. Es wurde nichts gespeichert. Versuche es erneut, wenn Coin-op geladen ist; was das Laden verhindert, steht bei Coin-op unter Einstellungen > Geräte & Dienste."
       }
     }
   },

@@ -11,7 +11,7 @@ import pytest
 from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
-from .devices import add_device, add_hub, configure, start_reconfigure
+from .devices import add_device, add_hub, configure, open_other, start_reconfigure
 from .test_device_flow import fields, offered
 from .test_other_devices import add_kiln, set_kiln
 
@@ -251,6 +251,32 @@ async def test_changing_what_an_other_device_has_is_named_announced_and_refused_
     # Add Device says where its answers can be changed, before they are given.
     reconfigure = texts[f"{prefix}.step.reconfigure.title"]
     assert quoted.format(reconfigure) in texts[f"{prefix}.step.other.description"]
+
+
+@pytest.mark.parametrize(
+    ("language", "unseen"), [("en", "capabilit"), ("de", "fähigkeit")]
+)
+async def test_a_change_refused_while_coinop_is_not_loaded_says_why_in_its_own_words(
+    hass: HomeAssistant, hass_storage: dict[str, Any], language: str, unseen: str
+) -> None:
+    entry = await add_hub(hass)
+    kiln = await add_kiln(hass, entry)
+    await set_kiln(hass, "on")
+    loaded = await open_other(hass, entry, kiln)
+    await hass.config_entries.async_unload(entry.entry_id)
+    with_a_run = await open_other(hass, entry, kiln)
+    hass_storage["coinop.live"]["version"] += 1
+    unreadable = await open_other(hass, entry, kiln)
+
+    texts = await async_get_translations(hass, language, "config_subentries", [DOMAIN])
+
+    refusals = [
+        texts.get(f"component.{DOMAIN}.config_subentries.device.abort.{reason}")
+        for reason in (loaded["reason"], with_a_run["reason"], unreadable["reason"])
+    ]
+    assert all(refusals), refusals
+    assert len(set(refusals)) == 3
+    assert [text for text in refusals if text and unseen in text.lower()] == []
 
 
 async def test_entities_are_named_in_the_configured_language(
