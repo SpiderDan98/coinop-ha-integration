@@ -450,6 +450,8 @@ The Device Type itself stays fixed: an Other Device never becomes a shipped Devi
 
 You can set a Spoolman URL in Coin-op's integration options. Materials can then be linked to a Spoolman Filament, so their price per gram comes from Spoolman, or be created from your Spoolman Filaments. When Spoolman can't be reached, the last price read is used and the Run gets a Flag.
 
+While no Spoolman URL is set and a Device uses Material, Coin-op looks for a Spoolman that is already in Home Assistant: the URL of the [Spoolman integration](https://github.com/Disane87/spoolman-homeassistant), or a running Spoolman add-on, Ingress add-ons included. When one answers, a repair under Settings > System > Repairs offers to connect it with one click. Ignore the repair if Coin-op should not read Spoolman. Coin-op looks again at every start and after each change to its Devices or options.
+
 ## Cost Statement
 
 Select ended Runs in the panel and download a Cost Statement: a PDF in English or German, detailed (every Line Item and the Cover Image per Run) or compact (one row per Run), optionally with a Markup on top. It opens with the total and how it splits into electricity, water, material and other costs. It is explicitly not an invoice. A default Markup can be set in the integration options. With exactly one Tag filtered, the title defaults to "Cost Statement – <Tag>". The browser remembers the last export options except title and note. The download works the way Home Assistant's own backup download does, so it also works from the Companion app.

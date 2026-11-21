@@ -8,12 +8,12 @@ from homeassistant.helpers.typing import ConfigType
 from . import ha_device, panel, websocket
 from .catalog import Catalog
 from .const import DEVICE_TYPE_3D_PRINTER, DOMAIN, SUBENTRY_DEVICE
-from .device_config import DeviceConfig
+from .device_config import Capability, DeviceConfig
 from .device_settings import DeviceSettings
 from .images import DeviceImages, ImageLibrary, RunImageView, RunUploadView
 from .run_book import RunBook
 from .runtime import CoinOp, CoinOpConfigEntry
-from .spoolman import CONF_SPOOLMAN_URL, Spoolman
+from .spoolman import CONF_SPOOLMAN_URL, Spoolman, async_offer
 from .statement import CONF_MARKUP, CostStatements, CostStatementView
 from .store import CoinOpStores, RunStore
 from .tracker import DeviceTracker
@@ -107,6 +107,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CoinOpConfigEntry) -> bo
     for tracker in entry.runtime_data.trackers:
         await tracker.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+    wanted = spoolman.url is None and any(
+        Capability.MATERIAL in device.capabilities for device in devices
+    )
+    entry.async_create_background_task(
+        hass, async_offer(hass, wanted), "coinop_spoolman_offer"
+    )
     entry.async_on_unload(ha_device.async_track_renames(hass, entry))
     return True
 

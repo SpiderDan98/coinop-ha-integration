@@ -1,4 +1,5 @@
-"""Fix flow for missing stored data: restore a backup, or deliberately start fresh."""
+"""Fix flows: missing stored data (restore a backup, or deliberately start fresh),
+and a Spoolman found in Home Assistant (connect it)."""
 
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +13,12 @@ if TYPE_CHECKING:
 
 from .const import DOMAIN
 from .schema import vol
+from .spoolman import (
+    CONF_SPOOLMAN_URL,
+    ISSUE_SPOOLMAN_FOUND,
+    SpoolmanUnreachable,
+    async_check,
+)
 from .store import ISSUE_DATA_MISSING, async_start_fresh
 
 
@@ -50,7 +57,41 @@ class DataMissingFlow(RepairsFlow):
         return self.async_create_entry(data={})
 
 
+class SpoolmanFoundFlow(RepairsFlow):
+    def __init__(self, url: str) -> None:
+        self._url = url
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        placeholders = {"url": self._url}
+        if user_input is None:
+            return self.async_show_form(
+                step_id="confirm",
+                data_schema=vol.Schema({}),
+                description_placeholders=placeholders,
+            )
+        try:
+            await async_check(self.hass, self._url)
+        except SpoolmanUnreachable:
+            return self.async_abort(
+                reason="cannot_connect", description_placeholders=placeholders
+            )
+        [entry] = self.hass.config_entries.async_entries(DOMAIN)
+        self.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_SPOOLMAN_URL: self._url}
+        )
+        return self.async_create_entry(data={})
+
+
 async def async_create_fix_flow(
     hass: HomeAssistant, issue_id: str, data: dict[str, Any] | None
 ) -> RepairsFlow:
+    if issue_id == ISSUE_SPOOLMAN_FOUND and data:
+        return SpoolmanFoundFlow(data["url"])
     return DataMissingFlow()

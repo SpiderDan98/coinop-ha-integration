@@ -10,14 +10,22 @@ from typing import Any
 
 from aiohttp import ClientError, ClientTimeout
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.hassio import is_hassio
 from yarl import URL
 
 from .catalog import Catalog
+from .const import DOMAIN
 from .materials import Material, MaterialForm, SpoolmanPrice
 
 CONF_SPOOLMAN_URL = "spoolman_url"
+ISSUE_SPOOLMAN_FOUND = "spoolman_found"
 _TIMEOUT = ClientTimeout(total=10)
+_PORT = 7912
+# The Spoolman integration (Disane87/spoolman-homeassistant) keeps its URL here.
+_INTEGRATION_DOMAIN = "spoolman"
+_INTEGRATION_URL = "spoolman_url"
 
 
 class SpoolmanUnreachable(Exception):
@@ -109,11 +117,74 @@ async def _async_get(hass: HomeAssistant, url: str, path: str) -> Any:
         raise SpoolmanUnreachable from err
 
 
+def clean_url(url: str) -> str:
+    return url.strip().rstrip("/")
+
+
 async def async_check(hass: HomeAssistant, url: str) -> None:
     """Raise SpoolmanUnreachable unless Spoolman answers at `url`."""
     info = await _async_get(hass, url, "info")
     if not isinstance(info, dict) or "version" not in info:
         raise SpoolmanUnreachable
+
+
+async def _async_addon_urls(hass: HomeAssistant) -> list[str]:
+    """Where HA reaches each running Spoolman add-on inside the Supervisor's network."""
+    if not is_hassio(hass):
+        return []
+    # Only loaded on a Supervisor install, where hassio is already set up.
+    from homeassistant.components.hassio import (
+        SupervisorError,
+        get_supervisor_client,
+    )
+
+    client = get_supervisor_client(hass)
+    urls: list[str] = []
+    try:
+        for addon in await client.addons.list():
+            if "spoolman" not in addon.slug or addon.state != "started":
+                continue
+            info = await client.addons.addon_info(addon.slug)
+            # An Ingress add-on's own proxy adds the Ingress path, so its port serves the API at /.
+            ports = [info.ingress_port] if info.ingress and info.ingress_port else []
+            ports += [int(port.partition("/")[0]) for port in info.network or {}]
+            urls += [f"http://{info.hostname}:{port}" for port in [*ports, _PORT]]
+    except SupervisorError:
+        pass
+    return urls
+
+
+async def async_find(hass: HomeAssistant) -> str | None:
+    """A Spoolman URL that answers: the Spoolman integration's first, then an add-on's."""
+    candidates = [
+        clean_url(url)
+        for entry in hass.config_entries.async_entries(_INTEGRATION_DOMAIN)
+        if isinstance(url := entry.data.get(_INTEGRATION_URL), str)
+    ] + await _async_addon_urls(hass)
+    for url in dict.fromkeys(candidates):
+        try:
+            await async_check(hass, url)
+        except SpoolmanUnreachable:
+            continue
+        return url
+    return None
+
+
+async def async_offer(hass: HomeAssistant, wanted: bool) -> None:
+    """Offer the Spoolman found in HA as a repair, while `wanted` (no URL set, a Device uses Material)."""
+    if not wanted or (url := await async_find(hass)) is None:
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_SPOOLMAN_FOUND)
+        return
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        ISSUE_SPOOLMAN_FOUND,
+        is_fixable=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=ISSUE_SPOOLMAN_FOUND,
+        translation_placeholders={"url": url},
+        data={"url": url},
+    )
 
 
 class Spoolman:

@@ -23,7 +23,12 @@ from homeassistant.helpers.selector import (
 from .const import DOMAIN, NAME, SUBENTRY_DEVICE
 from .device_flow import DeviceSubentryFlow
 from .schema import vol
-from .spoolman import CONF_SPOOLMAN_URL, SpoolmanUnreachable, async_check
+from .spoolman import (
+    CONF_SPOOLMAN_URL,
+    SpoolmanUnreachable,
+    async_check,
+    clean_url,
+)
 from .statement import CONF_MARKUP
 
 OPTIONS_SCHEMA = vol.Schema(
@@ -81,7 +86,7 @@ async def _async_validate(
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """The options to save, or the errors to show."""
     options, errors = dict(user_input), {}
-    if url := options.pop(CONF_SPOOLMAN_URL, "").strip().rstrip("/"):
+    if url := clean_url(options.pop(CONF_SPOOLMAN_URL, "")):
         try:
             await async_check(hass, url)
         except SpoolmanUnreachable:
