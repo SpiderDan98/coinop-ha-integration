@@ -304,8 +304,9 @@ def moonraker(find: Find) -> dict[str, Any]:
                 paused=["paused"],
                 finished=["complete"],
                 cancelled=["cancelled"],
+                # Klipper resets to it after a print or an error, never during a print.
+                ended=["standby"],
                 fault=["error"],
-                ignored=["standby"],
             ),
         ),
         "job": found(job, entity_id=job, attribute=None)

@@ -29,9 +29,9 @@ MAPPING = {
     "paused": ["paused"],
     "finished": ["complete"],
     "cancelled": ["cancelled"],
-    "ended": [],
+    "ended": ["standby"],
     "fault": ["error"],
-    "ignored": ["standby"],
+    "ignored": [],
 }
 
 
@@ -188,10 +188,10 @@ async def test_a_moonraker_print_is_one_run_with_its_outcome(
     assert (run["usage"]["value"], run["usage"]["unit"]) == (4250, "mm")
 
 
-async def test_a_moonraker_print_in_error_is_flagged_and_closed_by_the_next_print(
+async def test_a_moonraker_print_in_error_is_flagged_and_ended_by_the_standby_after_it(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
-    """Klipper goes from `error` to `standby`, which ends no Run."""
+    """Klipper stays in `error` until it is reset, which is `standby`."""
     printer = add_moonraker(hass)
     await idle_printer(hass, printer)
     entry = await add_hub(hass)
@@ -214,9 +214,11 @@ async def test_a_moonraker_print_in_error_is_flagged_and_closed_by_the_next_prin
 
     benchy, cube = stored_runs(hass_storage)
     assert benchy["job_name"] == "Benchy.gcode"
-    assert (benchy["ended"], benchy["outcome"]) == (at(minutes=30), "unknown")
+    assert (benchy["ended"], benchy["outcome"]) == (at(minutes=40), "unknown")
+    assert benchy["pauses"] == [{"start": at(minutes=30), "end": at(minutes=40)}]
     assert "fault" in benchy["flags"]
     assert (cube["job_name"], cube["outcome"]) == ("Cube.gcode", "completed")
+    assert cube["started"] == at(minutes=50)
     assert "fault" not in cube["flags"]
 
 
