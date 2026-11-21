@@ -2,7 +2,9 @@
 
 import asyncio
 from datetime import datetime, timedelta
+import json
 from pathlib import Path
+import re
 from typing import Any
 
 from homeassistant.config_entries import SOURCE_USER
@@ -198,6 +200,22 @@ def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     assert "boolean" in fields["open_run"]["selector"]
 
 
+def test_no_two_pieces_share_a_helper_and_loading_resets_every_helper_a_device_uses() -> (
+    None
+):
+    users: dict[str, list[str]] = {}
+    unreset = {}
+    for name, piece in PIECES.items():
+        for helper in piece.helpers:
+            users.setdefault(helper, []).append(name)
+        if isinstance(piece, DeviceWithHistory):
+            inputs = set(re.findall(r"input_\w+\.\w+", json.dumps(piece.device)))
+            unreset[name] = inputs - set(piece.helpers)
+
+    assert {helper: names for helper, names in users.items() if len(names) > 1} == {}
+    assert {name: inputs for name, inputs in unreset.items() if inputs} == {}
+
+
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
     """Devices, Materials, Runs and open Runs."""
     runs = (await panel.call("coinop/runs/list"))["runs"]
@@ -244,6 +262,9 @@ async def test_a_preset_fills_coinop_from_scratch(
         ("prusa", (1, 8, 7, 0)),
         ("bambu", (1, 8, 10, 0)),
         ("washer", (1, 4, 10, 0)),
+        ("dishwasher", (1, 3, 10, 0)),
+        ("dryer", (1, 2, 9, 0)),
+        ("coffee", (1, 2, 12, 0)),
         ("oven", (1, 0, 10, 0)),
         ("charger", (1, 0, 10, 0)),
         ("mower", (1, 0, 10, 0)),
@@ -331,7 +352,7 @@ async def test_all_pieces_load_together_with_their_shared_data_once(
     await async_load(hass, {"pieces": list(PIECES)}, hass_admin_user)
     await hass.async_block_till_done()
 
-    assert await counts(panel) == (7, 12, 63, 0)
+    assert await counts(panel) == (10, 19, 94, 0)
     await panel.subscribe("coinop/catalog/subscribe")
     catalog = await panel.event()
     assert len(catalog["tags"]) == 6
@@ -365,6 +386,9 @@ async def test_without_history_every_device_with_history_exists_without_a_run(
         "Prusa MK4",
         "Bambu Lab X1C",
         "Washing machine",
+        "Kitchen dishwasher",
+        "Heat pump dryer",
+        "Espresso machine",
         "Kitchen oven",
         "Carport charger",
         "Robotic mower",
@@ -470,6 +494,9 @@ ENDS: dict[str, dict[str, str | float]] = {
     "prusa": {"input_select.prusa_status": "finished"},
     "bambu": {"input_select.bambu_status": "finished"},
     "washer": {"input_select.washer_status": "finished"},
+    "dishwasher": {"input_select.dishwasher_status": "finished"},
+    "dryer": {"input_select.dryer_status": "finished"},
+    "coffee": {"input_select.coffee_status": "finished"},
     "oven": {"input_select.kitchen_oven_status": "finished"},
     "charger": {
         "input_number.carport_charger_session": 7.4,
@@ -509,7 +536,10 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     assert sorted(running.values()) == [
         "Bambu Lab X1C",
         "Carport charger",
+        "Espresso machine",
         "Garden valve",
+        "Heat pump dryer",
+        "Kitchen dishwasher",
         "Kitchen oven",
         "Prusa MK4",
         "Robotic mower",
@@ -518,7 +548,7 @@ async def test_the_open_run_option_starts_a_run_on_each_device_that_its_helpers_
     runs = (await panel.call("coinop/runs/list"))["runs"]
     assert {run["outcome"] for run in runs if run["id"] in running} == {"completed"}
     assert not [run for run in runs if run["ended"] is None]
-    assert len(runs) == (7 if history == "none" else 63 + 7)
+    assert len(runs) == (10 if history == "none" else 94 + 10)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -573,6 +603,72 @@ async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
         None,
     }
     assert any("ended_early_defaults" in run["flags"] for run in runs)
+
+
+# An appliance Device with history's Device Type, its Runs' Line Items by kind and
+# how each was got, and their Programs.
+APPLIANCES_WITH_HISTORY = {
+    "dishwasher": (
+        "dishwasher",
+        {
+            ("electricity", "measured"),
+            ("water", "measured"),
+            ("material", "program_default"),
+            ("material", "default_row"),
+        },
+        {"Eco 50°", "Auto 45-65°", "Intensive 70°", "Quick 45°"},
+    ),
+    "dryer": (
+        "tumble_dryer",
+        {
+            ("electricity", "measured"),
+            ("material", "program_default"),
+            ("material", "default_row"),
+        },
+        {"Cotton cupboard dry", "Cotton iron dry", "Synthetics", "Wool finish"},
+    ),
+    "coffee": (
+        "coffee_machine",
+        {
+            ("electricity", "program_default"),
+            ("water", "program_default"),
+            ("material", "program_default"),
+            ("material", "default_row"),
+        },
+        {"Espresso", "Lungo", "Cappuccino", "Latte macchiato"},
+    ),
+}
+
+
+@pytest.mark.usefixtures("helpers")
+@pytest.mark.parametrize("history", ["short", "long"])
+@pytest.mark.parametrize("piece", APPLIANCES_WITH_HISTORY)
+async def test_an_appliance_with_history_has_its_device_types_line_items_and_programs(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    piece: str,
+    history: str,
+) -> None:
+    device_type, line_items, programs = APPLIANCES_WITH_HISTORY[piece]
+    await async_load(hass, {"pieces": [piece], "history": history}, hass_admin_user)
+    await hass.async_block_till_done()
+
+    [device] = (await panel.call("coinop/devices/list"))["devices"]
+    runs = [
+        (await panel.call("coinop/runs/get", run_id=run["id"]))["run"]
+        for run in (await panel.call("coinop/runs/list"))["runs"]
+    ]
+    assert device["type"] == device_type
+    assert {
+        (item["kind"], item.get("method") or item.get("dose_source"))
+        for run in runs
+        for item in run["line_items"]
+    } == line_items
+    assert {run["program"] for run in runs} == programs
+    assert {run["outcome"] for run in runs} == {"completed", "cancelled"}
+    assert all(run["finalised"] for run in runs)
 
 
 @pytest.mark.usefixtures("helpers")
@@ -718,6 +814,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         (
             "dishwasher",
             [
+                "dishwasher",
                 "ha_washdata.dishwasher",
                 "miele.dishwasher",
                 "home_connect.dishwasher",
@@ -729,6 +826,7 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
         (
             "tumble_dryer",
             [
+                "dryer",
                 "ha_washdata.tumble_dryer",
                 "miele.tumble_dryer",
                 "home_connect.tumble_dryer",
@@ -736,7 +834,10 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
                 "smartthings.tumble_dryer",
             ],
         ),
-        ("coffee_machine", ["miele.coffee_machine", "home_connect.coffee_machine"]),
+        (
+            "coffee_machine",
+            ["coffee", "miele.coffee_machine", "home_connect.coffee_machine"],
+        ),
         (
             "oven",
             [
@@ -845,12 +946,12 @@ async def test_quick_start_adds_the_washing_machine_washdata_follows(
         hass, "Washing machine · WashData", optional_meter=PLUG_ENERGY, price=0.32
     )
 
-    await set_helper(hass, "input_number.washer_energy", 100)
-    await set_helper(hass, "input_select.washer_program", "Eco 40-60")
-    await set_helper(hass, "input_select.washer_status", "running")
+    await set_helper(hass, "input_number.washdata_washer_energy", 100)
+    await set_helper(hass, "input_select.washdata_washer_program", "Eco 40-60")
+    await set_helper(hass, "input_select.washdata_washer_status", "running")
     await clock.advance(hours=1)
-    await set_helper(hass, "input_number.washer_energy", 100.7)
-    await set_helper(hass, "input_select.washer_status", "cancelled")
+    await set_helper(hass, "input_number.washdata_washer_energy", 100.7)
+    await set_helper(hass, "input_select.washdata_washer_status", "cancelled")
     await clock.advance(minutes=10)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
@@ -881,12 +982,12 @@ async def test_quick_start_adds_the_dishwasher_washdata_follows_as_a_dishwasher(
 
     [device] = (await panel.call("coinop/devices/list"))["devices"]
     assert (device["name"], device["type"]) == ("Dishwasher", "dishwasher")
-    await set_helper(hass, "input_number.dishwasher_energy", 50)
-    await set_helper(hass, "input_select.dishwasher_program", "Eco 50°")
-    await set_helper(hass, "input_select.dishwasher_status", "running")
+    await set_helper(hass, "input_number.washdata_dishwasher_energy", 50)
+    await set_helper(hass, "input_select.washdata_dishwasher_program", "Eco 50°")
+    await set_helper(hass, "input_select.washdata_dishwasher_status", "running")
     await clock.advance(hours=2)
-    await set_helper(hass, "input_number.dishwasher_energy", 50.9)
-    await set_helper(hass, "input_select.dishwasher_status", "finished")
+    await set_helper(hass, "input_number.washdata_dishwasher_energy", 50.9)
+    await set_helper(hass, "input_select.washdata_dishwasher_status", "finished")
     await clock.advance(minutes=10)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
@@ -1154,6 +1255,9 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.p1s_power": 120,
         "input_select.washer_status": "running",
         "input_select.dishwasher_status": "running",
+        "input_select.dryer_status": "running",
+        "input_select.coffee_status": "running",
+        "input_select.washdata_dishwasher_status": "running",
         "input_select.irrigation_status": "watering",
         "input_select.wall_connector_status": "charging",
     }
@@ -1172,6 +1276,9 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.p1s_power": "0.0",
         "input_select.washer_status": "off",
         "input_select.dishwasher_status": "off",
+        "input_select.dryer_status": "off",
+        "input_select.coffee_status": "off",
+        "input_select.washdata_dishwasher_status": "off",
         "input_select.irrigation_status": "off",
         "input_select.wall_connector_status": "not_connected",
     }
