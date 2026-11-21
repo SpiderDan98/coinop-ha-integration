@@ -32,3 +32,13 @@ load:
             - ha_washdata.dishwasher
             - tesla_wall_connector.ev_charger
             - irrigation
+    history:
+      name: History
+      description: How much history the Devices with history get.
+      default: short
+      selector:
+        select:
+          options:
+            - none
+            - short
+            - long
