@@ -528,6 +528,8 @@ async def _replay(
     # the service call that is waiting for this load.
     before = set(hass._tasks)
     hass.states.async_set(entity_id, str(value), attributes, timestamp=at.timestamp())
+    # Older Home Assistant runs state listeners a loop iteration after the change.
+    await asyncio.sleep(0)
     while started := hass._tasks - before:
         await asyncio.wait(started)
 
