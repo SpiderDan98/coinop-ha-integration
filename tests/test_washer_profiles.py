@@ -8,7 +8,6 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
-from .anycubic import add_anycubic_local
 from .clock import Clock
 from .devices import (
     WASHER_ENERGY,
@@ -18,7 +17,7 @@ from .devices import (
     start_add_device,
     start_reconfigure,
 )
-from .registry import HaDevice
+from .registry import HaDevice, add_anycubic_local
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
 from .test_quick_start import quick_start, register

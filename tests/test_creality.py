@@ -7,7 +7,6 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 
 from .clock import Clock
-from .creality import add_creality
 from .devices import (
     ENERGY,
     POWER,
@@ -17,7 +16,7 @@ from .devices import (
     configure,
     start_reconfigure,
 )
-from .registry import HaDevice
+from .registry import HaDevice, add_creality
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register

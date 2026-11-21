@@ -8,7 +8,6 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .anycubic import add_anycubic_cloud, add_anycubic_local
 from .clock import Clock
 from .devices import (
     ENERGY,
@@ -20,7 +19,7 @@ from .devices import (
     start_add_device,
     start_reconfigure,
 )
-from .registry import HaDevice
+from .registry import HaDevice, add_anycubic_cloud, add_anycubic_local
 from .test_device_flow import suggested
 from .test_runs import stored_runs
 

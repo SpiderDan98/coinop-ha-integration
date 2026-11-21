@@ -17,7 +17,7 @@ from .devices import (
     report_status,
     start_reconfigure,
 )
-from .prusalink import add_prusalink
+from .registry import add_prusalink
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register

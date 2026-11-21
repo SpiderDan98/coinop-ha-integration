@@ -17,8 +17,7 @@ from .devices import (
     report_status,
     start_reconfigure,
 )
-from .octoprint import add_octoprint
-from .registry import HaDevice
+from .registry import HaDevice, add_octoprint
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register
