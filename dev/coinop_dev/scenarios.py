@@ -517,8 +517,12 @@ async def _replay(
 ) -> None:
     """Report a helper's value as of `at`, which its services can't backdate."""
     attributes = state.attributes if (state := hass.states.get(entity_id)) else None
+    # Awaits only what the report starts: async_block_till_done would also wait for
+    # the service call that is waiting for this load.
+    before = set(hass._tasks)
     hass.states.async_set(entity_id, str(value), attributes, timestamp=at.timestamp())
-    await hass.async_block_till_done()
+    while started := hass._tasks - before:
+        await asyncio.wait(started)
 
 
 async def _async_set_washer(hass: HomeAssistant, status: str, program: str) -> None:

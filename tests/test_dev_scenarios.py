@@ -1,13 +1,15 @@
 """The dev container's Scenarios load through today's websocket API."""
 
+import asyncio
 from pathlib import Path
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.setup import async_setup_component
 from homeassistant.util.yaml import load_yaml_dict
 import pytest
 from pytest_homeassistant_custom_component.common import MockUser
 
+from dev.coinop_dev import async_setup
 from dev.coinop_dev.scenarios import async_load
 
 from .websocket import PanelClient
@@ -112,3 +114,23 @@ async def test_the_washing_machine_mixes_measured_values_and_program_defaults(
         None,
     }
     assert any("ended_early_defaults" in run["flags"] for run in runs)
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_the_load_service_fills_coinop_when_a_task_awaits_its_call(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    """As over REST (`make dev`), whose view awaits the service call in a task."""
+    assert await async_setup(hass, {})
+    call = hass.services.async_call(
+        "coinop_dev",
+        "load",
+        {"scenario": "washing-machine"},
+        blocking=True,
+        context=Context(user_id=hass_admin_user.id),
+    )
+
+    async with asyncio.timeout(10):
+        await hass.async_create_task(call)
+
+    assert await counts(panel) == (1, 4, 10, 0)
