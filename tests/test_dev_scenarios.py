@@ -467,6 +467,42 @@ async def test_the_next_scenario_takes_the_stand_ins_devices_away(
     assert not any(hass.config_entries.async_entries(d) for d in stand_ins)
 
 
+@pytest.mark.usefixtures("helpers")
+async def test_the_next_scenario_resets_the_helpers_left_running(
+    hass: HomeAssistant, hass_admin_user: MockUser, files: Path
+) -> None:
+    await async_load(hass, "quick-start", hass_admin_user)
+    running: dict[str, str | float] = {
+        "input_select.prusa_status": "printing",
+        "input_text.prusa_job": "Benchy.gcode",
+        "input_select.kobra_status": "printing",
+        "input_number.kobra_power": 120,
+        "input_select.voron_status": "printing",
+        "input_number.voron_filament": 3.2,
+        "input_select.washer_status": "running",
+        "input_select.dishwasher_status": "running",
+        "input_select.irrigation_status": "watering",
+        "input_select.wall_connector_status": "charging",
+    }
+    for entity_id, value in running.items():
+        await set_helper(hass, entity_id, value)
+
+    await async_load(hass, "empty", hass_admin_user)
+
+    assert {entity_id: state(hass, entity_id) for entity_id in running} == {
+        "input_select.prusa_status": "idle",
+        "input_text.prusa_job": "",
+        "input_select.kobra_status": "idle",
+        "input_number.kobra_power": "0.0",
+        "input_select.voron_status": "standby",
+        "input_number.voron_filament": "0.0",
+        "input_select.washer_status": "off",
+        "input_select.dishwasher_status": "off",
+        "input_select.irrigation_status": "off",
+        "input_select.wall_connector_status": "not_connected",
+    }
+
+
 async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     """Add the HA device Quick Start offers as `label`."""
     [entry] = hass.config_entries.async_entries("coinop")
@@ -486,6 +522,12 @@ async def quick_start(hass: HomeAssistant, label: str, **answers: Any) -> None:
     result = await configure(hass, result, {"device": devices[label]})
     result = await configure(hass, result, answers)
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
+
+
+def state(hass: HomeAssistant, entity_id: str) -> str:
+    current = hass.states.get(entity_id)
+    assert current is not None
+    return current.state
 
 
 async def set_helper(hass: HomeAssistant, entity_id: str, value: str | float) -> None:
