@@ -112,6 +112,12 @@ TYPICAL = {
     "Wool": (61, 0.4, 45.0, 40),
     "Quick 30": (31, 0.32, 38.0, 50),
 }
+# The meters' readings before the first load.
+WASHER_METERS = {
+    "washer_energy": 412.5,
+    "washer_water": 18250.0,
+    "detergent_scale": 650.0,
+}
 # Days ago, hour it starts at, minutes, litres.
 WATERINGS = [
     (12, 6, 20, 182.0),
@@ -121,6 +127,7 @@ WATERINGS = [
     (2, 6, 25, 224.0),
     (1, 20, 15, 133.5),
 ]
+IRRIGATION_WATER = 48200.0
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
 TAGS = ["Customer Miller", "Household", "Garden", "Electronics", "Gifts", "Prototypes"]
@@ -549,7 +556,7 @@ async def _washer_long(seed: Seed) -> None:
 
 
 async def _wash(seed: Seed, loads: list[tuple[Any, ...]]) -> None:
-    meters = {"washer_energy": 412.5, "washer_water": 18250.0, "detergent_scale": 650.0}
+    meters = dict(WASHER_METERS)
     for days, program, recognised, minutes, kwh, litres, grams, outcome in loads:
         if meters["detergent_scale"] < grams:
             # A new bottle; a refill between loads counts nothing.
@@ -601,7 +608,7 @@ async def _irrigation_long(seed: Seed) -> None:
 
 
 async def _water(seed: Seed, waterings: list[tuple[int, int, int, float]]) -> None:
-    meter = {"irrigation_water": 48200.0}
+    meter = {"irrigation_water": IRRIGATION_WATER}
     for days, hour, minutes, litres in waterings:
         start = seed.now.replace(hour=hour, minute=0) - timedelta(days=days)
         end = start + timedelta(minutes=minutes)
@@ -827,6 +834,14 @@ def _printer_helpers(key: str, idle: str = "idle") -> dict[str, str | float]:
     return {f"input_text.{key}_job": "", f"input_select.{key}_status": idle}
 
 
+def _washdata_helpers(key: str, program: str) -> dict[str, str | float]:
+    return {
+        f"input_select.{key}_status": "off",
+        f"input_select.{key}_program": program,
+        f"input_number.{key}_energy": 0,
+    }
+
+
 PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
     "prusa": DeviceWithHistory(
         "3d_printer",
@@ -924,7 +939,11 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Energy and water meters, a detergent scale, 4 laundry products as Doses "
         "and Program Defaults. Short history: 10 loads over four weeks; long: a load "
         "every few days for two years.",
-        {"input_select.washer_status": "off"},
+        {
+            "input_select.washer_status": "off",
+            "input_select.washer_program": "Cotton 60°",
+            **{f"input_number.{key}": value for key, value in WASHER_METERS.items()},
+        },
         device=_washer(),
         short=_washer_short,
         long=_washer_long,
@@ -937,7 +956,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Washing machine · WashData",
         "A washing machine WashData follows, with its plug sensor as meter; the "
         "washing machine's helpers run it.",
-        {"input_select.washer_status": "off"},
+        _washdata_helpers("washdata_washer", "Cotton 60°"),
         domain="ha_washdata",
     ),
     "ha_washdata.dishwasher": QuickStartPiece(
@@ -945,7 +964,7 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         "Dishwasher · WashData",
         "A dishwasher WashData follows, with its plug sensor as meter; the "
         "dishwasher's helpers run it.",
-        {"input_select.dishwasher_status": "off"},
+        _washdata_helpers("washdata_dishwasher", "Eco 50°"),
         domain="ha_washdata",
         data={"name": "Dishwasher", "device_type": "dishwasher"},
     ),
@@ -1020,7 +1039,10 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         'An Other Device under the Type Name "Irrigation" with water on a water '
         "meter and the electricity source None, each watering costing only its "
         "water. Short history: 6 waterings over two weeks; long: two summers of them.",
-        {"input_select.irrigation_status": "off"},
+        {
+            "input_select.irrigation_status": "off",
+            "input_number.irrigation_water": IRRIGATION_WATER,
+        },
         device=_garden_valve(),
         short=_irrigation_short,
         long=_irrigation_long,

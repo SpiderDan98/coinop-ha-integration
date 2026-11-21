@@ -2,7 +2,9 @@
 
 import asyncio
 from datetime import datetime, timedelta
+import json
 from pathlib import Path
+import re
 from typing import Any
 
 from homeassistant.config_entries import SOURCE_USER
@@ -195,6 +197,22 @@ def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     assert fields["pieces"]["selector"]["select"]["options"] == list(PIECES)
     assert fields["history"]["selector"]["select"]["options"] == list(HISTORIES)
     assert "boolean" in fields["open_run"]["selector"]
+
+
+def test_no_two_pieces_share_a_helper_and_loading_resets_every_helper_a_device_uses() -> (
+    None
+):
+    users: dict[str, list[str]] = {}
+    unreset = {}
+    for name, piece in PIECES.items():
+        for helper in piece.helpers:
+            users.setdefault(helper, []).append(name)
+        if isinstance(piece, DeviceWithHistory):
+            inputs = set(re.findall(r"input_\w+\.\w+", json.dumps(piece.device)))
+            unreset[name] = inputs - set(piece.helpers)
+
+    assert {helper: names for helper, names in users.items() if len(names) > 1} == {}
+    assert {name: inputs for name, inputs in unreset.items() if inputs} == {}
 
 
 async def counts(panel: PanelClient) -> tuple[int, int, int, int]:
@@ -671,12 +689,12 @@ async def test_quick_start_adds_the_washing_machine_washdata_follows(
         hass, "Washing machine · WashData", optional_meter=PLUG_ENERGY, price=0.32
     )
 
-    await set_helper(hass, "input_number.washer_energy", 100)
-    await set_helper(hass, "input_select.washer_program", "Eco 40-60")
-    await set_helper(hass, "input_select.washer_status", "running")
+    await set_helper(hass, "input_number.washdata_washer_energy", 100)
+    await set_helper(hass, "input_select.washdata_washer_program", "Eco 40-60")
+    await set_helper(hass, "input_select.washdata_washer_status", "running")
     await clock.advance(hours=1)
-    await set_helper(hass, "input_number.washer_energy", 100.7)
-    await set_helper(hass, "input_select.washer_status", "cancelled")
+    await set_helper(hass, "input_number.washdata_washer_energy", 100.7)
+    await set_helper(hass, "input_select.washdata_washer_status", "cancelled")
     await clock.advance(minutes=10)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
@@ -707,12 +725,12 @@ async def test_quick_start_adds_the_dishwasher_washdata_follows_as_a_dishwasher(
 
     [device] = (await panel.call("coinop/devices/list"))["devices"]
     assert (device["name"], device["type"]) == ("Dishwasher", "dishwasher")
-    await set_helper(hass, "input_number.dishwasher_energy", 50)
-    await set_helper(hass, "input_select.dishwasher_program", "Eco 50°")
-    await set_helper(hass, "input_select.dishwasher_status", "running")
+    await set_helper(hass, "input_number.washdata_dishwasher_energy", 50)
+    await set_helper(hass, "input_select.washdata_dishwasher_program", "Eco 50°")
+    await set_helper(hass, "input_select.washdata_dishwasher_status", "running")
     await clock.advance(hours=2)
-    await set_helper(hass, "input_number.dishwasher_energy", 50.9)
-    await set_helper(hass, "input_select.dishwasher_status", "finished")
+    await set_helper(hass, "input_number.washdata_dishwasher_energy", 50.9)
+    await set_helper(hass, "input_select.washdata_dishwasher_status", "finished")
     await clock.advance(minutes=10)
 
     [run] = (await panel.call("coinop/runs/list"))["runs"]
@@ -972,7 +990,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.voron_filament": 3.2,
         "input_number.p1s_power": 120,
         "input_select.washer_status": "running",
-        "input_select.dishwasher_status": "running",
+        "input_select.washdata_dishwasher_status": "running",
         "input_select.irrigation_status": "watering",
         "input_select.wall_connector_status": "charging",
     }
@@ -990,7 +1008,7 @@ async def test_the_next_scenario_resets_the_helpers_left_running(
         "input_number.voron_filament": "0.0",
         "input_number.p1s_power": "0.0",
         "input_select.washer_status": "off",
-        "input_select.dishwasher_status": "off",
+        "input_select.washdata_dishwasher_status": "off",
         "input_select.irrigation_status": "off",
         "input_select.wall_connector_status": "not_connected",
     }
