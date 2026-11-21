@@ -17,7 +17,7 @@ HELPERS = {"washing_machine": "washer", "dishwasher": "dishwasher"}
 STATES = {"cancelled": "interrupted"}
 
 
-def _state(hass: HomeAssistant, status: str, program: str) -> str | None:
+def _state(hass: HomeAssistant, status: str) -> str | None:
     state = hass.states.get(status)
     return STATES.get(state.state, state.state) if state else None
 
@@ -37,8 +37,10 @@ async def async_setup_entry(
 ) -> None:
     async_add_entities(
         [
-            HelperSensor(entry, "washer_state", "State", _state),
-            HelperSensor(entry, "washer_program", "Program", _program),
+            HelperSensor(entry, "washer_state", "State", _state, "status"),
+            HelperSensor(
+                entry, "washer_program", "Program", _program, "status", "program"
+            ),
         ]
     )
 
@@ -52,7 +54,8 @@ class HelperSensor(SensorEntity):
         entry: ConfigEntry,
         key: str,
         name: str,
-        read: Callable[[HomeAssistant, str, str], str | None],
+        read: Callable[..., str | None],
+        *helpers: str,
     ) -> None:
         # WashData's unique ids, which the Integration Profile looks for.
         self._attr_unique_id = f"{entry.entry_id}_{key}"
@@ -62,11 +65,8 @@ class HelperSensor(SensorEntity):
             name=entry.title,
             manufacturer="WashData",
         )
-        helper = HELPERS[entry.data["device_type"]]
-        self._helpers = [
-            f"input_select.{helper}_status",
-            f"input_select.{helper}_program",
-        ]
+        prefix = HELPERS[entry.data["device_type"]]
+        self._helpers = [f"input_select.{prefix}_{helper}" for helper in helpers]
         self._read = read
 
     async def async_added_to_hass(self) -> None:

@@ -16,7 +16,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
 @dataclass
-class Washer:
+class Appliance:
     device: dr.DeviceEntry
     # Entity ids by the integration's entity key.
     entities: dict[str, str] = field(default_factory=dict)
@@ -25,9 +25,9 @@ class Washer:
         return self.entities[key]
 
 
-def _washer(
+def _appliance(
     hass: HomeAssistant, domain: str, identifier: str, name: str
-) -> tuple[MockConfigEntry, Washer]:
+) -> tuple[MockConfigEntry, Appliance]:
     config_entry = MockConfigEntry(domain=domain)
     config_entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
@@ -35,12 +35,12 @@ def _washer(
         identifiers={(domain, identifier)},
         name=name,
     )
-    return config_entry, Washer(device)
+    return config_entry, Appliance(device)
 
 
 def _add(
     hass: HomeAssistant,
-    washer: Washer,
+    appliance: Appliance,
     config_entry: ConfigEntry,
     platform: str,
     key: str,
@@ -48,14 +48,14 @@ def _add(
     object_id: str,
     **kwargs: Any,
 ) -> None:
-    washer.entities[key] = (
+    appliance.entities[key] = (
         er.async_get(hass)
         .async_get_or_create(
             platform,
             config_entry.domain,
             unique_id,
             config_entry=config_entry,
-            device_id=washer.device.id,
+            device_id=appliance.device.id,
             suggested_object_id=object_id,
             **kwargs,
         )
@@ -69,7 +69,7 @@ def add_washdata(
     *,
     name: str = "Washer",
     changed_to: str | None = None,
-) -> Washer:
+) -> Appliance:
     """3dg1luk43/ha_washdata: one HA device per config entry, named after it, unique
     ids `<entry id>_<key>`.
 
@@ -89,7 +89,7 @@ def add_washdata(
         options={"device_type": changed_to} | settings if changed_to else {},
     )
     config_entry.add_to_hass(hass)
-    washer = Washer(
+    appliance = Appliance(
         dr.async_get(hass).async_get_or_create(
             config_entry_id=config_entry.entry_id,
             identifiers={("ha_washdata", config_entry.entry_id)},
@@ -101,7 +101,7 @@ def add_washdata(
     def add(key: str, **kwargs: Any) -> None:
         _add(
             hass,
-            washer,
+            appliance,
             config_entry,
             "sensor",
             key,
@@ -117,7 +117,7 @@ def add_washdata(
     add("energy_total", unit_of_measurement="kWh")
     add("last_cycle_energy", unit_of_measurement="kWh")
     add("last_cycle_cost")
-    return washer
+    return appliance
 
 
 # HA core `miele`'s sensors by key: object id, translation key and unit.
@@ -132,9 +132,7 @@ _STATUS = ("state_status",)
 _PROGRAM = (*_STATUS, "state_program_id", "state_program_phase")
 _ENERGY = (*_PROGRAM, "current_energy_consumption")
 _WATER = (*_ENERGY, "current_water_consumption")
-# The sensors it registers for an appliance, by the model it gives the HA device: the
-# appliance type's tag (`DEVICE_TYPE_TAGS` in its const.py), capitalised, and the
-# `types` of each sensor description in its sensor.py.
+# By the HA device's model (`DEVICE_TYPE_TAGS` in its const.py), its sensors' `types`.
 MIELE_MODELS = {
     "Washing machine": _WATER,
     "Washer dryer": _WATER,
@@ -160,7 +158,7 @@ def add_miele(
     model: str = "Washing machine",
     *,
     serial: str = "000123456789",
-) -> Washer:
+) -> Appliance:
     """HA core `miele`: every appliance of an account on one config entry, named
     after its kind, unique ids `<serial>-<key>`.
 
@@ -172,7 +170,7 @@ def add_miele(
     if config_entry is None:
         config_entry = MockConfigEntry(domain="miele")
         config_entry.add_to_hass(hass)
-    washer = Washer(
+    appliance = Appliance(
         dr.async_get(hass).async_get_or_create(
             config_entry_id=config_entry.entry_id,
             identifiers={("miele", serial)},
@@ -186,7 +184,7 @@ def add_miele(
         object_id, translation_key, unit = MIELE_SENSORS[key]
         _add(
             hass,
-            washer,
+            appliance,
             config_entry,
             "sensor",
             key,
@@ -195,11 +193,10 @@ def add_miele(
             translation_key=translation_key,
             unit_of_measurement=unit,
         )
-    return washer
+    return appliance
 
 
-# The API's appliance types HA core `home_connect` fetches programs for
-# (`APPLIANCES_WITH_PROGRAMS` in its const.py).
+# `APPLIANCES_WITH_PROGRAMS` in HA core `home_connect`'s const.py.
 HOME_CONNECT_WITH_PROGRAMS = (
     "AirConditioner",
     "CleaningRobot",
@@ -213,9 +210,7 @@ HOME_CONNECT_WITH_PROGRAMS = (
     "Washer",
     "WasherDryer",
 )
-# What it registers for an appliance type alone, whatever the appliance reports
-# (`EVENT_SENSORS` and `BSH_PROGRAM_SENSORS` in its sensor.py): by BSH key, the
-# translation key and the types. A coffee maker has 17 more event sensors.
+# `EVENT_SENSORS` in its sensor.py, without 17 more of a coffee maker.
 HOME_CONNECT_EVENT_SENSORS = {
     "BSH.Common.Event.ProgramAborted": (
         "program_aborted",
@@ -341,6 +336,7 @@ HOME_CONNECT_EVENT_SENSORS = {
         ("Hood",),
     ),
 }
+# `BSH_PROGRAM_SENSORS` in its sensor.py.
 HOME_CONNECT_PROGRAM_SENSORS = {
     "BSH.Common.Option.RemainingProgramTime": (
         "program_finish_time",
@@ -361,8 +357,7 @@ HOME_CONNECT_PROGRAM_SENSORS = {
         HOME_CONNECT_WITH_PROGRAMS,
     ),
 }
-# The event sensors Home Assistant 2026.5, Coin-op's minimum, registers for fewer
-# types: it knows no `Hob` and lacks the favorite buttons and most dishwasher events.
+# The types Home Assistant 2026.5, Coin-op's minimum, registers fewer event sensors for.
 HOME_CONNECT_MINIMUM_HA: dict[str, tuple[str, ...]] = {
     "BSH.Common.Event.AlarmClockElapsed": ("Oven", "Cooktop"),
     "BSH.Common.Event.Favorite.001.ExternalTrigger": (),
@@ -384,7 +379,7 @@ def add_home_connect(
     *,
     name: str = "Washer",
     minimum_ha: bool = False,
-) -> Washer:
+) -> Appliance:
     """HA core `home_connect`: unique ids `<haId>-<BSH key>`.
 
     `appliance_type` is the API's type of the appliance, which is on no registry
@@ -397,12 +392,12 @@ def add_home_connect(
     """
     object_id = slugify(name)
     ha_id = f"SIEMENS-{object_id.upper()}-0123"
-    config_entry, washer = _washer(hass, "home_connect", ha_id, name)
+    config_entry, appliance = _appliance(hass, "home_connect", ha_id, name)
 
     def add(platform: str, key: str, translation_key: str, **kwargs: Any) -> None:
         _add(
             hass,
-            washer,
+            appliance,
             config_entry,
             platform,
             key,
@@ -430,4 +425,4 @@ def add_home_connect(
         add("sensor", "BSH.Common.Status.DoorState", "door")
         add("select", "BSH.Common.Root.SelectedProgram", "selected_program")
         add("select", "BSH.Common.Root.ActiveProgram", "active_program")
-    return washer
+    return appliance

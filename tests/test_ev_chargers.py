@@ -4,17 +4,17 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .clock import Clock
 from .devices import (
+    BASIC_DATA,
     add_basic_device,
     add_hub,
-    configure,
+    basic_entities,
+    coinop_entities,
     start_reconfigure,
-    walk_to_mapping,
 )
 from .http import HttpClient
 from .test_cost_statement import export
@@ -80,34 +80,10 @@ async def charge(hass: HomeAssistant, clock: Clock, kwh: float) -> None:
 async def test_an_ev_charger_asks_only_for_what_every_device_has(
     hass: HomeAssistant,
 ) -> None:
-    await set_session(hass, 0)
-    entry = await add_hub(hass)
+    charger = await add_charger(hass)
 
-    result = await walk_to_mapping(
-        hass, entry, name="Wallbox", status=CHARGER_STATUS, device_type="ev_charger"
-    )
-    result = await configure(hass, result, CHARGER_MAPPING)
-    assert (result["step_id"], result["menu_options"]) == (
-        "consumption",
-        ["energy", "power"],
-    )
-    result = await configure(hass, result, {"next_step_id": "energy"})
-    result = await configure(hass, result, {"entity_id": SESSION_ENERGY})
-    assert result["step_id"] == "price"
-    result = await configure(hass, result, {"next_step_id": "fixed_price"})
-    result = await configure(hass, result, {"price": 0.30})
-
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    [charger] = entry.subentries.values()
     assert charger.data["device_type"] == "ev_charger"
-    assert sorted(charger.data) == [
-        "consumption",
-        "device_type",
-        "mapping",
-        "price",
-        "printer_device_id",
-        "status",
-    ]
+    assert sorted(charger.data) == BASIC_DATA
 
 
 async def test_reconfiguring_an_ev_charger_offers_only_what_every_device_has(
@@ -121,7 +97,7 @@ async def test_reconfiguring_an_ev_charger_offers_only_what_every_device_has(
     assert result["menu_options"] == ["status", "consumption", "price", "save"]
 
 
-async def test_a_session_energy_sensor_back_at_zero_between_sessions_is_no_reset(
+async def test_a_session_energy_sensor_back_at_zero_between_runs_is_no_reset(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     await add_charger(hass)
@@ -157,7 +133,7 @@ async def test_a_session_sensor_dropping_before_it_reported_the_end_is_no_reset(
     assert run["flags"] == []
 
 
-async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_session(
+async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_run(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any], panel: PanelClient
 ) -> None:
     await add_charger(hass)
@@ -180,7 +156,7 @@ async def test_a_car_that_stops_charging_while_plugged_in_stays_in_its_session(
     assert listed["running_seconds"] == 90 * 60
 
 
-async def test_a_charging_session_is_priced_with_the_price_of_each_hour(
+async def test_a_charging_run_is_priced_with_the_price_of_each_hour(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:
     await set_price(hass, 0.20)
@@ -234,23 +210,7 @@ async def test_an_ev_charger_has_no_water_sensors_and_its_ended_event_no_program
 
     await charge(hass, clock, 11.5)
 
-    assert sorted(
-        entity.entity_id
-        for entity in entity_registry.entities.values()
-        if entity.platform == "coinop"
-    ) == [
-        "event.wallbox_run",
-        "sensor.wallbox_current_run_cost",
-        "sensor.wallbox_electricity_cost",
-        "sensor.wallbox_energy_in_runs",
-        "sensor.wallbox_flagged_runs",
-        "sensor.wallbox_last_run_cost",
-        "sensor.wallbox_material_cost",
-        "sensor.wallbox_other_cost",
-        "sensor.wallbox_running_time",
-        "sensor.wallbox_runs",
-        "sensor.wallbox_total_cost",
-    ]
+    assert coinop_entities(entity_registry) == basic_entities("wallbox")
     [_, ended] = fired
     assert (ended["event_type"], ended["outcome"]) == ("ended", "completed")
     assert ended["energy_kwh"] == pytest.approx(11.5)
@@ -264,7 +224,7 @@ async def test_an_ev_charger_has_no_water_sensors_and_its_ended_event_no_program
     }.isdisjoint(ended)
 
 
-async def test_charging_sessions_take_the_tags_and_templates_for_new_runs(
+async def test_charging_runs_take_the_tags_and_templates_for_new_runs(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     charger = await add_charger(hass)
@@ -295,7 +255,7 @@ async def test_charging_sessions_take_the_tags_and_templates_for_new_runs(
     assert retagged["run"]["tags"] == ["Guest car"]
 
 
-async def test_a_cost_statement_lists_a_charging_session_without_part_count(
+async def test_a_cost_statement_lists_a_charging_run_without_part_count(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, browser: HttpClient
 ) -> None:
     await add_charger(hass)

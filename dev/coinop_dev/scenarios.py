@@ -30,10 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 PRINTERS = {"prusa": ("Prusa MK4", 120.0), "bambu": ("Bambu Lab X1C", 150.0)}
 WASHER = "washer"
 DISHWASHER = "dishwasher"
-# The stand-ins in dev/ for integrations with an Integration Profile, each with what
-# its config flow is started with per device: Anycubic Cloud & LAN, whose printer
-# follows the Kobra's helpers, and WashData, which follows a washing machine and a
-# dishwasher, so Quick Start offers two Device Types from one integration.
+# What each stand-in's config flow in dev/ is started with, per device it registers.
 STAND_INS: dict[str, tuple[dict[str, str] | None, ...]] = {
     "anycubic_cloud": (None,),
     "ha_washdata": (None, {"name": "Dishwasher", "device_type": "dishwasher"}),

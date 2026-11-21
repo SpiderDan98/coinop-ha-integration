@@ -1,6 +1,6 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -71,6 +71,14 @@ UNUSED: dict[str, dict[str, Any]] = {
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
 }
+# The sections only a Device Type with the Capability has.
+NEEDS = {
+    "job": Capability.JOB,
+    "images": Capability.IMAGES,
+    "program": Capability.PROGRAM,
+    "water": Capability.WATER,
+    "water_price": Capability.WATER,
+}
 
 
 def _watts(minimum: float) -> NumberSelector:
@@ -128,8 +136,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._job: dict[str, Any] = {}
         # The profile's sections while Detect again walks them.
         self._detecting: dict[str, Any] = {}
-        # The HA device picked in Quick Start.
-        self._candidate = Candidate((), "", {})
+        self._candidate: Candidate | None = None
 
     def _capabilities(self) -> frozenset[Capability]:
         return CAPABILITIES[self._data["device_type"]]
@@ -146,19 +153,18 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "water": self.async_step_water,
             "water_price": self.async_step_water_price,
         }
-        needs = {
-            "job": Capability.JOB,
-            "images": Capability.IMAGES,
-            "program": Capability.PROGRAM,
-            "water": Capability.WATER,
-            "water_price": Capability.WATER,
-        }
         if (self._data.get("water") or {}).get("source") == WaterSource.NONE:
-            del needs["water_price"], sections["water_price"]
+            del sections["water_price"]
+        return self._fitting(sections)
+
+    def _fitting[T](self, sections: Mapping[str, T]) -> dict[str, T]:
+        """Those of the sections the Device Type has: a profile also finds a washing
+        machine's water meter for a Device added as a tumble dryer."""
+        capabilities = self._capabilities()
         return {
-            name: step
-            for name, step in sections.items()
-            if name not in needs or needs[name] in self._capabilities()
+            name: section
+            for name, section in sections.items()
+            if name not in NEEDS or NEEDS[name] in capabilities
         }
 
     async def _section_done(self, section: str) -> SubentryFlowResult:
@@ -186,9 +192,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
 
     def _detected(self) -> dict[str, Any] | None:
-        return detect(
+        found = detect(
             self.hass, self._data["device_type"], self._data.get("printer_device_id")
         )
+        return found and self._fitting(found)
 
     async def async_step_detect(
         self, user_input: dict[str, Any] | None = None
@@ -308,7 +315,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """The Device Type of a device whose kind its integration doesn't tell, among
         those the integration serves; a device whose kind is told isn't asked."""
-        candidate = self._candidate
+        candidate = self._picked()
         device_types = [t for t in CAPABILITIES if t in candidate.device_types]
         if user_input is None and len(device_types) > 1:
             return self.async_show_form(
@@ -322,24 +329,33 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._data["device_type"] = (
             user_input["device_type"] if user_input else device_types[0]
         )
-        sections = candidate.sections
-        self._data |= {
+        return await self.async_step_quick_start_confirm()
+
+    def _picked(self) -> Candidate:
+        """The HA device picked in Quick Start, which its later steps are about."""
+        assert self._candidate is not None
+        return self._candidate
+
+    def _found_sections(self) -> dict[str, Any]:
+        """The picked device's sections as the steps store them: those its Device Type
+        has, unused what the profile didn't find, a meter with its unit."""
+        sections = self._fitting(self._picked().sections)
+        stored = {
             name: values
             for name, values in sections.items()
             if name not in UNUSED and name not in METERS
         }
-        self._data |= {
+        stored |= {
             name: unused | sections.get(name, {})
-            for name, unused in UNUSED.items()
-            if name in self._sections()
+            for name, unused in self._fitting(UNUSED).items()
         }
         for quantity in (ELECTRICITY, WATER):
             found = sections.get(quantity.source_key)
             if found and (
                 meter := self._meter_of(quantity, found["entity_id"], [found["source"]])
             ):
-                self._data[quantity.source_key] = meter
-        return await self.async_step_quick_start_confirm()
+                stored[quantity.source_key] = meter
+        return stored
 
     def _meter_of(
         self, quantity: Quantity, entity_id: str, sources: list[str]
@@ -370,9 +386,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         capabilities = self._capabilities()
         per_program = Capability.PROGRAM_CONSUMPTION in capabilities
         meter_field = "optional_meter" if per_program else "meter"
-        needs_meter = ELECTRICITY.source_key not in self._data
+        found = self._found_sections()
+        needs_meter = ELECTRICITY.source_key not in found
         if user_input is not None:
-            data = dict(self._data)
+            data = self._data | found
             if needs_meter:
                 data["consumption"] = self._quick_meter(user_input.get(meter_field))
                 if data["consumption"] is None:
@@ -424,8 +441,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             description_placeholders={
                 "device": self._name,
                 "device_type": await self._device_type_name(),
-                "integration": self._candidate.integration,
-                "inputs": "\n".join(f"- {name}" for name in self._found_inputs()),
+                "integration": self._picked().integration,
+                "inputs": "\n".join(f"- {name}" for name in self._found_inputs(found)),
                 "currency": currency,
             },
         )
@@ -464,20 +481,20 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "factor": None,
         }
 
-    def _found_inputs(self) -> list[str]:
+    def _found_inputs(self, found: dict[str, Any]) -> list[str]:
         """The names of the entities Quick Start took from the profile."""
-        job = self._data.get("job", {})
-        images = self._data.get("images", {})
+        job = found.get("job", {})
+        images = found.get("images", {})
         entity_ids = [
-            self._data["status"]["entity_id"],
-            self._data.get("program", {}).get("entity_id"),
+            found["status"]["entity_id"],
+            found.get("program", {}).get("entity_id"),
             job.get("entity_id"),
             (job.get("material") or {}).get("entity_id"),
             *job.get("slots", []),
             job.get("loaded_slot"),
             images.get("thumbnail"),
             images.get("camera"),
-            *(self._data.get(key, {}).get("entity_id") for key in METERS),
+            *(found.get(key, {}).get("entity_id") for key in METERS),
         ]
         return [
             state.name if (state := self.hass.states.get(entity_id)) else entity_id

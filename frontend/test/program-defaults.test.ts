@@ -134,6 +134,29 @@ describe("A tumble dryer's Program Defaults", () => {
     expect(queryAll(dialog, ".doses .dose-name").map(text)).toEqual(["Dryer sheets"]);
   });
 
+  it.each([
+    [
+      "en",
+      "Amounts per Run: kWh when nothing measures them, and a column for each Dose above, in " +
+        "its Material's unit. An empty cell means not set or not dosed. A Run uses the row of " +
+        "its Program, else the Default row.",
+    ],
+    [
+      "de",
+      "Mengen pro Lauf: kWh, wenn nichts sie misst, und eine Spalte für jede Dosierung oben, " +
+        "in der Einheit ihres Materials. Ein leeres Feld heißt nicht festgelegt oder nicht " +
+        "dosiert. Ein Lauf verwendet die Zeile seines Programms, sonst die Standardzeile.",
+    ],
+  ])("are explained by the columns they have, so without litres (%s)", async (language, hint) => {
+    const backend = backendWith(tumbleDryer);
+    backend.update({ language });
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    await click(panel, query(panel, ".device ha-icon-button.edit"));
+
+    expect(text(query(panel, ".settings-dialog .program-defaults .hint"))).toBe(hint);
+  });
+
   it("stay a kWh column once the Dose list is emptied", async () => {
     const backend = backendWith(tumbleDryer);
     const panel = await mountPanel(backend, { path: "/devices" });
@@ -150,5 +173,44 @@ describe("A tumble dryer's Program Defaults", () => {
         programs: { "Cupboard dry": { doses: {}, kwh: 2.4 } },
       },
     });
+  });
+});
+
+describe("A Tumble dryer set up from a washing machine's HA device", () => {
+  const { dryerFromWasher } = recorded;
+  const waterParts = (panel: Element) => queryAll(panel, ".device .water, .device .water-price");
+
+  it("shows nothing about water on its card or in its Program Defaults", async () => {
+    const panel = await mountPanel(backendWith(dryerFromWasher), { path: "/devices" });
+
+    expect(queryAll(panel, ".device > dl:not(.settings)").map(text)).toEqual([
+      "Status sensor.washing_machine_status " +
+        "Program sensor.washing_machine_program " +
+        "Consumption source Energy meter sensor.washing_machine_energy_consumption " +
+        "Electricity price €0.30 per kWh",
+    ]);
+    expect(headers(await openDialog(panel, dryerFromWasher))).toEqual([
+      "Program",
+      "Electricity (kWh)",
+    ]);
+  });
+
+  it("shows none either when a water source is stored for it", async () => {
+    const stored = {
+      ...dryerFromWasher,
+      ha_settings: {
+        ...dryerFromWasher.ha_settings,
+        water: {
+          source: "meter",
+          entity_id: "sensor.washing_machine_water_consumption",
+          attribute: null,
+        },
+        water_price: { source: "fixed", value: 4 },
+      },
+    } satisfies Device;
+    const panel = await mountPanel(backendWith(stored), { path: "/devices" });
+
+    expect(waterParts(panel)).toEqual([]);
+    expect(headers(await openDialog(panel, stored))).toEqual(["Program", "Electricity (kWh)"]);
   });
 });

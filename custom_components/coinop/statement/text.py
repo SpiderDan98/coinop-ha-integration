@@ -21,7 +21,7 @@ STRINGS: dict[str, dict[str, Any]] = {
     for language in LANGUAGES
 }
 
-CONSUMED = {quantity.unit: quantity for quantity in QUANTITIES.values()}
+QUANTITIES_BY_UNIT = {quantity.unit: quantity for quantity in QUANTITIES.values()}
 QUANTITY_DECIMALS = {"g": 1, "ml": 1, "h": 2, "pcs": 0}
 SYMBOLS = {
     "EUR": "€",
@@ -75,8 +75,8 @@ class Text:
 
     def quantity(self, quantity: float, unit: str) -> str:
         decimals = (
-            CONSUMED[unit].shown_decimals(quantity)
-            if unit in CONSUMED
+            QUANTITIES_BY_UNIT[unit].shown_decimals(quantity)
+            if unit in QUANTITIES_BY_UNIT
             else QUANTITY_DECIMALS.get(unit, 2)
         )
         return f"{self.number(quantity, decimals)} {unit}"

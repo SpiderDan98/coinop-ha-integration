@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Coin-op erfasst, was jeder Lauf deiner Geräte kostet, bei 3D-Druckern, Waschmaschinen und weiteren Haushaltsgeräten. Füge nach der Einrichtung jedes davon als Gerät hinzu."
+        "description": "Coin-op erfasst, was jeder Lauf deiner Geräte kostet, bei 3D-Druckern, Waschmaschinen und den weiteren Gerätetypen, die es kennt. Füge nach der Einrichtung jedes deiner Geräte hinzu."
       }
     },
     "abort": {

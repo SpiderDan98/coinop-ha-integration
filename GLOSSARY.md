@@ -25,7 +25,7 @@ _Avoid_: Gate, bay, tray
 _German UI_: Fach
 
 **Integration Profile**:
-The known Device Inputs of a specific integration, used to fill in a Device's Device Inputs automatically for the Device Types the integration serves.
+The known Device Inputs of a specific integration, used to fill in a Device's Device Inputs automatically for the Device Types the integration serves. It also tells an HA device's appliance kind: what the integration itself registered it as (Miele's "Tumble dryer", WashData's "dishwasher"), before it is a Device. A kind is not a Device Type: Quick Start adds a kind that is one as that Device Type (several kinds can be the same one, as a washer-dryer is a Washing machine), asks for the Device Type where the integration doesn't tell the kind, and leaves out a kind that is none, such as a fridge. The kind is never stored.
 _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 
