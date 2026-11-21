@@ -25,10 +25,17 @@ The Device Type is chosen when a Device is added and can't be changed afterwards
 | 3D printer | Electricity (energy meter, power sensor or an estimate from average power), the material used (per Slot with a multi-material unit), Part Count, Thumbnail and Snapshot | [Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN](#anycubic-printers) |
 | Washing machine | Its Program, electricity and water (measured or per Program) and the Doses of detergent and other products | [WashData, Miele, Home Connect](#washing-machine-integration-profiles) |
 | Dishwasher | Its Program, electricity and water (measured or per Program) and the Doses of tabs, salt and other products | no integration yet: set up manually |
+| Tumble dryer | Its Program, electricity (measured or per Program) and, if you list any, the Doses of dryer sheets or fragrance | no integration yet: set up manually |
+| Oven | Its Program and electricity (measured or per Program) | no integration yet: set up manually |
 
 "Pre-filled for" names the integrations Coin-op has an Integration Profile for: their devices are offered by [Quick Start](#quick-start), and manual setup comes pre-filled for them. A device of any other integration is set up manually, by picking its entities yourself.
 
 A dishwasher has the same setup steps, Program Defaults, Doses, Flags, entities and manual Runs as a washing machine: everything under [Washing machines](#washing-machines) applies to it too.
+
+A tumble dryer and an oven are set up like a washing machine without the water source and the water price. They have no water sensors, and their Run event's `ended` carries the Program but no litres. What [Washing machines](#washing-machines) says about the Program, the Program Defaults, Flags and manual Runs applies to both, with these differences:
+
+- **Tumble dryer**: the Dose list is optional (dryer sheets, fragrance); an empty one adds nothing to a Run. Its Program Defaults have the kWh and a column per Dose, never litres.
+- **Oven**: it has no Dose list. Its Program Defaults are just the kWh per Program, with rows suggested from the Program input and past Runs and the measured kWh suggested per Program, as for a washing machine.
 
 ## Installation
 
