@@ -27,7 +27,7 @@ from custom_components.coinop.device_config import DEVICE_TYPES, stored_capabili
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
-from .stand_ins import Registration, printers
+from .stand_ins import Registration, appliances, printers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -839,6 +839,16 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_select.washer_status": "off"},
         domain="ha_washdata",
     ),
+    "miele.washing_machine": StaticPiece(
+        "washing_machine",
+        "Miele washing machine · Miele",
+        "A washing machine with its own energy and water meters for the cycle; set "
+        "its status in the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele, serial="000111000001", name="Miele washing machine"
+        ),
+    ),
     "ha_washdata.dishwasher": QuickStartPiece(
         "dishwasher",
         "Dishwasher · WashData",
@@ -847,6 +857,55 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece | StaticPiece] = {
         {"input_select.dishwasher_status": "off"},
         domain="ha_washdata",
         data={"name": "Dishwasher", "device_type": "dishwasher"},
+    ),
+    "miele.dishwasher": StaticPiece(
+        "dishwasher",
+        "Miele dishwasher · Miele",
+        "A dishwasher with its own energy and water meters for the cycle; set its "
+        "status in the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele,
+            "Dishwasher",
+            serial="000111000002",
+            name="Miele dishwasher",
+        ),
+    ),
+    "miele.tumble_dryer": StaticPiece(
+        "tumble_dryer",
+        "Miele tumble dryer · Miele",
+        "A tumble dryer with its own energy meter for the cycle; set its status in "
+        "the developer tools to run it.",
+        {},
+        registration=partial(
+            appliances.miele,
+            "Tumble dryer",
+            serial="000111000003",
+            name="Miele tumble dryer",
+        ),
+    ),
+    "miele.coffee_machine": StaticPiece(
+        "coffee_machine",
+        "Miele coffee system · Miele",
+        "A coffee machine with its plug sensor as meter; set its status in the "
+        "developer tools to run it.",
+        {"input_number.miele_coffee_system_power": 0},
+        registration=partial(
+            appliances.miele,
+            "Coffee system",
+            serial="000111000004",
+            name="Miele coffee system",
+        ),
+    ),
+    "miele.oven": StaticPiece(
+        "oven",
+        "Miele oven · Miele",
+        "An oven with its plug sensor as meter; set its status in the developer "
+        "tools to run it.",
+        {"input_number.miele_oven_power": 0},
+        registration=partial(
+            appliances.miele, "Oven", serial="000111000005", name="Miele oven"
+        ),
     ),
     "tesla_wall_connector.ev_charger": QuickStartPiece(
         "ev_charger",

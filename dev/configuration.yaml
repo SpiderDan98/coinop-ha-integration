@@ -176,6 +176,21 @@ input_number:
     step: 1
     mode: box
     unit_of_measurement: W
+  # The plugs of the static stand-ins' appliances whose integration brings no meter.
+  miele_coffee_system_power:
+    name: Miele coffee system power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
+  miele_oven_power:
+    name: Miele oven power
+    min: 0
+    max: 4000
+    step: 1
+    mode: box
+    unit_of_measurement: W
 
 # The metering plugs, which Quick Start offers as meters.
 template:
@@ -237,6 +252,18 @@ template:
       - name: Centauri Carbon plug power
         unique_id: centauri_carbon_plug_power
         state: "{{ states('input_number.centauri_carbon_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Miele coffee system plug power
+        unique_id: miele_coffee_system_plug_power
+        state: "{{ states('input_number.miele_coffee_system_power') }}"
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+      - name: Miele oven plug power
+        unique_id: miele_oven_plug_power
+        state: "{{ states('input_number.miele_oven_power') }}"
         unit_of_measurement: W
         device_class: power
         state_class: measurement

@@ -35,6 +35,11 @@ load:
             - moonraker.3d_printer
             - washer
             - ha_washdata.washing_machine
+            - miele.washing_machine
             - ha_washdata.dishwasher
+            - miele.dishwasher
+            - miele.tumble_dryer
+            - miele.coffee_machine
+            - miele.oven
             - tesla_wall_connector.ev_charger
             - irrigation

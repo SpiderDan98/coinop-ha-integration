@@ -103,15 +103,19 @@ MIELE_MODELS = {
 
 
 def miele(
-    model: str = "Washing machine", *, serial: str = "000123456789"
+    model: str = "Washing machine",
+    *,
+    serial: str = "000123456789",
+    name: str | None = None,
 ) -> Registration:
-    """HA core `miele`: every appliance of an account on one config entry, named
-    after its kind, unique ids `<serial>-<key>`.
+    """HA core `miele`: every appliance of an account on one config entry, unique ids
+    `<serial>-<key>`.
 
     `model` is the appliance's kind as the integration writes it on the HA device; it
-    also decides which sensors the integration registers. A second appliance needs
-    its own `serial`.
+    also decides which sensors the integration registers. `name` is the HA device's,
+    its kind by default. A second appliance needs its own `serial`.
     """
+    name = name or model
     return Registration(
         "miele",
         (
@@ -119,7 +123,7 @@ def miele(
                 {
                     "identifiers": {("miele", serial)},
                     "manufacturer": "Miele",
-                    "name": model,
+                    "name": name,
                     "model": model,
                     "serial_number": serial,
                 },
@@ -129,7 +133,7 @@ def miele(
                         f"{serial}-{key}",
                         state=MIELE_SENSORS[key][2],
                         unit=MIELE_SENSORS[key][1],
-                        object_id=f"{model} {MIELE_SENSORS[key][0]}",
+                        object_id=f"{name} {MIELE_SENSORS[key][0]}",
                     )
                     for key in MIELE_MODELS[model]
                 },
