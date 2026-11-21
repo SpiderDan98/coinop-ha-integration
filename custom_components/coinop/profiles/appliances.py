@@ -1,5 +1,6 @@
 """Integration Profiles and kind checks of appliance integrations."""
 
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -104,25 +105,65 @@ def miele(find: Find) -> dict[str, Any]:
     }
 
 
-def home_connect(find: Find) -> dict[str, Any]:
-    """HA core `home_connect`: unique ids `<haId>-<BSH key>`."""
-    status = find("sensor", "-BSH.Common.Status.OperationState")
-    program = find("select", "-BSH.Common.Root.ActiveProgram")
+# The Home Connect API's operation states, `BSH.Common.EnumType.OperationState.<state>`.
+HOME_CONNECT_STATES = {
+    "running": ["Run"],
+    "paused": ["Pause", "ActionRequired"],
+    "finished": ["Finished"],
+    "cancelled": ["Aborting"],
+    "fault": ["Error"],
+    "ignored": ["Inactive", "Ready", "DelayedStart"],
+}
+
+
+def _operation_state(
+    status: str | None, program: str | None, state: Callable[[str], str]
+) -> dict[str, Any]:
+    """A Home Connect appliance's inputs, its operation states as `state` reports
+    them."""
     return {
         "status": found(status, entity_id=status, attribute=None),
         "mapping": found(
             status,
             **mapping(
-                running=["run"],
-                paused=["pause", "actionrequired"],
-                finished=["finished"],
-                cancelled=["aborting"],
-                fault=["error"],
-                ignored=["inactive", "ready", "delayedstart"],
+                **{
+                    target: [state(value) for value in values]
+                    for target, values in HOME_CONNECT_STATES.items()
+                }
             ),
         ),
         "program": found(program, entity_id=program, attribute=None),
     }
+
+
+def home_connect(find: Find) -> dict[str, Any]:
+    """HA core `home_connect`: unique ids `<haId>-<BSH key>`."""
+    return _operation_state(
+        find("sensor", "-BSH.Common.Status.OperationState"),
+        find("select", "-BSH.Common.Root.ActiveProgram"),
+        str.lower,
+    )
+
+
+def home_connect_local(find: Find) -> dict[str, Any]:
+    """chris-mc1/homeconnect_local_hass (`homeconnect_ws`): unique ids
+    `<device id>-<key>`, states as HA core's `home_connect` reports them."""
+    return _operation_state(
+        find("sensor", "-sensor_operation_state"),
+        find("sensor", "-sensor_active_program"),
+        str.lower,
+    )
+
+
+def home_connect_alt(find: Find) -> dict[str, Any]:
+    """ekutner/home-connect-hass (`home_connect_alt`): unique ids
+    `<haId>_<BSH key in lower case, dots as underscores>`, states the API's own unless
+    its translation mode is `server`, which reports the display texts instead."""
+    return _operation_state(
+        find("sensor", "_bsh_common_status_operationstate"),
+        find("sensor", "_active_program"),
+        "BSH.Common.EnumType.OperationState.{}".format,
+    )
 
 
 # WashData's device types (`DEVICE_TYPES` in its const.py) that say what the device
@@ -227,6 +268,13 @@ def home_connect_kind(
         tuple(registered(suffix) for suffix in HOME_CONNECT_SHARED),
         NoDeviceType.CANT_TELL,
     )
+
+
+def cant_tell(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> NoDeviceType:
+    """Home Connect Local and Home Connect Alt: Quick Start asks the Device Type."""
+    return NoDeviceType.CANT_TELL
 
 
 SMARTTHINGS_DEVICE_TYPES = (
