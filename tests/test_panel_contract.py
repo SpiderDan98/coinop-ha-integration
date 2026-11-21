@@ -38,6 +38,7 @@ from .stored import (
 )
 from .test_ev_chargers import add_charger
 from .test_other_devices import add_kiln, add_pump, fire
+from .test_other_doses import add_brew_kettle, add_soda_maker, carbonate, dose
 from .test_other_images_and_parts import (
     KILN_CAMERA,
     KILN_PREVIEW,
@@ -1154,6 +1155,50 @@ async def test_record_an_other_device_with_a_program_and_its_loaves(
     assert_recorded(
         "aggregates-other-program",
         stable_ids(runs | {"aggregates": [asked | by_program]}, ids),
+    )
+
+
+async def test_record_an_other_device_with_doses_and_no_program_and_a_bottle(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A soda maker ("Soda maker"): an Other Device with Doses and no Program, dosing
+    8 g of "co2" and 40 ml of "syrup" in its Default row, with the electricity source
+    none, and a bottle it carbonated. The catalogue holds the Materials of its Doses
+    and of the brew kettle's below."""
+    soda_maker = await add_soda_maker(hass, hass_storage)
+    await dose(panel, soda_maker, {"dose-co2": 8, "dose-syrup": 40})
+    await carbonate(hass, clock)
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    await panel.subscribe("coinop/catalog/subscribe")
+    catalogue = await panel.event()
+
+    co2, syrup = detail["run"]["line_items"]
+    ids = {
+        soda_maker.subentry_id: "device-soda-maker",
+        run["id"]: "bottle",
+        co2["id"]: "bottle-co2",
+        syrup["id"]: "bottle-syrup",
+    }
+    assert_recorded("devices-list-other-doses", stable_ids(devices, ids))
+    assert_recorded("runs-get-other-doses", stable_ids(detail, ids))
+    assert_recorded("catalog-subscribe-other-doses", catalogue)
+
+
+async def test_record_an_other_device_with_a_program_doses_and_water(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A brew kettle ("Brew kettle"): an Other Device with a Program, Doses and water,
+    its electricity and its water per Program, dosing "malt" and "hops"."""
+    brew_kettle = await add_brew_kettle(hass, panel, hass_storage)
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-other-program-doses",
+        stable_ids(devices, {brew_kettle.subentry_id: "device-brew-kettle"}),
     )
 
 

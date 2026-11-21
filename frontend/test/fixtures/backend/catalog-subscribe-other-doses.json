@@ -1,0 +1,86 @@
+{
+  "materials": [
+    {
+      "id": "co2",
+      "name": "CO₂",
+      "form": "other",
+      "type": "CO₂",
+      "density": 0.77,
+      "vendor": null,
+      "colour": null,
+      "diameter": null,
+      "default_for_type": false,
+      "archived": false,
+      "price": {
+        "source": "fixed",
+        "pack_price": 8.5,
+        "pack_size": 425.0,
+        "pack_unit": "g"
+      },
+      "price_per_gram": 0.02,
+      "price_per_piece": null
+    },
+    {
+      "id": "syrup",
+      "name": "Cola syrup",
+      "form": "other",
+      "type": "Cola syrup",
+      "density": 1.3,
+      "vendor": null,
+      "colour": null,
+      "diameter": null,
+      "default_for_type": false,
+      "archived": false,
+      "price": {
+        "source": "fixed",
+        "pack_price": 5.0,
+        "pack_size": 500.0,
+        "pack_unit": "ml"
+      },
+      "price_per_gram": 0.007692307692307693,
+      "price_per_piece": null
+    },
+    {
+      "id": "malt",
+      "name": "Pale malt",
+      "form": "other",
+      "type": "Pale malt",
+      "density": 0.6,
+      "vendor": null,
+      "colour": null,
+      "diameter": null,
+      "default_for_type": false,
+      "archived": false,
+      "price": {
+        "source": "fixed",
+        "pack_price": 50.0,
+        "pack_size": 25000.0,
+        "pack_unit": "g"
+      },
+      "price_per_gram": 0.002,
+      "price_per_piece": null
+    },
+    {
+      "id": "hops",
+      "name": "Hop pellets",
+      "form": "other",
+      "type": "Hop pellets",
+      "density": 0.5,
+      "vendor": null,
+      "colour": null,
+      "diameter": null,
+      "default_for_type": false,
+      "archived": false,
+      "price": {
+        "source": "fixed",
+        "pack_price": 5.0,
+        "pack_size": 100.0,
+        "pack_unit": "g"
+      },
+      "price_per_gram": 0.05,
+      "price_per_piece": null
+    }
+  ],
+  "tags": [],
+  "templates": []
+}

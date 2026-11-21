@@ -136,6 +136,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
     assert fields(result) == [
         "type_name",
         "program",
+        "doses",
         "water",
         "images",
         "part_count",

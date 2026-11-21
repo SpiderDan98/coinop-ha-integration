@@ -23,6 +23,7 @@ import aggregatesByProgram from "./fixtures/backend/aggregates-by-program.json";
 import aggregatesGet from "./fixtures/backend/aggregates-get.json";
 import aggregatesOtherProgram from "./fixtures/backend/aggregates-other-program.json";
 import catalogSubscribe from "./fixtures/backend/catalog-subscribe.json";
+import catalogSubscribeOtherDoses from "./fixtures/backend/catalog-subscribe-other-doses.json";
 import costStatementCreate from "./fixtures/backend/cost-statement-create.json";
 import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.json";
 import devicesList from "./fixtures/backend/devices-list.json";
@@ -31,8 +32,10 @@ import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.js
 import devicesListElectricityNone from "./fixtures/backend/devices-list-electricity-none.json";
 import devicesListEvCharger from "./fixtures/backend/devices-list-ev-charger.json";
 import devicesListOther from "./fixtures/backend/devices-list-other.json";
+import devicesListOtherDoses from "./fixtures/backend/devices-list-other-doses.json";
 import devicesListOtherImages from "./fixtures/backend/devices-list-other-images.json";
 import devicesListOtherProgram from "./fixtures/backend/devices-list-other-program.json";
+import devicesListOtherProgramDoses from "./fixtures/backend/devices-list-other-program-doses.json";
 import devicesListOtherWater from "./fixtures/backend/devices-list-other-water.json";
 import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
@@ -68,6 +71,7 @@ import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
 import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
 import runsGetOther from "./fixtures/backend/runs-get-other.json";
+import runsGetOtherDoses from "./fixtures/backend/runs-get-other-doses.json";
 import runsGetOtherImages from "./fixtures/backend/runs-get-other-images.json";
 import runsGetOtherProgram from "./fixtures/backend/runs-get-other-program.json";
 import runsGetOtherWater from "./fixtures/backend/runs-get-other-water.json";
@@ -211,6 +215,23 @@ export const recorded = {
   /** `coinop/runs/list` of its Runs "plain-loaf" (no Program, 0.12) and "wheat-loaf"
    * (Whole wheat, 0.15), with `coinop/aggregates/get` of the two by Program. */
   loaves: aggregatesOtherProgram as typeof byProgram,
+  /** `coinop/devices/list` with only "device-soda-maker", an Other Device under the Type
+   * Name "Soda maker" with Doses and no Program, with the electricity source none: its
+   * Default row doses 8 g of "co2" and 40 ml of "syrup". */
+  sodaMaker: devicesListOtherDoses.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-brew-kettle", an Other Device under the Type
+   * Name "Brew kettle" with a Program, Doses and water, its electricity and water per
+   * Program: the Default row 3 kWh, 25 L, 4,000 g of "malt" and 30 g of "hops", "Pale ale"
+   * 3.6 kWh, 30 L and 4,500 g of "malt". */
+  brewKettle: devicesListOtherProgramDoses.devices[0] as Device,
+  /** `coinop/runs/get` of the soda maker's unnamed Run "bottle": 8 g of CO₂ at 0.02
+   * ("bottle-co2") and 40 ml of Cola syrup at 0.01 ("bottle-syrup"), both from the Default
+   * row, and no Electricity Line Item; ended with Outcome Unknown. */
+  bottle: runsGetOtherDoses.run as RunDetail,
+  /** `coinop/catalog/subscribe` with the Materials the Doses of both point to, all of the
+   * form Other: "co2" (CO₂, by g), "syrup" (Cola syrup, by ml), "malt" (Pale malt, by g) and
+   * "hops" (Hop pellets, by g). */
+  consumables: catalogSubscribeOtherDoses as Catalog,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,
