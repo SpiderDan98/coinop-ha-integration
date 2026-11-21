@@ -37,7 +37,7 @@ SODA_MAKER_STATUS = "sensor.soda_maker_status"
 CO2_SCALE = "sensor.co2_scale"
 
 
-def consumable(
+def other_material(
     material_id: str, name: str, density: float, price: float, size: float, unit: str
 ) -> dict[str, Any]:
     """A Material of the form Other, bought as a pack of `size` `unit` at `price`."""
@@ -58,11 +58,11 @@ def consumable(
 
 
 # 0.02 per g, 0.01 per ml; 0.002 per g, 0.05 per g.
-CO2 = consumable("co2", "CO₂", 0.77, 8.5, 425.0, "g")
-SYRUP = consumable("syrup", "Cola syrup", 1.3, 5.0, 500.0, "ml")
-MALT = consumable("malt", "Pale malt", 0.6, 50.0, 25000.0, "g")
-HOPS = consumable("hops", "Hop pellets", 0.5, 5.0, 100.0, "g")
-CONSUMABLES = (CO2, SYRUP, MALT, HOPS)
+CO2 = other_material("co2", "CO₂", 0.77, 8.5, 425.0, "g")
+SYRUP = other_material("syrup", "Cola syrup", 1.3, 5.0, 500.0, "ml")
+MALT = other_material("malt", "Pale malt", 0.6, 50.0, 25000.0, "g")
+HOPS = other_material("hops", "Hop pellets", 0.5, 5.0, 100.0, "g")
+DOSE_MATERIALS = (CO2, SYRUP, MALT, HOPS)
 SODA_DOSES = [
     {"id": "dose-co2", "material_id": "co2"},
     {"id": "dose-syrup", "material_id": "syrup"},
@@ -88,11 +88,11 @@ async def add_soda_maker(
 ) -> ConfigSubentry:
     """A soda maker, off, in EUR: an Other Device with the Type Name "Soda maker" that
     has Doses and no Program, with the electricity source none unless `options` say
-    otherwise. `hass_storage` places the `CONSUMABLES`, which the hub reads when it
+    otherwise. `hass_storage` places the `DOSE_MATERIALS`, which the hub reads when it
     is set up; `SODA_DOSES` are the Doses of its `CO2` and `SYRUP`."""
     hass.config.currency = "EUR"
     if hass_storage is not None:
-        place_materials(hass_storage, *CONSUMABLES)
+        place_materials(hass_storage, *DOSE_MATERIALS)
     await set_soda_maker(hass, "off")
     soda_maker: dict[str, Any] = {
         "type_name": "Soda maker",
@@ -494,12 +494,12 @@ async def add_brew_kettle(
     """A brew kettle, off, in EUR at 0.30 per kWh and 4.00 per m³: an Other Device
     with the Type Name "Brew kettle" that has a Program (on its Program input, with
     no Program yet), Doses and water, its electricity and its water per Program
-    unless `options` say otherwise. `hass_storage` places the `CONSUMABLES`, as for
+    unless `options` say otherwise. `hass_storage` places the `DOSE_MATERIALS`, as for
     `add_soda_maker`; the Doses of its `MALT` and `HOPS` are saved as `BREW_DOSES`,
     with the Program Defaults `BREW_ROWS`."""
     hass.config.currency = "EUR"
     if hass_storage is not None:
-        place_materials(hass_storage, *CONSUMABLES)
+        place_materials(hass_storage, *DOSE_MATERIALS)
     await set_brew_kettle(hass, "off")
     await set_brew_program(hass, "unknown")
     brew_kettle: dict[str, Any] = {

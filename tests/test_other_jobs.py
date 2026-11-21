@@ -29,7 +29,7 @@ from .test_device_flow import fields, suggested
 from .test_manual_runs import create
 from .test_material_usage import material_items
 from .test_other_devices import choose_other
-from .test_other_images_and_parts import KILN_CAMERA, KILN_PREVIEW
+from .test_other_images_and_parts import KILN_CAMERA, KILN_THUMBNAIL
 from .test_other_programs import line_items
 from .test_run_event import record_events
 from .test_runs import stored_runs, value
@@ -175,7 +175,7 @@ async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sect
         {"entity_id": ROUTER_STATUS},
         ROUTER_MAPPING,
         {"entity_id": ROUTER_JOB, "material_entity_id": ROUTER_USED},
-        {"thumbnail": KILN_PREVIEW, "camera": KILN_CAMERA},
+        {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA},
         {"next_step_id": "estimate"},
         {"running_power": 300},
         price_choice(0.30),

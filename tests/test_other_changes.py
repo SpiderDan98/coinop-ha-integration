@@ -43,15 +43,15 @@ from .test_other_doses import (
     BREW_DOSES,
     BREW_KETTLE_PROGRAM,
     BREW_ROWS,
-    CONSUMABLES,
+    DOSE_MATERIALS,
     add_brew_kettle,
     brew,
 )
 from .test_other_images_and_parts import (
     KILN_CAMERA,
-    KILN_PREVIEW,
+    KILN_THUMBNAIL,
     add_kiln_camera,
-    add_kiln_preview,
+    add_kiln_thumbnail,
     add_kiln_with,
 )
 from .test_other_jobs import (
@@ -643,7 +643,7 @@ async def test_images_added_later_give_a_run_its_thumbnail_and_snapshot_until_re
     panel: PanelClient,
     hass_storage: dict[str, Any],
 ) -> None:
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
     entry = await add_hub(hass)
     kiln = await add_kiln(hass, entry)
@@ -653,7 +653,7 @@ async def test_images_added_later_give_a_run_its_thumbnail_and_snapshot_until_re
     result = await configure(hass, result, other_input("Kiln", ["images"]))
     assert result["step_id"] == "images"
     result = await configure(
-        hass, result, {"thumbnail": KILN_PREVIEW, "camera": KILN_CAMERA}
+        hass, result, {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA}
     )
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
@@ -723,7 +723,7 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
 async def test_doses_and_a_program_go_and_come_back_with_the_dose_list_and_its_amounts(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
-    place_materials(hass_storage, *CONSUMABLES)
+    place_materials(hass_storage, *DOSE_MATERIALS)
     entry = await add_hub(hass)
     kettle = await add_brew_kettle(hass, panel, entry=entry)
     [before] = (await panel.call("coinop/devices/list"))["devices"]
@@ -814,7 +814,7 @@ async def test_meters_count_each_run_from_0_only_while_the_device_says_so(
 async def test_a_change_that_removes_and_adds_walks_what_is_new_and_asked_again_in_order(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
-    place_materials(hass_storage, *CONSUMABLES)
+    place_materials(hass_storage, *DOSE_MATERIALS)
     entry = await add_hub(hass)
     kettle = await add_brew_kettle(hass, panel, entry=entry)
     await brew(hass, clock, "Pale ale")

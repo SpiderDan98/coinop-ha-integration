@@ -41,12 +41,14 @@ from .websocket import PanelClient
 
 SMALL_KILN_STATUS = "sensor.small_kiln_status"
 # What the kiln is firing, as its controller shows it, and the camera looking at it.
-KILN_PREVIEW = "image.kiln_preview"
+KILN_THUMBNAIL = "image.kiln_preview"
 KILN_CAMERA = "camera.kiln"
 
 
-async def add_kiln_preview(hass: HomeAssistant, content: bytes = b"") -> FakeThumbnail:
-    return await add_thumbnail(hass, content, entity_id=KILN_PREVIEW)
+async def add_kiln_thumbnail(
+    hass: HomeAssistant, content: bytes = b""
+) -> FakeThumbnail:
+    return await add_thumbnail(hass, content, entity_id=KILN_THUMBNAIL)
 
 
 async def add_kiln_camera(hass: HomeAssistant, *answers: bytes) -> FakeCamera:
@@ -102,7 +104,7 @@ async def test_images_alone_bring_the_images_step_and_no_job_step(
     assert result["step_id"] == "images"
     assert fields(result) == ["thumbnail", "camera", "snapshot"]
     result = await configure(
-        hass, result, {"thumbnail": KILN_PREVIEW, "camera": KILN_CAMERA}
+        hass, result, {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA}
     )
     assert result["step_id"] == "consumption"
 
@@ -135,11 +137,11 @@ async def test_a_device_with_images_stores_them_and_can_reconfigure_them(
     entry = await add_hub(hass)
 
     kiln = await add_kiln_with(
-        hass, "images", entry=entry, thumbnail=KILN_PREVIEW, camera=KILN_CAMERA
+        hass, "images", entry=entry, thumbnail=KILN_THUMBNAIL, camera=KILN_CAMERA
     )
 
     assert kiln.data["images"] == {
-        "thumbnail": KILN_PREVIEW,
+        "thumbnail": KILN_THUMBNAIL,
         "camera": KILN_CAMERA,
         "snapshot": True,
     }
@@ -174,9 +176,9 @@ async def test_a_part_count_alone_brings_no_step_and_no_section(
 async def test_a_run_gets_its_thumbnail_and_at_its_end_its_snapshot_without_a_job(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
-    thumbnail = await add_kiln_preview(hass, picture("red"))
+    thumbnail = await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
-    await add_kiln_with(hass, "images", thumbnail=KILN_PREVIEW, camera=KILN_CAMERA)
+    await add_kiln_with(hass, "images", thumbnail=KILN_THUMBNAIL, camera=KILN_CAMERA)
 
     await set_kiln(hass, "on")
     [started_with] = await run_images(panel)
@@ -226,7 +228,7 @@ async def test_a_run_of_a_device_with_images_takes_photos_and_a_picked_cover_ima
 async def test_a_device_without_images_takes_none_by_itself_but_still_photos(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
     await add_kiln_with(hass, "part_count")
 
@@ -288,14 +290,14 @@ async def test_a_run_of_a_device_without_a_part_count_has_none_and_takes_none(
 async def test_images_and_a_part_count_go_with_a_program(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
 ) -> None:
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     await add_kiln_camera(hass, picture("blue"))
     # The helper expects the images step before the Program step, as Add Device asks.
     await add_bread_maker(
         hass,
         panel,
         has=["program", "images", "part_count"],
-        thumbnail=KILN_PREVIEW,
+        thumbnail=KILN_THUMBNAIL,
         camera=KILN_CAMERA,
     )
 
@@ -381,7 +383,7 @@ async def test_the_devices_command_sends_what_images_and_a_part_count_bring(
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    await add_kiln_with(hass, "images", entry=entry, thumbnail=KILN_PREVIEW)
+    await add_kiln_with(hass, "images", entry=entry, thumbnail=KILN_THUMBNAIL)
     await add_kiln_with(
         hass, "part_count", entry=entry, name="Small kiln", status=SMALL_KILN_STATUS
     )
@@ -390,7 +392,7 @@ async def test_the_devices_command_sends_what_images_and_a_part_count_bring(
 
     assert kiln["capabilities"] == ["average_power", "images"]
     assert kiln["ha_settings"]["images"] == {
-        "thumbnail": KILN_PREVIEW,
+        "thumbnail": KILN_THUMBNAIL,
         "camera": None,
         "snapshot": False,
     }

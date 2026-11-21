@@ -5,12 +5,12 @@ import { click, fill, iconButton, mountPanel, query, queryAll, text } from "./re
 
 const LIST = "coinop/devices/list";
 const SETTINGS = "coinop/devices/update_settings";
-const { sodaMaker, brewKettle, bottle, consumables } = recorded;
+const { sodaMaker, brewKettle, bottle, doseMaterials } = recorded;
 
 const backendWith = (device: Device, language = "en") =>
   recordedBackend({ language })
     .reply(LIST, () => ({ devices: [device] }))
-    .subscription("coinop/catalog/subscribe", () => [consumables])
+    .subscription("coinop/catalog/subscribe", () => [doseMaterials])
     .reply("coinop/devices/measured_suggestions", () => ({
       suggestions: { default: {}, programs: {} },
     }))
