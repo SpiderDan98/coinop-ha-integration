@@ -74,6 +74,12 @@ INTEGRATIONS = {
         appliances.LG_THINQ_DEVICE_TYPES,
         appliances.lg_thinq_kind,
     ),
+    "smartthings": Integration(
+        "SmartThings",
+        appliances.smartthings,
+        appliances.SMARTTHINGS_DEVICE_TYPES,
+        appliances.smartthings_kind,
+    ),
     # EV chargers
     "tesla_wall_connector": Integration(
         "Tesla Wall Connector",

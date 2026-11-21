@@ -643,17 +643,17 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
         (
             "washing_machine",
             "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
-            "LG ThinQ",
+            "LG ThinQ, SmartThings",
         ),
         (
             "dishwasher",
             "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
-            "LG ThinQ",
+            "LG ThinQ, SmartThings",
         ),
         (
             "tumble_dryer",
             "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
-            "LG ThinQ",
+            "LG ThinQ, SmartThings",
         ),
         (
             "coffee_machine",
@@ -662,7 +662,7 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
         (
             "oven",
             "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
-            "LG ThinQ",
+            "LG ThinQ, SmartThings",
         ),
     ],
 )

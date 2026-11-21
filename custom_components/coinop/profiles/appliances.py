@@ -413,3 +413,90 @@ def lg_thinq_kind(
             NoDeviceType.NOT_A_DEVICE,
         )
     return LG_THINQ_KINDS.get(device_type, NoDeviceType.NOT_A_DEVICE)
+
+
+SMARTTHINGS_DEVICE_TYPES = (
+    DEVICE_TYPE_WASHING_MACHINE,
+    DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_TUMBLE_DRYER,
+    DEVICE_TYPE_OVEN,
+)
+# By capability with a machine state sensor: the kind it tells, and its running,
+# paused and finished values (finished is also the idle state).
+SMARTTHINGS_MACHINE_STATES = {
+    "washerOperatingState": (DEVICE_TYPE_WASHING_MACHINE, "run", "pause", "stop"),
+    "dryerOperatingState": (DEVICE_TYPE_TUMBLE_DRYER, "run", "pause", "stop"),
+    "dishwasherOperatingState": (DEVICE_TYPE_DISHWASHER, "run", "pause", "stop"),
+    "ovenOperatingState": (DEVICE_TYPE_OVEN, "running", "paused", "ready"),
+}
+
+
+def _smartthings_machine_state(
+    find: Find, *, disabled: bool = False
+) -> tuple[str, str] | None:
+    """The `main` component's machine state sensor and its capability: a washer's
+    upper washer and an oven's second cavity have one of their own."""
+    return next(
+        (
+            (status, capability)
+            for capability in SMARTTHINGS_MACHINE_STATES
+            if (
+                status := find(
+                    "sensor",
+                    f"_main_{capability}_machineState_machineState",
+                    disabled=disabled,
+                )
+            )
+        ),
+        None,
+    )
+
+
+def smartthings(find: Find) -> dict[str, Any]:
+    """HA core `smartthings`: unique ids
+    `<device id>_<component>_<capability>_<attribute>_<key>`.
+
+    Its machine state doesn't tell a finished cycle from a stopped one, so every
+    Run ends as Completed. It reports no program a Run could be named after.
+    """
+    machine_state = _smartthings_machine_state(find)
+    if machine_state is None:
+        return {"status": {}, "mapping": {}}
+    status, capability = machine_state
+    _, running, paused, finished = SMARTTHINGS_MACHINE_STATES[capability]
+    energy = find(
+        "sensor", "_main_powerConsumptionReport_powerConsumption_energy_meter"
+    )
+    return {
+        "status": {"entity_id": status, "attribute": None},
+        "mapping": mapping(running=[running], paused=[paused], finished=[finished]),
+        "consumption": found(
+            energy,
+            source=ConsumptionSource.ENERGY.value,
+            entity_id=energy,
+            attribute=None,
+        ),
+    }
+
+
+# What a steam closet (an AirDresser) registers along with a dryer's machine state.
+SMARTTHINGS_STEAM_CLOSET = {
+    "binary_sensor": (
+        "_main_samsungce.steamClosetKeepFreshMode_operatingState_operatingState"
+    ),
+    "switch": "_main_samsungce.steamClosetSanitizeMode_status_status",
+}
+
+
+def smartthings_kind(
+    find: Find, device: dr.DeviceEntry, config_entry: ConfigEntry
+) -> str | NoDeviceType:
+    """The kind the capability of the machine state sensor tells; a device without
+    one is a TV, a fridge or another device that is no Device Type."""
+    machine_state = _smartthings_machine_state(find, disabled=True)
+    if machine_state is None or any(
+        find(platform, suffix, disabled=True)
+        for platform, suffix in SMARTTHINGS_STEAM_CLOSET.items()
+    ):
+        return NoDeviceType.NOT_A_DEVICE
+    return SMARTTHINGS_MACHINE_STATES[machine_state[1]][0]
