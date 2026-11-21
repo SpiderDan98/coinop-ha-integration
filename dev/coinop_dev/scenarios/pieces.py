@@ -10,7 +10,13 @@ from homeassistant.config_entries import SOURCE_USER
 from custom_components.coinop.const import DOMAIN as COINOP
 from custom_components.coinop.device_config import DEVICE_TYPES
 
-from ..stand_ins import Registration, appliances, ev_chargers, printers
+from ..stand_ins import (
+    Registration,
+    account_entry,
+    appliances,
+    ev_chargers,
+    printers,
+)
 from . import devices, histories
 from .data import (
     COOKINGS,
@@ -86,9 +92,7 @@ class QuickStartPiece(Piece):
     async def fill(self, seed: Seed) -> None:
         """Adds its kind to the account's entry where the integration keeps one."""
         hass = seed.hass
-        account = self.registration().account
-        if account and (entries := hass.config_entries.async_entries(self.domain)):
-            [entry] = entries
+        if entry := account_entry(hass, self.registration()):
             kinds = [*entry.data[KINDS], self.group]
             hass.config_entries.async_update_entry(
                 entry, data={**entry.data, KINDS: kinds}
