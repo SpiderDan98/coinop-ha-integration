@@ -361,6 +361,30 @@ describe("Devices tab", () => {
   });
 
   it.each([
+    ["en", ["Tumble dryers", "Ovens"]],
+    ["de", ["Trockner", "Backöfen"]],
+  ])(
+    "lists a tumble dryer and an oven under their own headings (%s)",
+    async (language, headings) => {
+      const backend = recordedBackend({ language }).reply(LIST, () => ({
+        devices: [recorded.tumbleDryer, recorded.oven],
+      }));
+
+      const panel = await mountPanel(backend, { path: "/devices" });
+
+      expect(
+        queryAll(panel, ".device-type").map((section) => [
+          text(query(section, "h2")),
+          ...queryAll(section, ".device h3").map(text),
+        ]),
+      ).toEqual([
+        [headings[0], "Tumble dryer"],
+        [headings[1], "Oven"],
+      ]);
+    },
+  );
+
+  it.each([
     ["en", "Coffee machines"],
     ["de", "Kaffeemaschinen"],
   ])("lists a coffee machine under its own heading (%s)", async (language, heading) => {

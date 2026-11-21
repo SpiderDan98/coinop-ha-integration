@@ -125,6 +125,6 @@ _Avoid_: Level sensor, fill level
 _German UI_: Bestandssensor
 
 **Program Defaults**:
-A Device's kWh, litres and Dose amounts for each Program, plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
+A Device's kWh, litres and Dose amounts for each Program, whichever of them its Device Type has (an oven's are just the kWh), plus a Default row for Runs without a known Program, filling in whatever a Run doesn't measure.
 _Avoid_: Presets, program profiles, estimates
 _German UI_: Programmvorgaben
