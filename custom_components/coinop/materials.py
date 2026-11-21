@@ -21,6 +21,7 @@ class MaterialForm(StrEnum):
     LAUNDRY_ADDITIVE = "laundry_additive"
     DISHWASHER_PRODUCT = "dishwasher_product"
     BEVERAGE_INGREDIENT = "beverage_ingredient"
+    OTHER = "other"
 
 
 class PackUnit(StrEnum):
@@ -29,14 +30,18 @@ class PackUnit(StrEnum):
     PIECE = "pcs"
 
 
-# The pack unit of a form's Materials unless one is given; grams for every other form.
+# The pack unit of a form's Materials unless one is given; grams for a form not listed.
 USUAL_UNITS = {
     MaterialForm.RESIN: PackUnit.MILLILITRE,
     MaterialForm.DISHWASHER_PRODUCT: PackUnit.PIECE,
 }
 # Forms whose Materials are never linked to a Spoolman Filament.
 UNLINKED_FORMS = frozenset(
-    {MaterialForm.DISHWASHER_PRODUCT, MaterialForm.BEVERAGE_INGREDIENT}
+    {
+        MaterialForm.DISHWASHER_PRODUCT,
+        MaterialForm.BEVERAGE_INGREDIENT,
+        MaterialForm.OTHER,
+    }
 )
 
 DEFAULT_DIAMETER = 1.75

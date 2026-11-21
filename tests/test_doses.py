@@ -144,6 +144,59 @@ async def test_dishwasher_products_and_beverage_ingredients_are_dosed(
     assert run["flags"] == []
 
 
+async def test_materials_of_the_form_other_are_dosed_in_their_pack_unit(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    device = await add_washer(hass, program=False, price=0.50)
+    # 0.008 per g, 0.012 per ml, 0.15 per piece.
+    packs = {
+        "g": (1.1, 8.0, 1000.0),
+        "ml": (1.2, 6.0, 500.0),
+        "pcs": (None, 4.5, 30.0),
+    }
+    materials = {}
+    for unit, (density, price, size) in packs.items():
+        created = await panel.call(
+            "coinop/materials/create",
+            material={
+                "name": f"Fertiliser by the {unit}",
+                "form": "other",
+                "type": "Fertiliser",
+                "density": density,
+                "price": {
+                    "source": "fixed",
+                    "pack_price": price,
+                    "pack_size": size,
+                    "pack_unit": unit,
+                },
+            },
+        )
+        materials[unit] = created["material"]["id"]
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device.subentry_id,
+        settings={
+            "doses": [
+                {"id": f"dose-{unit}", "material_id": material}
+                for unit, material in materials.items()
+            ],
+            "program_defaults": {
+                "default": {"doses": {"dose-g": 50, "dose-ml": 25, "dose-pcs": 2}}
+            },
+        },
+    )
+
+    await washed(hass, clock, kwh=1.2)
+
+    [run] = stored_runs(hass_storage)
+    assert doses(run) == [
+        ("dose-g", "default_row", materials["g"], 50, "g", 0.008, 0.40),
+        ("dose-ml", "default_row", materials["ml"], 25, "ml", 0.012, 0.30),
+        ("dose-pcs", "default_row", materials["pcs"], 2, "pcs", 0.15, 0.30),
+    ]
+    assert run["flags"] == []
+
+
 async def test_editing_the_default_row_changes_the_open_run_but_no_ended_one(
     hass: HomeAssistant,
     clock: Clock,
