@@ -346,7 +346,8 @@ def home_connect(
     that reports nothing, here as the locked Home Assistant does or, with
     `minimum_ha`, as Coin-op's minimum does. The operation state comes from what the
     appliance reports; every stand-in has one, so that it is its kind that decides
-    whether Quick Start offers it. Each one is a config entry and device of its own.
+    whether Quick Start offers it. Every appliance of an account is on one config
+    entry, a device of its own.
     """
     object_id = slugify(name)
     ha_id = f"SIEMENS-{object_id.upper()}-0123"
@@ -405,6 +406,7 @@ def home_connect(
                 event_sensors | program_sensors | status | programs,
             ),
         ),
+        account=True,
     )
 
 
