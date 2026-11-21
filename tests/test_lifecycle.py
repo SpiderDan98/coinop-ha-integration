@@ -279,6 +279,32 @@ async def test_a_run_is_named_after_its_job(
     assert (run["name"], run["job_name"]) == (name, job)
 
 
+async def test_a_job_name_reported_just_after_the_start_names_the_run(
+    hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
+) -> None:
+    """Some integrations write the status before the new job's name."""
+    entry = await add_hub(hass)
+    await add_device(hass, entry, job=JOB, running_power=100)
+    await start_job(hass, "benchy.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    await clock.advance(hours=1)
+
+    await set_status(hass, "printing")
+    hass.states.async_set(JOB, "cube.gcode")
+    await clock.advance(hours=1)
+    await set_status(hass, "paused")
+    await clock.advance(minutes=10)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=50)
+    await set_status(hass, "finished")
+
+    _, cube = stored_runs(hass_storage)
+    assert (cube["name"], cube["job_name"]) == ("cube", "cube.gcode")
+    assert (cube["started"], cube["ended"]) == (at(hours=2), at(hours=4))
+    assert cube["outcome"] == "completed"
+
+
 async def test_the_job_name_can_come_from_an_attribute_of_the_print_event(
     hass: HomeAssistant, clock: Clock, hass_storage: dict[str, Any]
 ) -> None:

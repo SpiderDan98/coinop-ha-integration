@@ -636,18 +636,24 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
 @pytest.mark.parametrize(
     ("device_type", "integrations"),
     [
-        ("3d_printer", "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN"),
+        (
+            "3d_printer",
+            "Anycubic 3D Printer - Local Control, Anycubic Cloud & LAN, Bambu Lab",
+        ),
         (
             "washing_machine",
-            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
         ),
         (
             "dishwasher",
-            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
         ),
         (
             "tumble_dryer",
-            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
         ),
         (
             "coffee_machine",
@@ -655,7 +661,8 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
         ),
         (
             "oven",
-            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt",
+            "WashData, Miele, Home Connect, Home Connect Local, Home Connect Alt, "
+            "LG ThinQ, SmartThings",
         ),
     ],
 )

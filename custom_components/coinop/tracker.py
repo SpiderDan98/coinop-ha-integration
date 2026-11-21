@@ -200,6 +200,11 @@ class DeviceTracker:
                 ),
             ]
         self._follow_stocks()
+        job = self._config.job_entity_id
+        if job and job != self._config.status_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(self._hass, job, self._on_job)
+            )
         if program := self._config.program_entity_id:
             self._unsubscribe.append(
                 async_track_state_change_event(self._hass, program, self._on_program)
@@ -653,6 +658,21 @@ class DeviceTracker:
             if run.job_name is None:
                 run.job_name = job_name
                 run.name = run.name or job_title(job_name)
+        self._book.async_update(run)
+
+    @callback
+    def _on_job(self, event: Event[EventStateChangedData]) -> None:
+        """While the Run runs, the job's name is its own: some integrations write
+        the Status that opens the Run before the new job's name."""
+        run = self._book.open_run(self._config.device_id)
+        job_name = self._job_name()
+        if run is None or run.paused or self._status_lost or job_name is None:
+            return
+        if job_name == run.job_name:
+            return
+        if run.name == job_title(run.job_name):
+            run.name = job_title(job_name)
+        run.job_name = job_name
         self._book.async_update(run)
 
     def _job_name(self) -> str | None:
