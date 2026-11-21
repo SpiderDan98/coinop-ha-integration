@@ -525,7 +525,9 @@
       "options": {
         "3d_printer": "3D printer",
         "washing_machine": "Washing machine",
-        "dishwasher": "Dishwasher"
+        "dishwasher": "Dishwasher",
+        "tumble_dryer": "Tumble dryer",
+        "oven": "Oven"
       }
     }
   }

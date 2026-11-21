@@ -10,6 +10,8 @@ from homeassistant.config_entries import ConfigSubentry
 from .const import (
     DEVICE_TYPE_3D_PRINTER,
     DEVICE_TYPE_DISHWASHER,
+    DEVICE_TYPE_OVEN,
+    DEVICE_TYPE_TUMBLE_DRYER,
     DEVICE_TYPE_WASHING_MACHINE,
 )
 
@@ -90,6 +92,21 @@ CAPABILITIES = {
             Capability.PROGRAM,
             Capability.DOSES,
             Capability.WATER,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_TUMBLE_DRYER: frozenset(
+        {
+            Capability.PROGRAM,
+            Capability.DOSES,
+            Capability.PROGRAM_CONSUMPTION,
+            Capability.PER_RUN_METERS,
+        }
+    ),
+    DEVICE_TYPE_OVEN: frozenset(
+        {
+            Capability.PROGRAM,
             Capability.PROGRAM_CONSUMPTION,
             Capability.PER_RUN_METERS,
         }

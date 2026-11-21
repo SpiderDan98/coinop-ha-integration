@@ -116,6 +116,8 @@
   "device_type.3d_printer": "3D-Drucker",
   "device_type.washing_machine": "Waschmaschinen",
   "device_type.dishwasher": "Spülmaschinen",
+  "device_type.tumble_dryer": "Trockner",
+  "device_type.oven": "Backöfen",
   "device.none": "Keine",
   "device.edit": "Einstellungen von {device} bearbeiten",
   "device.settings_title": "Einstellungen von {device}",
