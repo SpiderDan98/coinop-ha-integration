@@ -53,6 +53,12 @@ INTEGRATIONS = {
         appliances.DEVICE_TYPES,
         appliances.home_connect_kind,
     ),
+    "smartthings": Integration(
+        "SmartThings",
+        appliances.smartthings,
+        appliances.SMARTTHINGS_DEVICE_TYPES,
+        appliances.smartthings_kind,
+    ),
     # EV chargers
 }
 
