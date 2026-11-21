@@ -19,6 +19,8 @@ class MaterialForm(StrEnum):
     DETERGENT = "detergent"
     FABRIC_SOFTENER = "fabric_softener"
     LAUNDRY_ADDITIVE = "laundry_additive"
+    DISHWASHER_PRODUCT = "dishwasher_product"
+    BEVERAGE_INGREDIENT = "beverage_ingredient"
 
 
 class PackUnit(StrEnum):
@@ -26,6 +28,16 @@ class PackUnit(StrEnum):
     MILLILITRE = "ml"
     PIECE = "pcs"
 
+
+# The pack unit of a form's Materials unless one is given; grams for every other form.
+USUAL_UNITS = {
+    MaterialForm.RESIN: PackUnit.MILLILITRE,
+    MaterialForm.DISHWASHER_PRODUCT: PackUnit.PIECE,
+}
+# Forms whose Materials are never linked to a Spoolman Filament.
+UNLINKED_FORMS = frozenset(
+    {MaterialForm.DISHWASHER_PRODUCT, MaterialForm.BEVERAGE_INGREDIENT}
+)
 
 DEFAULT_DIAMETER = 1.75
 
@@ -52,6 +64,13 @@ MATERIAL_TYPES: dict[str, tuple[MaterialForm, float | None, PackUnit]] = {
     "Whitener": (MaterialForm.LAUNDRY_ADDITIVE, 0.9, PackUnit.GRAM),
     "Stain remover": (MaterialForm.LAUNDRY_ADDITIVE, 1.02, PackUnit.MILLILITRE),
     "Colour catcher sheets": (MaterialForm.LAUNDRY_ADDITIVE, None, PackUnit.PIECE),
+    "Dishwasher tabs": (MaterialForm.DISHWASHER_PRODUCT, None, PackUnit.PIECE),
+    "Dishwasher powder": (MaterialForm.DISHWASHER_PRODUCT, 0.95, PackUnit.GRAM),
+    "Dishwasher salt": (MaterialForm.DISHWASHER_PRODUCT, 1.2, PackUnit.GRAM),
+    "Rinse aid": (MaterialForm.DISHWASHER_PRODUCT, 1.02, PackUnit.MILLILITRE),
+    "Coffee beans": (MaterialForm.BEVERAGE_INGREDIENT, 0.4, PackUnit.GRAM),
+    "Ground coffee": (MaterialForm.BEVERAGE_INGREDIENT, 0.35, PackUnit.GRAM),
+    "Milk": (MaterialForm.BEVERAGE_INGREDIENT, 1.03, PackUnit.MILLILITRE),
 }
 
 
@@ -156,6 +175,11 @@ class Material:
     @property
     def by_piece(self) -> bool:
         return self.price.pack_unit is PackUnit.PIECE
+
+    @property
+    def linkable(self) -> bool:
+        """Whether the Material can be linked to a Spoolman Filament."""
+        return not self.by_piece and self.form not in UNLINKED_FORMS
 
     @property
     def price_per_gram(self) -> float | None:

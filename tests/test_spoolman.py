@@ -457,6 +457,50 @@ async def test_a_material_priced_per_piece_is_not_linked(
     assert material["price"] == pods["price"]
 
 
+@pytest.mark.parametrize(
+    ("form", "type_", "pack_unit"),
+    [
+        ("dishwasher_product", "Dishwasher salt", "g"),
+        ("beverage_ingredient", "Milk", "ml"),
+    ],
+)
+async def test_a_dishwasher_product_or_beverage_ingredient_is_not_linked(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    hass_storage: dict[str, Any],
+    aioclient_mock: AiohttpClientMocker,
+    form: str,
+    type_: str,
+    pack_unit: str,
+) -> None:
+    stored = stored_material(
+        "product",
+        form=form,
+        type=type_,
+        density=1.1,
+        diameter=None,
+        price={
+            "source": "fixed",
+            "pack_price": 2,
+            "pack_size": 1000,
+            "pack_unit": pack_unit,
+        },
+    )
+    place_materials(hass_storage, stored)
+    await add_spoolman_hub(hass, aioclient_mock, filaments=[filament(7)])
+
+    error = await panel.error(
+        "coinop/materials/update",
+        material_id="product",
+        material={"price": {"source": "spoolman", "filament_id": 7}},
+    )
+
+    assert error["code"] == "not_allowed"
+    [material] = (await panel.call("coinop/materials/list"))["materials"]
+    assert (material["form"], material["price"]) == (form, stored["price"])
+
+
 def linked_material(material_id: str, per_gram: float, **fields: Any) -> dict[str, Any]:
     """A Material linked to Filament 7, last read at `per_gram`."""
     price = {"source": "spoolman", "filament_id": 7, "per_gram": per_gram}
