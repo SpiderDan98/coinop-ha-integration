@@ -45,7 +45,7 @@ import { table, tableStyles } from "./table";
 
 const DEFAULT_DIAMETER = "1.75";
 // The form Other has no usual pack unit: it keeps the one picked.
-const USUAL_UNIT: Partial<Record<MaterialForm, PackUnit>> = {
+const USUAL_UNIT = {
   filament: "g",
   resin: "ml",
   detergent: "ml",
@@ -53,7 +53,8 @@ const USUAL_UNIT: Partial<Record<MaterialForm, PackUnit>> = {
   laundry_additive: "g",
   dishwasher_product: "pcs",
   beverage_ingredient: "g",
-};
+  other: null,
+} satisfies Record<MaterialForm, PackUnit | null>;
 const usualUnit = (form: MaterialForm, picked: PackUnit) => USUAL_UNIT[form] ?? picked;
 
 // Inputs keep their text as typed; numbers are read only when saving.

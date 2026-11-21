@@ -234,7 +234,7 @@ export const recorded = {
   /** `coinop/catalog/subscribe` with the Materials the Doses of both point to, all of the
    * form Other: "co2" (CO₂, by g), "syrup" (Cola syrup, by ml), "malt" (Pale malt, by g) and
    * "hops" (Hop pellets, by g). */
-  consumables: catalogSubscribeOtherDoses as Catalog,
+  doseMaterials: catalogSubscribeOtherDoses as Catalog,
   /** `coinop/devices/list` with only "device-cnc-router", an Other Device under the Type
    * Name "CNC router" with Job and Material, Images and a Part Count: its job name and
    * Material used inputs (in g), no Slots and no image input, the default Material "mdf". */

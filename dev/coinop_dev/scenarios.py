@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 from PIL import Image, ImageDraw
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
-from custom_components.coinop.device_config import chosen_capabilities
+from custom_components.coinop.device_config import stored_capabilities
 from custom_components.coinop.models import ImageKind
 from custom_components.coinop.runtime import CoinOpConfigEntry
 
@@ -271,10 +271,14 @@ async def _async_set_printer(
         {"entity_id": f"input_text.{printer}_job", "value": job},
         blocking=True,
     )
+    await _async_select(hass, f"input_select.{printer}_status", status)
+
+
+async def _async_select(hass: HomeAssistant, entity_id: str, option: str) -> None:
     await hass.services.async_call(
         "input_select",
         "select_option",
-        {"entity_id": f"input_select.{printer}_status", "option": status},
+        {"entity_id": entity_id, "option": option},
         blocking=True,
     )
 
@@ -545,16 +549,7 @@ async def _irrigation(seed: Seed) -> None:
         },
         blocking=True,
     )
-    await _async_close_valve(seed.hass)
-
-
-async def _async_close_valve(hass: HomeAssistant) -> None:
-    await hass.services.async_call(
-        "input_select",
-        "select_option",
-        {"entity_id": "input_select.irrigation_status", "option": "off"},
-        blocking=True,
-    )
+    await _async_select(seed.hass, "input_select.irrigation_status", "off")
 
 
 async def _replay_meters(
@@ -584,16 +579,8 @@ async def _replay(
 async def _async_set_appliance(
     hass: HomeAssistant, key: str, status: str, program: str
 ) -> None:
-    for entity_id, option in (
-        (f"input_select.{key}_program", program),
-        (f"input_select.{key}_status", status),
-    ):
-        await hass.services.async_call(
-            "input_select",
-            "select_option",
-            {"entity_id": entity_id, "option": option},
-            blocking=True,
-        )
+    await _async_select(hass, f"input_select.{key}_program", program)
+    await _async_select(hass, f"input_select.{key}_status", status)
 
 
 async def _printing_now(seed: Seed) -> None:
@@ -753,7 +740,7 @@ def _garden_valve() -> dict[str, Any]:
     return {
         "device_type": "other",
         "type_name": "Irrigation",
-        "capabilities": sorted(c.value for c in chosen_capabilities(["water"])),
+        "capabilities": stored_capabilities(["water"]),
         "printer_device_id": None,
         "status": {"entity_id": "input_select.irrigation_status", "attribute": None},
         "mapping": {
@@ -794,7 +781,7 @@ async def async_load(hass: HomeAssistant, name: str, user: User | None) -> None:
         if program := hass.states.get(f"input_select.{key}_program"):
             await _async_set_appliance(hass, key, "off", program.state)
     if hass.states.get("input_select.irrigation_status"):
-        await _async_close_valve(hass)
+        await _async_select(hass, "input_select.irrigation_status", "off")
     entry = await _async_add_hub(hass)
     await hass.config_entries.async_unload(entry.entry_id)
     for key in scenario.devices:

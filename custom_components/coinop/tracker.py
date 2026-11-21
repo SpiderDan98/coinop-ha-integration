@@ -965,11 +965,7 @@ class DeviceTracker:
             finalised.set_result(None)
 
     def _unfinalised_runs(self) -> list[Run]:
-        return [
-            run
-            for run in self._book.runs()
-            if run.device_id == self._config.device_id and not run.finalised
-        ]
+        return self._book.unfinalised(self._config.device_id)
 
     def _slot_fell_back(self, slot: SlotReport) -> bool:
         return slot_material(slot, self._catalog.materials()) is None

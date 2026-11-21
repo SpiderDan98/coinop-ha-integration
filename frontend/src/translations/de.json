@@ -211,7 +211,7 @@
   "item.add_material": "Material-Posten hinzufügen",
   "evidence.length": "{length} bei {diameter} und {density}",
   "evidence.length_only": "{length} gemessen; Material wählen, um es zu wiegen",
-  "evidence.measured": "Vom Drucker gemessen",
+  "evidence.measured": "Vom Gerät gemessen",
   "materials.archived_name": "{name} (archiviert)",
   "device.material": "Materialverbrauch",
   "device.default_material": "Standardmaterial",

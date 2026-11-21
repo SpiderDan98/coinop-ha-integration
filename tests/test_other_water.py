@@ -19,6 +19,9 @@ from .devices import (
     coinop_entities,
     configure,
     other_input,
+    report_status,
+    save,
+    settle,
     start_reconfigure,
     walk_to_mapping,
 )
@@ -31,11 +34,17 @@ from .websocket import PanelClient
 
 VALVE_STATUS = "sensor.garden_valve_status"
 VALVE_WATER = "sensor.garden_valve_water"
+# The water steps' answers that put the valve on its meter, at 4.00 per m³.
+ON_ITS_METER = (
+    {"next_step_id": "water_meter"},
+    {"entity_id": VALVE_WATER},
+    {"next_step_id": "water_fixed_price"},
+    {"price": 4.0},
+)
 
 
 async def set_valve(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(VALVE_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, VALVE_STATUS, status)
 
 
 async def set_valve_water(hass: HomeAssistant, litres: float | str) -> None:
@@ -44,7 +53,7 @@ async def set_valve_water(hass: HomeAssistant, litres: float | str) -> None:
 
 
 async def add_irrigation(
-    hass: HomeAssistant, entry: ConfigEntry | None = None, **options: Any
+    hass: HomeAssistant, *, entry: ConfigEntry | None = None, **options: Any
 ) -> ConfigSubentry:
     """A battery-driven garden valve, off, in EUR: an Other Device with the Type Name
     "Irrigation" that has water, on its water meter `VALVE_WATER` at 4.00 per m³ and
@@ -141,7 +150,7 @@ async def test_the_water_source_none_skips_the_water_price(
 ) -> None:
     entry = await add_hub(hass)
 
-    valve = await add_irrigation(hass, entry, water="none")
+    valve = await add_irrigation(hass, entry=entry, water="none")
 
     assert valve.data["water"] == {"source": "none"}
     assert "water_price" not in valve.data
@@ -154,7 +163,7 @@ async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
 ) -> None:
     await set_valve_water(hass, 1000)
     entry = await add_hub(hass)
-    valve = await add_irrigation(hass, entry, water="none")
+    valve = await add_irrigation(hass, entry=entry, water="none")
     result = await start_reconfigure(hass, entry, valve)
     result = await configure(hass, result, {"next_step_id": "water"})
     assert result["menu_options"] == ["water_meter", "water_flow", "water_none"]
@@ -173,8 +182,7 @@ async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
         "water_price",
         "save",
     ]
-    await configure(hass, result, {"next_step_id": "save"})
-    await hass.async_block_till_done()
+    await save(hass, result)
     [device] = (await panel.call("coinop/devices/list"))["devices"]
     assert device["ha_settings"]["water"]["source"] == "meter"
     assert device["ha_settings"]["water_price"] == {"source": "fixed", "value": 2.5}
@@ -191,8 +199,7 @@ async def irrigate(
     await set_valve_water(hass, start + litres)
     await set_valve(hass, "off")
     await set_valve_water(hass, start + litres)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)
 
 
 async def test_a_run_with_the_electricity_source_none_costs_only_its_water(

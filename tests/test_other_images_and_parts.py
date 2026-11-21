@@ -4,7 +4,6 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -15,6 +14,7 @@ from .devices import (
     add_hub,
     configure,
     other_input,
+    report_status,
     start_reconfigure,
     walk_to_mapping,
 )
@@ -41,12 +41,14 @@ from .websocket import PanelClient
 
 SMALL_KILN_STATUS = "sensor.small_kiln_status"
 # What the kiln is firing, as its controller shows it, and the camera looking at it.
-KILN_PREVIEW = "image.kiln_preview"
+KILN_THUMBNAIL = "image.kiln_preview"
 KILN_CAMERA = "camera.kiln"
 
 
-async def add_kiln_preview(hass: HomeAssistant, content: bytes = b"") -> FakeThumbnail:
-    return await add_thumbnail(hass, content, entity_id=KILN_PREVIEW)
+async def add_kiln_thumbnail(
+    hass: HomeAssistant, content: bytes = b""
+) -> FakeThumbnail:
+    return await add_thumbnail(hass, content, entity_id=KILN_THUMBNAIL)
 
 
 async def add_kiln_camera(hass: HomeAssistant, *answers: bytes) -> FakeCamera:
@@ -54,15 +56,7 @@ async def add_kiln_camera(hass: HomeAssistant, *answers: bytes) -> FakeCamera:
 
 
 async def set_small_kiln(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(SMALL_KILN_STATUS, status)
-    await hass.async_block_till_done()
-
-
-async def add_kiln_with(
-    hass: HomeAssistant, *has: str, entry: ConfigEntry | None = None, **options: Any
-) -> ConfigSubentry:
-    """A kiln (see `add_kiln`) that has the choices `has`: "images", "part_count"."""
-    return await add_kiln(hass, entry, has=has, **options)
+    await report_status(hass, SMALL_KILN_STATUS, status)
 
 
 async def fired_run(panel: PanelClient) -> dict[str, Any]:
@@ -102,7 +96,7 @@ async def test_images_alone_bring_the_images_step_and_no_job_step(
     assert result["step_id"] == "images"
     assert fields(result) == ["thumbnail", "camera", "snapshot"]
     result = await configure(
-        hass, result, {"thumbnail": KILN_PREVIEW, "camera": KILN_CAMERA}
+        hass, result, {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA}
     )
     assert result["step_id"] == "consumption"
 
@@ -134,12 +128,12 @@ async def test_a_device_with_images_stores_them_and_can_reconfigure_them(
 ) -> None:
     entry = await add_hub(hass)
 
-    kiln = await add_kiln_with(
-        hass, "images", entry=entry, thumbnail=KILN_PREVIEW, camera=KILN_CAMERA
+    kiln = await add_kiln(
+        hass, entry=entry, has=["images"], thumbnail=KILN_THUMBNAIL, camera=KILN_CAMERA
     )
 
     assert kiln.data["images"] == {
-        "thumbnail": KILN_PREVIEW,
+        "thumbnail": KILN_THUMBNAIL,
         "camera": KILN_CAMERA,
         "snapshot": True,
     }
@@ -164,7 +158,7 @@ async def test_a_part_count_alone_brings_no_step_and_no_section(
     entry = await add_hub(hass)
 
     # `add_kiln` fails on any step between the Status mapping and the electricity.
-    kiln = await add_kiln_with(hass, "part_count", entry=entry)
+    kiln = await add_kiln(hass, entry=entry, has=["part_count"])
 
     assert {"job", "images"}.isdisjoint(kiln.data)
     result = await start_reconfigure(hass, entry, kiln)
@@ -174,9 +168,9 @@ async def test_a_part_count_alone_brings_no_step_and_no_section(
 async def test_a_run_gets_its_thumbnail_and_at_its_end_its_snapshot_without_a_job(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
-    thumbnail = await add_kiln_preview(hass, picture("red"))
+    thumbnail = await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
-    await add_kiln_with(hass, "images", thumbnail=KILN_PREVIEW, camera=KILN_CAMERA)
+    await add_kiln(hass, has=["images"], thumbnail=KILN_THUMBNAIL, camera=KILN_CAMERA)
 
     await set_kiln(hass, "on")
     [started_with] = await run_images(panel)
@@ -206,7 +200,7 @@ async def test_a_run_of_a_device_with_images_takes_photos_and_a_picked_cover_ima
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
     await add_kiln_camera(hass, picture("blue"))
-    await add_kiln_with(hass, "images", camera=KILN_CAMERA)
+    await add_kiln(hass, has=["images"], camera=KILN_CAMERA)
     await fire(hass, clock)
     run = await only_run(panel)
     assert run["cover"]["kind"] == "snapshot"
@@ -226,9 +220,9 @@ async def test_a_run_of_a_device_with_images_takes_photos_and_a_picked_cover_ima
 async def test_a_device_without_images_takes_none_by_itself_but_still_photos(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     camera = await add_kiln_camera(hass, picture("blue"))
-    await add_kiln_with(hass, "part_count")
+    await add_kiln(hass, has=["part_count"])
 
     await fire(hass, clock)
 
@@ -242,7 +236,7 @@ async def test_a_device_without_images_takes_none_by_itself_but_still_photos(
 async def test_a_run_of_a_device_with_a_part_count_is_costed_per_part(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
-    await add_kiln_with(hass, "part_count")
+    await add_kiln(hass, has=["part_count"])
     events = record_events(hass, "event.kiln_run")
 
     await fire(hass, clock)
@@ -268,7 +262,7 @@ async def test_a_run_of_a_device_without_a_part_count_has_none_and_takes_none(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:
     await add_kiln_camera(hass, picture("blue"))
-    await add_kiln_with(hass, "images", camera=KILN_CAMERA)
+    await add_kiln(hass, has=["images"], camera=KILN_CAMERA)
     events = record_events(hass, "event.kiln_run")
 
     await fire(hass, clock)
@@ -288,14 +282,14 @@ async def test_a_run_of_a_device_without_a_part_count_has_none_and_takes_none(
 async def test_images_and_a_part_count_go_with_a_program(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient
 ) -> None:
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     await add_kiln_camera(hass, picture("blue"))
     # The helper expects the images step before the Program step, as Add Device asks.
     await add_bread_maker(
         hass,
         panel,
         has=["program", "images", "part_count"],
-        thumbnail=KILN_PREVIEW,
+        thumbnail=KILN_THUMBNAIL,
         camera=KILN_CAMERA,
     )
 
@@ -311,9 +305,9 @@ async def test_a_manual_run_has_a_part_count_only_on_a_device_with_one(
     hass: HomeAssistant, clock: Clock, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    kiln = await add_kiln_with(hass, "part_count", entry=entry)
-    small = await add_kiln_with(
-        hass, "images", entry=entry, name="Small kiln", status=SMALL_KILN_STATUS
+    kiln = await add_kiln(hass, entry=entry, has=["part_count"])
+    small = await add_kiln(
+        hass, entry=entry, has=["images"], name="Small kiln", status=SMALL_KILN_STATUS
     )
     await clock.advance(hours=5)
 
@@ -329,15 +323,11 @@ async def fire_both(hass: HomeAssistant, clock: Clock, panel: PanelClient) -> li
     """A kiln with a Part Count and a small kiln without, fired one after the other
     for 90 minutes each: "Mugs" of 9 parts, then "Test tiles". Returns their ids."""
     entry = await add_hub(hass)
-    await add_kiln_with(hass, "part_count", entry=entry)
+    await add_kiln(hass, entry=entry, has=["part_count"])
     await set_small_kiln(hass, "off")
-    await add_kiln_with(hass, entry=entry, name="Small kiln", status=SMALL_KILN_STATUS)
+    await add_kiln(hass, entry=entry, name="Small kiln", status=SMALL_KILN_STATUS)
     await fire(hass, clock)
-    await set_small_kiln(hass, "on")
-    await clock.advance(minutes=90)
-    await set_small_kiln(hass, "off")
-    # Older Home Assistant needs a second pass for the Run to be final.
-    await hass.async_block_till_done()
+    await fire(hass, clock, SMALL_KILN_STATUS)
     runs = (await panel.call("coinop/runs/list"))["runs"]
     mugs, tiles = (run["id"] for run in sorted(runs, key=lambda run: run["started"]))
     await panel.call("coinop/runs/update", run_id=mugs, name="Mugs", part_count=9)
@@ -381,16 +371,20 @@ async def test_the_devices_command_sends_what_images_and_a_part_count_bring(
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    await add_kiln_with(hass, "images", entry=entry, thumbnail=KILN_PREVIEW)
-    await add_kiln_with(
-        hass, "part_count", entry=entry, name="Small kiln", status=SMALL_KILN_STATUS
+    await add_kiln(hass, entry=entry, has=["images"], thumbnail=KILN_THUMBNAIL)
+    await add_kiln(
+        hass,
+        entry=entry,
+        has=["part_count"],
+        name="Small kiln",
+        status=SMALL_KILN_STATUS,
     )
 
     kiln, small = (await panel.call("coinop/devices/list"))["devices"]
 
     assert kiln["capabilities"] == ["average_power", "images"]
     assert kiln["ha_settings"]["images"] == {
-        "thumbnail": KILN_PREVIEW,
+        "thumbnail": KILN_THUMBNAIL,
         "camera": None,
         "snapshot": False,
     }

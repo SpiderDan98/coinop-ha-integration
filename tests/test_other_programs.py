@@ -19,12 +19,14 @@ from .devices import (
     other_input,
     price_choice,
     price_input,
+    report_status,
+    settle,
     start_reconfigure,
 )
 from .test_device_flow import fields
 from .test_manual_runs import create
 from .test_other_devices import add_kiln, choose_other, fire
-from .test_program_consumption import approx
+from .test_ovens import line_items
 from .test_run_event import record_events
 from .test_runs import stored_runs
 from .websocket import PanelClient
@@ -37,15 +39,14 @@ BREAD_MAKER_MAPPING = {
     "finished": ["done"],
     "cancelled": ["cancelled"],
 }
-ROWS = {
+BREAD_ROWS = {
     "default": {"doses": {}, "kwh": 0.4},
     "programs": {"Whole wheat": {"doses": {}, "kwh": 0.5}},
 }
 
 
 async def set_bread_maker(hass: HomeAssistant, status: str) -> None:
-    hass.states.async_set(BREAD_MAKER_STATUS, status)
-    await hass.async_block_till_done()
+    await report_status(hass, BREAD_MAKER_STATUS, status)
 
 
 async def set_bread_program(
@@ -63,12 +64,13 @@ async def set_bread_energy(hass: HomeAssistant, kwh: float) -> None:
 async def add_bread_maker(
     hass: HomeAssistant,
     panel: PanelClient,
+    *,
     entry: ConfigEntry | None = None,
     **options: Any,
 ) -> ConfigSubentry:
     """A bread maker, off, in EUR at 0.30 per kWh: an Other Device with the Type Name
     "Bread maker" that has a Program, on its Program input (with no Program yet) and
-    with the ROWS above, its electricity per Program unless `options` say otherwise;
+    with the `BREAD_ROWS` above, its electricity per Program unless `options` say otherwise;
     `source="energy"` is its plug's energy meter, at 100 kWh."""
     hass.config.currency = "EUR"
     await set_bread_maker(hass, "off")
@@ -89,7 +91,7 @@ async def add_bread_maker(
     await panel.call(
         "coinop/devices/update_settings",
         device_id=subentry.subentry_id,
-        settings={"program_defaults": ROWS},
+        settings={"program_defaults": BREAD_ROWS},
     )
     return subentry
 
@@ -116,8 +118,7 @@ async def bake(
     if reading is not None:
         await set_bread_energy(hass, reading)
     await set_bread_maker(hass, outcome)
-    # Older Home Assistant needs a second pass for the Run event's listeners.
-    await hass.async_block_till_done()
+    await settle(hass)
 
 
 async def bake_from_zero(hass: HomeAssistant, clock: Clock, kwh: float) -> None:
@@ -131,15 +132,6 @@ async def bake_from_zero(hass: HomeAssistant, clock: Clock, kwh: float) -> None:
     await set_bread_maker(hass, "done")
     await clock.advance(seconds=10)
     await set_bread_energy(hass, 0)
-
-
-def line_items(run: dict[str, Any]) -> list[tuple[Any, ...]]:
-    return approx(
-        [
-            (i["kind"], i["method"], i["quantity"], i["unit"], i["amount"])
-            for i in run["line_items"]
-        ]
-    )
 
 
 async def test_picking_program_adds_the_program_step_and_electricity_per_program(
@@ -181,7 +173,7 @@ async def test_reconfigure_has_the_program_section_and_per_program_for_the_estim
     hass: HomeAssistant, panel: PanelClient
 ) -> None:
     entry = await add_hub(hass)
-    bread_maker = await add_bread_maker(hass, panel, entry)
+    bread_maker = await add_bread_maker(hass, panel, entry=entry)
 
     result = await start_reconfigure(hass, entry, bread_maker)
 
@@ -338,7 +330,7 @@ async def test_the_devices_command_sends_what_it_has_and_the_programs_it_knows(
         ["program", "program_consumption"],
     )
     assert device["known_programs"] == ["Basic", "Whole wheat", "Gluten free"]
-    assert device["settings"]["program_defaults"] == ROWS
+    assert device["settings"]["program_defaults"] == BREAD_ROWS
     assert device["ha_settings"]["program"]["entity_id"] == BREAD_MAKER_PROGRAM
     assert device["ha_settings"]["consumption"] == {"source": "per_program"}
 

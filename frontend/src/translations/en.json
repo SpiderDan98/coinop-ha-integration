@@ -211,7 +211,7 @@
   "item.add_material": "Add Material Line Item",
   "evidence.length": "{length} at {diameter} and {density}",
   "evidence.length_only": "{length} measured; pick a Material to weigh it",
-  "evidence.measured": "Measured by the printer",
+  "evidence.measured": "Measured by the Device",
   "materials.archived_name": "{name} (archived)",
   "device.material": "Material used",
   "device.default_material": "Default Material",

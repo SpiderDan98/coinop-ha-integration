@@ -1,6 +1,7 @@
 """Add Device and reconfigure: the subentry flow that maps a Device's Device Inputs."""
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from enum import StrEnum
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -37,10 +38,10 @@ from .device_config import (
     Target,
     WaterSource,
     capabilities_of,
-    chosen_capabilities,
     picked_choices,
     picks_capabilities,
     refused_combination,
+    stored_capabilities,
 )
 from .device_inputs import (
     entity_unit,
@@ -51,8 +52,10 @@ from .device_inputs import (
 )
 from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
+from .run_book import unfinalised
 from .schema import vol
 from .sensor import async_remove_lost
+from .store import async_stored_runs
 
 # Offered when a meter or Material used attribute is picked, which has no unit of its own.
 ATTRIBUTE_UNITS: dict[str, list[str]] = {
@@ -87,6 +90,14 @@ NEEDS = {
     "program": Capability.PROGRAM,
     "water": Capability.WATER,
     "water_price": Capability.WATER,
+}
+# The sources only a Device with the Capability is offered, by the quantity's section.
+SOURCE_NEEDS: dict[str, dict[StrEnum, Capability]] = {
+    ELECTRICITY.source_key: {
+        ConsumptionSource.ESTIMATE: Capability.AVERAGE_POWER,
+        ConsumptionSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION,
+    },
+    WATER.source_key: {WaterSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION},
 }
 
 
@@ -196,6 +207,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             return await self._sections()[following[0]]()
         return self.async_create_entry(title=self._name, data=self._data)
 
+    async def _walk_before_menu(self, sections: Iterable[str]) -> SubentryFlowResult:
+        """Reconfigure walks those of `sections` the Device has, in Add Device's
+        order, before it shows its menu again."""
+        self._walking = frozenset(sections)
+        return await self._walk(list(self._sections()))
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
@@ -226,8 +243,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
         for section, values in detected.items():
             self._data[section] = (self._data.get(section) or {}) | values
-        self._walking = frozenset(detected)
-        return await self.async_step_status()
+        return await self._walk_before_menu(detected)
 
     async def async_step_save(
         self, user_input: dict[str, Any] | None = None
@@ -235,8 +251,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         subentry = self._get_reconfigure_subentry()
         had, has = capabilities_of(subentry.data), self._capabilities()
         # A Run may have started after the `other` step let the change through.
-        if has != had and self._recording():
-            return self.async_abort(reason="run_open")
+        if has != had and (refusal := await self._async_refusal()):
+            return self.async_abort(reason=refusal)
         # Only here: a setup or reload must never cost a Device an entity.
         async_remove_lost(self.hass, subentry.subentry_id, had - has)
         return self.async_update_and_abort(self._get_entry(), subentry, data=self._data)
@@ -279,8 +295,10 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """What a shipped Device Type answers by itself: the Type Name the Device is
         listed under and what it has."""
-        if self.source == SOURCE_RECONFIGURE and self._recording():
-            return self.async_abort(reason="run_open")
+        if self.source == SOURCE_RECONFIGURE and (
+            refusal := await self._async_refusal()
+        ):
+            return self.async_abort(reason=refusal)
         errors: dict[str, str] = {}
         if user_input is not None:
             type_name = user_input["type_name"].strip()
@@ -291,9 +309,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 errors["base"] = refused
             if not errors:
                 self._data["type_name"] = type_name
-                self._data["capabilities"] = sorted(
-                    capability.value for capability in chosen_capabilities(picked)
-                )
+                self._data["capabilities"] = stored_capabilities(picked)
                 if self.source == SOURCE_RECONFIGURE:
                     return await self._async_fit_sections()
                 return await self.async_step_device()
@@ -342,19 +358,20 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             self._data[ELECTRICITY.source_key] = {
                 key: value for key, value in power.items() if key != "running_power"
             }
-        sections = list(self._sections())
-        self._walking = frozenset(sections) - self._data.keys()
-        return await self._walk(sections)
+        return await self._walk_before_menu(self._sections().keys() - self._data.keys())
 
-    def _recording(self) -> bool:
-        """Whether a Run of the Device being reconfigured can still change: an open
-        one, or an ended one that waits for its inputs' last reports."""
+    async def _async_refusal(self) -> str | None:
+        """Why what the Device being reconfigured has can't change now, as the abort
+        reason: a Run of it isn't final yet, or nothing can tell whether one is."""
         entry = self._get_entry()
         device_id = self._get_reconfigure_subentry().subentry_id
-        return entry.state is ConfigEntryState.LOADED and any(
-            run.device_id == device_id and not run.finalised
-            for run in entry.runtime_data.book.runs()
-        )
+        if entry.state is ConfigEntryState.LOADED:
+            changing = entry.runtime_data.book.unfinalised(device_id)
+            return "run_open" if changing else None
+        # A stored Run goes on once the hub entry is loaded again.
+        if (stored := await async_stored_runs(self.hass)) is None:
+            return "runs_unreadable"
+        return "run_open_not_loaded" if unfinalised(stored, device_id) else None
 
     def _stored_choices(self) -> dict[str, Any] | None:
         """The `other` step's input as the Device being reconfigured has it."""
@@ -899,19 +916,12 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     def _sources(self, quantity: Quantity) -> list[str]:
         """Where the Device can take the quantity from, as its source menu offers it."""
         capabilities = self._capabilities()
-        per_program = Capability.PROGRAM_CONSUMPTION in capabilities
-        if quantity is WATER:
-            return [
-                source.value
-                for source in WaterSource
-                if source is not WaterSource.PER_PROGRAM or per_program
-            ]
-        sources = [ConsumptionSource.ENERGY, ConsumptionSource.POWER]
-        if Capability.AVERAGE_POWER in capabilities:
-            sources.append(ConsumptionSource.ESTIMATE)
-        if per_program:
-            sources.append(ConsumptionSource.PER_PROGRAM)
-        return [source.value for source in (*sources, ConsumptionSource.NONE)]
+        needs = SOURCE_NEEDS[quantity.source_key]
+        return [
+            source.value
+            for source in quantity.sources
+            if source not in needs or needs[source] in capabilities
+        ]
 
     async def async_step_energy(
         self, user_input: dict[str, Any] | None = None
@@ -1080,10 +1090,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
 
     async def _meter_done(self, quantity: Quantity) -> SubentryFlowResult:
         self._data[quantity.source_key] = self._meter
-        sections = self._sections()
-        if quantity.price_key in sections and quantity.price_key not in self._data:
+        if quantity.price_key not in self._data:
             # A source picked in reconfigure after none needs its price too.
-            return await sections[quantity.price_key]()
+            self._walking |= {quantity.price_key}
         return await self._section_done(quantity.source_key)
 
     async def async_step_estimate(

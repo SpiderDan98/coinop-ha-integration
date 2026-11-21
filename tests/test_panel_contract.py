@@ -41,9 +41,9 @@ from .test_other_devices import add_kiln, add_pump, fire
 from .test_other_doses import add_brew_kettle, add_soda_maker, carbonate, dose
 from .test_other_images_and_parts import (
     KILN_CAMERA,
-    KILN_PREVIEW,
+    KILN_THUMBNAIL,
     add_kiln_camera,
-    add_kiln_preview,
+    add_kiln_thumbnail,
 )
 from .test_other_jobs import add_cnc_router, cut
 from .test_other_programs import add_bread_maker, bake, set_bread_program
@@ -1062,10 +1062,10 @@ async def test_record_other_devices_and_a_firing(
     estimates its electricity, and a pool pump and a pond pump (both "Pump") whose
     meters count each Run from 0; and a firing of the kiln."""
     entry = await add_hub(hass)
-    kiln = await add_kiln(hass, entry)
-    pool = await add_pump(hass, entry)
+    kiln = await add_kiln(hass, entry=entry)
+    pool = await add_pump(hass, entry=entry)
     pond = await add_pump(
-        hass, entry, name="Pond pump", status="sensor.pond_pump_status"
+        hass, entry=entry, name="Pond pump", status="sensor.pond_pump_status"
     )
     await fire(hass, clock)
 
@@ -1090,13 +1090,13 @@ async def test_record_an_other_device_with_images_and_a_part_count(
 ) -> None:
     """A studio kiln ("Kiln") that has images and a Part Count and no job, and its
     firing "Mugs" of 9 parts with its Thumbnail and its Snapshot."""
-    await add_kiln_preview(hass, picture("red"))
+    await add_kiln_thumbnail(hass, picture("red"))
     await add_kiln_camera(hass, picture("blue"))
     kiln = await add_kiln(
         hass,
         name="Studio kiln",
         has=["images", "part_count"],
-        thumbnail=KILN_PREVIEW,
+        thumbnail=KILN_THUMBNAIL,
         camera=KILN_CAMERA,
     )
     await fire(hass, clock)
