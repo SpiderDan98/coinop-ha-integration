@@ -548,6 +548,61 @@ async def test_record_electricity_and_water_per_program(
     assert_recorded("runs-get-per-program", stable_ids(detail, ids))
 
 
+async def test_record_a_device_with_electricity_source_none(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    """A washing machine whose electricity isn't followed, with the kWh it had in its
+    Program Defaults before: a "Wool" Run with water alone, and electricity added to
+    it by hand."""
+    hass.config.currency = "EUR"
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set("sensor.washer_program", "Wool", {"options": ["Wool"]})
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        program={"entity_id": "sensor.washer_program"},
+        source="none",
+        water="per_program",
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "program_defaults": {
+                "default": {"doses": {}, "kwh": 0.9, "litres": 50},
+                "programs": {"Wool": {"doses": {}, "kwh": 0.4, "litres": 45}},
+            }
+        },
+    )
+    hass.states.async_set(WASHER_STATUS, "running")
+    await clock.advance(minutes=40)
+    hass.states.async_set(WASHER_STATUS, "finished")
+    await hass.async_block_till_done()
+
+    devices = await panel.call("coinop/devices/list")
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    detail = await panel.call("coinop/runs/get", run_id=run["id"])
+    added = await panel.call(
+        "coinop/line_items/add",
+        run_id=run["id"],
+        kind="electricity",
+        quantity=0.4,
+        unit_price=0.3,
+    )
+
+    ids = {
+        subentry.subentry_id: "device-washer",
+        run["id"]: "unpowered",
+        **{
+            item["id"]: f"unpowered-{item['kind']}"
+            for item in added["run"]["line_items"]
+        },
+    }
+    assert_recorded("devices-list-electricity-none", stable_ids(devices, ids))
+    assert_recorded("runs-get-electricity-none", stable_ids(detail, ids))
+    assert_recorded("line-items-add-electricity", stable_ids(added, ids))
+
+
 async def test_record_a_dishwasher(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

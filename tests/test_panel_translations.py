@@ -38,6 +38,7 @@ SHARED_TERMS = {
     "consumption.per_program": (
         "config_subentries.device.step.consumption.menu_options.per_program"
     ),
+    "consumption.none": "config_subentries.device.step.consumption.menu_options.none",
     "device.program": "config_subentries.device.step.program.title",
     "device.water": "config_subentries.device.step.reconfigure.menu_options.water",
     "device.water_price": "config_subentries.device.step.water_price.title",
