@@ -25,7 +25,7 @@ _Avoid_: Gate, bay, tray
 _German UI_: Fach
 
 **Integration Profile**:
-The known Device Inputs of a specific integration for one Device Type, used to fill in a Device's Device Inputs automatically.
+The known Device Inputs of a specific integration, used to fill in a Device's Device Inputs automatically for the Device Types the integration serves.
 _Avoid_: Preset, adapter, template
 _German UI_: Integrationsprofil
 

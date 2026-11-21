@@ -1,6 +1,6 @@
 # No binding to a specific printer integration
 
-Coin-op never depends on a particular printer integration. Each Device reads configurable Device Inputs (an entity, optionally one of its attributes), and an Integration Profile only pre-fills them when the printer's HA device belongs to a known integration domain. What is stored is the concrete entities and values the user confirmed, never a reference to the profile. v1 ships profiles for `anycubic` (chrisfore/anycubic_ha_local) and `anycubic_cloud` (Nino6689/hass-anycubic); every other printer, Moonraker/Rinkhals included, is mapped by hand. The same holds for washing machines: profiles are kept per Device Type, and washing machines have profiles for `ha_washdata` (WashData), `miele` and `home_connect`.
+Coin-op never depends on a particular printer integration. Each Device reads configurable Device Inputs (an entity, optionally one of its attributes), and an Integration Profile only pre-fills them when the printer's HA device belongs to a known integration domain. What is stored is the concrete entities and values the user confirmed, never a reference to the profile. v1 ships profiles for `anycubic` (chrisfore/anycubic_ha_local) and `anycubic_cloud` (Nino6689/hass-anycubic); every other printer, Moonraker/Rinkhals included, is mapped by hand. The same holds for washing machines: profiles are registered per integration, each with the Device Types it serves, and washing machines have profiles for `ha_washdata` (WashData), `miele` and `home_connect`.
 
 ## Why
 
