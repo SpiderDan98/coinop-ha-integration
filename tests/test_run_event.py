@@ -3,7 +3,7 @@
 from typing import Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 import pytest
 
@@ -25,6 +25,8 @@ def record_events(
     # event's type tells them apart.
     seen: set[tuple[str, Any]] = set()
 
+    # Without it Home Assistant runs the listener in a thread, in no certain order.
+    @callback
     def on_change(event: Event[EventStateChangedData]) -> None:
         new = event.data["new_state"]
         if new is None or new.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
