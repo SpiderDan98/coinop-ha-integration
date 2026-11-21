@@ -462,9 +462,11 @@ async def test_a_material_priced_per_piece_is_not_linked(
     [
         ("dishwasher_product", "Dishwasher salt", "g"),
         ("beverage_ingredient", "Milk", "ml"),
+        ("other", "Fertiliser", "g"),
+        ("other", "Fertiliser", "ml"),
     ],
 )
-async def test_a_dishwasher_product_or_beverage_ingredient_is_not_linked(
+async def test_a_dishwasher_product_beverage_ingredient_or_other_material_is_not_linked(
     hass: HomeAssistant,
     clock: Clock,
     panel: PanelClient,

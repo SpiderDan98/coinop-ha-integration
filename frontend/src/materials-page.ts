@@ -44,7 +44,8 @@ import { shared } from "./styles";
 import { table, tableStyles } from "./table";
 
 const DEFAULT_DIAMETER = "1.75";
-const USUAL_UNIT = {
+// The form Other has no usual pack unit: it keeps the one picked.
+const USUAL_UNIT: Partial<Record<MaterialForm, PackUnit>> = {
   filament: "g",
   resin: "ml",
   detergent: "ml",
@@ -52,8 +53,8 @@ const USUAL_UNIT = {
   laundry_additive: "g",
   dishwasher_product: "pcs",
   beverage_ingredient: "g",
-} satisfies Record<MaterialForm, PackUnit>;
-const usualUnit = (form: MaterialForm): PackUnit => USUAL_UNIT[form];
+};
+const usualUnit = (form: MaterialForm, picked: PackUnit) => USUAL_UNIT[form] ?? picked;
 
 // Inputs keep their text as typed; numbers are read only when saving.
 const blankDraft = () => ({
@@ -91,7 +92,7 @@ const draftOf = ({ price, ...material }: Material): Draft => ({
         pack_size: String(price.pack_size),
         pack_unit: price.pack_unit,
       }
-    : { pack_unit: usualUnit(material.form), filament_id: String(price.filament_id) }),
+    : { pack_unit: usualUnit(material.form, "g"), filament_id: String(price.filament_id) }),
 });
 
 /** A copy leaves its type's default and a Spoolman link with the original. */
@@ -113,7 +114,12 @@ const filamentName = (filament: Filament) =>
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
 
-const UNLINKED_FORMS = new Set<MaterialForm>(["dishwasher_product", "beverage_ingredient"]);
+const UNLINKED_FORMS = new Set<MaterialForm>([
+  "dishwasher_product",
+  "beverage_ingredient",
+  "other",
+]);
+const hasBuiltInTypes = (form: MaterialForm) => form !== "other";
 const byPiece = (draft: Draft) => draft.pack_unit === "pcs";
 const hasDiameter = (draft: Draft) => draft.form === "filament" && !byPiece(draft);
 
@@ -417,10 +423,13 @@ export class MaterialsPage extends LitElement {
       });
     const colour = draft.colour.trim();
     const setColour = (value: string) => set({ colour: value });
+    const builtIn = hasBuiltInTypes(draft.form);
     const known = [
       ...new Set([
-        ...this.types.map((entry) => entry.type),
-        ...(this.materials ?? []).map((material) => material.type),
+        ...(builtIn ? this.types.map((entry) => entry.type) : []),
+        ...(this.materials ?? [])
+          .filter((material) => builtIn || material.form === draft.form)
+          .map((material) => material.type),
       ]),
     ];
     const linked = draft.price_source === "spoolman";
@@ -433,7 +442,7 @@ export class MaterialsPage extends LitElement {
             options: MATERIAL_FORMS.map((form) => [form, t(`form.${form}`)]),
             onChange: (picked) => {
               const form = picked as MaterialForm;
-              set({ form, pack_unit: usualUnit(form) });
+              set({ form, pack_unit: usualUnit(form, draft.pack_unit) });
             },
           }),
         )}
@@ -628,12 +637,14 @@ export class MaterialsPage extends LitElement {
       : undefined;
   }
 
-  /** A built-in type pre-fills its form, density and pack unit. */
+  /** A built-in type pre-fills its form, density and pack unit, except under a form without any. */
   private setType(type: string) {
     if (!this.draft) return;
-    const known = this.types.find(
-      (entry) => entry.type.toLocaleLowerCase() === type.trim().toLocaleLowerCase(),
-    );
+    const known =
+      hasBuiltInTypes(this.draft.form) &&
+      this.types.find(
+        (entry) => entry.type.toLocaleLowerCase() === type.trim().toLocaleLowerCase(),
+      );
     this.draft = known
       ? {
           ...this.draft,
