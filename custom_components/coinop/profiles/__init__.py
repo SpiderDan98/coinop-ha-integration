@@ -46,6 +46,12 @@ INTEGRATIONS = {
     "octoprint": Integration(
         "OctoPrint", printers.octoprint, printers.DEVICE_TYPES, printers.KIND
     ),
+    "ha_creality_ws": Integration(
+        "Creality", printers.creality, printers.DEVICE_TYPES, printers.KIND
+    ),
+    "elegoo_printer": Integration(
+        "Elegoo", printers.elegoo, printers.DEVICE_TYPES, printers.KIND
+    ),
     "moonraker": Integration(
         "Moonraker", printers.moonraker, printers.DEVICE_TYPES, printers.KIND
     ),

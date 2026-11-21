@@ -91,10 +91,12 @@ PRINT_FILE = re.compile(r"(\.gcode)?\.(gcode|bgcode|gco|3mf)$", re.IGNORECASE)
 
 
 def job_title(job_name: str | None) -> str | None:
-    """A Run's name from its job: "Gear_Set.gcode.3mf" becomes "Gear Set"."""
+    """A Run's name from its job: "gcodes/Gear_Set.gcode.3mf" becomes "Gear Set"."""
     if job_name is None:
         return None
-    return PRINT_FILE.sub("", job_name).replace("_", " ").strip() or job_name
+    # Only a print file's folder goes: a Program like "Cotton 40/60" keeps its slash.
+    name = job_name.rsplit("/", 1)[-1] if PRINT_FILE.search(job_name) else job_name
+    return PRINT_FILE.sub("", name).replace("_", " ").strip() or job_name
 
 
 class DeviceTracker:

@@ -2,7 +2,8 @@
 
 An image entity as Thumbnail is copied whenever it changes; a camera, whose state
 doesn't change with its picture, is fetched when the Run starts and again until
-it gave one, never after the Run ended.
+it gave one, never after the Run ended. So is an image entity whose state is
+unknown when the Run starts: some only get a state once something fetched them.
 """
 
 import asyncio
@@ -35,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SNAPSHOT_ATTEMPTS = 3
 SNAPSHOT_RETRY = timedelta(seconds=10)
-CAMERA_TIMEOUT = 10
+FETCH_TIMEOUT = 10
 THUMBNAIL_RETRY = timedelta(minutes=1)
 # A later end than this would show the Device after the Run, e.g. emptied.
 SNAPSHOT_LATEST = timedelta(minutes=2)
@@ -93,9 +94,12 @@ class DeviceImages:
         entity_id = self._config.thumbnail_entity_id
         if not entity_id:
             return
-        if _is_camera(entity_id):
+        state = self._hass.states.get(entity_id)
+        if _is_camera(entity_id) or (
+            state is not None and state.state == STATE_UNKNOWN
+        ):
             self._hass.async_create_task(self._async_fetch_thumbnail(run, entity_id))
-        elif _has_image(self._hass.states.get(entity_id)):
+        elif _has_image(state):
             self._hass.async_create_task(self._async_copy_thumbnail(run, entity_id))
 
     @callback
@@ -128,21 +132,30 @@ class DeviceImages:
                 _LOGGER.debug("No Thumbnail from %s: %s", entity_id, err)
 
     async def _async_fetch_thumbnail(self, run: Run, entity_id: str) -> None:
-        # Imported lazily for the same reason as in `_async_snapshot`.
-        from homeassistant.components import camera
-
         async with self._thumbnail_lock:
             if self._stopped or self._book.open_run(self._config.device_id) is not run:
                 return
             try:
-                picture = await camera.async_get_image(
-                    self._hass, entity_id, timeout=CAMERA_TIMEOUT
-                )
-                await self._library.async_add(run, ImageKind.THUMBNAIL, picture.content)
+                content = await self._async_fetch(entity_id)
+                await self._library.async_add(run, ImageKind.THUMBNAIL, content)
             except (HomeAssistantError, InvalidImage) as err:
                 _LOGGER.debug("No Thumbnail from %s: %s", entity_id, err)
                 if not any(i.kind is ImageKind.THUMBNAIL for i in run.images):
                     self._retry_thumbnail(run, entity_id)
+
+    async def _async_fetch(self, entity_id: str) -> bytes:
+        if not _is_camera(entity_id):
+            fetched = await image.async_get_image(
+                self._hass, entity_id, timeout=FETCH_TIMEOUT
+            )
+            return fetched.content
+        # Imported lazily for the same reason as in `_async_snapshot`.
+        from homeassistant.components import camera
+
+        picture = await camera.async_get_image(
+            self._hass, entity_id, timeout=FETCH_TIMEOUT
+        )
+        return picture.content
 
     def _retry_thumbnail(self, run: Run, entity_id: str) -> None:
         @callback
@@ -165,7 +178,7 @@ class DeviceImages:
 
         try:
             snapshot = await camera.async_get_image(
-                self._hass, entity_id, timeout=CAMERA_TIMEOUT
+                self._hass, entity_id, timeout=FETCH_TIMEOUT
             )
             await self._library.async_add(run, ImageKind.SNAPSHOT, snapshot.content)
         except (HomeAssistantError, InvalidImage) as err:

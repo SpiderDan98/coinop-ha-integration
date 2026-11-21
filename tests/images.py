@@ -100,11 +100,17 @@ class FakeCamera(Camera):
 
 
 async def add_thumbnail(
-    hass: HomeAssistant, content: bytes = b"", *, entity_id: str = THUMBNAIL
+    hass: HomeAssistant,
+    content: bytes = b"",
+    *,
+    entity_id: str = THUMBNAIL,
+    fetched: bool = True,
 ) -> FakeThumbnail:
+    """Unless `fetched`, its state stays unknown until something asks for its
+    picture, as Creality's print preview and Elegoo's cover image do."""
     entity = FakeThumbnail(hass, entity_id)
     entity.content = content
-    if content:
+    if content and fetched:
         entity._attr_image_last_updated = dt_util.utcnow()
     await _add(hass, "image", entity)
     return entity

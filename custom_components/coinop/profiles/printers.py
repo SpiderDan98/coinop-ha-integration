@@ -192,6 +192,98 @@ def octoprint(find: Find) -> dict[str, Any]:
     }
 
 
+def creality(find: Find) -> dict[str, Any]:
+    """3dg1luk43/ha_creality_ws: unique ids `<host>-<key>`, moved to a new host in place."""
+    status = find("sensor", "-print_status")
+    material = find("sensor", "-used_material_length")
+    thumbnail = find("image", "-current_print_preview")
+    # Registered on models without a camera too, unless set up without a URL.
+    camera = find("camera", "-camera")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                running=["printing"],
+                paused=["paused"],
+                finished=["completed"],
+                cancelled=["stopped"],
+                fault=["error"],
+                # `processing` is a job's warm-up and also where a cancelled job idles.
+                ignored=["processing", "self-testing", "idle", "off", "unknown"],
+            ),
+        ),
+        # The job's file is an attribute of the Status.
+        "job": found(status, entity_id=status, attribute="file")
+        | found(
+            material, material={"entity_id": material, "attribute": None, "unit": "cm"}
+        ),
+        "images": found(thumbnail, thumbnail=thumbnail)
+        | found(camera, camera=camera, snapshot=True),
+    }
+
+
+def elegoo(find: Find) -> dict[str, Any]:
+    """danielcherubini/elegoo-homeassistant: unique ids `<machine id>_<key>`."""
+    status = find("sensor", "_print_status")
+    job = find("sensor", "_filename")
+    # FDM printers with OpenCentauri firmware or the CC2 protocol only.
+    extrusion = find("sensor", "_current_extrusion")
+    # Not on printers that speak MQTT.
+    thumbnail = find("image", "_cover_image")
+    # Registered for every printer, whether it has a camera or not.
+    camera = find("camera", "_chamber_camera")
+    return {
+        "status": found(status, entity_id=status, attribute=None),
+        "mapping": found(
+            status,
+            **mapping(
+                # The resin states first; FDM printers may park on a milestone
+                # ("preheating_completed") for a whole print.
+                running=[
+                    "printing",
+                    "printing_recovery",
+                    "recovery",
+                    "homing",
+                    "dropping",
+                    "lifting",
+                    "preheating",
+                    "leveling",
+                    "loading",
+                    "printers_checking",
+                    "print_started",
+                    "resuming",
+                    "resonance_testing",
+                    "auto_leveling_completed",
+                    "preheating_completed",
+                    "homing_completed",
+                    "resonance_testing_completed",
+                    "auto_feeding",
+                    "filament_unloading",
+                ],
+                # A failed filament unload waits for the user.
+                paused=[
+                    "pausing",
+                    "paused",
+                    "filament_unload_paused",
+                    "filament_unload_abnormal",
+                ],
+                finished=["complete"],
+                cancelled=["stopping", "stopped"],
+                fault=["error"],
+                ignored=["idle", "file_checking", "unrecognized"],
+            ),
+        ),
+        "job": found(job, entity_id=job, attribute=None)
+        | found(
+            extrusion,
+            material={"entity_id": extrusion, "attribute": None, "unit": "mm"},
+        ),
+        "images": found(thumbnail, thumbnail=thumbnail)
+        | found(camera, camera=camera, snapshot=True),
+    }
+
+
 def moonraker(find: Find) -> dict[str, Any]:
     """marcolivierarsenault/moonraker-home-assistant: unique ids `<entry id>_<key>`."""
     # The print's state, not the printer's own `state` (ready, shutdown and so on).
