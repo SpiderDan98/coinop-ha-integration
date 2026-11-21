@@ -347,23 +347,26 @@ describe("Test data", () => {
     expect(assign).toHaveBeenCalledWith("/coinop");
   });
 
-  it("loads a Preset picked by its name, so that it is stored as loaded", async () => {
+  it("loads a Preset picked as its selection", async () => {
     const backend = devBackend().reply("call_service", () => ({}));
     vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
-    await click(panel, presetButton(dialog, "Quick Start"));
+    await click(panel, presetButton(dialog, "Long history"));
 
     await click(panel, loadButton(dialog));
 
     expect(backend.sent("call_service")).toMatchObject([
-      { service: "load", service_data: { preset: "quick-start" } },
+      {
+        service: "load",
+        service_data: { pieces: ["prusa", "bambu"], history: "long", open_run: false },
+      },
     ]);
   });
 
-  it("keeps the Pieces picked and says so when loading fails", async () => {
+  it("keeps the Pieces picked and shows the error when loading fails", async () => {
     const backend = devBackend().reply("call_service", () => {
-      throw new WsError("home_assistant_error");
+      throw new WsError("home_assistant_error", "No user to load the Scenario as");
     });
     const panel = await mountPanel(backend);
     const dialog = await open(panel);
@@ -371,7 +374,9 @@ describe("Test data", () => {
 
     await click(panel, loadButton(dialog));
 
-    expect(text(dialog)).toContain("The Scenario could not be loaded");
+    expect(text(dialog)).toContain(
+      "The Scenario could not be loaded: No user to load the Scenario as",
+    );
     expect(selected(dialog)).toEqual(["Prusa MK4", "Garden valve"]);
     expect(loadButton(dialog)).toMatchObject({ loading: false, disabled: false });
   });

@@ -1,12 +1,24 @@
 """The Presets: named Scenarios."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
+
+from custom_components.coinop.schema import vol
 
 from .pieces import PIECES, QuickStartPiece, ordered
 
 # How much history the Devices with history get: none leaves each alone.
 HISTORIES = ("none", "short", "long")
+# A selection with its Pieces in order and the Options it leaves out at their defaults.
+SELECTION = vol.Schema(
+    {
+        vol.Required("pieces"): vol.All([vol.In(list(PIECES))], ordered),
+        vol.Optional("history", default="short"): vol.In(HISTORIES),
+        vol.Optional("open_run", default=False): bool,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -14,16 +26,15 @@ class Preset:
     title: str
     description: str
     pieces: tuple[str, ...]
-    history: str = "short"
-    open_run: bool = False
+    # The Options it doesn't leave at their defaults.
+    options: Mapping[str, Any] = MappingProxyType({})
 
     @property
     def selection(self) -> dict[str, Any]:
-        return {
-            "pieces": ordered(self.pieces),
-            "history": self.history,
-            "open_run": self.open_run,
-        }
+        selection: dict[str, Any] = SELECTION(
+            {"pieces": list(self.pieces), **self.options}
+        )
+        return selection
 
 
 PRESETS = {
@@ -41,7 +52,7 @@ PRESETS = {
         "3D printer, printing now",
         "Like a few Runs, with an open Run; the printer's helpers end it.",
         ("prusa",),
-        open_run=True,
+        {"open_run": True},
     ),
     "two-printers": Preset(
         "Two printers", "The Prusa and the Bambu with their Runs.", ("prusa", "bambu")
@@ -51,7 +62,7 @@ PRESETS = {
         "Two years of Runs on two printers, 8 Materials (one archived), a Line Item "
         "Template.",
         ("prusa", "bambu"),
-        history="long",
+        {"history": "long"},
     ),
     "washing-machine": Preset(
         "Washing machine", "The washing machine with its 10 loads.", ("washer",)
@@ -62,3 +73,8 @@ PRESETS = {
         ("irrigation",),
     ),
 }
+
+
+def preset_of(selection: Mapping[str, Any]) -> str | None:
+    """The name of the Preset that has the selection, if one has it."""
+    return next((n for n, p in PRESETS.items() if p.selection == selection), None)

@@ -202,6 +202,13 @@ def test_the_load_service_offers_every_preset_piece_and_option() -> None:
     assert "boolean" in fields["open_run"]["selector"]
 
 
+def test_no_two_presets_have_the_same_selection() -> None:
+    """A selection loaded is stored as loaded from the Preset that has it."""
+    selections = [json.dumps(p.selection, sort_keys=True) for p in PRESETS.values()]
+
+    assert len(set(selections)) == len(selections)
+
+
 def test_no_two_pieces_share_a_helper_and_loading_resets_every_helper_a_device_uses() -> (
     None
 ):
@@ -815,7 +822,10 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     )
     picked = await panel.call("coinop_dev/scenarios")
 
-    assert (before["preset"], before["selection"]) == (None, None)
+    assert (before["preset"], before["selection"]) == (
+        None,
+        {"pieces": [], "history": "short", "open_run": False},
+    )
     assert [
         (group["device_type"], [piece["name"] for piece in group["pieces"]])
         for group in before["groups"]
@@ -957,6 +967,27 @@ async def test_the_scenarios_command_answers_the_pieces_presets_and_the_loaded_s
     assert (picked["preset"], picked["selection"]) == (
         None,
         {"pieces": ["washer", "irrigation"], "history": "none", "open_run": True},
+    )
+
+
+@pytest.mark.usefixtures("helpers")
+async def test_a_selection_a_preset_has_is_stored_as_loaded_from_that_preset(
+    hass: HomeAssistant, hass_admin_user: MockUser, panel: PanelClient, files: Path
+) -> None:
+    """As the dialog sends a Preset it fills in: its selection."""
+    await async_load(hass, "empty", hass_admin_user)
+    assert await async_setup(hass, {})
+
+    await load(
+        hass,
+        hass_admin_user,
+        {"pieces": ["bambu", "prusa"], "history": "short", "open_run": False},
+    )
+
+    answer = await panel.call("coinop_dev/scenarios")
+    assert (answer["preset"], answer["selection"]) == (
+        "two-printers",
+        {"pieces": ["prusa", "bambu"], "history": "short", "open_run": False},
     )
 
 

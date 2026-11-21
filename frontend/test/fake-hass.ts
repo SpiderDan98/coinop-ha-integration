@@ -344,8 +344,11 @@ type Reply = (msg: Message) => unknown;
 type Listener = (event: unknown) => void;
 
 export class WsError extends Error {
-  constructor(readonly code: string) {
-    super(code);
+  constructor(
+    readonly code: string,
+    message = code,
+  ) {
+    super(message);
   }
 }
 

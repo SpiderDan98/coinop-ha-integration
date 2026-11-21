@@ -368,7 +368,7 @@
   "dev.hint": "Dev container only: loading a Scenario replaces everything Coin-op holds.",
   "dev.load": "Load",
   "dev.loading": "Loading…",
-  "dev.failed": "The Scenario could not be loaded; see Home Assistant's log.",
+  "dev.failed": "The Scenario could not be loaded: {error}",
   "dev.count": "{count} of {total}",
   "dev.devices_with_history": "Devices with history",
   "dev.quick_start": "Quick Start",

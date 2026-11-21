@@ -18,9 +18,12 @@ const SECTIONS = [
   ["quick_start", "dev.quick_start"],
 ] as const;
 
-type Selection = { pieces: string[]; history: "none" | "short" | "long"; open_run: boolean };
-
-const listScenarios = (hass: HomeAssistant) =>
+// `Selection` names the shape the Presets and the stored selection share.
+const listScenarios = <
+  Selection extends { pieces: string[]; history: "none" | "short" | "long"; open_run: boolean },
+>(
+  hass: HomeAssistant,
+) =>
   hass.callWS<{
     groups: {
       device_type: Device["type"];
@@ -34,7 +37,7 @@ const listScenarios = (hass: HomeAssistant) =>
     options: { history: Selection["history"][] };
     presets: { name: string; title: string; description: string; selection: Selection }[];
     preset: string | null;
-    selection: Selection | null;
+    selection: Selection;
   }>({ type: `${DEV_INTEGRATION}/scenarios` });
 
 @customElement("coinop-dev-scenarios-dialog")
@@ -44,11 +47,12 @@ export class DevScenariosDialog extends LitElement {
 
   @state() private list?: Awaited<ReturnType<typeof listScenarios>>;
   @state() private picked = new Set<string>();
-  @state() private history: Selection["history"] = "short";
-  @state() private openRun = false;
+  // As the stored selection has them, once listed.
+  @state() private history!: NonNullable<typeof this.list>["selection"]["history"];
+  @state() private openRun!: boolean;
   @state() private preset = "";
   @state() private loading = false;
-  @state() private failed = false;
+  @state() private error?: string;
   // Fixed once listed, so that the groups open and close only when the user says so.
   private expanded = new Set<string>();
 
@@ -56,7 +60,7 @@ export class DevScenariosDialog extends LitElement {
     super.connectedCallback();
     listScenarios(this.hass).then(
       (list) => {
-        this.pick(list.selection ?? { pieces: [] }, list.preset ?? "");
+        this.pick(list.selection, list.preset ?? "");
         this.expanded = new Set(
           list.groups
             .filter(({ pieces }) => pieces.some(({ name }) => this.picked.has(name)))
@@ -64,7 +68,7 @@ export class DevScenariosDialog extends LitElement {
         );
         this.list = list;
       },
-      () => (this.failed = true),
+      (error) => (this.error = message(error)),
     );
   }
 
@@ -93,7 +97,7 @@ export class DevScenariosDialog extends LitElement {
         </div>
         ${this.list ? this.renderOptionFields(this.list.options, t) : nothing}
         ${this.list?.groups.map((group) => this.renderGroup(group, t))}`,
-      error: this.failed && t("dev.failed"),
+      error: this.error !== undefined && t("dev.failed", { error: this.error }),
       action: "load",
       submit: this.loading ? t("dev.loading") : t("dev.load"),
       busy: this.loading,
@@ -132,7 +136,7 @@ export class DevScenariosDialog extends LitElement {
           value: this.history,
           options: history.map((value) => [value, t(`dev.history_${value}`)] as const),
           disabled: this.loading,
-          onChange: (value) => this.pick({ history: value as Selection["history"] }),
+          onChange: (value) => this.pick({ history: value as typeof this.history }),
         }),
       )}
       ${checkbox({
@@ -152,7 +156,9 @@ export class DevScenariosDialog extends LitElement {
       pieces = this.picked,
       history = this.history,
       open_run = this.openRun,
-    }: Partial<Omit<Selection, "pieces">> & { pieces?: Iterable<string> },
+    }: Partial<Omit<NonNullable<typeof this.list>["selection"], "pieces">> & {
+      pieces?: Iterable<string>;
+    },
     preset = "",
   ) {
     this.picked = new Set(pieces);
@@ -169,20 +175,21 @@ export class DevScenariosDialog extends LitElement {
   private async load() {
     const pieces = this.names().filter((name) => this.picked.has(name));
     this.loading = true;
-    this.failed = false;
+    this.error = undefined;
     try {
       await this.hass.callWS({
         type: "call_service",
         domain: DEV_INTEGRATION,
         service: "load",
-        // By name, a Preset is stored as loaded.
-        service_data: this.preset
-          ? { preset: this.preset }
-          : ({ pieces, history: this.history, open_run: this.openRun } satisfies Selection),
+        service_data: {
+          pieces,
+          history: this.history,
+          open_run: this.openRun,
+        } satisfies NonNullable<typeof this.list>["selection"],
       });
-    } catch {
+    } catch (error) {
       this.loading = false;
-      this.failed = true;
+      this.error = message(error);
       return;
     }
     location.assign(this.basePath);
@@ -288,6 +295,10 @@ export class DevScenariosDialog extends LitElement {
     `,
   ];
 }
+
+/** What a failed websocket call says, an `Error` or Home Assistant's `{code, message}`. */
+const message = (error: unknown) =>
+  (error as { message?: string } | undefined)?.message ?? String(error);
 
 declare global {
   interface HTMLElementTagNameMap {

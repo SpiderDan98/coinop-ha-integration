@@ -10,8 +10,8 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.coinop.const import DOMAIN as COINOP, SUBENTRY_DEVICE
 
-from .pieces import PIECES, DeviceWithHistory, ordered
-from .presets import PRESETS
+from .pieces import PIECES, DeviceWithHistory
+from .presets import PRESETS, SELECTION
 from .seed import SHARED, Api, ScenarioError, Seed, async_set
 
 
@@ -20,10 +20,12 @@ async def async_load(
 ) -> dict[str, Any]:
     """Replace whatever Coin-op holds by a Preset or a selection of Pieces; returns
     the selection loaded."""
-    if isinstance(choice, str):
-        choice = PRESETS[choice].selection
-    pieces = ordered(choice["pieces"])
-    history, open_run = choice.get("history", "short"), choice.get("open_run", False)
+    selection = (
+        PRESETS[choice].selection
+        if isinstance(choice, str)
+        else SELECTION(dict(choice))
+    )
+    pieces, history = selection["pieces"], selection["history"]
     user = user or await hass.auth.async_get_owner()
     if user is None:
         raise ScenarioError("No user to load the Scenario as")
@@ -63,10 +65,10 @@ async def async_load(
         await seed.api.call(
             "coinop/materials/archive", material_id=seed.materials[name]["id"]
         )
-    if open_run:
+    if selection["open_run"]:
         for piece in with_history.values():
             await piece.open_run(seed)
-    return {"pieces": pieces, "history": history, "open_run": open_run}
+    return selection
 
 
 async def _async_add_hub(hass: HomeAssistant) -> ConfigEntry:
