@@ -140,6 +140,21 @@ describe("A manual Run", () => {
     ]);
   });
 
+  it("offers a dishwasher's Programs", async () => {
+    const backend = creating().reply("coinop/devices/list", () => ({
+      devices: [recorded.dishwasher],
+    }));
+    const panel = await mountPanel(backend, RUNS);
+
+    const dialog = await open(panel);
+
+    const known = query(dialog, `datalist#${field(dialog, "program").getAttribute("list")}`);
+    expect(queryAll(known, "option").map((option) => option.getAttribute("value"))).toEqual([
+      "Eco 50°",
+      "Intensive 70°",
+    ]);
+  });
+
   it("sends a washing machine's Program, known or typed, which names an unnamed Run", async () => {
     const backend = creating().reply("coinop/devices/list", () => ({
       devices: [recorded.washer],

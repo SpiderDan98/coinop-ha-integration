@@ -544,6 +544,60 @@ async def test_record_electricity_and_water_per_program(
     assert_recorded("runs-get-per-program", stable_ids(detail, ids))
 
 
+async def test_record_a_dishwasher(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    """A Dishwasher on an energy meter with water per Program and tabs as its Dose."""
+    place_materials(
+        hass_storage,
+        stored_material(
+            "material-tabs",
+            name="Dishwasher tabs",
+            form="detergent",
+            type="Dishwasher tabs",
+            density=None,
+            diameter=None,
+            price={
+                "source": "fixed",
+                "pack_price": 9.0,
+                "pack_size": 60.0,
+                "pack_unit": "pcs",
+            },
+        ),
+    )
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(WASHER_STATUS, "off")
+    hass.states.async_set(
+        "sensor.washer_program", "Eco 50°", {"options": ["Eco 50°", "Intensive 70°"]}
+    )
+    subentry = await add_washing_machine(
+        hass,
+        await add_hub(hass),
+        name="Dishwasher",
+        device_type="dishwasher",
+        program={"entity_id": "sensor.washer_program"},
+        water="per_program",
+    )
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=subentry.subentry_id,
+        settings={
+            "doses": [{"id": "dose-tabs", "material_id": "material-tabs"}],
+            "program_defaults": {
+                "default": {"doses": {"dose-tabs": 1}, "litres": 14},
+                "programs": {"Eco 50°": {"doses": {"dose-tabs": 1}, "litres": 9.5}},
+            },
+        },
+    )
+
+    devices = await panel.call("coinop/devices/list")
+
+    assert_recorded(
+        "devices-list-dishwasher",
+        stable_ids(devices, {subentry.subentry_id: "device-dishwasher"}),
+    )
+
+
 async def test_record_what_deleting_a_run_drops(
     hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
 ) -> None:

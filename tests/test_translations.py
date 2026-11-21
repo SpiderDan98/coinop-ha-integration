@@ -12,6 +12,7 @@ from custom_components.coinop.const import DOMAIN
 
 from .clock import Clock
 from .devices import add_device, add_hub
+from .test_device_flow import offered
 
 TRANSLATIONS = Path(__file__).parents[1] / "custom_components" / DOMAIN / "translations"
 STATEMENT = TRANSLATIONS.parent / "statement" / "strings"
@@ -78,11 +79,59 @@ async def test_add_device_texts_load_in_home_assistant(
     assert translations[f"{prefix}.step.estimate.data_description.running_power"]
     assert translations[f"{prefix}.error.no_ending_value"]
     assert "{integrations}" in translations[f"{prefix}.step.device.description"]
+    unnamed = translations[f"{prefix}.step.device_without_profile.description"]
+    assert unnamed
+    assert "{" not in unnamed
     confirm = translations[f"{prefix}.step.quick_start_confirm.description"]
     assert all(
         placeholder in confirm
         for placeholder in ("{device}", "{integration}", "{inputs}")
     )
+
+
+# The steps only a 3D printer has; every other step is shared between Device Types.
+PRINTER_STEPS = {"job", "material_unit", "images", "estimate"}
+
+
+@pytest.mark.parametrize(
+    ("language", "words"),
+    [
+        ("en", ("print", "wash", "laundry", "load", "machine")),
+        ("de", ("druck", "wasch", "wäsche", "maschine")),
+    ],
+)
+def test_steps_shared_between_device_types_speak_of_none_of_them(
+    language: str, words: tuple[str, ...]
+) -> None:
+    def texts(tree: dict[str, Any]) -> list[str]:
+        return [
+            text
+            for value in tree.values()
+            for text in (texts(value) if isinstance(value, dict) else [value])
+        ]
+
+    steps = _load(language)["config_subentries"]["device"]["step"]
+    shared = [
+        text
+        for name, step in steps.items()
+        if name not in PRINTER_STEPS
+        for text in texts(step)
+    ]
+
+    assert [
+        text for text in shared if any(word in text.lower() for word in words)
+    ] == []
+
+
+@pytest.mark.parametrize(
+    ("language", "words"), [("en", ("load", "laundry")), ("de", ("wäsche",))]
+)
+def test_the_hub_description_speaks_of_no_laundry(
+    language: str, words: tuple[str, ...]
+) -> None:
+    description = _load(language)["config"]["step"]["user"]["description"]
+
+    assert not any(word in description.lower() for word in words)
 
 
 @pytest.mark.parametrize("language", ["en", "de"])
@@ -94,6 +143,21 @@ async def test_quick_starts_manual_choice_is_translated(
     assert translations[
         f"component.{DOMAIN}.selector.quick_start_device.options.manual"
     ] not in ("", "manual")
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+async def test_every_device_type_add_device_offers_is_named(
+    hass: HomeAssistant, language: str
+) -> None:
+    entry = await add_hub(hass)
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, "device"), context={"source": "user"}
+    )
+
+    named = _load(language)["selector"]["device_type"]["options"]
+
+    assert list(named) == offered(result, "device_type")
+    assert all(named.values())
 
 
 async def test_entities_are_named_in_the_configured_language(
