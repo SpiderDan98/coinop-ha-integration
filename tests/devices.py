@@ -230,7 +230,7 @@ async def add_washing_machine(
     source: str = "energy",
     meter: dict[str, Any] | None = None,
     price: float | dict[str, Any] = 0.30,
-    water: str = "none",
+    water: str | None = "none",
     water_meter: dict[str, Any] | None = None,
     water_price: float | dict[str, Any] = 4.0,
     device_type: str = "washing_machine",
@@ -241,7 +241,8 @@ async def add_washing_machine(
 
     `source` "per_program" takes no `meter`. `water` is "meter" (on `WASHER_WATER`
     unless `water_meter` gives the input), "flow", "per_program" or "none"; a fixed
-    `water_price` is per m³.
+    `water_price` is per m³. `water=None` walks a Device Type without water, which
+    is done after the electricity price.
     """
     result = await walk_to_mapping(
         hass,
@@ -261,13 +262,14 @@ async def add_washing_machine(
     assert result["step_id"] == "price", result.get("errors")
     result = await configure(hass, result, price_choice(price))
     result = await configure(hass, result, price_input(price))
-    assert result["step_id"] == "water", result.get("errors")
-    result = await configure(hass, result, {"next_step_id": f"water_{water}"})
+    if water is not None:
+        assert result["step_id"] == "water", result.get("errors")
+        result = await configure(hass, result, {"next_step_id": f"water_{water}"})
     if water in ("meter", "flow"):
         result = await configure(
             hass, result, water_meter or {"entity_id": WASHER_WATER}
         )
-    if water != "none":
+    if water not in (None, "none"):
         assert result["step_id"] == "water_price", result.get("errors")
         result = await configure(
             hass,

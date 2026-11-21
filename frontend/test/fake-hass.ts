@@ -27,9 +27,12 @@ import costStatementDefaults from "./fixtures/backend/cost-statement-defaults.js
 import devicesList from "./fixtures/backend/devices-list.json";
 import devicesListCoffeeMachine from "./fixtures/backend/devices-list-coffee-machine.json";
 import devicesListDishwasher from "./fixtures/backend/devices-list-dishwasher.json";
+import devicesListOven from "./fixtures/backend/devices-list-oven.json";
 import devicesListPerProgram from "./fixtures/backend/devices-list-per-program.json";
+import devicesListTumbleDryer from "./fixtures/backend/devices-list-tumble-dryer.json";
 import devicesListWashingMachine from "./fixtures/backend/devices-list-washing-machine.json";
 import devicesMeasuredSuggestions from "./fixtures/backend/devices-measured-suggestions.json";
+import devicesMeasuredSuggestionsOven from "./fixtures/backend/devices-measured-suggestions-oven.json";
 import devicesMeasuredSuggestionsSmall from "./fixtures/backend/devices-measured-suggestions-small.json";
 import imagesDelete from "./fixtures/backend/images-delete.json";
 import imagesSetCover from "./fixtures/backend/images-set-cover.json";
@@ -133,6 +136,10 @@ export const recorded = {
   /** `coinop/devices/list` with only "device-dishwasher", a Dishwasher on an energy meter
    * with water per Program, dosing one of "material-tabs" (see `dishwasherAndBeverage`). */
   dishwasher: devicesListDishwasher.devices[0] as Device,
+  /** `coinop/devices/list` with only "device-dryer", a Tumble dryer on an energy meter,
+   * dosing "material-sheets" (not in a recorded catalogue): 1 in the Default row, 2 for
+   * "Cupboard dry". */
+  tumbleDryer: devicesListTumbleDryer.devices[0] as Device,
   /** `coinop/devices/list` with only "device-coffee-machine", a Coffee machine whose
    * electricity and water come per Program, dosing "material-beans" (see
    * `dishwasherAndBeverage`): the Default row 0.02 kWh and 0.125 L, "Espresso" 0.012 kWh
@@ -142,6 +149,14 @@ export const recorded = {
    * ("espresso-electricity") and 0.04 L at 4.00 per m³ ("espresso-water") from the
    * Program's row, both amounts rounding to 0.00. */
   espresso: runsGetCoffeeMachine.run as RunDetail,
+  /** `coinop/devices/list` with only "device-oven", an Oven (a Program and no Doses) on an
+   * energy meter: the Default row 1 kWh, "Fan plus 180°" 1.6 kWh. */
+  oven: devicesListOven.devices[0] as Device,
+  /** `coinop/devices/measured_suggestions` of "device-oven" after a "Fan plus 180°" Run:
+   * 1.4 kWh from 1 Run for that Program, nothing for the Default row. */
+  ovenSuggestions: devicesMeasuredSuggestionsOven.suggestions as Awaited<
+    ReturnType<typeof getMeasuredSuggestions>
+  >,
   /** `coinop/runs/get` of its finished Run "wash": 1.2 kWh measured at 0.30. */
   wash: runsGetWashingMachine.run as RunDetail,
   /** `coinop/devices/measured_suggestions` of "device-washer" after "wash" (Cotton 60°,

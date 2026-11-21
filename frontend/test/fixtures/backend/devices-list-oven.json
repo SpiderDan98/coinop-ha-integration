@@ -1,0 +1,77 @@
+{
+  "devices": [
+    {
+      "id": "device-oven",
+      "name": "Oven",
+      "type": "oven",
+      "capabilities": [
+        "per_run_meters",
+        "program",
+        "program_consumption"
+      ],
+      "ha_settings": {
+        "printer_device_id": null,
+        "status": {
+          "entity_id": "sensor.washer_status",
+          "attribute": null
+        },
+        "mapping": {
+          "running": [
+            "running"
+          ],
+          "paused": [
+            "paused"
+          ],
+          "finished": [
+            "finished"
+          ],
+          "cancelled": [
+            "cancelled"
+          ],
+          "ended": [],
+          "fault": [],
+          "ignored": [
+            "off"
+          ]
+        },
+        "program": {
+          "entity_id": "sensor.washer_program",
+          "attribute": null
+        },
+        "consumption": {
+          "source": "energy",
+          "entity_id": "sensor.washer_plug_energy",
+          "attribute": null,
+          "unit": "kWh",
+          "factor": null
+        },
+        "price": {
+          "source": "fixed",
+          "value": 0.3
+        }
+      },
+      "settings": {
+        "tags_for_new_runs": [],
+        "automatic_templates": [],
+        "default_material": null,
+        "doses": [],
+        "program_defaults": {
+          "default": {
+            "doses": {},
+            "kwh": 1.0
+          },
+          "programs": {
+            "Fan plus 180°": {
+              "doses": {},
+              "kwh": 1.6
+            }
+          }
+        }
+      },
+      "known_programs": [
+        "Fan plus 180°",
+        "Conventional heat"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "suggestions": {
+    "default": {},
+    "programs": {
+      "Fan plus 180°": {
+        "kwh": {
+          "mean": 1.4,
+          "runs": 1
+        }
+      }
+    }
+  }
+}
