@@ -523,6 +523,8 @@ async def _replay(
     hass: HomeAssistant, entity_id: str, value: float | str, at: datetime
 ) -> None:
     """Report a helper's value as of `at`, which its services can't backdate."""
+    # A task started eagerly, as the service call's is, isn't tracked before it waits.
+    await asyncio.sleep(0)
     attributes = state.attributes if (state := hass.states.get(entity_id)) else None
     # Awaits only what the report starts: async_block_till_done would also wait for
     # the service call that is waiting for this load.
