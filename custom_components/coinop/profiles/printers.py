@@ -5,7 +5,7 @@ from typing import Any
 
 from custom_components.coinop.const import DEVICE_TYPE_3D_PRINTER
 
-from .base import Find, always, found, mapping
+from .base import Find, always, entity_input, found, mapping
 
 DEVICE_TYPES = (DEVICE_TYPE_3D_PRINTER,)
 KIND = always(DEVICE_TYPE_3D_PRINTER)
@@ -28,7 +28,7 @@ def anycubic(find: Find) -> dict[str, Any]:
     thumbnail = find("image", "_object_top_view", "_object_thumbnail")
     camera = find("camera", "_camera")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -41,7 +41,7 @@ def anycubic(find: Find) -> dict[str, Any]:
                 ignored=["clear_ready", "clear_done", "clear_failed"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None)
+        "job": entity_input(job)
         # The state is grams from a guessed density; the attribute is the measured length.
         | found(
             filament,
@@ -68,7 +68,7 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
     thumbnail = find("image", "-job_image_url")
     camera = find("camera", "-camera")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -82,7 +82,7 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
                 ignored=["downloading", "checking", "slicing"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None)
+        "job": entity_input(job)
         | found(
             filament, material={"entity_id": filament, "attribute": None, "unit": "mm"}
         )
@@ -103,7 +103,7 @@ def bambu_lab(find: Find) -> dict[str, Any]:
     # Missing where the printer's camera is turned off or offered as an image.
     camera = find("camera", "_camera")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -116,7 +116,7 @@ def bambu_lab(find: Find) -> dict[str, Any]:
                 ignored=["idle", "init", "slicing", "offline", "unknown"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None)
+        "job": entity_input(job)
         | found(weight, material={"entity_id": weight, "attribute": None, "unit": "g"}),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
@@ -130,7 +130,7 @@ def prusalink(find: Find) -> dict[str, Any]:
     # The job preview is a camera; the integration has no webcam.
     thumbnail = find("camera", "_job_preview")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -143,7 +143,7 @@ def prusalink(find: Find) -> dict[str, Any]:
                 ignored=["idle", "ready", "busy"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None),
+        "job": entity_input(job),
         "images": found(thumbnail, thumbnail=thumbnail),
     }
 
@@ -158,7 +158,7 @@ def octoprint(find: Find) -> dict[str, Any]:
     # Its only camera, there while the webcam is enabled in OctoPrint.
     camera = find("camera", "")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -187,7 +187,7 @@ def octoprint(find: Find) -> dict[str, Any]:
                 ],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None),
+        "job": entity_input(job),
         "images": found(camera, camera=camera, snapshot=True),
     }
 
@@ -200,7 +200,7 @@ def creality(find: Find) -> dict[str, Any]:
     # Registered on models without a camera too, unless set up without a URL.
     camera = find("camera", "-camera")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -234,7 +234,7 @@ def elegoo(find: Find) -> dict[str, Any]:
     # Registered for every printer, whether it has a camera or not.
     camera = find("camera", "_chamber_camera")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -274,7 +274,7 @@ def elegoo(find: Find) -> dict[str, Any]:
                 ignored=["idle", "file_checking", "unrecognized"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None)
+        "job": entity_input(job)
         | found(
             extrusion,
             material={"entity_id": extrusion, "attribute": None, "unit": "mm"},
@@ -296,7 +296,7 @@ def moonraker(find: Find) -> dict[str, Any]:
     # A webcam is `<entry id>_<webcam name>_<index>`: any camera but the preview.
     camera = find("camera", "", exclude="_thumbnail")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -309,7 +309,7 @@ def moonraker(find: Find) -> dict[str, Any]:
                 fault=["error"],
             ),
         ),
-        "job": found(job, entity_id=job, attribute=None)
+        "job": entity_input(job)
         | found(
             filament, material={"entity_id": filament, "attribute": None, "unit": "m"}
         ),

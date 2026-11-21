@@ -10,9 +10,16 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
 from custom_components.coinop.const import DEVICE_TYPE_EV_CHARGER
-from custom_components.coinop.device_config import ConsumptionSource
 
-from .base import Find, NoDeviceType, always, found, mapping
+from .base import (
+    Find,
+    NoDeviceType,
+    always,
+    energy_source,
+    entity_input,
+    found,
+    mapping,
+)
 
 DEVICE_TYPES = (DEVICE_TYPE_EV_CHARGER,)
 KIND = always(DEVICE_TYPE_EV_CHARGER)
@@ -36,9 +43,7 @@ def energy_meter(
     """
     counters = (session, lifetime) if session_first else (lifetime, session)
     meter = find("sensor", *(counter for counter in counters if counter), start=start)
-    return found(
-        meter, source=ConsumptionSource.ENERGY.value, entity_id=meter, attribute=None
-    )
+    return energy_source(meter)
 
 
 def tesla_wall_connector(find: Find) -> dict[str, Any]:
@@ -48,7 +53,7 @@ def tesla_wall_connector(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "-status")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -82,7 +87,7 @@ def evcc(find: Find) -> dict[str, Any]:
     """
     status = find("binary_sensor", "_charging")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(status, **mapping(running=["on"], finished=["off"])),
         "consumption": energy_meter(
             find,
@@ -100,7 +105,7 @@ def ocpp(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", ".status_connector.sensor")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -127,7 +132,7 @@ def easee(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "_status")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -175,7 +180,7 @@ def zaptec(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "_charger_operation_mode")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -201,7 +206,7 @@ def goe_mqtt(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "-sensor-car-car")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -226,7 +231,7 @@ def goe_api2(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "_car_value")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -256,7 +261,7 @@ def wallbox(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "status_description-", start=True)
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(

@@ -3,17 +3,27 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Protocol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.coinop.device_config import Target
+from custom_components.coinop.device_config import ConsumptionSource, Target
 
-# Matches the end of a unique id, or its start with `start=True`.
-# `disabled=True` also finds a disabled entity: a kind check reads what is registered.
-# `exclude` passes over unique ids that end in it, such as a longer key ending alike.
-Find = Callable[..., str | None]
+
+class Find(Protocol):
+    """The first of the HA device's entities on the platform whose unique id ends in
+    (or with `start`, starts with) one of the keys, in the keys' order."""
+
+    def __call__(
+        self,
+        platform: str,
+        /,
+        *keys: str,
+        start: bool = False,
+        disabled: bool = False,
+        exclude: str | None = None,
+    ) -> str | None: ...
 
 
 class NoDeviceType(Enum):
@@ -31,22 +41,30 @@ KindCheck = Callable[[Find, dr.DeviceEntry, ConfigEntry], str | NoDeviceType]
 class Integration:
     """A known integration: its name, the profile that finds its Device Inputs, the
     Device Types it serves and how it tells which of them an HA device is.
-
-    `linked_devices` is whether the profile also finds the entities of the HA devices
-    linked to the chosen one (a multi-material unit); an integration whose linked
-    devices are Devices of their own reads the chosen one alone.
     """
 
     name: str
     profile: Callable[[Find], dict[str, Any]]
     device_types: tuple[str, ...]
     kind: KindCheck
+    # Whether the profile also reads the HA devices linked to the chosen one (a
+    # multi-material unit); not where those are Devices of their own (OCPP connectors).
     linked_devices: bool = True
 
 
 def found(entity: str | list[str] | None, /, **fields: Any) -> dict[str, Any]:
     """The fields of an input, or none if the profile didn't find its entity."""
     return fields if entity else {}
+
+
+def entity_input(entity_id: str | None, /, **fields: Any) -> dict[str, Any]:
+    """An input read from the entity's state, or none if the profile didn't find it."""
+    return found(entity_id, entity_id=entity_id, attribute=None, **fields)
+
+
+def energy_source(entity_id: str | None) -> dict[str, Any]:
+    """The electricity source on the entity's energy meter, if the profile found it."""
+    return entity_input(entity_id, source=ConsumptionSource.ENERGY.value)
 
 
 def mapping(**values: list[str]) -> dict[str, list[str]]:

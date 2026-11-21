@@ -13,9 +13,9 @@ from custom_components.coinop.const import (
     DEVICE_TYPE_TUMBLE_DRYER,
     DEVICE_TYPE_WASHING_MACHINE,
 )
-from custom_components.coinop.device_config import ConsumptionSource, WaterSource
+from custom_components.coinop.device_config import WaterSource
 
-from .base import Find, NoDeviceType, found, mapping
+from .base import Find, NoDeviceType, energy_source, entity_input, found, mapping
 
 # The Device Types an appliance of WashData, Miele or Home Connect can be.
 DEVICE_TYPES = (
@@ -44,7 +44,7 @@ def washdata(find: Find) -> dict[str, Any]:
     status = find("sensor", "_washer_state")
     program = find("sensor", "_washer_program")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -56,9 +56,7 @@ def washdata(find: Find) -> dict[str, Any]:
                 ignored=["off", "idle", "starting", "delay_wait", "unknown"],
             ),
         ),
-        "program": found(
-            program, entity_id=program, attribute=None, ignored=WASHDATA_PLACEHOLDERS
-        ),
+        "program": entity_input(program, ignored=WASHDATA_PLACEHOLDERS),
     }
 
 
@@ -72,7 +70,7 @@ def miele(find: Find) -> dict[str, Any]:
     energy = find("sensor", "-current_energy_consumption")
     water = find("sensor", "-current_water_consumption")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -92,16 +90,9 @@ def miele(find: Find) -> dict[str, Any]:
                 ],
             ),
         ),
-        "program": found(program, entity_id=program, attribute=None),
-        "consumption": found(
-            energy,
-            source=ConsumptionSource.ENERGY.value,
-            entity_id=energy,
-            attribute=None,
-        ),
-        "water": found(
-            water, source=WaterSource.METER.value, entity_id=water, attribute=None
-        ),
+        "program": entity_input(program),
+        "consumption": energy_source(energy),
+        "water": entity_input(water, source=WaterSource.METER.value),
     }
 
 
@@ -122,7 +113,7 @@ def _operation_state(
     """A Home Connect appliance's inputs, its operation states as `state` reports
     them."""
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         "mapping": found(
             status,
             **mapping(
@@ -132,7 +123,7 @@ def _operation_state(
                 }
             ),
         ),
-        "program": found(program, entity_id=program, attribute=None),
+        "program": entity_input(program),
     }
 
 
@@ -298,7 +289,7 @@ def lg_thinq(find: Find) -> dict[str, Any]:
     )
     program = find("sensor", "_current_dish_washing_course")
     return {
-        "status": found(status, entity_id=status, attribute=None),
+        "status": entity_input(status),
         # The integration has one list of states for all appliances (its strings.json).
         "mapping": found(
             status,
@@ -373,7 +364,7 @@ def lg_thinq(find: Find) -> dict[str, Any]:
                 ],
             ),
         ),
-        "program": found(program, entity_id=program, attribute=None),
+        "program": entity_input(program),
     }
 
 
@@ -469,12 +460,7 @@ def smartthings(find: Find) -> dict[str, Any]:
     return {
         "status": {"entity_id": status, "attribute": None},
         "mapping": mapping(running=[running], paused=[paused], finished=[finished]),
-        "consumption": found(
-            energy,
-            source=ConsumptionSource.ENERGY.value,
-            entity_id=energy,
-            attribute=None,
-        ),
+        "consumption": energy_source(energy),
     }
 
 

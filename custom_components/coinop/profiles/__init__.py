@@ -8,6 +8,7 @@ Each group's profiles and kind checks live in its own module (`printers`,
 """
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -22,39 +23,22 @@ from .base import Find, Integration, NoDeviceType
 # Sections a profile pre-fills only in Add Device: Detect again leaves them alone.
 METERS = (ELECTRICITY.source_key, WATER.source_key)
 
+_printer = partial(Integration, device_types=printers.DEVICE_TYPES, kind=printers.KIND)
+_ev_charger = partial(
+    Integration, device_types=ev_chargers.DEVICE_TYPES, kind=ev_chargers.KIND
+)
+
 # By integration domain, in the order Quick Start and the HA device step list them.
 INTEGRATIONS = {
     # 3D printers
-    "anycubic": Integration(
-        "Anycubic 3D Printer - Local Control",
-        printers.anycubic,
-        printers.DEVICE_TYPES,
-        printers.KIND,
-    ),
-    "anycubic_cloud": Integration(
-        "Anycubic Cloud & LAN",
-        printers.anycubic_cloud,
-        printers.DEVICE_TYPES,
-        printers.KIND,
-    ),
-    "bambu_lab": Integration(
-        "Bambu Lab", printers.bambu_lab, printers.DEVICE_TYPES, printers.KIND
-    ),
-    "prusalink": Integration(
-        "PrusaLink", printers.prusalink, printers.DEVICE_TYPES, printers.KIND
-    ),
-    "octoprint": Integration(
-        "OctoPrint", printers.octoprint, printers.DEVICE_TYPES, printers.KIND
-    ),
-    "ha_creality_ws": Integration(
-        "Creality", printers.creality, printers.DEVICE_TYPES, printers.KIND
-    ),
-    "elegoo_printer": Integration(
-        "Elegoo", printers.elegoo, printers.DEVICE_TYPES, printers.KIND
-    ),
-    "moonraker": Integration(
-        "Moonraker", printers.moonraker, printers.DEVICE_TYPES, printers.KIND
-    ),
+    "anycubic": _printer("Anycubic 3D Printer - Local Control", printers.anycubic),
+    "anycubic_cloud": _printer("Anycubic Cloud & LAN", printers.anycubic_cloud),
+    "bambu_lab": _printer("Bambu Lab", printers.bambu_lab),
+    "prusalink": _printer("PrusaLink", printers.prusalink),
+    "octoprint": _printer("OctoPrint", printers.octoprint),
+    "ha_creality_ws": _printer("Creality", printers.creality),
+    "elegoo_printer": _printer("Elegoo", printers.elegoo),
+    "moonraker": _printer("Moonraker", printers.moonraker),
     # Appliances
     "ha_washdata": Integration(
         "WashData",
@@ -96,44 +80,16 @@ INTEGRATIONS = {
         appliances.smartthings_kind,
     ),
     # EV chargers
-    "tesla_wall_connector": Integration(
-        "Tesla Wall Connector",
-        ev_chargers.tesla_wall_connector,
-        ev_chargers.DEVICE_TYPES,
-        ev_chargers.KIND,
+    "tesla_wall_connector": _ev_charger(
+        "Tesla Wall Connector", ev_chargers.tesla_wall_connector
     ),
-    "evcc_intg": Integration(
-        "evcc", ev_chargers.evcc, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
-    ),
-    # Each connector of a charge point with several is an HA device linked to it.
-    "ocpp": Integration(
-        "OCPP",
-        ev_chargers.ocpp,
-        ev_chargers.DEVICE_TYPES,
-        ev_chargers.KIND,
-        linked_devices=False,
-    ),
-    "easee": Integration(
-        "Easee", ev_chargers.easee, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
-    ),
-    "zaptec": Integration(
-        "Zaptec", ev_chargers.zaptec, ev_chargers.DEVICE_TYPES, ev_chargers.zaptec_kind
-    ),
-    "goecharger_mqtt": Integration(
-        "go-e Charger MQTT",
-        ev_chargers.goe_mqtt,
-        ev_chargers.DEVICE_TYPES,
-        ev_chargers.KIND,
-    ),
-    "goecharger_api2": Integration(
-        "go-e Charger API v2",
-        ev_chargers.goe_api2,
-        ev_chargers.DEVICE_TYPES,
-        ev_chargers.KIND,
-    ),
-    "wallbox": Integration(
-        "Wallbox", ev_chargers.wallbox, ev_chargers.DEVICE_TYPES, ev_chargers.KIND
-    ),
+    "evcc_intg": _ev_charger("evcc", ev_chargers.evcc),
+    "ocpp": _ev_charger("OCPP", ev_chargers.ocpp, linked_devices=False),
+    "easee": _ev_charger("Easee", ev_chargers.easee),
+    "zaptec": _ev_charger("Zaptec", ev_chargers.zaptec, kind=ev_chargers.zaptec_kind),
+    "goecharger_mqtt": _ev_charger("go-e Charger MQTT", ev_chargers.goe_mqtt),
+    "goecharger_api2": _ev_charger("go-e Charger API v2", ev_chargers.goe_api2),
+    "wallbox": _ev_charger("Wallbox", ev_chargers.wallbox),
 }
 
 
@@ -151,9 +107,7 @@ def known_integrations(device_type: str) -> str:
 
 
 def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:
-    """Finds the integration's entities of the HA device and, unless its integration
-    says otherwise, the devices linked to it."""
-    # A multi-material unit is its own HA device, linked to the printer's.
+    """Finds the integration's entities of the HA device (and its linked devices)."""
     linked = INTEGRATIONS[config_entry.domain].linked_devices
     device_ids = [
         device.id
