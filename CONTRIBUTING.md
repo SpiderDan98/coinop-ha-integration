@@ -189,7 +189,7 @@ npm run typecheck
 
 The committed `manifest.json` keeps the placeholder version `0.0.0`; a release gets its version only from its tag.
 
-1. Push a tag with the version, without a `v` prefix: `1.2.0`, or `1.2.0b1` / `1.2.0rc1` for a pre-release (releases before 1.0 are pre-releases).
+1. Push a tag with the version, without a `v` prefix: `1.2.0`, or `1.2.0b1` / `1.2.0rc1` for a pre-release. Users only get a pre-release by picking it, and without a regular release the Marketplace installs the default branch, which has no `coinop.zip`.
 2. `.github/workflows/release.yaml` builds the panel, runs `scripts/release.py` (which fails for any other tag) to zip `custom_components/coinop/` with the tag as the manifest's version, and creates a **draft** release with `coinop.zip` and generated notes, marked as a pre-release for `b` / `rc` tags.
 3. Edit the notes (they become the release notes users see in Home Assistant; mention any raise of the minimum HA version) and publish the release. HACS and the Marketplace only offer published releases.
 

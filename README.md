@@ -16,8 +16,6 @@ A Home Assistant custom integration that records what each Run of your household
   <img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/overview.png" alt="The Coin-op panel's overview: cost this month and in total, cost per month, cost by Material and the most recent Runs" width="100%">
 </p>
 
-Coin-op is in early development. Releases before 1.0 are pre-releases for testing.
-
 Requires Home Assistant 2026.5 or newer. Licensed under the [MIT licence](LICENSE).
 
 Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -98,9 +96,8 @@ Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the buil
 [![Open your Home Assistant instance and open this repository in HACS or the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SpiderDan98&repository=coinop-ha-integration&category=integration)
 
 1. Select the badge above, or add `https://github.com/SpiderDan98/coinop-ha-integration` as a custom repository of type **Integration**. On the Marketplace this needs a GitHub connection.
-2. Releases before 1.0 are pre-releases: turn on pre-releases for the repository to be offered them.
-3. Download Coin-op. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
-4. Go to **Settings > Devices & services > Add integration**, pick **Coin-op** and add your first Device.
+2. Download Coin-op. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
+3. Go to **Settings > Devices & services > Add integration**, pick **Coin-op** and add your first Device.
 
 ## Quick Start
 
