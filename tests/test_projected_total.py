@@ -14,6 +14,7 @@ from .test_measured import set_meter
 from .test_program_consumption import set_rows
 from .test_runs import set_status, stored_runs
 from .test_templates import WEAR, add_template, create
+from .test_water import set_water
 from .washing import add_washer, set_energy, set_program, set_washer
 from .websocket import PanelClient
 
@@ -460,3 +461,26 @@ async def test_measured_above_the_programs_default_leaves_nothing_to_come(
     [summary] = (await panel.call("coinop/runs/list"))["runs"]
     run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
     assert run["projected_parts"] == ["electricity"]
+
+
+async def test_a_measured_waters_rest_is_what_the_programs_litres_leave(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_water(hass, 1000)
+    washer = await add_washer(hass, water="meter")
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+    await set_water(hass, 1020)
+
+    # 20 of Cotton's 60 L so far at 4.00 per m³: 0.08, and 0.16 to come.
+    state = projected(hass, WASHER_PROJECTED)
+    assert float(state.state) == pytest.approx(0.27 + 0.18 + 0.08 + 0.16)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["electricity", "water"]
+
+    await clock.advance(minutes=5)
+    await set_water(hass, 1070)
+    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(
+        0.27 + 0.18 + 0.28
+    )

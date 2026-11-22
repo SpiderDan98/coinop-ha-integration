@@ -514,6 +514,7 @@ class ProjectedPart(StrEnum):
     """What a Projected Total's rest can come from."""
 
     ELECTRICITY = "electricity"
+    WATER = "water"
     RUNNING_HOURS = "running_hours"
 
 

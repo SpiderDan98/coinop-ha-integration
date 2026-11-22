@@ -88,7 +88,7 @@ from .models import (
     Stock,
     Usage,
 )
-from .quantities import ELECTRICITY, QUANTITIES, WATER, Quantity
+from .quantities import ELECTRICITY, QUANTITIES, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
 from .templates import add_templates, count_running_hours
@@ -159,18 +159,21 @@ class DeviceTracker:
             fallback=self._electricity_fallback,
             silent_meter_falls_back=self._per_program,
         )
-        self._meterings: tuple[Metering, ...] = (self._electricity,)
-        if Capability.WATER in config.capabilities:
-            self._meterings += (
-                Metering(
-                    hass,
-                    WATER,
-                    config,
-                    gap_rates=lambda run: [(run.started, None)],
-                    fallback=self._water_fallback,
-                    silent_meter_falls_back=self._per_program,
-                ),
+        self._water = (
+            Metering(
+                hass,
+                WATER,
+                config,
+                gap_rates=lambda run: [(run.started, None)],
+                fallback=self._water_fallback,
+                silent_meter_falls_back=self._per_program,
             )
+            if Capability.WATER in config.capabilities
+            else None
+        )
+        self._meterings = tuple(
+            m for m in (self._electricity, self._water) if m is not None
+        )
 
     @property
     def _per_program(self) -> bool:
@@ -1146,6 +1149,7 @@ class DeviceTracker:
                 ProjectedPart.ELECTRICITY: None
                 if kwh is None
                 else kwh * self._electricity.price_now(run),
+                ProjectedPart.WATER: self._water_rest(run),
                 ProjectedPart.RUNNING_HOURS: None
                 if hours is None
                 else running_hours_rest(run, hours),
@@ -1208,20 +1212,31 @@ class DeviceTracker:
             return expected_energy_rest(
                 kwh, item.quantity or 0.0, expected["form"] == ExpectedEnergyForm.TOTAL
             )
-        if (default := self._default_rest(run, ELECTRICITY, item)) is not None:
+        if (default := self._default_rest(run, self._electricity)) is not None:
             return default
         if hours is None or (power := self._base_power(run, now)) is None:
             return None
         return power * hours / 1000
 
-    def _default_rest(
-        self, run: Run, quantity: Quantity, item: LineItem
-    ) -> float | None:
-        """What the Run's Program default leaves after the measured `item`; None
-        without a default or a measurement."""
-        if not self._per_program or item.method is not ConsumptionMethod.MEASURED:
+    def _water_rest(self, run: Run) -> float | None:
+        """The water still to come, priced: what the Program's litres leave after
+        the measured; None otherwise."""
+        if self._water is None or (litres := self._default_rest(run, self._water)) is None:
             return None
-        default = self._program_row(run)[0].get(quantity.default_key)
+        return litres * self._water.price_now(run)
+
+    def _default_rest(self, run: Run, metering: Metering) -> float | None:
+        """What the Run's Program default leaves after what `metering` measured;
+        None without a default or a measurement."""
+        kind = metering.quantity.kind
+        item = next((i for i in run.line_items if i.kind is kind), None)
+        if (
+            not self._per_program
+            or item is None
+            or item.method is not ConsumptionMethod.MEASURED
+        ):
+            return None
+        default = self._program_row(run)[0].get(metering.quantity.default_key)
         return None if default is None else total_rest(default, item.quantity or 0.0)
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
