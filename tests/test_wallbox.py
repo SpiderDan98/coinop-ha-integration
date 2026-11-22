@@ -191,7 +191,7 @@ async def test_manual_setup_of_a_wallbox_comes_pre_filled(
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
         assert not result.get("errors"), result["errors"]
-    assert shown == ["status", "mapping"]
+    assert shown == ["status", "mapping", "progress"]
     result = await configure(hass, result, {"next_step_id": "energy"})
     assert suggested(result, "entity_id") == wallbox["added_energy"]
     result = await configure(hass, result, accepted(result))

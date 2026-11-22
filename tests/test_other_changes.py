@@ -131,7 +131,14 @@ async def test_only_an_other_devices_reconfigure_menu_offers_its_type_name_and_w
     assert len(shipped) == 8
 
     result = await start_reconfigure(hass, entry, kiln)
-    assert result["menu_options"] == ["other", "status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "save",
+    ]
     for device_type in shipped:
         device = await add_shipped(hass, entry, device_type)
         result = await start_reconfigure(hass, entry, device)
@@ -206,7 +213,7 @@ async def test_renaming_the_type_name_alone_moves_the_device_under_the_new_headi
     assert unnamed["errors"] == {"type_name": "type_name_required"}
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "images", "consumption", "price", "save"],
+        ["other", "status", "images", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
 
@@ -239,6 +246,7 @@ async def test_adding_water_walks_its_source_and_price_and_the_next_run_gets_wat
     assert result["menu_options"] == [
         "other",
         "status",
+        "progress",
         "consumption",
         "price",
         "water",
@@ -267,7 +275,7 @@ async def test_removing_water_drops_its_sections_and_the_next_run_records_no_wat
     result = await configure(hass, result, other_input("Irrigation"))
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "consumption", "price", "save"],
+        ["other", "status", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     await irrigate(hass, clock, start=1120, litres=80)
@@ -298,7 +306,7 @@ async def test_adding_a_program_asks_a_device_on_the_estimate_for_its_electricit
     result = await configure(hass, result, {"next_step_id": "per_program"})
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "program", "consumption", "price", "save"],
+        ["other", "status", "program", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     await panel.call(
@@ -349,7 +357,16 @@ async def test_removing_the_program_asks_for_every_source_that_was_per_program_a
     result = await configure(hass, result, {"entity_id": VALVE_WATER})
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "consumption", "price", "water", "water_price", "save"],
+        [
+            "other",
+            "status",
+            "progress",
+            "consumption",
+            "price",
+            "water",
+            "water_price",
+            "save",
+        ],
     )
     await save(hass, result)
     await set_kiln(hass, "on")
@@ -576,7 +593,13 @@ async def test_leaving_halfway_through_the_sections_a_change_brings_changes_noth
 
     assert entry.subentries[valve.subentry_id].data == stored
     result = await start_reconfigure(hass, entry, valve)
-    assert result["menu_options"] == ["other", "status", "consumption", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "save",
+    ]
 
 
 async def test_job_and_material_goes_and_comes_back_with_its_default_material(
@@ -591,7 +614,7 @@ async def test_job_and_material_goes_and_comes_back_with_its_default_material(
     result = await configure(hass, result, other_input("CNC router"))
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "consumption", "price", "save"],
+        ["other", "status", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     assert "job" not in entry.subentries[router.subentry_id].data
@@ -607,7 +630,7 @@ async def test_job_and_material_goes_and_comes_back_with_its_default_material(
     )
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "job", "consumption", "price", "save"],
+        ["other", "status", "job", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     await cut(hass, clock, "Shelf.gcode", grams=500)
@@ -655,7 +678,7 @@ async def test_images_added_later_give_a_run_its_thumbnail_and_snapshot_until_re
     )
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "images", "consumption", "price", "save"],
+        ["other", "status", "images", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     await fire(hass, clock)
@@ -687,7 +710,7 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
     # Its plug's meter is a source with and without a Program, so nothing is asked.
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "consumption", "price", "save"],
+        ["other", "status", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     assert "program" not in entry.subentries[bread_maker.subentry_id].data
@@ -700,7 +723,7 @@ async def test_a_program_goes_and_comes_back_with_its_program_defaults(
     result = await configure(hass, result, {"entity_id": BREAD_MAKER_PROGRAM})
     assert (result["step_id"], result["menu_options"]) == (
         "reconfigure",
-        ["other", "status", "program", "consumption", "price", "save"],
+        ["other", "status", "program", "progress", "consumption", "price", "save"],
     )
     await save(hass, result)
     await bake(hass, clock, kwh=0.6)
@@ -833,6 +856,7 @@ async def test_a_change_that_removes_and_adds_walks_what_is_new_and_asked_again_
         "status",
         "job",
         "images",
+        "progress",
         "consumption",
         "price",
         "water",

@@ -86,6 +86,7 @@ async def test_a_robotic_mowers_power_sensor_has_no_average_power_for_gaps(
         hass, entry, name="Mower", status=MOWER_STATUS, device_type="robotic_mower"
     )
     result = await configure(hass, result, MOWER_MAPPING)
+    result = await configure(hass, result, {})
 
     result = await configure(hass, result, {"next_step_id": "power"})
 
@@ -100,7 +101,13 @@ async def test_reconfiguring_a_robotic_mower_offers_only_what_every_device_has(
 
     result = await start_reconfigure(hass, entry, mower)
 
-    assert result["menu_options"] == ["status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "save",
+    ]
 
 
 async def mow(hass: HomeAssistant, clock: Clock, *, kwh: float = 0.25) -> None:
@@ -209,6 +216,7 @@ async def test_the_devices_command_sends_no_capability_for_a_robotic_mower(
         "status": {"entity_id": MOWER_STATUS, "attribute": None},
         "mapping": MOWER_MAPPING
         | {"finished": [], "cancelled": [], "fault": [], "ignored": []},
+        "progress": {"remaining_time": None},
         "consumption": {
             "source": "energy",
             "entity_id": STATION_ENERGY,

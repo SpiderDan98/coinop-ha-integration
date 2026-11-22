@@ -27,6 +27,9 @@
           "fault": [],
           "ignored": []
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "estimate",
           "running_power": 2000.0,
@@ -79,6 +82,9 @@
           ],
           "fault": [],
           "ignored": []
+        },
+        "progress": {
+          "remaining_time": null
         },
         "consumption": {
           "source": "energy",
@@ -134,6 +140,9 @@
           ],
           "fault": [],
           "ignored": []
+        },
+        "progress": {
+          "remaining_time": null
         },
         "consumption": {
           "source": "energy",

@@ -76,7 +76,7 @@ async def test_manual_setup_comes_pre_filled_from_a_prusalink_printer(
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
     assert data["status"] == {"entity_id": printer["printer.state"], "attribute": None}
     assert data["mapping"] == MAPPING

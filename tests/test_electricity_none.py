@@ -109,7 +109,14 @@ async def test_reconfigure_offers_the_electricity_source_but_not_its_price(
 
     result = await start_reconfigure(hass, entry, subentry)
 
-    assert result["menu_options"] == ["status", "job", "images", "consumption", "save"]
+    assert result["menu_options"] == [
+        "status",
+        "job",
+        "images",
+        "progress",
+        "consumption",
+        "save",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -140,6 +147,7 @@ async def test_a_source_picked_in_reconfigure_walks_on_to_the_missing_price(
         "status",
         "job",
         "images",
+        "progress",
         "consumption",
         "price",
         "save",

@@ -80,7 +80,7 @@ async def test_manual_setup_comes_pre_filled_from_a_bambu_lab_printer(
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
     # The weight reports g itself, so no unit step.
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
     assert data["status"] == {"entity_id": printer["print_status"], "attribute": None}
     assert data["mapping"] == MAPPING
@@ -125,7 +125,7 @@ async def test_a_disabled_print_weight_is_not_pre_filled(
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     assert subentry.data["job"]["material"] is None
 
 

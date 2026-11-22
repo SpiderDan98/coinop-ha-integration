@@ -16,6 +16,7 @@ from .devices import (
     add_basic_device,
     add_hub,
     add_other_device,
+    answer_progress,
     basic_entities,
     coinop_entities,
     configure,
@@ -150,6 +151,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
         {"name": "Kiln"},
         {"entity_id": KILN_STATUS},
         OTHER_MAPPING,
+        {},
         {"next_step_id": "estimate"},
         {"running_power": 2000},
         price_choice(0.30),
@@ -163,6 +165,7 @@ async def test_other_asks_for_a_type_name_and_what_the_device_has_then_the_basic
         "name",
         "status",
         "mapping",
+        "progress",
         "consumption",
         "estimate",
         "price",
@@ -258,6 +261,7 @@ async def test_a_device_that_has_nothing_can_estimate_its_electricity(
     )
 
     result = await configure(hass, result, OTHER_MAPPING)
+    result = await answer_progress(hass, result)
 
     assert result["menu_options"] == ["energy", "power", "estimate", "none"]
     result = await configure(hass, result, {"next_step_id": "power"})
@@ -302,7 +306,14 @@ async def test_reconfiguring_an_other_device_offers_its_sections_and_no_detect_a
 
     result = await start_reconfigure(hass, entry, kiln)
 
-    assert result["menu_options"] == ["other", "status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "save",
+    ]
 
 
 async def test_reconfiguring_a_section_leaves_the_type_name_and_what_it_has_alone(
@@ -473,6 +484,7 @@ async def test_the_devices_command_sends_an_other_devices_type_name_and_what_it_
         "status": {"entity_id": KILN_STATUS, "attribute": None},
         "mapping": OTHER_MAPPING
         | {"paused": [], "finished": [], "cancelled": [], "fault": [], "ignored": []},
+        "progress": {"remaining_time": None},
         "consumption": {
             "source": "estimate",
             "running_power": 2000,

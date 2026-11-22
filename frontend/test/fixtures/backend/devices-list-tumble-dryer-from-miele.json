@@ -55,6 +55,9 @@
           "unit": "kWh",
           "factor": null
         },
+        "progress": {
+          "remaining_time": null
+        },
         "price": {
           "source": "fixed",
           "value": 0.3

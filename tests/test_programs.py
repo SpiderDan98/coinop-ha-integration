@@ -15,6 +15,7 @@ from .devices import (
     add_device,
     add_hub,
     add_washing_machine,
+    answer_progress,
     configure,
     reconfigure,
     walk_to_mapping,
@@ -51,6 +52,7 @@ async def test_the_program_step_follows_the_status_mapping(
     result = await configure(
         hass, result, {"entity_id": WASHER_PROGRAM, "attribute": "program"}
     )
+    result = await answer_progress(hass, result)
     assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "consumption"
 

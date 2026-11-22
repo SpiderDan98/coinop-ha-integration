@@ -15,6 +15,7 @@ from .devices import (
     OTHER_MAPPING,
     add_hub,
     add_other_device,
+    answer_progress,
     basic_entities,
     coinop_entities,
     configure,
@@ -88,6 +89,7 @@ async def test_water_adds_the_water_source_and_its_price_to_add_device_and_recon
         {"name": "Garden valve"},
         {"entity_id": VALVE_STATUS},
         OTHER_MAPPING,
+        {},
         {"next_step_id": "none"},
         {"next_step_id": "water_meter"},
         {"entity_id": VALVE_WATER},
@@ -102,6 +104,7 @@ async def test_water_adds_the_water_source_and_its_price_to_add_device_and_recon
         "name",
         "status",
         "mapping",
+        "progress",
         "consumption",
         "water",
         "water_meter",
@@ -115,6 +118,7 @@ async def test_water_adds_the_water_source_and_its_price_to_add_device_and_recon
     assert result["menu_options"] == [
         "other",
         "status",
+        "progress",
         "consumption",
         "water",
         "water_price",
@@ -135,6 +139,7 @@ async def test_water_comes_from_a_meter_a_flow_sensor_or_nowhere_never_per_progr
         other=other_input("Irrigation", ["water"]),
     )
     result = await configure(hass, result, OTHER_MAPPING)
+    result = await answer_progress(hass, result)
     assert result["menu_options"] == ["energy", "power", "estimate", "none"]
 
     result = await configure(hass, result, {"next_step_id": "none"})
@@ -155,7 +160,14 @@ async def test_the_water_source_none_skips_the_water_price(
     assert valve.data["water"] == {"source": "none"}
     assert "water_price" not in valve.data
     result = await start_reconfigure(hass, entry, valve)
-    assert result["menu_options"] == ["other", "status", "consumption", "water", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "water",
+        "save",
+    ]
 
 
 async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
@@ -177,6 +189,7 @@ async def test_a_water_source_picked_in_reconfigure_walks_on_to_the_water_price(
     assert result["menu_options"] == [
         "other",
         "status",
+        "progress",
         "consumption",
         "water",
         "water_price",

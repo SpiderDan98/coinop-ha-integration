@@ -40,6 +40,9 @@
           "entity_id": "sensor.washer_program",
           "attribute": null
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "none"
         },

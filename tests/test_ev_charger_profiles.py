@@ -103,7 +103,14 @@ async def test_detect_again_on_an_ev_charger_leaves_electricity_and_price_alone(
         before["consumption"]["entity_id"], disabled_by=er.RegistryEntryDisabler.USER
     )
     menu = await start_reconfigure(hass, entry, subentry)
-    assert menu["menu_options"] == ["status", "consumption", "price", "detect", "save"]
+    assert menu["menu_options"] == [
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "detect",
+        "save",
+    ]
 
     result = await configure(hass, menu, {"next_step_id": "detect"})
     shown = []
@@ -236,7 +243,7 @@ async def test_manual_setup_of_a_wall_connector_comes_pre_filled(
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
         assert not result.get("errors"), result["errors"]
-    assert shown == ["status", "mapping"]
+    assert shown == ["status", "mapping", "progress"]
     assert result["step_id"] == "consumption"
     result = await configure(hass, result, {"next_step_id": "energy"})
     assert suggested(result, "entity_id") == charger["energy_kWh"]

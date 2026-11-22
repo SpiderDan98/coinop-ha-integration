@@ -149,6 +149,7 @@ async def test_picking_program_adds_the_program_step_and_electricity_per_program
         {"entity_id": BREAD_MAKER_STATUS},
         BREAD_MAKER_MAPPING,
         {"entity_id": BREAD_MAKER_PROGRAM},
+        {},
     ):
         result = await configure(hass, result, user_input)
         steps.append(result["step_id"])
@@ -159,6 +160,7 @@ async def test_picking_program_adds_the_program_step_and_electricity_per_program
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
     ]
     assert result["menu_options"] == ["energy", "power", "per_program", "none"]
@@ -181,6 +183,7 @@ async def test_reconfigure_has_the_program_section_and_per_program_for_the_estim
         "other",
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "save",

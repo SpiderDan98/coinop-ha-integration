@@ -17,6 +17,7 @@ from .devices import (
     add_hub,
     add_printer,
     answer_electricity,
+    answer_progress,
     configure,
     open_device_types,
     other_input,
@@ -370,6 +371,7 @@ async def test_a_device_type_chosen_after_going_back_keeps_nothing_of_the_first(
     result = await configure(hass, result, {"name": "Mower"})
     result = await configure(hass, result, {"entity_id": STATUS})
     result = await configure(hass, result, MAPPING)
+    result = await answer_progress(hass, result)
     result = await answer_electricity(hass, result, "none", None, 0)
 
     assert result["type"] is FlowResultType.CREATE_ENTRY, result.get("errors")
@@ -379,7 +381,57 @@ async def test_a_device_type_chosen_after_going_back_keeps_nothing_of_the_first(
         "device_type",
         "mapping",
         "printer_device_id",
+        "progress",
         "status",
     ]
     assert subentry.data["device_type"] == "robotic_mower"
     assert subentry.data["printer_device_id"] is None
+
+
+REMAINING = "sensor.kobra_time_remaining"
+
+
+@pytest.mark.parametrize(
+    "device_type",
+    [
+        "3d_printer",
+        "washing_machine",
+        "dishwasher",
+        "tumble_dryer",
+        "coffee_machine",
+        "oven",
+        "ev_charger",
+        "robotic_mower",
+        "other",
+    ],
+)
+async def test_every_device_is_asked_for_its_remaining_time_before_its_electricity(
+    hass: HomeAssistant, device_type: str
+) -> None:
+    entry = await add_hub(hass)
+    result = await walk_to_mapping(
+        hass,
+        entry,
+        device_type=device_type,
+        other=other_input("Kiln") if device_type == "other" else None,
+    )
+    result = await configure(hass, result, MAPPING)
+    while result["step_id"] != "progress":
+        assert result["type"] is FlowResultType.FORM, result["step_id"]
+        result = await configure(hass, result, {})
+
+    assert fields(result) == ["remaining_time"]
+    result = await configure(hass, result, {"remaining_time": REMAINING})
+    assert result["step_id"] == "consumption"
+
+
+async def test_the_remaining_time_is_stored_with_the_device(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+
+    timed = await add_device(hass, entry, remaining_time=REMAINING)
+    untimed = await add_device(hass, entry, name="Voron", status="sensor.voron")
+
+    assert timed.data["progress"] == {"remaining_time": REMAINING}
+    assert untimed.data["progress"] == {"remaining_time": None}

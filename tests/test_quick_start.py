@@ -344,6 +344,7 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
                 "unknown",
             ],
         },
+        "progress": {"remaining_time": None},
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,

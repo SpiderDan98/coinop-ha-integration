@@ -15,6 +15,7 @@ from .devices import (
     WATER_PRICE,
     add_hub,
     add_washing_machine,
+    answer_progress,
     configure,
     walk_to_mapping,
 )
@@ -39,6 +40,7 @@ async def test_electricity_and_water_can_come_per_program(
     )
     result = await configure(hass, result, WASHER_MAPPING)
     result = await configure(hass, result, {})
+    result = await answer_progress(hass, result)
     assert result["menu_options"] == ["energy", "power", "per_program", "none"]
     result = await configure(hass, result, {"next_step_id": "per_program"})
     assert result["step_id"] == "price"

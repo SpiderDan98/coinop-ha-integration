@@ -34,6 +34,9 @@
           "camera": "camera.kiln",
           "snapshot": true
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "estimate",
           "running_power": 2000.0,

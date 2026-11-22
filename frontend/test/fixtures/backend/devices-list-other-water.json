@@ -28,6 +28,9 @@
           "fault": [],
           "ignored": []
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "none"
         },

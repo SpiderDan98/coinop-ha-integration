@@ -16,6 +16,7 @@ from .devices import (
     add_device,
     add_hub,
     add_washing_machine,
+    answer_progress,
     configure,
     open_device_types,
     start_add_device,
@@ -68,6 +69,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
     result = await configure(hass, result, WASHER_MAPPING)
     assert result["step_id"] == "program"
     result = await configure(hass, result, {})
+    result = await answer_progress(hass, result)
     assert result["type"] is FlowResultType.MENU
     assert result["menu_options"] == ["energy", "power", "per_program", "none"]
     result = await configure(hass, result, {"next_step_id": "power"})
@@ -83,6 +85,7 @@ async def test_a_washing_machine_asks_status_mapping_electricity_and_price(
         "price",
         "printer_device_id",
         "program",
+        "progress",
         "status",
         "water",
     ]
@@ -118,6 +121,7 @@ async def test_reconfiguring_a_washing_machine_offers_its_sections(
     assert result["menu_options"] == [
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",
@@ -237,6 +241,7 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
         "status": {"entity_id": WASHER_STATUS, "attribute": None},
         "mapping": WASHER_MAPPING | {"ended": [], "fault": []},
         "program": {"entity_id": None, "attribute": None},
+        "progress": {"remaining_time": None},
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,

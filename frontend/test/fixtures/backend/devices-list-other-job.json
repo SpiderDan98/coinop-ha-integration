@@ -54,6 +54,9 @@
           "camera": null,
           "snapshot": false
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "estimate",
           "running_power": 300.0,

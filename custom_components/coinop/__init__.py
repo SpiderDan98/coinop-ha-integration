@@ -42,6 +42,15 @@ async def async_migrate_entry(hass: HomeAssistant, entry: CoinOpConfigEntry) -> 
                     data={**subentry.data, "device_type": DEVICE_TYPE_3D_PRINTER},
                 )
         hass.config_entries.async_update_entry(entry, minor_version=2)
+    if entry.minor_version < 3:
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type == SUBENTRY_DEVICE:
+                hass.config_entries.async_update_subentry(
+                    entry,
+                    subentry,
+                    data={**subentry.data, "progress": {"remaining_time": None}},
+                )
+        hass.config_entries.async_update_entry(entry, minor_version=3)
     return True
 
 

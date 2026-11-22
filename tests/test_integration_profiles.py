@@ -79,7 +79,7 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "material_unit", "images"]
+    assert shown == ["status", "mapping", "job", "material_unit", "images", "progress"]
     data = subentry.data
     assert data["printer_device_id"] == printer.device.id
     assert data["status"] == {
@@ -157,7 +157,7 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
     # The Material used entity reports mm itself, so no unit step.
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
     assert data["status"] == {
         "entity_id": "sensor.kobra_s1_job_state",
@@ -262,6 +262,7 @@ async def test_detect_again_is_offered_for_a_known_integration(
         "status",
         "job",
         "images",
+        "progress",
         "consumption",
         "price",
         "detect",

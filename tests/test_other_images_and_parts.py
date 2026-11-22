@@ -12,6 +12,7 @@ from .devices import (
     MAPPING,
     OTHER_MAPPING,
     add_hub,
+    answer_progress,
     configure,
     other_input,
     report_status,
@@ -98,6 +99,7 @@ async def test_images_alone_bring_the_images_step_and_no_job_step(
     result = await configure(
         hass, result, {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA}
     )
+    result = await answer_progress(hass, result)
     assert result["step_id"] == "consumption"
 
 
@@ -143,6 +145,7 @@ async def test_a_device_with_images_stores_them_and_can_reconfigure_them(
         "other",
         "status",
         "images",
+        "progress",
         "consumption",
         "price",
         "save",
@@ -162,7 +165,14 @@ async def test_a_part_count_alone_brings_no_step_and_no_section(
 
     assert {"job", "images"}.isdisjoint(kiln.data)
     result = await start_reconfigure(hass, entry, kiln)
-    assert result["menu_options"] == ["other", "status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "save",
+    ]
 
 
 async def test_a_run_gets_its_thumbnail_and_at_its_end_its_snapshot_without_a_job(

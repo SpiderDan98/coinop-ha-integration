@@ -16,6 +16,7 @@ from .devices import (
     WASHER_WATER,
     add_hub,
     add_washing_machine,
+    answer_progress,
     configure,
     start_reconfigure,
     walk_to_mapping,
@@ -110,6 +111,7 @@ async def test_a_dishwasher_walks_the_washing_machines_steps(
     result = await configure(hass, result, WASHER_MAPPING)
     assert result["step_id"] == "program"
     result = await configure(hass, result, {})
+    result = await answer_progress(hass, result)
     assert (result["step_id"], result["menu_options"]) == (
         "consumption",
         ["energy", "power", "per_program", "none"],
@@ -139,6 +141,7 @@ async def test_a_dishwasher_walks_the_washing_machines_steps(
         "price",
         "printer_device_id",
         "program",
+        "progress",
         "status",
         "water",
         "water_price",
@@ -160,6 +163,7 @@ async def test_reconfiguring_a_dishwasher_offers_the_washing_machines_sections(
     assert result["menu_options"] == [
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",

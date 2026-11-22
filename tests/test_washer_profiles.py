@@ -94,6 +94,7 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
         "energy",
         "price",
@@ -168,6 +169,7 @@ async def test_miele_fills_status_program_and_both_meters(
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
         "energy",
         "price",
@@ -374,6 +376,7 @@ async def test_detect_again_leaves_electricity_water_and_prices_alone(
     assert menu["menu_options"] == [
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",
@@ -436,6 +439,7 @@ async def test_manual_setup_pre_fills_the_chosen_device_type_whatever_kind_is_to
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
         "price",
         "fixed_price",
@@ -494,7 +498,7 @@ async def test_manual_setup_pre_fills_from_a_miele_appliance_of_any_kind(
         water={"next_step_id": "water_meter"},
     )
 
-    assert shown == ["status", "mapping", "program", *steps]
+    assert shown == ["status", "mapping", "program", "progress", *steps]
     data = subentry.data
     assert data["device_type"] == device_type
     assert data["status"] == {"entity_id": appliance["state_status"], "attribute": None}
@@ -519,6 +523,7 @@ async def test_a_tumble_dryer_added_from_a_miele_washing_machine_takes_no_water(
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
         "energy",
         "price",
@@ -532,6 +537,7 @@ async def test_a_tumble_dryer_added_from_a_miele_washing_machine_takes_no_water(
         "price",
         "printer_device_id",
         "program",
+        "progress",
         "status",
     ]
     assert data["consumption"]["entity_id"] == washer["current_energy_consumption"]

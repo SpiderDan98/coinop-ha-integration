@@ -18,6 +18,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .clock import Clock
 from .devices import ENERGY, add_device, add_hub
+from .stored import place_runs, stored_run
 from .test_dynamic_price import PRICE_ENTITY, segments, set_price
 from .test_lifecycle import at, start_coinop, stop_coinop
 from .test_measured import electricity, set_meter
@@ -29,6 +30,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "storage"
 # The hub entry with its Device subentries as each config entry version stored it.
 ENTRIES = Path(__file__).parent / "fixtures" / "config_entry"
 STORES = ("coinop.catalog", "coinop.runs", "coinop.live")
+UNUSED_PROGRESS = {"progress": {"remaining_time": None}}
 
 
 def read(path: Path) -> Any:
@@ -239,10 +241,38 @@ async def test_devices_stored_before_device_types_become_3d_printers(
             s["subentry_type"],
             s["title"],
             s["unique_id"],
-            s["data"] | {"device_type": "3d_printer"},
+            s["data"] | {"device_type": "3d_printer"} | UNUSED_PROGRESS,
         )
         for s in stored["subentries"]
     ]
     assert entry.options == stored["options"]
     listed = (await panel.call("coinop/devices/list"))["devices"]
     assert [d["type"] for d in listed] == ["3d_printer", "3d_printer"]
+
+
+async def test_devices_stored_before_the_progress_section_load_with_it_unused(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    stored = read(ENTRIES / "1.2.json")
+    final = stored_run("final")
+    place_runs(hass_storage, final, stored_run("open", ended=False))
+    entry = MockConfigEntry(
+        domain="coinop",
+        title="Coin-op",
+        version=stored["version"],
+        minor_version=stored["minor_version"],
+        data=stored["data"],
+        options=stored["options"],
+        subentries_data=stored["subentries"],
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [dict(s.data) for s in entry.subentries.values()] == [
+        s["data"] | UNUSED_PROGRESS for s in stored["subentries"]
+    ]
+    [item] = (await panel.call("coinop/runs/get", run_id="final"))["run"]["line_items"]
+    assert (item["quantity"], item["unit_price"]) == (0.24, 0.30)
+    [kept] = stored_runs(hass_storage)
+    assert kept["line_items"] == final["line_items"]

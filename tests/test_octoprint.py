@@ -88,7 +88,7 @@ async def test_renamed_octoprint_entities_are_still_found(
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
     assert data["status"]["entity_id"] == renamed["Current State"]
     assert data["mapping"] == MAPPING

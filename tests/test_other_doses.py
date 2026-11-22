@@ -162,6 +162,7 @@ async def test_doses_without_a_program_bring_no_step_and_no_section(
         {"name": "Soda maker"},
         {"entity_id": SODA_MAKER_STATUS},
         OTHER_MAPPING,
+        {},
     ):
         result = await configure(hass, result, user_input)
         steps.append(result["step_id"])
@@ -171,6 +172,7 @@ async def test_doses_without_a_program_bring_no_step_and_no_section(
         "name",
         "status",
         "mapping",
+        "progress",
         "consumption",
     ]
     assert result["menu_options"] == ["energy", "power", "estimate", "none"]
@@ -178,7 +180,13 @@ async def test_doses_without_a_program_bring_no_step_and_no_section(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     [soda_maker] = entry.subentries.values()
     result = await start_reconfigure(hass, entry, soda_maker)
-    assert result["menu_options"] == ["other", "status", "consumption", "save"]
+    assert result["menu_options"] == [
+        "other",
+        "status",
+        "progress",
+        "consumption",
+        "save",
+    ]
 
 
 async def test_without_a_program_every_run_takes_the_default_rows_amounts(
@@ -549,6 +557,7 @@ async def test_program_doses_and_water_bring_the_program_step_and_water_per_prog
         {"entity_id": BREW_KETTLE_STATUS},
         BREW_KETTLE_MAPPING,
         {"entity_id": BREW_KETTLE_PROGRAM},
+        {},
         {"next_step_id": "per_program"},
         {"next_step_id": "fixed_price"},
         {"price": 0.30},
@@ -567,6 +576,7 @@ async def test_program_doses_and_water_bring_the_program_step_and_water_per_prog
         "status",
         "mapping",
         "program",
+        "progress",
         "consumption",
         "price",
         "fixed_price",
@@ -589,6 +599,7 @@ async def test_program_doses_and_water_bring_the_program_step_and_water_per_prog
         "other",
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",

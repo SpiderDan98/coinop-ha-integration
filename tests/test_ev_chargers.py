@@ -94,7 +94,13 @@ async def test_reconfiguring_an_ev_charger_offers_only_what_every_device_has(
 
     result = await start_reconfigure(hass, entry, charger)
 
-    assert result["menu_options"] == ["status", "consumption", "price", "save"]
+    assert result["menu_options"] == [
+        "status",
+        "progress",
+        "consumption",
+        "price",
+        "save",
+    ]
 
 
 async def test_a_session_energy_sensor_back_at_zero_between_runs_is_no_reset(
@@ -192,6 +198,7 @@ async def test_the_devices_command_sends_an_ev_chargers_one_capability(
         "mapping",
         "price",
         "printer_device_id",
+        "progress",
         "status",
     ]
     error = await panel.error(

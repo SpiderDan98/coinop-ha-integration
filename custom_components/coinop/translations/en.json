@@ -26,6 +26,7 @@
             "job": "Job & Material",
             "images": "Images",
             "program": "Program",
+            "progress": "Progress",
             "consumption": "Consumption source",
             "price": "Electricity price",
             "water": "Water source",
@@ -226,6 +227,16 @@
           "data_description": {
             "attribute": "Read this attribute instead of the entity's state.",
             "ignored": "Values the entity reports while it knows no program, such as a placeholder while it is still detecting. They never become a Run's Program."
+          }
+        },
+        "progress": {
+          "title": "Progress",
+          "description": "Optionally pick the entity that reports how many minutes the Device's Run has left. While a Run is open, Coin-op then shows its Projected Total: the cost so far plus what the time left is expected to add.",
+          "data": {
+            "remaining_time": "Remaining time (optional)"
+          },
+          "data_description": {
+            "remaining_time": "Minutes left until the Run ends, as the Device reports them."
           }
         },
         "consumption": {
@@ -525,6 +536,14 @@
       },
       "current_run_cost": {
         "name": "Current Run cost"
+      },
+      "projected_run_cost": {
+        "name": "Projected Run cost",
+        "state_attributes": {
+          "ends_at": {
+            "name": "Ends at"
+          }
+        }
       },
       "last_run_cost": {
         "name": "Last Run cost"

@@ -36,6 +36,9 @@
           "entity_id": "sensor.brew_kettle_program",
           "attribute": null
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "per_program"
         },

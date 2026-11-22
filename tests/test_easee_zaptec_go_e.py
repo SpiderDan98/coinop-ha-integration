@@ -336,7 +336,7 @@ async def test_manual_setup_of_the_charger_comes_pre_filled(
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
         assert not result.get("errors"), result["errors"]
-    assert shown == ["status", "mapping"]
+    assert shown == ["status", "mapping", "progress"]
     assert result["step_id"] == "consumption"
     result = await configure(hass, result, {"next_step_id": "energy"})
     assert suggested(result, "entity_id") == device[charger.counter]

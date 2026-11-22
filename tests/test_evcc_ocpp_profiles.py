@@ -197,7 +197,7 @@ async def walk_manual_setup(
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
         assert not result.get("errors"), result["errors"]
-    assert shown == ["status", "mapping"]
+    assert shown == ["status", "mapping", "progress"]
     result = await configure(hass, result, {"next_step_id": "energy"})
     result = await configure(hass, result, accepted(result))
     result = await configure(hass, result, {"next_step_id": "fixed_price"})

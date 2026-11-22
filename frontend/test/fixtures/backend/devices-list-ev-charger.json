@@ -28,6 +28,9 @@
           "fault": [],
           "ignored": []
         },
+        "progress": {
+          "remaining_time": null
+        },
         "consumption": {
           "source": "energy",
           "entity_id": "sensor.wallbox_session_energy",

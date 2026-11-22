@@ -19,6 +19,7 @@ from .devices import (
     add_hub,
     configure,
     reconfigure,
+    save as reconfigure_save,
     start_reconfigure,
 )
 from .test_device_flow import suggested
@@ -41,6 +42,7 @@ async def test_reconfigure_is_a_menu_of_the_devices_sections(
         "status",
         "job",
         "images",
+        "progress",
         "consumption",
         "price",
         "save",
@@ -462,3 +464,20 @@ async def test_an_open_measured_run_keeps_its_meter_after_a_change(
     [run] = stored_runs(hass_storage)
     assert run["line_items"][0]["method"] == "measured"
     assert run["line_items"][0]["quantity"] == pytest.approx(0.3)
+
+
+async def test_the_remaining_time_is_pre_filled_and_changed_in_its_section(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, remaining_time="sensor.kobra_left")
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    result = await configure(hass, menu, {"next_step_id": "progress"})
+    assert suggested(result, "remaining_time") == "sensor.kobra_left"
+    result = await configure(hass, result, {"remaining_time": "sensor.kobra_eta"})
+    assert result["step_id"] == "reconfigure"
+    await reconfigure_save(hass, result)
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["progress"] == {"remaining_time": "sensor.kobra_eta"}

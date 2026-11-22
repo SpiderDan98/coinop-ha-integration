@@ -91,6 +91,7 @@ UNUSED: dict[str, dict[str, Any]] = {
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
+    "progress": {"remaining_time": None},
 }
 # The sections only a Device with the Capability has.
 NEEDS = {
@@ -183,6 +184,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             "job": self.async_step_job,
             "images": self.async_step_images,
             "program": self.async_step_program,
+            "progress": self.async_step_progress,
             "consumption": self.async_step_consumption,
             "price": self.async_step_price,
             "water": self.async_step_water,
@@ -679,6 +681,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             job.get("loaded_slot"),
             images.get("thumbnail"),
             images.get("camera"),
+            found.get("progress", {}).get("remaining_time"),
             *(found.get(key, {}).get("entity_id") for key in METERS),
         ]
         return [
@@ -954,6 +957,28 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             step_id="program",
             data_schema=self.add_suggested_values_to_schema(
                 schema, self._data.get("program")
+            ),
+        )
+
+    async def async_step_progress(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            self._data["progress"] = {
+                "remaining_time": user_input.get("remaining_time")
+            }
+            return await self._section_done("progress")
+        schema = vol.Schema(
+            {
+                vol.Optional("remaining_time"): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="progress",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self._data.get("progress")
             ),
         )
 

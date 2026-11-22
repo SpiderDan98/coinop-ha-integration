@@ -16,6 +16,7 @@ from .devices import (
     MAPPING,
     add_hub,
     add_other_device,
+    answer_progress,
     basic_entities,
     coinop_entities,
     configure,
@@ -168,6 +169,7 @@ async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sect
         ROUTER_MAPPING,
         {"entity_id": ROUTER_JOB, "material_entity_id": ROUTER_USED},
         {"thumbnail": KILN_THUMBNAIL, "camera": KILN_CAMERA},
+        {},
         {"next_step_id": "estimate"},
         {"running_power": 300},
         price_choice(0.30),
@@ -183,6 +185,7 @@ async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sect
         "mapping",
         "job",
         "images",
+        "progress",
         "consumption",
         "estimate",
         "price",
@@ -206,6 +209,7 @@ async def test_job_and_material_with_images_and_a_part_count_asks_for_their_sect
         "status",
         "job",
         "images",
+        "progress",
         "consumption",
         "price",
         "save",
@@ -238,6 +242,7 @@ async def test_job_and_material_alone_brings_the_job_step_a_printer_sees(
         ],
     )
     result = await configure(hass, router, {})
+    result = await answer_progress(hass, result)
     assert result["menu_options"] == ["energy", "power", "estimate", "none"]
 
 

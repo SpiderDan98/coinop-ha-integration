@@ -17,6 +17,7 @@ from .devices import (
     add_device,
     add_hub,
     add_washing_machine,
+    answer_progress,
     configure,
     start_reconfigure,
     walk_to_mapping,
@@ -105,6 +106,7 @@ async def walk_to_water(hass: HomeAssistant, entry: ConfigEntry) -> Any:
     )
     result = await configure(hass, result, WASHER_MAPPING)
     result = await configure(hass, result, {})
+    result = await answer_progress(hass, result)
     result = await configure(hass, result, {"next_step_id": "energy"})
     result = await configure(hass, result, {"entity_id": WASHER_ENERGY})
     result = await configure(hass, result, {"next_step_id": "fixed_price"})
@@ -245,6 +247,7 @@ async def test_reconfigure_offers_water_and_asks_a_price_for_a_new_meter(
     assert result["menu_options"] == [
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",
@@ -261,6 +264,7 @@ async def test_reconfigure_offers_water_and_asks_a_price_for_a_new_meter(
     assert result["menu_options"] == [
         "status",
         "program",
+        "progress",
         "consumption",
         "price",
         "water",

@@ -118,7 +118,7 @@ async def test_an_elegoo_printer_without_a_cover_image_has_the_rest_pre_filled(
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     assert subentry.data["job"]["material"]["entity_id"] == printer["current_extrusion"]
     assert subentry.data["images"] == {
         "thumbnail": None,
@@ -136,7 +136,7 @@ async def test_manual_setup_comes_pre_filled_from_an_elegoo_printer(
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
     # The extrusion reports mm itself, so no unit step.
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
     assert data["status"] == {"entity_id": printer["print_status"], "attribute": None}
     assert data["mapping"] == MAPPING
