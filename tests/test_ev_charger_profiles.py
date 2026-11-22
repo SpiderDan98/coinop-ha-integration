@@ -117,7 +117,9 @@ async def test_detect_again_on_an_ev_charger_leaves_electricity_and_price_alone(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping"]
+    # Only a charger with a target has a progress section to detect.
+    targeted = before["progress"]["expected_energy"] is not None
+    assert shown == ["status", "mapping", *(["progress"] if targeted else [])]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 

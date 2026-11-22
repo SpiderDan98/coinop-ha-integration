@@ -8,7 +8,11 @@ from typing import Any, Protocol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
-from custom_components.coinop.device_config import ConsumptionSource, Target
+from custom_components.coinop.device_config import (
+    ConsumptionSource,
+    ExpectedEnergyForm,
+    Target,
+)
 
 
 class Find(Protocol):
@@ -65,6 +69,20 @@ def entity_input(entity_id: str | None, /, **fields: Any) -> dict[str, Any]:
 def energy_source(entity_id: str | None) -> dict[str, Any]:
     """The electricity source on the entity's energy meter, if the profile found it."""
     return entity_input(entity_id, source=ConsumptionSource.ENERGY.value)
+
+
+def expected_energy(
+    entity_id: str | None, form: ExpectedEnergyForm, attribute: str | None = None
+) -> dict[str, Any]:
+    """The progress section's Expected energy, if the profile found its entity."""
+    return found(
+        entity_id,
+        expected_energy={
+            "entity_id": entity_id,
+            "attribute": attribute,
+            "form": form.value,
+        },
+    )
 
 
 def mapping(**values: list[str]) -> dict[str, list[str]]:
