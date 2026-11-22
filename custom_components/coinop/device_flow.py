@@ -187,8 +187,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._meter: dict[str, Any] = {}
         self._price: dict[str, Any] = {}
         self._job: dict[str, Any] = {}
-        # The drying unit whose drying left is being asked for.
-        self._unit = 0
+        self._drying_index = 0
         # The sections reconfigure walks before it returns to its menu.
         self._walking: frozenset[str] = frozenset()
         self._candidate: Candidate | None = None
@@ -896,28 +895,30 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_material_unit(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        return await self._usage_unit("material_unit", "material", user_input)
+        return await self._usage_unit(
+            "material_unit", "material", self._material_done, user_input
+        )
 
     async def async_step_planned_material_unit(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         return await self._usage_unit(
-            "planned_material_unit", "planned_material", user_input
+            "planned_material_unit", "planned_material", self._job_done, user_input
         )
 
     async def _usage_unit(
-        self, step_id: str, key: str, user_input: dict[str, Any] | None
+        self,
+        step_id: str,
+        key: str,
+        done: Callable[[], Awaitable[SubentryFlowResult]],
+        user_input: dict[str, Any] | None,
     ) -> SubentryFlowResult:
         """Ask the unit of the job's `key` input, which reports none of its own."""
         errors: dict[str, str] = {}
         if user_input is not None:
             if usage_scale(user_input["unit"]):
                 self._job[key]["unit"] = user_input["unit"]
-                return (
-                    await self._material_done()
-                    if key == "material"
-                    else await self._job_done()
-                )
+                return await done()
             errors["unit"] = "not_length_or_mass"
         schema = vol.Schema(
             {
@@ -964,7 +965,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             ]
             if not self._job["drying"]:
                 return await self._drying_done([])
-            self._unit = 0
+            self._drying_index = 0
             return await self.async_step_drying_left()
         schema = vol.Schema(
             {
@@ -987,11 +988,11 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         units = self._job["drying"]
         if user_input is not None:
-            units[self._unit]["drying_left"] = user_input.get("drying_left")
-            self._unit += 1
-        if self._unit == len(units):
+            units[self._drying_index]["drying_left"] = user_input.get("drying_left")
+            self._drying_index += 1
+        if self._drying_index == len(units):
             return await self.async_step_drying_power()
-        unit = units[self._unit]
+        unit = units[self._drying_index]
         state = self.hass.states.get(unit["active"])
         schema = vol.Schema(
             {
