@@ -13,8 +13,11 @@ from .test_ev_chargers import add_charger, set_charger, set_session
 from .stored import place_materials, stored_material
 from .test_material_usage import GRAMS_PER_METRE, add_measuring_device, set_usage
 from .test_measured import set_meter
+from .test_program_consumption import set_rows
 from .test_runs import set_status, stored_runs
 from .test_templates import WEAR, add_template, create
+from .test_water import set_water
+from .washing import add_washer, set_energy, set_program, set_washer
 from .websocket import PanelClient
 
 REMAINING = "sensor.kobra_time_remaining"
@@ -417,6 +420,100 @@ async def test_the_runs_total_energy_leaves_what_was_measured_and_comes_first(
 
     await set_expected(hass, 4)
     assert float(projected(hass, CHARGER_PROJECTED).state) == pytest.approx(1.50)
+
+
+WASHER_REMAINING = "sensor.washer_time_left"
+WASHER_PROJECTED = "sensor.washer_projected_run_cost"
+
+
+async def heat_up(hass: HomeAssistant, clock: Clock, program: str, kwh: float) -> None:
+    """A load of `program` that drew `kwh` in its first 20 minutes, an hour to go."""
+    await set_program(hass, program)
+    await set_washer(hass, "running")
+    await clock.advance(minutes=20)
+    await set_energy(hass, 100 + kwh)
+    hass.states.async_set(WASHER_REMAINING, "60", {"unit_of_measurement": "min"})
+    await hass.async_block_till_done()
+
+
+async def test_a_metered_appliance_projects_what_its_programs_default_leaves(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = await add_washer(hass, remaining_time=WASHER_REMAINING)
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+
+    # 0.9 kWh of Cotton's 1.5 so far, not the heating's 2.7 kW for the hour left.
+    state = projected(hass, WASHER_PROJECTED)
+    assert float(state.state) == pytest.approx(0.27 + 0.18)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(hours=1)
+
+
+async def test_measured_above_the_programs_default_leaves_nothing_to_come(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = await add_washer(hass)
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Eco 40-60", 0.9)
+
+    # Past the Default row's 0.8 kWh: the cost so far, with no time left needed.
+    state = projected(hass, WASHER_PROJECTED)
+    assert float(state.state) == pytest.approx(0.27)
+    assert state.attributes["ends_at"] is None
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["electricity"]
+
+
+async def test_a_measured_waters_rest_is_what_the_programs_litres_leave(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_water(hass, 1000)
+    washer = await add_washer(hass, water="meter")
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+    await set_water(hass, 1020)
+
+    # 20 of Cotton's 60 L so far at 4.00 per m³: 0.08, and 0.16 to come.
+    state = projected(hass, WASHER_PROJECTED)
+    assert float(state.state) == pytest.approx(0.27 + 0.18 + 0.08 + 0.16)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["electricity", "water"]
+
+    await clock.advance(minutes=5)
+    await set_water(hass, 1070)
+    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(
+        0.27 + 0.18 + 0.28
+    )
+
+
+async def test_an_appliance_without_program_defaults_projects_its_recent_power(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_washer(hass, remaining_time=WASHER_REMAINING)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+
+    # No kWh in its Program Defaults: its 2.7 kW for the hour left.
+    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(0.27 + 0.81)
+
+
+async def test_an_appliance_costed_by_its_program_defaults_alone_projects_nothing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = await add_washer(
+        hass,
+        source="per_program",
+        water="per_program",
+        remaining_time=WASHER_REMAINING,
+    )
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+
+    # Its cost so far is already the Program's whole kWh and litres.
+    assert projected(hass, WASHER_PROJECTED).state == STATE_UNKNOWN
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (summary["projected_total"], summary["projected_end"]) == (None, None)
 
 
 PLANNED = "sensor.kobra_planned_filament"

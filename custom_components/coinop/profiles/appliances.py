@@ -23,6 +23,7 @@ from .base import (
     expected_energy,
     found,
     mapping,
+    progress_inputs,
 )
 
 # The Device Types an appliance of WashData, Miele or Home Connect can be.
@@ -51,6 +52,7 @@ def washdata(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "_washer_state")
     program = find("sensor", "_washer_program")
+    progress = find("sensor", "_cycle_progress")
     return {
         "status": entity_input(status),
         "mapping": found(
@@ -65,10 +67,9 @@ def washdata(find: Find) -> dict[str, Any]:
             ),
         ),
         "program": entity_input(program, ignored=WASHDATA_PLACEHOLDERS),
-        "progress": expected_energy(
-            find("sensor", "_cycle_progress"),
-            ExpectedEnergyForm.TOTAL,
-            attribute="projected_energy_kwh",
+        "progress": progress_inputs(find("sensor", "_time_remaining"), progress)
+        | expected_energy(
+            progress, ExpectedEnergyForm.TOTAL, attribute="projected_energy_kwh"
         ),
     }
 
@@ -104,6 +105,7 @@ def miele(find: Find) -> dict[str, Any]:
             ),
         ),
         "program": entity_input(program),
+        "progress": progress_inputs(find("sensor", "-state_remaining_time"), None),
         "consumption": energy_source(energy),
         "water": entity_input(water, source=WaterSource.METER.value),
     }
@@ -121,7 +123,10 @@ HOME_CONNECT_STATES = {
 
 
 def _operation_state(
-    status: str | None, program: str | None, state: Callable[[str], str]
+    status: str | None,
+    program: str | None,
+    state: Callable[[str], str],
+    progress: dict[str, Any],
 ) -> dict[str, Any]:
     """A Home Connect appliance's inputs, its operation states as `state` reports
     them."""
@@ -137,6 +142,7 @@ def _operation_state(
             ),
         ),
         "program": entity_input(program),
+        "progress": progress,
     }
 
 
@@ -146,6 +152,10 @@ def home_connect(find: Find) -> dict[str, Any]:
         find("sensor", "-BSH.Common.Status.OperationState"),
         find("select", "-BSH.Common.Root.ActiveProgram"),
         str.lower,
+        progress_inputs(
+            find("sensor", "-BSH.Common.Option.RemainingProgramTime"),
+            find("sensor", "-BSH.Common.Option.ProgramProgress"),
+        ),
     )
 
 
@@ -156,6 +166,10 @@ def home_connect_local(find: Find) -> dict[str, Any]:
         find("sensor", "-sensor_operation_state"),
         find("sensor", "-sensor_active_program"),
         str.lower,
+        progress_inputs(
+            find("sensor", "-sensor_remaining_program_time"),
+            find("sensor", "-sensor_program_progress"),
+        ),
     )
 
 
@@ -167,6 +181,10 @@ def home_connect_alt(find: Find) -> dict[str, Any]:
         find("sensor", "_bsh_common_status_operationstate"),
         find("sensor", "_active_program"),
         "BSH.Common.EnumType.OperationState.{}".format,
+        progress_inputs(
+            find("sensor", "_bsh_common_option_remainingprogramtime"),
+            find("sensor", "_bsh_common_option_programprogress"),
+        ),
     )
 
 
@@ -301,6 +319,8 @@ def lg_thinq(find: Find) -> dict[str, Any]:
         "sensor", "_main_current_state", "_upper_current_state", "_current_state"
     )
     program = find("sensor", "_current_dish_washing_course")
+    # A finish timestamp; ThinQ reports no progress.
+    remaining = find("sensor", "_main_remain", "_upper_remain", "_remain")
     return {
         "status": entity_input(status),
         # The integration has one list of states for all appliances (its strings.json).
@@ -378,6 +398,7 @@ def lg_thinq(find: Find) -> dict[str, Any]:
             ),
         ),
         "program": entity_input(program),
+        "progress": progress_inputs(remaining, None),
     }
 
 
@@ -453,12 +474,12 @@ SMARTTHINGS_MACHINE_STATES = {
 
 def _smartthings_machine_state(
     find: Find, *, disabled: bool = False
-) -> tuple[str, MachineState] | None:
-    """The `main` component's machine state sensor and its states: a washer's
-    upper washer and an oven's second cavity have one of their own."""
+) -> tuple[str, str, MachineState] | None:
+    """The `main` component's machine state sensor, its capability and its states:
+    a washer's upper washer and an oven's second cavity have one of their own."""
     return next(
         (
-            (status, states)
+            (status, capability, states)
             for capability, states in SMARTTHINGS_MACHINE_STATES.items()
             if (
                 status := find(
@@ -482,7 +503,7 @@ def smartthings(find: Find) -> dict[str, Any]:
     machine_state = _smartthings_machine_state(find)
     if machine_state is None:
         return {"status": {}, "mapping": {}}
-    status, states = machine_state
+    status, capability, states = machine_state
     energy = find(
         "sensor", "_main_powerConsumptionReport_powerConsumption_energy_meter"
     )
@@ -494,6 +515,10 @@ def smartthings(find: Find) -> dict[str, Any]:
             finished=[states.finished],
         ),
         "consumption": energy_source(energy),
+        "progress": progress_inputs(
+            find("sensor", f"_main_{capability}_completionTime_completionTime"),
+            find("sensor", f"_main_samsungce.{capability}_progress_progress"),
+        ),
     }
 
 
@@ -517,4 +542,4 @@ def smartthings_kind(
         for platform, suffix in SMARTTHINGS_STEAM_CLOSET.items()
     ):
         return NoDeviceType.NOT_A_DEVICE
-    return machine_state[1].kind
+    return machine_state[2].kind

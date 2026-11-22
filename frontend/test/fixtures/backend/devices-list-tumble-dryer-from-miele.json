@@ -48,17 +48,17 @@
           "entity_id": "sensor.washing_machine_program",
           "attribute": null
         },
+        "progress": {
+          "remaining_time": "sensor.washing_machine_remaining_time",
+          "progress": null,
+          "expected_energy": null
+        },
         "consumption": {
           "source": "energy",
           "entity_id": "sensor.washing_machine_energy_consumption",
           "attribute": null,
           "unit": "kWh",
           "factor": null
-        },
-        "progress": {
-          "remaining_time": null,
-          "progress": null,
-          "expected_energy": null
         },
         "price": {
           "source": "fixed",

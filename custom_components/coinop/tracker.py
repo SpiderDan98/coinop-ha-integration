@@ -49,6 +49,7 @@ from .cost.projection import (
     project,
     recent_power,
     running_hours_rest,
+    total_rest,
 )
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, ExpectedEnergyForm, Target
@@ -166,18 +167,21 @@ class DeviceTracker:
             fallback=self._electricity_fallback,
             silent_meter_falls_back=self._per_program,
         )
-        self._meterings: tuple[Metering, ...] = (self._electricity,)
-        if Capability.WATER in config.capabilities:
-            self._meterings += (
-                Metering(
-                    hass,
-                    WATER,
-                    config,
-                    gap_rates=lambda run: [(run.started, None)],
-                    fallback=self._water_fallback,
-                    silent_meter_falls_back=self._per_program,
-                ),
+        self._water = (
+            Metering(
+                hass,
+                WATER,
+                config,
+                gap_rates=lambda run: [(run.started, None)],
+                fallback=self._water_fallback,
+                silent_meter_falls_back=self._per_program,
             )
+            if Capability.WATER in config.capabilities
+            else None
+        )
+        self._meterings = tuple(
+            m for m in (self._electricity, self._water) if m is not None
+        )
 
     @property
     def _per_program(self) -> bool:
@@ -1209,6 +1213,7 @@ class DeviceTracker:
         return project(
             {
                 ProjectedPart.ELECTRICITY: None if kwh is None else kwh * price,
+                ProjectedPart.WATER: self._water_rest(run),
                 ProjectedPart.MATERIAL: self._material_rest(run, now),
                 ProjectedPart.DRYING: None
                 if drying_kwh is None
@@ -1300,8 +1305,9 @@ class DeviceTracker:
     def _electricity_rest(
         self, run: Run, now: datetime, left: timedelta | None
     ) -> tuple[float | None, float | None, bool]:
-        """The kWh still to come: from the Expected energy, else the base power over
-        the time left, and apart from it the drying's; None for a Run without an
+        """The kWh still to come: from the Expected energy, else what the Program
+        default leaves, else the base power over the time left, and apart from it
+        the drying's; None for a Run without an
         Electricity Line Item, and for drying while no unit dries or its power is
         unknown, which the last says."""
         item = next(
@@ -1316,6 +1322,8 @@ class DeviceTracker:
         ) is not None:
             total = expected["form"] == ExpectedEnergyForm.TOTAL
             return expected_energy_rest(kwh, item.quantity or 0.0, total), None, False
+        if (default := self._default_rest(run, self._electricity)) is not None:
+            return default, None, False
         if left is None or (power := self._base_power(run, now)) is None:
             return None, None, False
         base = power * left.total_seconds() / 3_600_000
@@ -1345,6 +1353,30 @@ class DeviceTracker:
         return learned_drying_power(
             run, now, self._electricity.model(run), self._dried(run, now)
         )
+
+    def _water_rest(self, run: Run) -> float | None:
+        """The water still to come, priced: what the Program's litres leave after
+        the measured; None otherwise."""
+        if (
+            self._water is None
+            or (litres := self._default_rest(run, self._water)) is None
+        ):
+            return None
+        return litres * self._water.price_now(run)
+
+    def _default_rest(self, run: Run, metering: Metering) -> float | None:
+        """What the Run's Program default leaves after what `metering` measured;
+        None without a default or a measurement."""
+        kind = metering.quantity.kind
+        item = next((i for i in run.line_items if i.kind is kind), None)
+        if (
+            not self._per_program
+            or item is None
+            or item.method is not ConsumptionMethod.MEASURED
+        ):
+            return None
+        default = self._program_row(run)[0].get(metering.quantity.default_key)
+        return None if default is None else total_rest(default, item.quantity or 0.0)
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running

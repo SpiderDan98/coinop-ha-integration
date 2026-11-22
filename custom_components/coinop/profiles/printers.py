@@ -5,7 +5,7 @@ from typing import Any
 
 from custom_components.coinop.const import DEVICE_TYPE_3D_PRINTER
 
-from .base import Find, always, entity_input, found, mapping
+from .base import Find, always, entity_input, found, mapping, progress_inputs
 
 DEVICE_TYPES = (DEVICE_TYPE_3D_PRINTER,)
 KIND = always(DEVICE_TYPE_3D_PRINTER)
@@ -16,12 +16,6 @@ def _slots(find: Find, suffix: str) -> list[str]:
     """The Slots in order, up to the first one missing: a gap would shift the numbers."""
     slots = (find("sensor", suffix.format(number)) for number in SLOTS)
     return [entity_id for entity_id in takewhile(bool, slots) if entity_id]
-
-
-def _progress(remaining: str | None, progress: str | None) -> dict[str, Any]:
-    return found(remaining, remaining_time=remaining) | found(
-        progress, progress=progress
-    )
 
 
 def _drying(*units: tuple[str | None, str | None]) -> dict[str, Any]:
@@ -69,7 +63,7 @@ def anycubic(find: Find) -> dict[str, Any]:
         ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        "progress": _progress(remaining, find("sensor", "_progress")),
+        "progress": progress_inputs(remaining, find("sensor", "_progress")),
     }
 
 
@@ -119,7 +113,7 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
         ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "-job_time_remaining"), find("sensor", "-job_progress")
         ),
     }
@@ -162,7 +156,7 @@ def bambu_lab(find: Find) -> dict[str, Any]:
         ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "_remaining_time"), find("sensor", "_print_progress")
         ),
     }
@@ -191,7 +185,7 @@ def prusalink(find: Find) -> dict[str, Any]:
         "job": entity_input(job),
         "images": found(thumbnail, thumbnail=thumbnail),
         # Only a finish timestamp, no duration.
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "_job.finish"), find("sensor", "_job.progress")
         ),
     }
@@ -239,7 +233,7 @@ def octoprint(find: Find) -> dict[str, Any]:
         "job": entity_input(job),
         "images": found(camera, camera=camera, snapshot=True),
         # A finish timestamp, unknown while paused.
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "Estimated Finish Time-", start=True),
             find("sensor", "Job Percentage-", start=True),
         ),
@@ -274,7 +268,7 @@ def creality(find: Find) -> dict[str, Any]:
         ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "-print_left_time"), find("sensor", "-print_progress")
         ),
     }
@@ -339,7 +333,7 @@ def elegoo(find: Find) -> dict[str, Any]:
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         # Milliseconds.
-        "progress": _progress(
+        "progress": progress_inputs(
             find("sensor", "_ticks_remaining"), find("sensor", "_percent_complete")
         ),
     }
@@ -379,5 +373,5 @@ def moonraker(find: Find) -> dict[str, Any]:
         ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        "progress": _progress(remaining, progress),
+        "progress": progress_inputs(remaining, progress),
     }

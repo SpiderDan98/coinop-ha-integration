@@ -39,6 +39,7 @@ def washdata(
         "last_cycle_cost": (None, "0.27"),
         # Carries WashData's own projection as attributes while a cycle runs.
         "cycle_progress": ("%", "0"),
+        "time_remaining": ("min", "0"),
     }
     return Registration(
         "ha_washdata",
@@ -76,11 +77,17 @@ MIELE_SENSORS = {
     "state_status": ("status", None, "off"),
     "state_program_id": ("program", None, "no_program"),
     "state_program_phase": ("program_phase", None, "not_running"),
+    "state_remaining_time": ("remaining_time", "min", "0"),
     "current_energy_consumption": ("energy_consumption", "kWh", "0"),
     "current_water_consumption": ("water_consumption", "L", "0"),
 }
 _STATUS = ("state_status",)
-_PROGRAM = (*_STATUS, "state_program_id", "state_program_phase")
+_PROGRAM = (
+    *_STATUS,
+    "state_program_id",
+    "state_program_phase",
+    "state_remaining_time",
+)
 _ENERGY = (*_PROGRAM, "current_energy_consumption")
 _WATER = (*_ENERGY, "current_water_consumption")
 # By the HA device's model (`DEVICE_TYPE_TAGS` in its const.py), its sensors' `types`.
@@ -420,10 +427,12 @@ def home_connect_local(appliance_type: str = "Dishwasher") -> Registration:
     name = f"Bosch {appliance_type}"
     program = home_connect_program(appliance_type)
     keys = {
-        "sensor_operation_state": ("sensor", "ready"),
-        "sensor_active_program": ("sensor", "unknown"),
-        "sensor_door_state": ("sensor", "closed"),
-        "select_program": ("select", program),
+        "sensor_operation_state": ("sensor", "ready", None),
+        "sensor_active_program": ("sensor", "unknown", None),
+        "sensor_door_state": ("sensor", "closed", None),
+        "sensor_remaining_program_time": ("sensor", "0", "s"),
+        "sensor_program_progress": ("sensor", "0", "%"),
+        "select_program": ("select", program, None),
     }
     return Registration(
         "homeconnect_ws",
@@ -440,9 +449,10 @@ def home_connect_local(appliance_type: str = "Dishwasher") -> Registration:
                         platform,
                         f"{device_id}-{key}",
                         state=state,
+                        unit=unit,
                         object_id=f"{name} {key[len(platform) + 1 :]}",
                     )
-                    for key, (platform, state) in keys.items()
+                    for key, (platform, state, unit) in keys.items()
                 },
             ),
         ),
@@ -477,6 +487,7 @@ def home_connect_alt(
             "remaining_program_time",
             NO_TIME,
         ),
+        "BSH.Common.Option.ProgramProgress": ("sensor", "program_progress", "0"),
         "selected_program": ("sensor", "selected_program", program),
         "active_program": ("sensor", "active_program", "unknown"),
         "programs": ("select", "programs", program),
@@ -512,27 +523,32 @@ def home_connect_alt(
 # property has a location, and `<key>` where it hasn't. As Home Assistant 2026.5 has
 # them, and thinqconnect 1.0.12's device profiles.
 LG_THINQ_SENSORS = {
-    "DEVICE_WASHER": ("main_current_state", "main_cycle_count", "main_remain_time"),
-    "DEVICE_WASHCOMBO_MAIN": ("current_state", "cycle_count", "remain_time"),
-    "DEVICE_WASHCOMBO_MINI": ("current_state", "cycle_count", "remain_time"),
-    "DEVICE_WASHTOWER_WASHER": ("main_current_state", "main_remain_time"),
-    "DEVICE_DRYER": ("current_state", "cycle_count", "remain_time"),
-    "DEVICE_WASHTOWER_DRYER": ("current_state", "remain_time"),
+    "DEVICE_WASHER": ("main_current_state", "main_cycle_count", "main_remain"),
+    "DEVICE_WASHCOMBO_MAIN": ("current_state", "cycle_count", "remain"),
+    "DEVICE_WASHCOMBO_MINI": ("current_state", "cycle_count", "remain"),
+    "DEVICE_WASHTOWER_WASHER": ("main_current_state", "main_remain"),
+    "DEVICE_DRYER": ("current_state", "cycle_count", "remain"),
+    "DEVICE_WASHTOWER_DRYER": ("current_state", "remain"),
     "DEVICE_DISH_WASHER": (
         "current_state",
         "current_dish_washing_course",
         "rinse_level",
         "softening_level",
-        "remain_time",
+        "remain",
     ),
     "DEVICE_OVEN": ("oven_current_state", "oven_target_temperature"),
     "DEVICE_MICROWAVE_OVEN": ("current_state",),
-    "DEVICE_STYLER": ("current_state", "remain_time"),
+    "DEVICE_STYLER": ("current_state", "remain"),
     "DEVICE_AIR_CONDITIONER": ("pm1", "pm2", "humidity"),
     "DEVICE_REFRIGERATOR": ("fridge_water_filter_info_used_time",),
     # Two Status sensors on one HA device, the second half first: a TWINWash's mini
     # washer, a double oven's lower cavity.
-    "TWINWASH": ("mini_current_state", "main_current_state", "main_remain_time"),
+    "TWINWASH": (
+        "mini_current_state",
+        "mini_remain",
+        "main_current_state",
+        "main_remain",
+    ),
     "DOUBLE_OVEN": (
         "lower_current_state",
         "upper_current_state",
@@ -548,7 +564,7 @@ LG_THINQ_ENERGY_USAGE = {"yesterday": "0.8", "this_month": "12.3", "last_month":
 LG_THINQ_STATES = {
     "current_state": "power_off",
     "cycle_count": "42",
-    "remain_time": NO_TIME,
+    "remain": NO_TIME,
     "current_dish_washing_course": "auto",
     "rinse_level": "level_2",
     "softening_level": "level_2",
@@ -580,7 +596,7 @@ def lg_thinq(
     """
     unique_id = f"{device_id}_{sub_id}" if sub_id else device_id
     sensors = (
-        (f"{sub_id}_current_state", f"{sub_id}_remain_time")
+        (f"{sub_id}_current_state", f"{sub_id}_remain")
         if sub_id
         else LG_THINQ_SENSORS[appliance]
     )
@@ -622,18 +638,22 @@ SMARTTHINGS_POWER_METER = {
 }
 
 
-def _operating_state(capability: str, job_state: str) -> dict[str, str]:
+def _operating_state(
+    capability: str, job_state: str, *, progress: bool = False
+) -> dict[str, str]:
+    """A machine's operating state sensors; with `progress` its Samsung CE one's
+    progress too."""
     return {
         "machine_state": f"{capability}_machineState_machineState",
         "job_state": f"{capability}_{job_state}_{job_state}",
         "completion_time": f"{capability}_completionTime_completionTime",
-    }
+    } | ({"progress": f"samsungce.{capability}_progress_progress"} if progress else {})
 
 
 # By kind: the sensors of its `main` component, by entity key.
 SMARTTHINGS_APPLIANCES = {
-    "washer": _operating_state("washerOperatingState", "washerJobState"),
-    "dryer": _operating_state("dryerOperatingState", "dryerJobState"),
+    "washer": _operating_state("washerOperatingState", "washerJobState", progress=True),
+    "dryer": _operating_state("dryerOperatingState", "dryerJobState", progress=True),
     "dishwasher": _operating_state("dishwasherOperatingState", "dishwasherJobState"),
     "oven": _operating_state("ovenOperatingState", "ovenJobState")
     | {
@@ -669,6 +689,7 @@ SMARTTHINGS_STATES = {
     "machine_state": "stop",
     "job_state": "none",
     "completion_time": TIME,
+    "progress": "100",
     "oven_mode": "bake",
     "setpoint": "0",
     "temperature": "21",

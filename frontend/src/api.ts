@@ -20,7 +20,13 @@ export const CAPABILITIES = [
 ] as const;
 export const DOSE_SOURCES = ["program_default", "default_row", "stock_input"] as const;
 /** What an open Run's Projected Total can include, in the order the Run page names them. */
-export const PROJECTED_PARTS = ["electricity", "material", "drying", "running_hours"] as const;
+export const PROJECTED_PARTS = [
+  "electricity",
+  "water",
+  "material",
+  "drying",
+  "running_hours",
+] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
 /** The kinds to show: Water only where one of the Devices has water or something counts it. */

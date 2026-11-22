@@ -62,6 +62,12 @@ async def test_a_smartthings_laundry_or_dish_appliance_is_added_as_what_it_is(
     assert data["mapping"] == LAUNDRY_MAPPING
     assert data["consumption"] == energy_meter("sensor.appliance_energy")
     assert data["program"] == {"entity_id": None, "attribute": None}
+    # A dishwasher's Samsung CE state reports no progress.
+    assert data["progress"] == {
+        "remaining_time": appliance["completion_time"],
+        "progress": appliance["progress"] if kind != "dishwasher" else None,
+        "expected_energy": None,
+    }
 
 
 async def test_a_smartthings_oven_is_an_oven_read_from_its_main_cavity(
@@ -274,7 +280,7 @@ async def test_detect_again_re_applies_status_and_mapping_and_leaves_meters_alon
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
-    assert shown == ["status", "mapping"]
+    assert shown == ["status", "mapping", "progress"]
     data = entry.subentries[subentry.subentry_id].data
     assert data["status"]["entity_id"] == renamed["machine_state"]
     assert data["mapping"] == LAUNDRY_MAPPING

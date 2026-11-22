@@ -38,6 +38,7 @@
   "run.projected_end": "Voraussichtliches Ende {end}",
   "run.projected_parts": "Enthält {parts}",
   "projected_part.electricity": "Strom",
+  "projected_part.water": "Wasser",
   "projected_part.material": "Material",
   "projected_part.drying": "Trocknen",
   "projected_part.running_hours": "Betriebsstunden",

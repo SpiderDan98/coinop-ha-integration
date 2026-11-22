@@ -76,6 +76,13 @@ def energy_source(entity_id: str | None) -> dict[str, Any]:
     return entity_input(entity_id, source=ConsumptionSource.ENERGY.value)
 
 
+def progress_inputs(remaining: str | None, progress: str | None) -> dict[str, Any]:
+    """The progress section's Remaining time and Progress the profile found."""
+    return found(remaining, remaining_time=remaining) | found(
+        progress, progress=progress
+    )
+
+
 def expected_energy(
     entity_id: str | None, form: ExpectedEnergyForm, attribute: str | None = None
 ) -> dict[str, Any]:

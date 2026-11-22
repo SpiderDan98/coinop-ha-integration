@@ -27,6 +27,7 @@ from .registry import (
 )
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
+from .test_program_consumption import set_rows
 from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
 from .websocket import PanelClient
@@ -118,8 +119,8 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
         "ignored": WASHDATA_PLACEHOLDERS,
     }
     assert data["progress"] == {
-        "remaining_time": None,
-        "progress": None,
+        "remaining_time": washer["time_remaining"],
+        "progress": washer["cycle_progress"],
         "expected_energy": {
             "entity_id": washer["cycle_progress"],
             "attribute": "projected_energy_kwh",
@@ -199,6 +200,29 @@ async def test_washdatas_projected_energy_leaves_what_the_plug_measured(
     assert float(state.state) == pytest.approx(0.21)
 
 
+async def test_washdatas_projected_energy_comes_before_the_programs_default(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = add_washdata(hass)
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    _, subentry = await walk_pre_filled(
+        hass, entry, washer, energy={"entity_id": WASHER_ENERGY}
+    )
+    await set_rows(panel, subentry)
+
+    hass.states.async_set(washer["washer_state"], "running")
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_ENERGY, "100.6", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(washer["cycle_progress"], "40", {"projected_energy_kwh": 1.1})
+    await hass.async_block_till_done()
+
+    # The 0.5 kWh WashData expects on top, not the 0.2 the Default row's 0.8 leave.
+    state = hass.states.get("sensor.washer_projected_run_cost")
+    assert state is not None
+    assert float(state.state) == pytest.approx(0.18 + 0.15)
+
+
 def accepted_progress(washer: HaDevice) -> dict[str, Any]:
     """The progress step's fields as WashData's profile pre-fills them."""
     return {
@@ -258,6 +282,12 @@ async def test_miele_fills_status_program_and_both_meters(
     assert data["program"] == {
         "entity_id": "sensor.washing_machine_program",
         "attribute": None,
+    }
+    # Miele reports no progress.
+    assert data["progress"] == {
+        "remaining_time": "sensor.washing_machine_remaining_time",
+        "progress": None,
+        "expected_energy": None,
     }
     assert data["consumption"] == {
         "source": "energy",
@@ -325,6 +355,11 @@ async def test_home_connect_fills_status_mapping_and_program(
         "entity_id": "select.washer_active_program",
         "attribute": None,
     }
+    assert data["progress"] == {
+        "remaining_time": "sensor.washer_program_finish_time",
+        "progress": "sensor.washer_program_progress",
+        "expected_energy": None,
+    }
 
 
 @pytest.mark.parametrize(
@@ -391,7 +426,7 @@ async def test_detect_again_works_on_a_dishwasher_added_from_home_connect(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
@@ -444,7 +479,7 @@ async def test_detect_again_leaves_electricity_water_and_prices_alone(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     assert result["step_id"] == "reconfigure"
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
@@ -624,7 +659,7 @@ async def test_detect_again_works_on_a_tumble_dryer_added_from_miele(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
