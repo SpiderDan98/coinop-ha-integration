@@ -115,6 +115,33 @@ async def test_an_lg_appliance_is_added_as_the_kind_in_its_model(
     assert data["program"] == {"entity_id": None, "attribute": None}
 
 
+@pytest.mark.parametrize(
+    ("appliance", "remaining", "prices"),
+    [
+        ("DEVICE_WASHER", "main_remain", {"water_price": 4.0}),
+        ("DEVICE_DRYER", "remain", {}),
+        ("DEVICE_DISH_WASHER", "remain", {"water_price": 4.0}),
+        # The main washer's, not the mini's.
+        ("TWINWASH", "main_remain", {"water_price": 4.0}),
+        ("DEVICE_OVEN", None, {}),
+    ],
+)
+async def test_an_lg_appliances_remaining_time_is_its_finish_timestamp(
+    hass: HomeAssistant, appliance: str, remaining: str | None, prices: dict[str, Any]
+) -> None:
+    lg = add_lg_thinq(hass, appliance, name="Appliance")
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, lg.device.id, price=0.3, **prices)
+
+    # ThinQ reports no progress.
+    assert data["progress"] == {
+        "remaining_time": lg[remaining] if remaining else None,
+        "progress": None,
+        "expected_energy": None,
+    }
+
+
 async def test_an_lg_dishwasher_is_added_with_its_washing_course_as_program(
     hass: HomeAssistant,
 ) -> None:
@@ -355,7 +382,7 @@ async def test_detect_again_works_on_a_dishwasher_added_from_lg_thinq(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 

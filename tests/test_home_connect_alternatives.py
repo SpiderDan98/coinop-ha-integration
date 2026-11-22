@@ -68,6 +68,11 @@ async def test_quick_start_asks_a_home_connect_local_appliance_its_device_type(
         "entity_id": "sensor.bosch_dishwasher_active_program",
         "attribute": None,
     }
+    assert subentry.data["progress"] == {
+        "remaining_time": "sensor.bosch_dishwasher_remaining_program_time",
+        "progress": "sensor.bosch_dishwasher_program_progress",
+        "expected_energy": None,
+    }
 
 
 async def test_a_home_connect_local_run_opens_pauses_and_ends_as_with_home_connect(
@@ -133,6 +138,11 @@ async def test_quick_start_asks_a_home_connect_alt_appliance_its_device_type(
     assert subentry.data["program"] == {
         "entity_id": "sensor.washer_active_program",
         "attribute": None,
+    }
+    assert subentry.data["progress"] == {
+        "remaining_time": "sensor.washer_remaining_program_time",
+        "progress": "sensor.washer_program_progress",
+        "expected_energy": None,
     }
 
 
@@ -273,7 +283,7 @@ async def test_detect_again_re_applies_status_mapping_and_program_only(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
