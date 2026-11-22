@@ -297,3 +297,8 @@ def slot_colour(value: Any) -> str | None:
     except ValueError:
         return None
     return f"#{digits.lower()}" if len(digits) == 6 else None
+
+
+def drying(state: State | None) -> bool:
+    """Whether a Drying input's active entity says its unit dries."""
+    return state is not None and state.state == STATE_ON

@@ -49,7 +49,10 @@ from .test_other_images_and_parts import (
 from .test_other_jobs import add_cnc_router, cut
 from .test_other_programs import add_bread_maker, bake, set_bread_program
 from .test_other_water import add_irrigation, irrigate, set_valve_water
+from .test_projected_drying import add_drying_printer, draw, dry
+from .test_projected_total import set_remaining
 from .test_robotic_mowers import add_mower, mow
+from .test_runs import set_status
 from .test_spoolman import (
     add_spoolman_hub,
     filament,
@@ -1614,3 +1617,22 @@ async def test_record_the_cost_statement_export(
         "cost-statement-create",
         stable_ids(created, {token: "export-token", signature: "signature"}),
     )
+
+
+async def test_record_an_open_run_whose_ace_dries(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_drying_printer(hass)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass, 48)
+    await set_remaining(hass, 120)
+    [run] = (await panel.call("coinop/runs/list"))["runs"]
+    learning = await panel.call("coinop/runs/get", run_id=run["id"])
+    await draw(hass, clock, 400, 10)
+    learned = await panel.call("coinop/runs/get", run_id=run["id"])
+
+    ids = {run["id"]: "drying", run["device_id"]: "device-kobra"} | {
+        item["id"]: f"drying-{item['kind']}" for item in learned["run"]["line_items"]
+    }
+    assert_recorded("runs-get-drying", stable_ids([learning, learned], ids))

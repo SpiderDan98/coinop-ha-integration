@@ -69,6 +69,7 @@ import runsCreate from "./fixtures/backend/runs-create.json";
 import runsDeletePreview from "./fixtures/backend/runs-delete-preview.json";
 import runsGet from "./fixtures/backend/runs-get.json";
 import runsGetCoffeeMachine from "./fixtures/backend/runs-get-coffee-machine.json";
+import runsGetDrying from "./fixtures/backend/runs-get-drying.json";
 import runsGetElectricityNone from "./fixtures/backend/runs-get-electricity-none.json";
 import runsGetOther from "./fixtures/backend/runs-get-other.json";
 import runsGetOtherDoses from "./fixtures/backend/runs-get-other-doses.json";
@@ -109,6 +110,10 @@ export const recorded = {
    * its measured PLA Basic Black ("benchy-pla"); "helmet" only a Snapshot and a measured
    * length without Material ("helmet-filament"). */
   runs: runsGet.map((result) => result.run as RunDetail),
+  /** `coinop/runs/get` of Kobra's open Run "drying" while its ACE dries: first 0 of
+   * the 10 minutes its drying power is learned from, so drying is pending; then
+   * learned, so the Projected Total includes it. */
+  drying: runsGetDrying.map((result) => result.run as RunDetail),
   /** `coinop/aggregates/get` over the snapshot's Runs (all in January 2026), for each
    * grouping the Overview and Analysis ask for, then ungrouped for each selection of them
    * (`run_ids`, sorted). */

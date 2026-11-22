@@ -21,7 +21,9 @@ from .devices import (
     configure,
     open_device_types,
     other_input,
+    save,
     start_add_device,
+    start_reconfigure,
     walk_to_consumption,
     walk_to_mapping,
 )
@@ -519,3 +521,86 @@ async def test_an_expected_energy_entity_must_report_energy(
     assert result["step_id"] == "progress"
     assert result["errors"] == {"expected_energy": "not_energy"}
     assert suggested(result, "expected_energy") == "sensor.charger_power"
+
+
+SLOTS = ["sensor.ace_slot_1", "sensor.ace_slot_2"]
+ACE_DRYING = "switch.ace_drying"
+ACE_LEFT = "sensor.ace_drying_remaining"
+SECOND_DRYING = "binary_sensor.second_ace_drying"
+
+
+async def test_a_device_with_slots_is_asked_for_each_units_drying_after_its_job(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(ACE_DRYING, "off", {"friendly_name": "ACE Pro Drying"})
+    hass.states.async_set(SECOND_DRYING, "off", {"friendly_name": "ACE 2 Drying"})
+    entry = await add_hub(hass)
+    result = await configure(hass, await walk_to_mapping(hass, entry), MAPPING)
+    result = await configure(hass, result, {"slots": SLOTS})
+
+    assert (result["step_id"], fields(result)) == ("drying", ["active"])
+    result = await configure(hass, result, {"active": [ACE_DRYING, SECOND_DRYING]})
+    assert (result["step_id"], fields(result)) == ("drying_left", ["drying_left"])
+    assert result["description_placeholders"] == {"unit": "ACE Pro Drying"}
+    result = await configure(hass, result, {"drying_left": ACE_LEFT})
+    assert result["description_placeholders"] == {"unit": "ACE 2 Drying"}
+    result = await configure(hass, result, {})
+    assert (result["step_id"], fields(result)) == ("drying_power", ["drying_power"])
+    result = await configure(hass, result, {"drying_power": 150})
+    assert result["step_id"] == "images"
+
+
+async def test_the_drying_units_and_power_are_stored_in_the_job_section(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+
+    drying = await add_device(
+        hass,
+        entry,
+        slots=SLOTS,
+        drying=[(ACE_DRYING, ACE_LEFT), (SECOND_DRYING, None)],
+        drying_power=150,
+    )
+    unpowered = await add_device(
+        hass, entry, name="Voron", status="sensor.voron", slots=SLOTS
+    )
+    without_slots = await add_device(hass, entry, name="Mini", status="sensor.mini")
+
+    assert drying.data["job"]["drying"] == [
+        {"active": ACE_DRYING, "drying_left": ACE_LEFT},
+        {"active": SECOND_DRYING, "drying_left": None},
+    ]
+    assert drying.data["job"]["drying_power"] == 150
+    for device in (unpowered, without_slots):
+        job = device.data["job"]
+        assert (job["drying"], job["drying_power"]) == ([], None)
+
+
+async def test_reconfigure_pre_fills_the_drying_and_changes_it_with_the_job(
+    hass: HomeAssistant,
+) -> None:
+    entry = await add_hub(hass)
+    device = await add_device(
+        hass, entry, slots=SLOTS, drying=[(ACE_DRYING, ACE_LEFT)], drying_power=150
+    )
+    menu = await start_reconfigure(hass, entry, device)
+    result = await configure(hass, menu, {"next_step_id": "job"})
+    result = await configure(hass, result, {"slots": SLOTS})
+
+    assert suggested(result, "active") == [ACE_DRYING]
+    result = await configure(hass, result, {"active": [SECOND_DRYING, ACE_DRYING]})
+    assert suggested(result, "drying_left") is None
+    result = await configure(hass, result, {})
+    assert suggested(result, "drying_left") == ACE_LEFT
+    result = await configure(hass, result, {"drying_left": ACE_LEFT})
+    assert suggested(result, "drying_power") == 150
+    result = await configure(hass, result, {"drying_power": 90})
+    await save(hass, result)
+
+    job = entry.subentries[device.subentry_id].data["job"]
+    assert job["drying"] == [
+        {"active": SECOND_DRYING, "drying_left": None},
+        {"active": ACE_DRYING, "drying_left": ACE_LEFT},
+    ]
+    assert job["drying_power"] == 90

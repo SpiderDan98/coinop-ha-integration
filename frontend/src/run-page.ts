@@ -86,6 +86,7 @@ function projection(run: RunDetail, t: Localize, format: Format) {
       ? [t("run.projected_end", { end: format.dateTime(run.projected_end) })]
       : []),
     t("run.projected_parts", { parts }),
+    ...run.projected_pending.map((part) => t(`projected_pending.${part}`)),
   ].join(" · ");
 }
 

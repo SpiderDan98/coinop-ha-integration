@@ -48,7 +48,9 @@
           "planned_material": null,
           "slots": [],
           "colour_attribute": null,
-          "loaded_slot": null
+          "loaded_slot": null,
+          "drying": [],
+          "drying_power": null
         },
         "images": {
           "thumbnail": null,

@@ -8,7 +8,13 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import add_device, add_hub, configure, start_reconfigure
+from .devices import (
+    add_device,
+    add_hub,
+    answer_drying,
+    configure,
+    start_reconfigure,
+)
 from .stored import place_materials, stored_material
 from .test_device_flow import suggested
 from .test_lifecycle import start_coinop, stop_coinop
@@ -80,6 +86,8 @@ async def test_the_slots_are_stored_in_order_with_the_job(hass: HomeAssistant) -
         "slots": [SLOTS[2], SLOTS[0]],
         "colour_attribute": "color_hex",
         "loaded_slot": LOADED,
+        "drying": [],
+        "drying_power": None,
     }
 
 
@@ -96,6 +104,7 @@ async def test_reconfigure_offers_the_slots_as_stored(hass: HomeAssistant) -> No
     assert suggested(result, "colour_attribute") == "color"
     assert suggested(result, "loaded_slot") == LOADED
     result = await configure(hass, result, {"slots": SLOTS[:2], "loaded_slot": LOADED})
+    result = await answer_drying(hass, result)
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
     job = entry.subentries[device.subentry_id].data["job"]

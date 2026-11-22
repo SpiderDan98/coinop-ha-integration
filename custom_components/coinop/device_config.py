@@ -232,6 +232,10 @@ class DeviceConfig:
     slots: tuple[str, ...]
     colour_attribute: str | None
     loaded_slot_entity_id: str | None
+    # Per multi-material unit: its active and drying left entities.
+    drying: tuple[Mapping[str, Any], ...]
+    # The extra W a unit draws while it dries; None to learn it from the Run.
+    drying_power: float | None
     thumbnail_entity_id: str | None
     camera_entity_id: str | None
     snapshot: bool
@@ -274,6 +278,8 @@ class DeviceConfig:
             slots=tuple(job.get("slots", ())),
             colour_attribute=job.get("colour_attribute"),
             loaded_slot_entity_id=job.get("loaded_slot"),
+            drying=tuple(job.get("drying", ())),
+            drying_power=job.get("drying_power"),
             thumbnail_entity_id=images.get("thumbnail"),
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),

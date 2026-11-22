@@ -124,6 +124,8 @@ async def test_save_writes_every_section_at_once(hass: HomeAssistant) -> None:
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     }
     assert data["consumption"]["running_power"] == 90
     assert data["consumption"]["paused_power"] == 10

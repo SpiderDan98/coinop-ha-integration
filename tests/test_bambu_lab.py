@@ -70,6 +70,8 @@ async def test_quick_start_adds_a_bambu_lab_printer_with_every_input(
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     }
     assert data["images"] == {
         "thumbnail": printer["cover_image"],
@@ -265,3 +267,62 @@ async def test_detect_again_re_applies_a_bambu_lab_printers_inputs(
     }
     assert data["consumption"] == before["consumption"]
     assert data["price"] == before["price"]
+
+
+async def test_each_ams_that_dries_gives_the_printer_a_drying_input(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_bambu_lab(hass, ams=("AMS 2 Pro", "AMS", "AMS HT"))
+    register(hass, POWER, "W")
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, printer.device.id, meter=POWER, price=0.3)
+
+    # The plain AMS can't dry; the trays are no Slots.
+    assert (data["job"]["slots"], data["job"]["drying"]) == (
+        [],
+        [
+            {
+                "active": "binary_sensor.ams_1_drying",
+                "drying_left": "sensor.ams_1_remaining_drying_time",
+            },
+            {
+                "active": "binary_sensor.ams_3_drying",
+                "drying_left": "sensor.ams_3_remaining_drying_time",
+            },
+        ],
+    )
+
+
+async def test_detect_again_offers_the_ams_drying_without_slots(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_bambu_lab(hass, ams=("AMS 2 Pro",))
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry, printer=printer.device.id)
+    menu = await start_reconfigure(hass, entry, subentry)
+
+    result = await configure(hass, menu, {"next_step_id": "detect"})
+    shown = []
+    while result["type"] is FlowResultType.FORM:
+        shown.append(result["step_id"])
+        result = await configure(hass, result, accepted(result))
+    assert shown == [
+        "status",
+        "mapping",
+        "job",
+        "drying",
+        "drying_left",
+        "drying_power",
+        "images",
+        "progress",
+    ]
+    await configure(hass, result, {"next_step_id": "save"})
+    await hass.async_block_till_done()
+
+    assert entry.subentries[subentry.subentry_id].data["job"]["drying"] == [
+        {
+            "active": "binary_sensor.ams_1_drying",
+            "drying_left": "sensor.ams_1_remaining_drying_time",
+        }
+    ]

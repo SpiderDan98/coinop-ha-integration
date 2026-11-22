@@ -181,6 +181,8 @@ async def add_device(
     price: float | dict[str, Any] = 0.30,
     remaining_time: str | None = None,
     progress: str | None = None,
+    drying: Iterable[tuple[str, str | None]] = (),
+    drying_power: float | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device to the end; returns the new Device once the entry reloaded.
 
@@ -190,7 +192,8 @@ async def add_device(
     `material` is the Material used entity; with `material_attribute`, `material_unit`
     answers the unit step. `planned_material` is the Planned material entity, and
     `planned_material_unit` answers its unit step. `slots` are the Slot entities in
-    Slot order.
+    Slot order; with them, `drying` and `drying_power` answer the drying steps (see
+    `answer_drying`).
     `remaining_time` and `progress` answer the progress step, as in every `add_...`
     helper here.
     """
@@ -221,6 +224,8 @@ async def add_device(
     if planned_material_unit:
         assert result["step_id"] == "planned_material_unit", result.get("errors")
         result = await configure(hass, result, {"unit": planned_material_unit})
+    if slots or result["step_id"] == "drying":
+        result = await answer_drying(hass, result, drying, drying_power)
     assert result["step_id"] == "images", result.get("errors")
     result = await configure(hass, result, images_input(thumbnail, camera, snapshot))
     estimate = {"running_power": running_power} | (
@@ -428,6 +433,8 @@ async def add_other_device(
         if (job or {}).get("material_attribute"):
             assert result["step_id"] == "material_unit", result.get("errors")
             result = await configure(hass, result, {"unit": material_unit})
+        if (job or {}).get("slots"):
+            result = await answer_drying(hass, result)
     if "images" in has:
         assert result["step_id"] == "images", result.get("errors")
         result = await configure(
@@ -471,6 +478,28 @@ async def answer_electricity(
         assert result["step_id"] == "price", result.get("errors")
         result = await configure(hass, result, price_choice(price))
         result = await configure(hass, result, price_input(price))
+    return result
+
+
+async def answer_drying(
+    hass: HomeAssistant,
+    result: Any,
+    units: Iterable[tuple[str, str | None]] = (),
+    drying_power: float | None = None,
+) -> Any:
+    """Answer the drying steps from `result` on: the multi-material units by their
+    active and drying left entities, and with any, the `drying_power`."""
+    units = list(units)
+    assert result["step_id"] == "drying", result.get("errors")
+    result = await configure(hass, result, {"active": [a for a, _ in units]})
+    for _, left in units:
+        assert result["step_id"] == "drying_left", result.get("errors")
+        result = await configure(hass, result, {"drying_left": left} if left else {})
+    if units:
+        assert result["step_id"] == "drying_power", result.get("errors")
+        result = await configure(
+            hass, result, {} if drying_power is None else {"drying_power": drying_power}
+        )
     return result
 
 

@@ -79,7 +79,17 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    assert shown == ["status", "mapping", "job", "material_unit", "images", "progress"]
+    assert shown == [
+        "status",
+        "mapping",
+        "job",
+        "material_unit",
+        "drying",
+        "drying_left",
+        "drying_power",
+        "images",
+        "progress",
+    ]
     data = subentry.data
     assert data["printer_device_id"] == printer.device.id
     assert data["status"] == {
@@ -112,6 +122,13 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
         ],
         "colour_attribute": "color",
         "loaded_slot": "sensor.ace_pro_loaded_slot",
+        "drying": [
+            {
+                "active": "switch.ace_pro_drying",
+                "drying_left": "sensor.ace_pro_drying_remaining",
+            }
+        ],
+        "drying_power": None,
     }
     assert data["images"] == {
         "thumbnail": "image.anycubic_kobra_s1_object_top_view",
@@ -163,7 +180,17 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
     # The Material used entity reports mm itself, so no unit step.
-    assert shown == ["status", "mapping", "job", "images", "progress"]
+    assert shown == [
+        "status",
+        "mapping",
+        "job",
+        "drying",
+        "drying_left",
+        "drying_left",
+        "drying_power",
+        "images",
+        "progress",
+    ]
     data = subentry.data
     assert data["status"] == {
         "entity_id": "sensor.kobra_s1_job_state",
@@ -195,6 +222,22 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
         ],
         "colour_attribute": "color_hex",
         "loaded_slot": "sensor.kobra_s1_ace_pro_ace_loaded_slot",
+        # The second ACE's pair too, which stays off without a second ACE.
+        "drying": [
+            {
+                "active": "binary_sensor.kobra_s1_ace_pro_dry_status_is_drying",
+                "drying_left": "sensor.kobra_s1_ace_pro_dry_status_remaining_time",
+            },
+            {
+                "active": (
+                    "binary_sensor.kobra_s1_ace_pro_secondary_dry_status_is_drying"
+                ),
+                "drying_left": (
+                    "sensor.kobra_s1_ace_pro_secondary_dry_status_remaining_time"
+                ),
+            },
+        ],
+        "drying_power": None,
     }
     assert data["images"] == {
         "thumbnail": "image.kobra_s1_job_preview",
@@ -322,7 +365,17 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "job", "material_unit", "images", "progress"]
+    assert shown == [
+        "status",
+        "mapping",
+        "job",
+        "material_unit",
+        "drying",
+        "drying_left",
+        "drying_power",
+        "images",
+        "progress",
+    ]
     assert result["step_id"] == "reconfigure"
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
@@ -362,7 +415,14 @@ async def test_detect_again_pre_fills_the_profiles_values(
     job = await configure(hass, mapping, accepted(mapping))
     assert suggested(job, "colour_attribute") == "color_hex"
     assert suggested(job, "loaded_slot") == printer["ace_loaded_slot"]
-    images = await configure(hass, job, accepted(job))
+    drying = await configure(hass, job, accepted(job))
+    assert suggested(drying, "active") == [
+        printer["dry_status_is_drying"],
+        printer["secondary_dry_status_is_drying"],
+    ]
+    images = drying
+    while images["step_id"] != "images":
+        images = await configure(hass, images, accepted(images))
     assert suggested(images, "thumbnail") == printer["job_image_url"]
 
 
