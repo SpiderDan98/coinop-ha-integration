@@ -302,16 +302,3 @@ def slot_colour(value: Any) -> str | None:
 def drying(state: State | None) -> bool:
     """Whether a Drying input's active entity says its unit dries."""
     return state is not None and state.state == STATE_ON
-
-
-def drying_left(state: State | None) -> timedelta | None:
-    """A Drying input's drying left; None without a value or with an unknown unit."""
-    value = _number(state, None)
-    if state is None or value is None:
-        return None
-    # Anycubic Cloud declares no unit; its own card shows the value as minutes.
-    unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or UnitOfTime.MINUTES
-    if unit not in DurationConverter.VALID_UNITS:
-        return None
-    seconds = DurationConverter.convert(value, unit, UnitOfTime.SECONDS)
-    return timedelta(seconds=max(seconds, 0.0))

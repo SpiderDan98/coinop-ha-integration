@@ -53,7 +53,6 @@ from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, ExpectedEnergyForm, Target
 from .device_inputs import (
     drying,
-    drying_left as drying_left_of,
     expected_kwh,
     input_time,
     input_value,
@@ -1274,7 +1273,7 @@ class DeviceTracker:
         base = power * left.total_seconds() / 3_600_000
         states = self._hass.states
         drying_left = [
-            drying_left_of(states.get(unit["drying_left"]))
+            time_left(states.get(unit["drying_left"]), now)
             if unit["drying_left"]
             else None
             for unit in self._config.drying
