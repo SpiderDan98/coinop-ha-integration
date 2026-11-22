@@ -231,12 +231,14 @@
         },
         "progress": {
           "title": "Fortschritt",
-          "description": "Wähle optional die Entität, die meldet, wie viele Minuten der Lauf des Geräts noch dauert. Solange ein Lauf offen ist, zeigt Coin-op dann seine voraussichtlichen Kosten: die bisherigen Kosten und das, was die restliche Zeit voraussichtlich dazu bringt.",
+          "description": "Wähle optional die Entitäten, die melden, wie weit der Lauf des Geräts ist. Solange ein Lauf offen ist, zeigt Coin-op dann seine voraussichtlichen Kosten: die bisherigen Kosten und das, was die restliche Zeit voraussichtlich dazu bringt.",
           "data": {
-            "remaining_time": "Restzeit (optional)"
+            "remaining_time": "Restzeit (optional)",
+            "progress": "Fortschritt (optional)"
           },
           "data_description": {
-            "remaining_time": "Minuten bis zum Ende des Laufs, wie das Gerät sie meldet."
+            "remaining_time": "Die Zeit bis zum Ende des Laufs, in Stunden, Minuten, Sekunden oder Millisekunden, oder der Zeitpunkt, zu dem er voraussichtlich fertig ist.",
+            "progress": "Wie weit der Lauf ist, in %. Ohne Restzeit leitet Coin-op die restliche Zeit aus der bisherigen Laufzeit ab, sobald der Lauf zu 5 % fertig ist."
           }
         },
         "consumption": {

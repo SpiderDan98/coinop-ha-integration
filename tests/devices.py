@@ -177,6 +177,7 @@ async def add_device(
     paused_power: float | None = None,
     price: float | dict[str, Any] = 0.30,
     remaining_time: str | None = None,
+    progress: str | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device to the end; returns the new Device once the entry reloaded.
 
@@ -185,7 +186,8 @@ async def add_device(
     A fixed `price` is a number; a dict is the price entity step's input.
     `material` is the Material used entity; with `material_attribute`, `material_unit`
     answers the unit step. `slots` are the Slot entities in Slot order.
-    `remaining_time` answers the progress step, as in every `add_...` helper here.
+    `remaining_time` and `progress` answer the progress step, as in every `add_...`
+    helper here.
     """
     result = await walk_to_mapping(
         hass, entry, name=name, printer=printer, status=status, attribute=attribute
@@ -216,7 +218,7 @@ async def add_device(
     )
     result = await answer_electricity(
         hass,
-        await answer_progress(hass, result, remaining_time),
+        await answer_progress(hass, result, remaining_time, progress),
         source,
         estimate if source == "estimate" else meter,
         price,
@@ -240,6 +242,7 @@ async def add_basic_device(
     source: str = "energy",
     price: float | dict[str, Any] = 0.30,
     remaining_time: str | None = None,
+    progress: str | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device to the end for a Device Type with only the sections every
     Device has: HA device and name, Status, mapping, electricity source and price.
@@ -251,7 +254,7 @@ async def add_basic_device(
         hass, entry, name=name, status=status, device_type=device_type
     )
     result = await answer_progress(
-        hass, await configure(hass, result, mapping), remaining_time
+        hass, await configure(hass, result, mapping), remaining_time, progress
     )
     assert (result["step_id"], result["menu_options"]) == (
         "consumption",
@@ -375,6 +378,7 @@ async def add_other_device(
     water_meter: dict[str, Any] | None = None,
     water_price: float | dict[str, Any] = 4.0,
     remaining_time: str | None = None,
+    progress: str | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device to the end for an Other Device with `type_name` that has the
     choices `has`, running while its Status is "on" unless `mapping` says otherwise.
@@ -420,7 +424,7 @@ async def add_other_device(
     estimate = {"running_power": running_power}
     result = await answer_electricity(
         hass,
-        await answer_progress(hass, result, remaining_time),
+        await answer_progress(hass, result, remaining_time, progress),
         source,
         estimate if source == "estimate" else meter,
         price,
@@ -456,14 +460,17 @@ async def answer_electricity(
 
 
 async def answer_progress(
-    hass: HomeAssistant, result: Any, remaining_time: str | None = None
+    hass: HomeAssistant,
+    result: Any,
+    remaining_time: str | None = None,
+    progress: str | None = None,
 ) -> Any:
-    """Answer the progress step `result` with the Remaining time entity, if any."""
+    """Answer the progress step `result` with the Remaining time and Progress
+    entities, each if given."""
     assert result["step_id"] == "progress", result.get("errors")
+    answers = {"remaining_time": remaining_time, "progress": progress}
     return await configure(
-        hass,
-        result,
-        {} if remaining_time is None else {"remaining_time": remaining_time},
+        hass, result, {key: value for key, value in answers.items() if value}
     )
 
 
@@ -508,6 +515,7 @@ async def add_washing_machine(
     water_price: float | dict[str, Any] = 4.0,
     device_type: str = "washing_machine",
     remaining_time: str | None = None,
+    progress: str | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
     energy meter, no Program input and no water source. `device_type` walks it for
@@ -531,7 +539,7 @@ async def add_washing_machine(
     result = await configure(hass, result, program or {})
     result = await answer_electricity(
         hass,
-        await answer_progress(hass, result, remaining_time),
+        await answer_progress(hass, result, remaining_time, progress),
         source,
         meter or {"entity_id": WASHER_ENERGY},
         price,

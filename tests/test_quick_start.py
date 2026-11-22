@@ -344,7 +344,7 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
                 "unknown",
             ],
         },
-        "progress": {"remaining_time": None},
+        "progress": {"remaining_time": None, "progress": None},
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,
@@ -498,7 +498,10 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
         "camera": printer["camera"],
         "snapshot": True,
     }
-    assert data["progress"] == {"remaining_time": printer["time_remaining"]}
+    assert data["progress"] == {
+        "remaining_time": printer["time_remaining"],
+        "progress": None,
+    }
     assert data["consumption"] == {
         "source": "power",
         "entity_id": POWER,
@@ -530,7 +533,7 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "loaded_slot": printer["ace0_loaded_slot"],
     }
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
-    assert data["progress"] == {"remaining_time": None}
+    assert data["progress"] == {"remaining_time": None, "progress": None}
 
 
 async def test_a_printer_needs_a_meter(hass: HomeAssistant) -> None:

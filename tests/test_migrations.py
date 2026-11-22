@@ -30,7 +30,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "storage"
 # The hub entry with its Device subentries as each config entry version stored it.
 ENTRIES = Path(__file__).parent / "fixtures" / "config_entry"
 STORES = ("coinop.catalog", "coinop.runs", "coinop.live")
-UNUSED_PROGRESS = {"progress": {"remaining_time": None}}
+UNUSED_PROGRESS = {"progress": {"remaining_time": None, "progress": None}}
 
 
 def read(path: Path) -> Any:

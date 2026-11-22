@@ -226,6 +226,7 @@ class DeviceConfig:
     camera_entity_id: str | None
     snapshot: bool
     remaining_time_entity_id: str | None
+    progress_entity_id: str | None
     # The consumption section as Add Device wrote it.
     consumption: Mapping[str, Any]
     # The subentry data as the flow wrote it: the Device's HA-side settings.
@@ -264,6 +265,7 @@ class DeviceConfig:
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),
             remaining_time_entity_id=data.get("progress", {}).get("remaining_time"),
+            progress_entity_id=data.get("progress", {}).get("progress"),
             consumption=data["consumption"],
             flow_data=data,
         )

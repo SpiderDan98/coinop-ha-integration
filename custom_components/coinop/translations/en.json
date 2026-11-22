@@ -231,12 +231,14 @@
         },
         "progress": {
           "title": "Progress",
-          "description": "Optionally pick the entity that reports how many minutes the Device's Run has left. While a Run is open, Coin-op then shows its Projected Total: the cost so far plus what the time left is expected to add.",
+          "description": "Optionally pick the entities that report how far the Device's Run has got. While a Run is open, Coin-op then shows its Projected Total: the cost so far plus what the time left is expected to add.",
           "data": {
-            "remaining_time": "Remaining time (optional)"
+            "remaining_time": "Remaining time (optional)",
+            "progress": "Progress (optional)"
           },
           "data_description": {
-            "remaining_time": "Minutes left until the Run ends, as the Device reports them."
+            "remaining_time": "The time left until the Run ends, in hours, minutes, seconds or milliseconds, or the time it is expected to finish.",
+            "progress": "How far the Run has got, in %. Without a remaining time, Coin-op takes the time left from the running time so far, once the Run is 5 % done."
           }
         },
         "consumption": {

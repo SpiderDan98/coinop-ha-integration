@@ -15,6 +15,7 @@ from .test_templates import WEAR, add_template, create
 from .websocket import PanelClient
 
 REMAINING = "sensor.kobra_time_remaining"
+PROGRESS = "sensor.kobra_progress"
 PROJECTED = "sensor.kobra_projected_run_cost"
 
 
@@ -225,3 +226,43 @@ async def test_a_finish_timestamp_leaves_the_time_until_it(
     await clock.advance(minutes=40)
     # Past its finish, the rest is nothing more.
     assert float(projected(hass).state) == pytest.approx(0.10)
+
+
+async def set_progress(hass: HomeAssistant, percent: float | str) -> None:
+    hass.states.async_set(PROGRESS, str(percent), {"unit_of_measurement": "%"})
+    await hass.async_block_till_done()
+
+
+async def test_with_only_progress_the_time_left_follows_the_running_time(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, progress=PROGRESS)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_progress(hass, 4)
+    assert projected(hass).state == STATE_UNKNOWN
+
+    await set_progress(hass, 5)
+    # 30 minutes for 5 %: 570 more for the other 95, at 200 W.
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.03 + 0.57)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=570)
+
+    await clock.advance(minutes=30)
+    await set_progress(hass, 50)
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.06)
+
+
+async def test_a_remaining_time_comes_before_the_progress(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING, progress=PROGRESS)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_progress(hass, 25)
+    await set_remaining(hass, STATE_UNKNOWN)
+    # Without a remaining time, 30 minutes for 25 %: 90 more.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09)
+
+    await set_remaining(hass, 30)
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.03)

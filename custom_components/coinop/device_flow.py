@@ -91,7 +91,7 @@ UNUSED: dict[str, dict[str, Any]] = {
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
-    "progress": {"remaining_time": None},
+    "progress": {"remaining_time": None, "progress": None},
 }
 # The sections only a Device with the Capability has.
 NEEDS = {
@@ -682,6 +682,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             images.get("thumbnail"),
             images.get("camera"),
             found.get("progress", {}).get("remaining_time"),
+            found.get("progress", {}).get("progress"),
             *(found.get(key, {}).get("entity_id") for key in METERS),
         ]
         return [
@@ -965,14 +966,13 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         if user_input is not None:
             self._data["progress"] = {
-                "remaining_time": user_input.get("remaining_time")
+                key: user_input.get(key) for key in UNUSED["progress"]
             }
             return await self._section_done("progress")
         schema = vol.Schema(
             {
-                vol.Optional("remaining_time"): EntitySelector(
-                    EntitySelectorConfig(domain="sensor")
-                )
+                vol.Optional(key): EntitySelector(EntitySelectorConfig(domain="sensor"))
+                for key in UNUSED["progress"]
             }
         )
         return self.async_show_form(

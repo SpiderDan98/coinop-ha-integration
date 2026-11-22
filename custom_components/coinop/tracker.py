@@ -39,12 +39,18 @@ from .cost.material import (
     slot_line_items,
 )
 from .cost.pricing import priced_line_item
-from .cost.projection import project, recent_power, running_hours_rest
+from .cost.projection import (
+    progress_time_left,
+    project,
+    recent_power,
+    running_hours_rest,
+)
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
     input_time,
     input_value,
+    progress_reading,
     slot_colour,
     slot_number,
     stock_reading,
@@ -225,9 +231,16 @@ class DeviceTracker:
                     self._hass, [loaded_slot, *self._config.slots], self._on_slot
                 )
             )
-        if remaining := self._config.remaining_time_entity_id:
+        if progress := [
+            entity_id
+            for entity_id in (
+                self._config.remaining_time_entity_id,
+                self._config.progress_entity_id,
+            )
+            if entity_id
+        ]:
             self._unsubscribe.append(
-                async_track_state_change_event(self._hass, remaining, self._on_progress)
+                async_track_state_change_event(self._hass, progress, self._on_progress)
             )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
@@ -1104,7 +1117,7 @@ class DeviceTracker:
 
     def _projection(self, run: Run, now: datetime) -> Projection | None:
         """The open Run's rest from its time left; None while that is unknown."""
-        left = self._time_left(now)
+        left = self._time_left(run, now)
         if left is None:
             return None
         hours = left.total_seconds() / 3600
@@ -1119,10 +1132,18 @@ class DeviceTracker:
             now + left,
         )
 
-    def _time_left(self, now: datetime) -> timedelta | None:
-        """The open Run's time left from its Remaining time; None while unknown."""
-        entity_id = self._config.remaining_time_entity_id
-        return time_left(self._hass.states.get(entity_id), now) if entity_id else None
+    def _time_left(self, run: Run, now: datetime) -> timedelta | None:
+        """The open Run's time left from its Remaining time, else from its Progress;
+        None while neither tells."""
+        remaining = self._config.remaining_time_entity_id
+        left = time_left(self._hass.states.get(remaining), now) if remaining else None
+        if left is not None:
+            return left
+        progress = self._config.progress_entity_id
+        percent = (
+            progress_reading(self._hass.states.get(progress)) if progress else None
+        )
+        return None if percent is None else progress_time_left(run, now, percent)
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running

@@ -35,7 +35,8 @@
           "snapshot": true
         },
         "progress": {
-          "remaining_time": null
+          "remaining_time": null,
+          "progress": null
         },
         "consumption": {
           "source": "estimate",

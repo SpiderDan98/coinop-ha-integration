@@ -389,6 +389,7 @@ async def test_a_device_type_chosen_after_going_back_keeps_nothing_of_the_first(
 
 
 REMAINING = "sensor.kobra_time_remaining"
+PROGRESS = "sensor.kobra_progress"
 
 
 @pytest.mark.parametrize(
@@ -405,7 +406,7 @@ REMAINING = "sensor.kobra_time_remaining"
         "other",
     ],
 )
-async def test_every_device_is_asked_for_its_remaining_time_before_its_electricity(
+async def test_every_device_is_asked_for_its_progress_before_its_electricity(
     hass: HomeAssistant, device_type: str
 ) -> None:
     entry = await add_hub(hass)
@@ -420,18 +421,21 @@ async def test_every_device_is_asked_for_its_remaining_time_before_its_electrici
         assert result["type"] is FlowResultType.FORM, result["step_id"]
         result = await configure(hass, result, {})
 
-    assert fields(result) == ["remaining_time"]
+    assert fields(result) == ["remaining_time", "progress"]
     result = await configure(hass, result, {"remaining_time": REMAINING})
     assert result["step_id"] == "consumption"
 
 
-async def test_the_remaining_time_is_stored_with_the_device(
+async def test_the_remaining_time_and_progress_are_stored_with_the_device(
     hass: HomeAssistant,
 ) -> None:
     entry = await add_hub(hass)
 
-    timed = await add_device(hass, entry, remaining_time=REMAINING)
+    timed = await add_device(hass, entry, remaining_time=REMAINING, progress=PROGRESS)
     untimed = await add_device(hass, entry, name="Voron", status="sensor.voron")
 
-    assert timed.data["progress"] == {"remaining_time": REMAINING}
-    assert untimed.data["progress"] == {"remaining_time": None}
+    assert timed.data["progress"] == {
+        "remaining_time": REMAINING,
+        "progress": PROGRESS,
+    }
+    assert untimed.data["progress"] == {"remaining_time": None, "progress": None}
