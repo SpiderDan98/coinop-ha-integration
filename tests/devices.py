@@ -214,7 +214,7 @@ async def add_device(
     if material_attribute:
         assert result["step_id"] == "material_unit", result.get("errors")
         result = await configure(hass, result, {"unit": material_unit})
-    if slots:
+    if slots or result["step_id"] == "drying":
         result = await answer_drying(hass, result, drying, drying_power)
     assert result["step_id"] == "images", result.get("errors")
     result = await configure(hass, result, images_input(thumbnail, camera, snapshot))

@@ -107,6 +107,47 @@ def known_integrations(device_type: str | None = None) -> str:
     return ", ".join(integration.name for integration in serving.values())
 
 
+@dataclass(frozen=True)
+class _Finder:
+    """Finds the integration's entities among the `candidates`, those of an HA
+    device and its `linked_ids` devices."""
+
+    candidates: list[er.RegistryEntry]
+    linked_ids: list[str]
+
+    def __call__(
+        self,
+        platform: str,
+        /,
+        *keys: str,
+        start: bool = False,
+        disabled: bool = False,
+        exclude: str | None = None,
+    ) -> str | None:
+        return next(
+            (
+                entity.entity_id
+                for key in keys
+                for entity in self.candidates
+                if entity.domain == platform
+                and (
+                    entity.unique_id.startswith(key)
+                    if start
+                    else entity.unique_id.endswith(key)
+                )
+                and not (exclude and entity.unique_id.endswith(exclude))
+                and (disabled or not entity.disabled)
+            ),
+            None,
+        )
+
+    def linked(self) -> list[Find]:
+        return [
+            _Finder([e for e in self.candidates if e.device_id == device_id], [])
+            for device_id in self.linked_ids
+        ]
+
+
 def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> Find:
     """Finds the integration's entities of the HA device (and its linked devices)."""
     linked = INTEGRATIONS[config_entry.domain].linked_devices
@@ -126,32 +167,7 @@ def _finder(hass: HomeAssistant, device_id: str, config_entry: ConfigEntry) -> F
         )
         if entity.platform == config_entry.domain
     ]
-
-    def find(
-        platform: str,
-        *keys: str,
-        start: bool = False,
-        disabled: bool = False,
-        exclude: str | None = None,
-    ) -> str | None:
-        return next(
-            (
-                entity.entity_id
-                for key in keys
-                for entity in candidates
-                if entity.domain == platform
-                and (
-                    entity.unique_id.startswith(key)
-                    if start
-                    else entity.unique_id.endswith(key)
-                )
-                and not (exclude and entity.unique_id.endswith(exclude))
-                and (disabled or not entity.disabled)
-            ),
-            None,
-        )
-
-    return find
+    return _Finder(candidates, [d for d in device_ids if d != device_id])
 
 
 def detect(

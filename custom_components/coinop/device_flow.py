@@ -690,6 +690,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             (job.get("material") or {}).get("entity_id"),
             *job.get("slots", []),
             job.get("loaded_slot"),
+            *(e for unit in job.get("drying", []) for e in unit.values()),
             images.get("thumbnail"),
             images.get("camera"),
             found.get("progress", {}).get("remaining_time"),

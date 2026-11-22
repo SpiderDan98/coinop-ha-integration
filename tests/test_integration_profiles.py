@@ -85,6 +85,8 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
         "job",
         "material_unit",
         "drying",
+        "drying_left",
+        "drying_power",
         "images",
         "progress",
     ]
@@ -119,7 +121,12 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
         ],
         "colour_attribute": "color",
         "loaded_slot": "sensor.ace_pro_loaded_slot",
-        "drying": [],
+        "drying": [
+            {
+                "active": "switch.ace_pro_drying",
+                "drying_left": "sensor.ace_pro_drying_remaining",
+            }
+        ],
         "drying_power": None,
     }
     assert data["images"] == {
@@ -172,7 +179,17 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
     # The Material used entity reports mm itself, so no unit step.
-    assert shown == ["status", "mapping", "job", "drying", "images", "progress"]
+    assert shown == [
+        "status",
+        "mapping",
+        "job",
+        "drying",
+        "drying_left",
+        "drying_left",
+        "drying_power",
+        "images",
+        "progress",
+    ]
     data = subentry.data
     assert data["status"] == {
         "entity_id": "sensor.kobra_s1_job_state",
@@ -203,7 +220,21 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
         ],
         "colour_attribute": "color_hex",
         "loaded_slot": "sensor.kobra_s1_ace_pro_ace_loaded_slot",
-        "drying": [],
+        # The second ACE's pair too, which stays off without a second ACE.
+        "drying": [
+            {
+                "active": "binary_sensor.kobra_s1_ace_pro_dry_status_is_drying",
+                "drying_left": "sensor.kobra_s1_ace_pro_dry_status_remaining_time",
+            },
+            {
+                "active": (
+                    "binary_sensor.kobra_s1_ace_pro_secondary_dry_status_is_drying"
+                ),
+                "drying_left": (
+                    "sensor.kobra_s1_ace_pro_secondary_dry_status_remaining_time"
+                ),
+            },
+        ],
         "drying_power": None,
     }
     assert data["images"] == {
@@ -338,6 +369,8 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
         "job",
         "material_unit",
         "drying",
+        "drying_left",
+        "drying_power",
         "images",
         "progress",
     ]
@@ -381,7 +414,13 @@ async def test_detect_again_pre_fills_the_profiles_values(
     assert suggested(job, "colour_attribute") == "color_hex"
     assert suggested(job, "loaded_slot") == printer["ace_loaded_slot"]
     drying = await configure(hass, job, accepted(job))
-    images = await configure(hass, drying, accepted(drying))
+    assert suggested(drying, "active") == [
+        printer["dry_status_is_drying"],
+        printer["secondary_dry_status_is_drying"],
+    ]
+    images = drying
+    while images["step_id"] != "images":
+        images = await configure(hass, images, accepted(images))
     assert suggested(images, "thumbnail") == printer["job_image_url"]
 
 

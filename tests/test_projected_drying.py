@@ -106,6 +106,25 @@ async def test_a_unit_drying_without_a_drying_left_dries_for_the_whole_time_left
     assert float(projected(hass).state) == pytest.approx(0.03 + 0.09 + 0.12)
 
 
+@pytest.mark.parametrize(
+    ("value", "unit"), [("30", None), ("0.5", "h"), ("1800", "s"), ("1800000", "ms")]
+)
+async def test_a_drying_left_is_read_in_its_unit_and_without_one_in_minutes(
+    hass: HomeAssistant, clock: Clock, value: str, unit: str | None
+) -> None:
+    await add_drying_printer(hass, drying_power=200)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass)
+    hass.states.async_set(
+        ACE_LEFT, value, {"unit_of_measurement": unit} if unit else {}
+    )
+    await set_remaining(hass, 120)
+
+    # Half an hour at 200 W, as Anycubic Cloud's unitless minutes too.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09 + 0.03)
+
+
 async def test_the_base_power_leaves_out_the_drying(
     hass: HomeAssistant, clock: Clock
 ) -> None:

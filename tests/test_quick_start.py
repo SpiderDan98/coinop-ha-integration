@@ -483,6 +483,9 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
 
     result = await pick(hass, entry, printer.device.id)
     assert fields(result) == ["meter", "price", "price_entity", "pick_another_device"]
+    inputs = result["description_placeholders"]["inputs"].splitlines()
+    assert f"- {printer['ace0_drying']}" in inputs
+    assert f"- {printer['ace0_drying_remaining']}" in inputs
     result = await configure(hass, result, {"meter": POWER, "price": 0.3})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -503,7 +506,12 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
         "slots": [printer[f"ace0_slot_{number}"] for number in range(1, 5)],
         "colour_attribute": "color",
         "loaded_slot": printer["ace0_loaded_slot"],
-        "drying": [],
+        "drying": [
+            {
+                "active": printer["ace0_drying"],
+                "drying_left": printer["ace0_drying_remaining"],
+            }
+        ],
         "drying_power": None,
     }
     assert data["images"] == {
@@ -536,6 +544,7 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "filament_used",
         "camera",
         "ace0_slot_1",
+        "ace0_drying",
         "time_remaining",
         "progress",
     ):
