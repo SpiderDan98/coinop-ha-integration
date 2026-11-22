@@ -269,6 +269,7 @@ async def test_a_dishwasher_has_a_washing_machines_entities_and_ended_event(
         "sensor.dishwasher_last_run_cost",
         "sensor.dishwasher_material_cost",
         "sensor.dishwasher_other_cost",
+        "sensor.dishwasher_projected_run_cost",
         "sensor.dishwasher_running_time",
         "sensor.dishwasher_runs",
         "sensor.dishwasher_total_cost",

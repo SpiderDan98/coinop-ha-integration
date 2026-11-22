@@ -181,6 +181,7 @@ async def test_a_washing_machine_has_the_printer_entities_with_water_for_materia
         "sensor.washer_last_run_cost",
         "sensor.washer_material_cost",
         "sensor.washer_other_cost",
+        "sensor.washer_projected_run_cost",
         "sensor.washer_running_time",
         "sensor.washer_runs",
         "sensor.washer_total_cost",

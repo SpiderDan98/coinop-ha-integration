@@ -288,6 +288,7 @@ def basic_entities(slug: str) -> list[str]:
         "last_run_cost",
         "material_cost",
         "other_cost",
+        "projected_run_cost",
         "running_time",
         "runs",
         "total_cost",

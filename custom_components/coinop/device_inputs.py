@@ -1,7 +1,7 @@
 """Reading Device Inputs from Home Assistant's state machine and entity registry."""
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 from typing import Any
 
@@ -160,6 +160,12 @@ def _number(state: State | None, attribute: str | None) -> float | None:
     except ValueError:
         return None
     return number if math.isfinite(number) else None
+
+
+def time_left(state: State | None) -> timedelta | None:
+    """The Remaining time input's minutes as the time left; None without a value."""
+    minutes = _number(state, None)
+    return None if minutes is None else timedelta(minutes=max(minutes, 0.0))
 
 
 def _reported_unit(state: State, attribute: str | None) -> str | None:

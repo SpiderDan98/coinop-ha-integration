@@ -21,6 +21,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .cost.projection import projected_total
+from .cost.rounding import currency_decimals
 from .cost.totals import run_totals
 from .device_config import Capability, DeviceConfig
 from .entity import DeviceEntity, unique_id
@@ -98,6 +100,12 @@ CURRENT_RUN_COST = SensorEntityDescription(
     device_class=SensorDeviceClass.MONETARY,
     suggested_display_precision=2,
 )
+PROJECTED_RUN_COST = SensorEntityDescription(
+    key="projected_run_cost",
+    translation_key="projected_run_cost",
+    device_class=SensorDeviceClass.MONETARY,
+    suggested_display_precision=2,
+)
 LAST_RUN_COST = SensorEntityDescription(
     key="last_run_cost",
     translation_key="last_run_cost",
@@ -122,6 +130,7 @@ async def async_setup_entry(
                     or NEEDS[description.key] in device.capabilities
                 ),
                 CurrentRunCostSensor(hass, book, device, CURRENT_RUN_COST),
+                ProjectedRunCostSensor(hass, book, device, PROJECTED_RUN_COST),
                 LastRunCostSensor(hass, book, device, LAST_RUN_COST),
             ],
             config_subentry_id=device.device_id,
@@ -183,6 +192,31 @@ class CurrentRunCostSensor(DeviceSensor):
             "running_hours": run_totals(run, dt_util.utcnow()).running_hours,
             "tags": list(run.tags),
         }
+
+
+class ProjectedRunCostSensor(DeviceSensor):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        book: RunBook,
+        device: DeviceConfig,
+        description: SensorEntityDescription,
+    ) -> None:
+        super().__init__(hass, book, device, description)
+        self._decimals = currency_decimals(hass.config.currency)
+
+    @property
+    def native_value(self) -> float | None:
+        run = self._book.open_run(self._device_id)
+        total = None if run is None else projected_total(run, self._decimals)
+        return None if total is None else float(total)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        run = self._book.open_run(self._device_id)
+        if run is None or run.projection is None:
+            return None
+        return {"ends_at": run.projection.ends}
 
 
 class LastRunCostSensor(DeviceSensor):

@@ -270,7 +270,7 @@ async def test_renaming_the_type_name_alone_removes_and_creates_no_entity(
     )
 
     assert entry.subentries[valve.subentry_id].data["type_name"] == "Garden"
-    assert len(before) == 14
+    assert len(before) == 15
     assert registered(entity_registry, valve) == before
 
 
@@ -447,7 +447,7 @@ async def test_no_entity_of_a_shipped_device_type_is_removed_by_reconfiguring_or
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert len(before) == len(devices) * 14
+    assert len(before) == len(devices) * 15
     assert {
         "sensor.washing_machine_water_in_runs",
         "sensor.3d_printer_material_used",

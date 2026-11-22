@@ -39,6 +39,7 @@ from .cost.material import (
     slot_line_items,
 )
 from .cost.pricing import priced_line_item
+from .cost.projection import project, recent_power, running_hours_rest
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
@@ -47,6 +48,7 @@ from .device_inputs import (
     slot_colour,
     slot_number,
     stock_reading,
+    time_left,
     usage_reading,
 )
 from .device_settings import (
@@ -69,6 +71,8 @@ from .models import (
     LoadedSlot,
     Outcome,
     Pause,
+    ProjectedPart,
+    Projection,
     Run,
     SlotReport,
     Stock,
@@ -221,9 +225,14 @@ class DeviceTracker:
                     self._hass, [loaded_slot, *self._config.slots], self._on_slot
                 )
             )
+        if remaining := self._config.remaining_time_entity_id:
+            self._unsubscribe.append(
+                async_track_state_change_event(self._hass, remaining, self._on_progress)
+            )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
             self._record_program(run)
+            run.projection = self._projection(run, dt_util.utcnow())
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
             self._record_usage(run, self._usage_state())
@@ -592,6 +601,12 @@ class DeviceTracker:
         self._follow_stocks()
         if run := self._book.open_run(self._config.device_id):
             self._record_stocks(run)
+            self._refresh(run, dt_util.utcnow())
+            self._book.async_update(run)
+
+    @callback
+    def _on_progress(self, event: Event[EventStateChangedData]) -> None:
+        if run := self._book.open_run(self._config.device_id):
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
 
@@ -1085,6 +1100,38 @@ class DeviceTracker:
             ),
         ]
         count_running_hours(run.line_items, run, until)
+        run.projection = None if run.ended else self._projection(run, until)
+
+    def _projection(self, run: Run, now: datetime) -> Projection | None:
+        """The open Run's rest from its time left; None while that is unknown."""
+        entity_id = self._config.remaining_time_entity_id
+        left = time_left(self._hass.states.get(entity_id)) if entity_id else None
+        if left is None:
+            return None
+        hours = left.total_seconds() / 3600
+        power = self._base_power(run, now)
+        return project(
+            {
+                ProjectedPart.ELECTRICITY: None
+                if power is None
+                else power * hours / 1000 * self._electricity.price_now(run),
+                ProjectedPart.RUNNING_HOURS: running_hours_rest(run, hours),
+            },
+            now + left,
+        )
+
+    def _base_power(self, run: Run, now: datetime) -> float | None:
+        """The W the rest is expected to draw: measured lately, else the running
+        power; None for electricity that isn't drawn over time."""
+        item = next(
+            (i for i in run.line_items if i.kind is LineItemKind.ELECTRICITY), None
+        )
+        method = None if item is None else item.method
+        if method is ConsumptionMethod.MEASURED:
+            return recent_power(run, now, self._electricity.model(run))
+        if method is ConsumptionMethod.ESTIMATED and run.average_powers:
+            return run.average_powers[-1][1]
+        return None
 
 
 def _reapplied(run: Run, item: LineItem, amount: float | None) -> LineItem:

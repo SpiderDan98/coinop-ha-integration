@@ -277,6 +277,7 @@ async def test_an_oven_has_no_water_sensors_and_no_litres_in_its_ended_event(
         "sensor.oven_last_run_cost",
         "sensor.oven_material_cost",
         "sensor.oven_other_cost",
+        "sensor.oven_projected_run_cost",
         "sensor.oven_running_time",
         "sensor.oven_runs",
         "sensor.oven_total_cost",

@@ -229,6 +229,11 @@ class Metering:
             return self.quantity.per_unit(self._price["value"])
         return self._price_of(self._hass.states.get(entity_id))
 
+    def price_now(self, run: Run) -> float:
+        """The open Run's current unit price: the last valid one it followed."""
+        prices = self.timeline(run).prices
+        return next((price for _, price in reversed(prices) if price is not None), 0.0)
+
     def remember_price(self, state: State | None) -> None:
         if state is not None and (price := self._price_of(state)) is not None:
             self._last_price = (self._price_time(state), price)

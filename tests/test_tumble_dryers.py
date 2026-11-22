@@ -232,6 +232,7 @@ async def test_a_tumble_dryer_has_no_water_sensors_and_no_litres_in_its_ended_ev
         "sensor.tumble_dryer_last_run_cost",
         "sensor.tumble_dryer_material_cost",
         "sensor.tumble_dryer_other_cost",
+        "sensor.tumble_dryer_projected_run_cost",
         "sensor.tumble_dryer_running_time",
         "sensor.tumble_dryer_runs",
         "sensor.tumble_dryer_total_cost",

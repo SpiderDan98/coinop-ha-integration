@@ -510,6 +510,22 @@ class Pause:
     end: datetime | None = None
 
 
+class ProjectedPart(StrEnum):
+    """What a Projected Total's rest can come from."""
+
+    ELECTRICITY = "electricity"
+    RUNNING_HOURS = "running_hours"
+
+
+@dataclass(frozen=True)
+class Projection:
+    """An open Run's rest still to come, unrounded, by what it comes from, and its
+    expected end; recomputed live and never stored (ADR 0002)."""
+
+    rests: dict[ProjectedPart, float]
+    ends: datetime | None
+
+
 @dataclass
 class Run:
     """One working cycle of a Device.
@@ -529,7 +545,8 @@ class Run:
     finalised; `stocks` what each Dose's stock input reported, by Dose id, too.
     `measured_doses` are the Doses whose stock input measured the Run (nothing used
     included), kept from finalisation on for a Program correction.
-    `cover_id` is the image the user picked as Cover Image.
+    `cover_id` is the image the user picked as Cover Image. `projection` is the
+    open Run's Projected Total as last refreshed, never stored.
     """
 
     id: str
@@ -560,6 +577,7 @@ class Run:
     stocks: dict[str, Stock] = field(default_factory=dict)
     measured_doses: list[str] = field(default_factory=list)
     cover_id: str | None = None
+    projection: Projection | None = field(default=None, compare=False, repr=False)
     unknown: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def follow_program(self, program: str | None) -> None:
