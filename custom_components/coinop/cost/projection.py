@@ -38,18 +38,82 @@ def running_spans(run: Run, until: datetime) -> list[tuple[datetime, datetime]]:
     return spans
 
 
-def recent_power(run: Run, until: datetime, measured: Model) -> float | None:
-    """The average W the `measured` kWh make over the Run's most recent half hour of
-    running time, or all of it if it ran less; None before it ran at all."""
-    left, seconds, kwh = RECENT, 0.0, 0.0
-    for start, end in reversed(running_spans(run, until)):
-        start = max(start, end - left)
-        seconds += (end - start).total_seconds()
-        kwh += measured(start, end)
-        left -= end - start
+def _without(
+    spans: Iterable[tuple[datetime, datetime]],
+    holes: Iterable[tuple[datetime, datetime]],
+) -> list[tuple[datetime, datetime]]:
+    """The parts of the ordered `spans` outside every one of the `holes`."""
+    holes = sorted(holes)
+    kept = []
+    for start, end in spans:
+        for hole_start, hole_end in holes:
+            if hole_end <= start or hole_start >= end:
+                continue
+            if hole_start > start:
+                kept.append((start, hole_start))
+            start = max(start, hole_end)
+        if start < end:
+            kept.append((start, end))
+    return kept
+
+
+def _within(
+    spans: Iterable[tuple[datetime, datetime]],
+    window: Iterable[tuple[datetime, datetime]],
+) -> list[tuple[datetime, datetime]]:
+    """The parts of the `spans` inside the `window`."""
+    window = list(window)
+    return [
+        (max(start, window_start), min(end, window_end))
+        for start, end in spans
+        for window_start, window_end in window
+        if max(start, window_start) < min(end, window_end)
+    ]
+
+
+def _seconds(spans: Iterable[tuple[datetime, datetime]]) -> float:
+    return sum((end - start).total_seconds() for start, end in spans)
+
+
+def _latest(
+    spans: list[tuple[datetime, datetime]],
+) -> list[tuple[datetime, datetime]]:
+    """The last `RECENT` of the ordered `spans`, or all of them if they are shorter."""
+    left, latest = RECENT, []
+    for start, end in reversed(spans):
         if left <= timedelta():
             break
-    return kwh * 3_600_000 / seconds if seconds else None
+        start = max(start, end - left)
+        latest.append((start, end))
+        left -= end - start
+    return latest
+
+
+def _watts(spans: list[tuple[datetime, datetime]], measured: Model) -> float:
+    return sum(measured(s, e) for s, e in spans) * 3_600_000 / _seconds(spans)
+
+
+def recent_power(
+    run: Run,
+    until: datetime,
+    measured: Model,
+    drying: Iterable[list[tuple[datetime, datetime]]] = (),
+    drying_power: float | None = None,
+) -> float | None:
+    """The average W the `measured` kWh make over the Run's most recent half hour of
+    running time outside the drying units' `drying` spans, or all of it if it ran
+    less; None before it ran at all.
+
+    A Run that dried all along gives its recent power less the units' `drying_power`.
+    """
+    drying = list(drying)
+    running = running_spans(run, until)
+    if clear := _without(running, (span for unit in drying for span in unit)):
+        return _watts(_latest(clear), measured)
+    if not (recent := _latest(running)):
+        return None
+    dried = sum(_seconds(_within(unit, recent)) for unit in drying)
+    return _watts(recent, measured) - (drying_power or 0.0) * dried / _seconds(recent)
 
 
 def drying_hours(left: timedelta, drying_left: Iterable[timedelta | None]) -> float:

@@ -141,6 +141,9 @@ class DeviceTracker:
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
         self._finishing: set[str] = set()
+        # The drying units' spans by active entity, and the open Run they belong to.
+        self._drying_spans: dict[str, list[tuple[datetime, datetime | None]]] = {}
+        self._drying_run: str | None = None
         self._electricity = Metering(
             hass,
             ELECTRICITY,
@@ -244,17 +247,17 @@ class DeviceTracker:
                     self._hass, expected["entity_id"], self._on_progress
                 )
             )
-        if drying_inputs := [
-            entity_id
-            for unit in self._config.drying
-            for entity_id in unit.values()
-            if entity_id
-        ]:
-            self._unsubscribe.append(
+        if units := self._config.drying:
+            self._unsubscribe += [
                 async_track_state_change_event(
-                    self._hass, drying_inputs, self._on_progress
-                )
-            )
+                    self._hass, [u["active"] for u in units], self._on_drying
+                ),
+                async_track_state_change_event(
+                    self._hass,
+                    [u["drying_left"] for u in units if u["drying_left"]],
+                    self._on_progress,
+                ),
+            ]
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
             self._record_program(run)
@@ -635,6 +638,46 @@ class DeviceTracker:
         if run := self._book.open_run(self._config.device_id):
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
+
+    @callback
+    def _on_drying(self, event: Event[EventStateChangedData]) -> None:
+        if not (run := self._book.open_run(self._config.device_id)):
+            return
+        self._follow_drying(run)
+        spans = self._drying_spans[event.data["entity_id"]]
+        state = event.data["new_state"]
+        at = dt_util.utcnow() if state is None else state.last_changed
+        if drying(state) and (not spans or spans[-1][1] is not None):
+            spans.append((at, None))
+        elif not drying(state) and spans and spans[-1][1] is None:
+            spans[-1] = (spans[-1][0], at)
+        self._refresh(run, dt_util.utcnow())
+        self._book.async_update(run)
+
+    def _follow_drying(self, run: Run) -> None:
+        """Start following the drying units for the open Run, from what they show."""
+        if self._drying_run == run.id:
+            return
+        self._drying_run = run.id
+        self._drying_spans = {}
+        for unit in self._config.drying:
+            state = self._hass.states.get(unit["active"])
+            self._drying_spans[unit["active"]] = (
+                [(max(run.started, state.last_changed), None)]
+                if state and drying(state)
+                else []
+            )
+
+    def _dried(
+        self, run: Run, until: datetime
+    ) -> list[list[tuple[datetime, datetime]]]:
+        """Each drying unit's spans of drying in the open Run up to `until`, as far as
+        Coin-op saw them: not kept over a restart."""
+        self._follow_drying(run)
+        return [
+            [(start, end or until) for start, end in spans]
+            for spans in self._drying_spans.values()
+        ]
 
     @callback
     def _on_tick(self, now: datetime) -> None:
@@ -1193,7 +1236,13 @@ class DeviceTracker:
         )
         method = None if item is None else item.method
         if method is ConsumptionMethod.MEASURED:
-            return recent_power(run, now, self._electricity.model(run))
+            return recent_power(
+                run,
+                now,
+                self._electricity.model(run),
+                self._dried(run, now),
+                self._config.drying_power,
+            )
         if method is ConsumptionMethod.ESTIMATED and run.average_powers:
             return run.average_powers[-1][1]
         return None

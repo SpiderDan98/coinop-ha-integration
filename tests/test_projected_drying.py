@@ -98,3 +98,35 @@ async def test_a_unit_drying_without_a_drying_left_dries_for_the_whole_time_left
 
     # 2 h at 150 W and 2 h at 200 W.
     assert float(projected(hass).state) == pytest.approx(0.03 + 0.09 + 0.12)
+
+
+async def test_the_base_power_leaves_out_the_drying(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_drying_printer(hass, drying_power=150)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass)
+    await draw(hass, clock, 300, 20)
+    await dry(hass, 40)
+    await set_remaining(hass, 120)
+
+    # 0.06 so far; 2 h at the 150 W before the drying, not the last half hour's
+    # 250 W, and 40 minutes at 150 W.
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.09 + 0.03)
+
+
+async def test_a_run_that_dried_all_along_takes_the_drying_power_off_its_base(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_drying_printer(hass, drying_power=150)
+    await dry(hass)
+    await clock.advance(minutes=10)
+    hass.states.async_set(ENERGY, "10.0", {"unit_of_measurement": "kWh"}, True)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 300, 40)
+    await dry(hass, 40)
+    await set_remaining(hass, 120)
+
+    # 0.06 so far; 2 h at 300 W less the 150 W of drying, and 40 minutes at 150 W.
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.09 + 0.03)
