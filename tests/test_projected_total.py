@@ -493,9 +493,7 @@ async def test_an_appliance_without_program_defaults_projects_its_recent_power(
     await heat_up(hass, clock, "Cotton 60°", 0.9)
 
     # No kWh in its Program Defaults: its 2.7 kW for the hour left.
-    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(
-        0.27 + 0.81
-    )
+    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(0.27 + 0.81)
 
 
 async def test_an_appliance_costed_by_its_program_defaults_alone_projects_nothing(

@@ -1221,7 +1221,10 @@ class DeviceTracker:
     def _water_rest(self, run: Run) -> float | None:
         """The water still to come, priced: what the Program's litres leave after
         the measured; None otherwise."""
-        if self._water is None or (litres := self._default_rest(run, self._water)) is None:
+        if (
+            self._water is None
+            or (litres := self._default_rest(run, self._water)) is None
+        ):
             return None
         return litres * self._water.price_now(run)
 
