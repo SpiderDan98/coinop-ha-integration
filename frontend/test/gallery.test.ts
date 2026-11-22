@@ -13,8 +13,8 @@ describe("Run gallery", () => {
 
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
-      "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h Failed €0.30 Cosplay helmet Gift",
-      "Benchy Kobra · Jan 12, 2026 · 1 h 15 min Completed €0.86 €0.22 per part × 4 Gift",
+      "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h Cosplay helmet Gift Failed €0.30",
+      "Benchy Kobra · Jan 12, 2026 · 1 h 15 min €0.22 per part × 4 Gift Completed €0.86",
     ]);
     expect(text(query(panel, "coinop-run-list .head"))).toBe("3 Runs · €1.23");
   });
@@ -26,17 +26,17 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, started);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min In progress €0.00 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min Batch 7 In progress €0.00",
     );
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min In progress €0.25 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 In progress €0.25",
     );
     backend.push(SUBSCRIBE, ended);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Completed €0.26 Batch 7",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 Completed €0.26",
     );
     backend.push(SUBSCRIBE, { ...ended, change: "deleted" });
     await settle(panel);
@@ -96,7 +96,7 @@ describe("Run gallery", () => {
     const panel = await mountPanel(recordedBackend({ language: "de" }));
 
     expect(tiles(panel)[1]).toBe(
-      "⚑ 2 Helmet Kobra · 13. Jan. 2026 · 9 Std. Fehlgeschlagen 0,30 € Cosplay helmet Gift",
+      "⚑ 2 Helmet Kobra · 13. Jan. 2026 · 9 Std. Cosplay helmet Gift Fehlgeschlagen 0,30 €",
     );
   });
 

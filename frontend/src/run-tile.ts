@@ -41,7 +41,6 @@ export function runTile(
           ${deviceName(run, devices, t)} · ${format.date(run.started)} ·
           ${format.duration(run.running_seconds)}
         </div>
-        <div class="row between">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
         ${
           run.part_count !== null && run.cost_per_part !== null && run.part_count > 1
             ? html`<div class="muted small">
@@ -63,6 +62,7 @@ export function runTile(
               </div>`
             : nothing
         }
+        <div class="row between foot">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
       </div>
     </a>
     ${
@@ -108,7 +108,10 @@ export const tileStyles = css`
     accent-color: var(--primary-color);
   }
   .tile {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 100%;
     color: inherit;
     background: var(--card-background-color, #fff);
     border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
@@ -133,10 +136,14 @@ export const tileStyles = css`
     color: #000;
   }
   .body {
+    flex: 1;
     padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+  .foot {
+    margin-top: auto;
   }
   .tags {
     display: flex;
