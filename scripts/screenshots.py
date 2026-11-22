@@ -4,8 +4,9 @@ Usage: uv run scripts/screenshots.py [name ...]
 
 Starts the dev container if it isn't running (and stops it again afterwards), loads
 each Preset a screenshot needs and saves the screenshots, in the dark theme at a
-fixed size, to docs/images/screenshots. The statement image is instead the top of
-the Cost Statement PDF the panel downloads. Names limit it to those
+fixed size, to docs/images/screenshots. The statement image is instead the first
+page of the Cost Statement PDF the panel downloads, fitted whole into the same
+size. Names limit it to those
 screenshots. Drives the installed Google Chrome, so Playwright needs no browser of
 its own.
 """
@@ -16,6 +17,7 @@ import subprocess
 import sys
 
 import devenv
+from PIL import Image
 from playwright.sync_api import Page, sync_playwright
 import pypdfium2 as pdfium
 
@@ -27,11 +29,12 @@ STYLE = "ha-icon-button.dev { display: none !important; }"
 SETTLE_MS = 2500
 # The newest Runs, few enough to fit the Cost Statement on one page.
 STATEMENT_RUNS = 4
-# PDF points to pixels: an A4 page comes out 1190 pixels wide.
-PDF_SCALE = 2
-# The page is cut to the other screenshots' 16:10 from this many points down, above
-# the letterhead.
-PDF_TOP = 30
+WIDTH, HEIGHT = 1280, 800
+DEVICE_SCALE = 1.5
+SIZE = (int(WIDTH * DEVICE_SCALE), int(HEIGHT * DEVICE_SCALE))
+# Room around the PDF page, in pixels, on HA's dark background.
+PDF_MARGIN = 48
+PDF_BACKGROUND = "#111111"
 
 
 def settle(page: Page, selector: str) -> None:
@@ -68,12 +71,17 @@ def statement(page: Page) -> bytes:
     with page.expect_download(timeout=60_000) as download:
         page.locator("ha-button.download").click()
     pdf = pdfium.PdfDocument(download.value.path())
-    page_image = pdf[0].render(scale=PDF_SCALE).to_pil()
+    width, height = pdf[0].get_size()
+    scale = min((SIZE[0] - 2 * PDF_MARGIN) / width, (SIZE[1] - 2 * PDF_MARGIN) / height)
+    page_image = pdf[0].render(scale=scale).to_pil()
     pdf.close()
-    top = PDF_TOP * PDF_SCALE
-    width = page_image.width
+    canvas = Image.new("RGB", SIZE, PDF_BACKGROUND)
+    canvas.paste(
+        page_image,
+        ((SIZE[0] - page_image.width) // 2, (SIZE[1] - page_image.height) // 2),
+    )
     image = io.BytesIO()
-    page_image.crop((0, top, width, top + width * 10 // 16)).save(image, "PNG")
+    canvas.save(image, "PNG")
     return image.getvalue()
 
 
@@ -113,8 +121,8 @@ def main() -> None:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(channel="chrome")
             context = browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                device_scale_factor=1.5,
+                viewport={"width": WIDTH, "height": HEIGHT},
+                device_scale_factor=DEVICE_SCALE,
                 color_scheme="dark",
                 locale="en-US",
             )
