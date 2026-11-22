@@ -420,7 +420,13 @@ async def test_every_device_is_asked_for_its_remaining_time_before_its_electrici
         assert result["type"] is FlowResultType.FORM, result["step_id"]
         result = await configure(hass, result, {})
 
-    assert fields(result) == ["remaining_time"]
+    assert fields(result) == [
+        "remaining_time",
+        "expected_energy",
+        "expected_energy_attribute",
+        "expected_energy_form",
+    ]
+    assert offered(result, "expected_energy_form") == ["remaining", "total"]
     result = await configure(hass, result, {"remaining_time": REMAINING})
     assert result["step_id"] == "consumption"
 
@@ -433,5 +439,78 @@ async def test_the_remaining_time_is_stored_with_the_device(
     timed = await add_device(hass, entry, remaining_time=REMAINING)
     untimed = await add_device(hass, entry, name="Voron", status="sensor.voron")
 
-    assert timed.data["progress"] == {"remaining_time": REMAINING}
-    assert untimed.data["progress"] == {"remaining_time": None}
+    assert timed.data["progress"] == {
+        "remaining_time": REMAINING,
+        "expected_energy": None,
+    }
+    assert untimed.data["progress"] == {
+        "remaining_time": None,
+        "expected_energy": None,
+    }
+
+
+EXPECTED = "sensor.charger_energy_to_charge"
+
+
+async def walk_to_progress(hass: HomeAssistant) -> Any:
+    result = await walk_to_mapping(hass, await add_hub(hass), device_type="ev_charger")
+    return await configure(hass, result, MAPPING)
+
+
+async def test_the_expected_energy_is_stored_with_its_form(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(EXPECTED, "12", {"unit_of_measurement": "Wh"})
+    result = await walk_to_progress(hass)
+
+    result = await configure(
+        hass,
+        result,
+        {"expected_energy": EXPECTED, "expected_energy_form": "total"},
+    )
+    result = await answer_electricity(hass, result, "none", None, 0)
+
+    [entry] = hass.config_entries.async_entries("coinop")
+    [subentry] = entry.subentries.values()
+    assert subentry.data["progress"] == {
+        "remaining_time": None,
+        "expected_energy": {"entity_id": EXPECTED, "attribute": None, "form": "total"},
+    }
+
+
+async def test_the_expected_energy_is_still_to_come_unless_told_otherwise(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set("sensor.washer_progress", "40", {"unit_of_measurement": "%"})
+    result = await walk_to_progress(hass)
+
+    result = await configure(
+        hass,
+        result,
+        {
+            "expected_energy": "sensor.washer_progress",
+            "expected_energy_attribute": "projected_energy_kwh",
+        },
+    )
+    await answer_electricity(hass, result, "none", None, 0)
+
+    [entry] = hass.config_entries.async_entries("coinop")
+    [subentry] = entry.subentries.values()
+    assert subentry.data["progress"]["expected_energy"] == {
+        "entity_id": "sensor.washer_progress",
+        "attribute": "projected_energy_kwh",
+        "form": "remaining",
+    }
+
+
+async def test_an_expected_energy_entity_must_report_energy(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set("sensor.charger_power", "11", {"unit_of_measurement": "kW"})
+    result = await walk_to_progress(hass)
+
+    result = await configure(hass, result, {"expected_energy": "sensor.charger_power"})
+
+    assert result["step_id"] == "progress"
+    assert result["errors"] == {"expected_energy": "not_energy"}
+    assert suggested(result, "expected_energy") == "sensor.charger_power"

@@ -55,7 +55,8 @@
           "snapshot": false
         },
         "progress": {
-          "remaining_time": null
+          "remaining_time": null,
+          "expected_energy": null
         },
         "consumption": {
           "source": "estimate",

@@ -50,6 +50,14 @@ class WaterSource(StrEnum):
     NONE = NO_SOURCE
 
 
+class ExpectedEnergyForm(StrEnum):
+    """What the Expected energy input reports: the energy still to come, or the
+    Run's total, of which the rest is what isn't measured yet."""
+
+    REMAINING = "remaining"
+    TOTAL = "total"
+
+
 class Capability(StrEnum):
     """What a Device can have; code branches on these, not on the Device Type."""
 
@@ -226,6 +234,8 @@ class DeviceConfig:
     camera_entity_id: str | None
     snapshot: bool
     remaining_time_entity_id: str | None
+    # The Expected energy input: entity_id, attribute and its ExpectedEnergyForm.
+    expected_energy: Mapping[str, Any] | None
     # The consumption section as Add Device wrote it.
     consumption: Mapping[str, Any]
     # The subentry data as the flow wrote it: the Device's HA-side settings.
@@ -264,6 +274,7 @@ class DeviceConfig:
             camera_entity_id=images.get("camera"),
             snapshot=images.get("snapshot", False),
             remaining_time_entity_id=data.get("progress", {}).get("remaining_time"),
+            expected_energy=data.get("progress", {}).get("expected_energy"),
             consumption=data["consumption"],
             flow_data=data,
         )

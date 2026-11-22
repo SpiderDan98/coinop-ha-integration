@@ -1,4 +1,4 @@
-"""Projected Total: an open Run's cost so far plus the rest its time left adds."""
+"""Projected Total: an open Run's cost so far plus the rest still to come."""
 
 from datetime import timedelta
 from typing import Any
@@ -9,6 +9,7 @@ import pytest
 
 from .clock import Clock
 from .devices import ENERGY, add_device, add_hub
+from .test_ev_chargers import add_charger, set_charger, set_session
 from .test_measured import set_meter
 from .test_runs import set_status, stored_runs
 from .test_templates import WEAR, add_template, create
@@ -23,8 +24,8 @@ async def set_remaining(hass: HomeAssistant, minutes: float | str) -> None:
     await hass.async_block_till_done()
 
 
-def projected(hass: HomeAssistant) -> State:
-    state = hass.states.get(PROJECTED)
+def projected(hass: HomeAssistant, entity_id: str = PROJECTED) -> State:
+    state = hass.states.get(entity_id)
     assert state is not None
     return state
 
@@ -175,3 +176,61 @@ async def test_the_panel_gets_the_projected_total_its_end_and_what_it_includes(
     assert run["projected_parts"] == []
     [summary] = (await panel.call("coinop/runs/list"))["runs"]
     assert (summary["projected_total"], summary["projected_end"]) == (None, None)
+
+
+TO_CHARGE = "sensor.wallbox_energy_to_charge"
+CHARGER_PROJECTED = "sensor.wallbox_projected_run_cost"
+STILL_TO_COME = {"expected_energy": TO_CHARGE, "expected_energy_form": "remaining"}
+SESSION_TOTAL = {"expected_energy": TO_CHARGE, "expected_energy_form": "total"}
+
+
+async def set_expected(
+    hass: HomeAssistant, value: float | str, unit: str = "kWh"
+) -> None:
+    hass.states.async_set(TO_CHARGE, str(value), {"unit_of_measurement": unit})
+    await hass.async_block_till_done()
+
+
+async def test_energy_still_to_come_projects_without_a_time_left(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await set_expected(hass, 20)
+    await add_charger(hass, expected_energy=STILL_TO_COME)
+    await set_charger(hass, "charging")
+    await clock.advance(hours=1)
+    await set_session(hass, 5)
+    await set_expected(hass, 15)
+
+    # 5 kWh so far and 15 to come, at 0.30.
+    state = projected(hass, CHARGER_PROJECTED)
+    assert float(state.state) == pytest.approx(1.50 + 4.50)
+    assert state.attributes["ends_at"] is None
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (summary["projected_total"], summary["projected_end"]) == (6.0, None)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["electricity"]
+
+    await set_expected(hass, 2500, "Wh")
+    assert float(projected(hass, CHARGER_PROJECTED).state) == pytest.approx(1.50 + 0.75)
+
+
+async def test_the_runs_total_energy_leaves_what_was_measured_and_comes_first(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await set_expected(hass, STATE_UNKNOWN)
+    await add_charger(hass, remaining_time=REMAINING, expected_energy=SESSION_TOTAL)
+    await set_charger(hass, "charging")
+    await clock.advance(hours=1)
+    await set_session(hass, 5)
+    await set_remaining(hass, 60)
+    # Without the total: 5 kW for the hour left.
+    assert float(projected(hass, CHARGER_PROJECTED).state) == pytest.approx(3.00)
+
+    await set_expected(hass, 12)
+    # 5 kWh so far and the 7 the total leaves, not 5 kW for the hour left.
+    state = projected(hass, CHARGER_PROJECTED)
+    assert float(state.state) == pytest.approx(1.50 + 2.10)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(hours=1)
+
+    await set_expected(hass, 4)
+    assert float(projected(hass, CHARGER_PROJECTED).state) == pytest.approx(1.50)

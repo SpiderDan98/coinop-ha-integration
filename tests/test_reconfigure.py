@@ -480,4 +480,33 @@ async def test_the_remaining_time_is_pre_filled_and_changed_in_its_section(
     await reconfigure_save(hass, result)
 
     data = entry.subentries[subentry.subentry_id].data
-    assert data["progress"] == {"remaining_time": "sensor.kobra_eta"}
+    assert data["progress"] == {
+        "remaining_time": "sensor.kobra_eta",
+        "expected_energy": None,
+    }
+
+
+async def test_the_expected_energy_is_pre_filled_and_removed_in_its_section(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(
+        "sensor.kobra_kwh_left", "1.2", {"unit_of_measurement": "kWh"}
+    )
+    entry = await add_hub(hass)
+    subentry = await add_device(hass, entry)
+    menu = await start_reconfigure(hass, entry, subentry)
+    result = await configure(hass, menu, {"next_step_id": "progress"})
+    result = await configure(
+        hass,
+        result,
+        {"expected_energy": "sensor.kobra_kwh_left", "expected_energy_form": "total"},
+    )
+    result = await configure(hass, result, {"next_step_id": "progress"})
+
+    assert suggested(result, "expected_energy") == "sensor.kobra_kwh_left"
+    assert suggested(result, "expected_energy_form") == "total"
+    result = await configure(hass, result, {"expected_energy_form": "total"})
+    await reconfigure_save(hass, result)
+
+    data = entry.subentries[subentry.subentry_id].data
+    assert data["progress"] == {"remaining_time": None, "expected_energy": None}
