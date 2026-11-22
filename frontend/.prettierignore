@@ -1,2 +1,5 @@
 # Written by the backend tests (tests/contract.py).
 test/fixtures/backend/
+
+# A frozen design reference, kept as it was drawn.
+prototype/
