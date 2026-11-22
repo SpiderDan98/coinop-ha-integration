@@ -3,6 +3,7 @@ the Run's time left."""
 
 from typing import Any
 
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -104,6 +105,21 @@ async def test_a_unit_drying_without_a_drying_left_dries_for_the_whole_time_left
 
     # 2 h at 150 W and 2 h at 200 W.
     assert float(projected(hass).state) == pytest.approx(0.03 + 0.09 + 0.12)
+
+
+@pytest.mark.parametrize("reading", [STATE_UNKNOWN, STATE_UNAVAILABLE])
+async def test_a_unit_whose_drying_left_reads_nothing_projects_no_drying(
+    hass: HomeAssistant, clock: Clock, reading: str
+) -> None:
+    await add_drying_printer(hass, drying_power=200)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass)
+    hass.states.async_set(ACE_LEFT, reading)
+    await set_remaining(hass, 120)
+
+    # 2 h at 150 W, and no guess at how long the unit still dries.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09)
 
 
 @pytest.mark.parametrize(

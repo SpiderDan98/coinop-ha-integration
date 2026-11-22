@@ -1334,6 +1334,10 @@ class DeviceTracker:
             else None
             for unit in self._config.drying
             if drying(states.get(unit["active"]))
+            and not (
+                unit["drying_left"]
+                and time_left(states.get(unit["drying_left"]), now) is None
+            )
         ]
         if not drying_left:
             return base, None, False
