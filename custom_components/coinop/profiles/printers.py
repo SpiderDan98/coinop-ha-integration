@@ -27,6 +27,7 @@ def anycubic(find: Find) -> dict[str, Any]:
     loaded = find("sensor", "_ace0_loaded_slot")
     thumbnail = find("image", "_object_top_view", "_object_thumbnail")
     camera = find("camera", "_camera")
+    remaining = find("sensor", "_time_remaining")
     return {
         "status": entity_input(status),
         "mapping": found(
@@ -51,6 +52,7 @@ def anycubic(find: Find) -> dict[str, Any]:
         | found(loaded, loaded_slot=loaded),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
+        "progress": found(remaining, remaining_time=remaining),
     }
 
 

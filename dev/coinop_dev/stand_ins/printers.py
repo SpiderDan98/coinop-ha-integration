@@ -59,6 +59,7 @@ def anycubic_local(
             object_id="anycubic_kobra_s1_file_name",
         ),
         own("sensor", "filament_used", state="0", unit="g"),
+        own("sensor", "time_remaining", state="0", unit="min"),
         own("sensor", "pause_reason", state="none"),
         own("binary_sensor", "printing", state="off"),
         own("camera", "camera", state=CAMERA),

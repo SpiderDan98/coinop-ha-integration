@@ -117,6 +117,9 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
         "camera": "camera.anycubic_kobra_s1_camera",
         "snapshot": True,
     }
+    assert data["progress"] == {
+        "remaining_time": "sensor.anycubic_kobra_s1_time_remaining"
+    }
 
 
 async def test_a_device_from_the_local_anycubic_records_runs(
@@ -294,7 +297,13 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
         key: entity_registry.async_update_entity(
             printer[key], new_entity_id=printer[key].replace("anycubic_kobra_s1", "s1")
         ).entity_id
-        for key in ("print_event", "filename", "filament_used", "camera")
+        for key in (
+            "print_event",
+            "filename",
+            "filament_used",
+            "camera",
+            "time_remaining",
+        )
     }
     menu = await start_reconfigure(hass, entry, subentry)
 
@@ -303,7 +312,7 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "job", "material_unit", "images"]
+    assert shown == ["status", "mapping", "job", "material_unit", "images", "progress"]
     assert result["step_id"] == "reconfigure"
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
@@ -313,6 +322,7 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
     assert data["job"]["entity_id"] == renamed["filename"]
     assert data["job"]["material"]["entity_id"] == renamed["filament_used"]
     assert data["images"]["camera"] == renamed["camera"]
+    assert data["progress"]["remaining_time"] == renamed["time_remaining"]
 
 
 async def test_detect_again_pre_fills_the_profiles_values(

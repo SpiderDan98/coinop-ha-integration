@@ -498,6 +498,7 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
         "camera": printer["camera"],
         "snapshot": True,
     }
+    assert data["progress"] == {"remaining_time": printer["time_remaining"]}
     assert data["consumption"] == {
         "source": "power",
         "entity_id": POWER,
@@ -513,7 +514,7 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
 ) -> None:
     printer = add_anycubic_local(hass, images=())
     registry = er.async_get(hass)
-    for key in ("filename", "filament_used", "camera", "ace0_slot_1"):
+    for key in ("filename", "filament_used", "camera", "ace0_slot_1", "time_remaining"):
         registry.async_remove(printer[key])
     register(hass, ENERGY, "kWh")
     entry = await add_hub(hass)
@@ -529,6 +530,7 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "loaded_slot": printer["ace0_loaded_slot"],
     }
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
+    assert data["progress"] == {"remaining_time": None}
 
 
 async def test_a_printer_needs_a_meter(hass: HomeAssistant) -> None:
