@@ -40,6 +40,11 @@ MAPPING = {
         "transferring_file",
     ],
 }
+PROGRESS = {
+    "remaining_time": "sensor.octoprint_estimated_finish_time",
+    "progress": "sensor.octoprint_job_percentage",
+    "expected_energy": None,
+}
 
 
 async def test_quick_start_adds_an_octoprint_printer_with_every_input(
@@ -55,6 +60,7 @@ async def test_quick_start_adds_an_octoprint_printer_with_every_input(
         {"value": "manual", "label": "manual"},
     ]
     data = await quick_start(hass, entry, printer.device.id, meter=POWER, price=0.3)
+    assert data["progress"] == PROGRESS
 
     assert data["device_type"] == "3d_printer"
     assert data["status"] == {"entity_id": printer["Current State"], "attribute": None}
@@ -92,6 +98,7 @@ async def test_renamed_octoprint_entities_are_still_found(
 
     assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
+    assert data["progress"] == PROGRESS
     assert data["status"]["entity_id"] == renamed["Current State"]
     assert data["mapping"] == MAPPING
     assert data["job"]["entity_id"] == renamed["Current File"]
@@ -220,11 +227,12 @@ async def test_detect_again_re_applies_an_octoprint_printers_inputs(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
     data = entry.subentries[subentry.subentry_id].data
+    assert data["progress"] == PROGRESS
     assert data["status"]["entity_id"] == printer["Current State"]
     assert data["mapping"] == MAPPING
     assert data["job"]["entity_id"] == printer["Current File"]

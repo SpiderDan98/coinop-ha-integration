@@ -218,6 +218,7 @@ async def test_quick_start_adds_the_charger_with_its_energy_counter(
     assert data["price"] == {"source": "fixed", "value": 0.3}
     assert data["progress"] == {
         "remaining_time": None,
+        "progress": None,
         "expected_energy": {
             "entity_id": device[charger.limit],
             "attribute": None,

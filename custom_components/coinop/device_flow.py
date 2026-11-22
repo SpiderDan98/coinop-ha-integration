@@ -95,7 +95,7 @@ UNUSED: dict[str, dict[str, Any]] = {
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
-    "progress": {"remaining_time": None, "expected_energy": None},
+    "progress": {"remaining_time": None, "progress": None, "expected_energy": None},
 }
 # The sections only a Device with the Capability has.
 NEEDS = {
@@ -693,6 +693,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             images.get("thumbnail"),
             images.get("camera"),
             found.get("progress", {}).get("remaining_time"),
+            found.get("progress", {}).get("progress"),
             (found.get("progress", {}).get("expected_energy") or {}).get("entity_id"),
             *(found.get(key, {}).get("entity_id") for key in METERS),
         ]
@@ -1066,6 +1067,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             else:
                 self._data["progress"] = {
                     "remaining_time": user_input.get("remaining_time"),
+                    "progress": user_input.get("progress"),
                     "expected_energy": {
                         "entity_id": expected,
                         "attribute": attribute,
@@ -1078,6 +1080,9 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         schema = vol.Schema(
             {
                 vol.Optional("remaining_time"): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional("progress"): EntitySelector(
                     EntitySelectorConfig(domain="sensor")
                 ),
                 vol.Optional("expected_energy"): EntitySelector(
@@ -1103,6 +1108,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 user_input
                 or {
                     "remaining_time": stored.get("remaining_time"),
+                    "progress": stored.get("progress"),
                     "expected_energy": expected.get("entity_id"),
                     "expected_energy_attribute": expected.get("attribute"),
                     "expected_energy_form": expected.get("form"),

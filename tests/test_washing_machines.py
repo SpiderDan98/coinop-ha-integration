@@ -242,7 +242,7 @@ async def test_the_devices_tab_learns_what_each_device_type_has(
         "status": {"entity_id": WASHER_STATUS, "attribute": None},
         "mapping": WASHER_MAPPING | {"ended": [], "fault": []},
         "program": {"entity_id": None, "attribute": None},
-        "progress": {"remaining_time": None, "expected_energy": None},
+        "progress": {"remaining_time": None, "progress": None, "expected_energy": None},
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,

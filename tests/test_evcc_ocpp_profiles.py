@@ -77,6 +77,7 @@ async def test_quick_start_adds_an_evcc_site_with_one_loadpoint(
     assert data["price"] == {"source": "fixed", "value": 0.3}
     assert data["progress"] == {
         "remaining_time": site["charge_remaining_duration"],
+        "progress": None,
         "expected_energy": {
             "entity_id": site["charge_remaining_energy"],
             "attribute": None,
@@ -169,8 +170,7 @@ async def test_an_evcc_charge_projects_the_energy_evcc_has_left_to_charge(
     await clock.advance(hours=1)
     await set_state(hass, site["charged_energy"], "6", unit="kWh")
     await set_state(hass, site["charge_remaining_energy"], "14", unit="kWh")
-    # HA shows a duration in the unit its user picks.
-    await set_state(hass, site["charge_remaining_duration"], "120", unit="min")
+    await set_state(hass, site["charge_remaining_duration"], "7200", unit="s")
 
     # 6 kWh so far and 14 still to charge, at 0.30.
     state = hass.states.get(projected)

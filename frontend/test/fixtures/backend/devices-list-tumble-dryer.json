@@ -41,6 +41,7 @@
         },
         "progress": {
           "remaining_time": null,
+          "progress": null,
           "expected_energy": null
         },
         "consumption": {

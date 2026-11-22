@@ -24,6 +24,8 @@ RECENT = timedelta(minutes=30)
 # The running time with and without drying a Run needs before its drying power is
 # learned from it.
 LEARNING = timedelta(minutes=10)
+# Below it, a progress reading would multiply the running time so far too much.
+MIN_PROGRESS = 5.0
 
 
 def running_spans(run: Run, until: datetime) -> list[tuple[datetime, datetime]]:
@@ -39,6 +41,15 @@ def running_spans(run: Run, until: datetime) -> list[tuple[datetime, datetime]]:
     if start < until:
         spans.append((start, until))
     return spans
+
+
+def progress_time_left(run: Run, until: datetime, percent: float) -> timedelta | None:
+    """The time left if the rest takes as long per percent as the running time so
+    far did; None below `MIN_PROGRESS`."""
+    if percent < MIN_PROGRESS:
+        return None
+    ran = sum((end - start for start, end in running_spans(run, until)), timedelta())
+    return ran * (100 - percent) / percent
 
 
 def _without(

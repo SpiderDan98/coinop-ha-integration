@@ -119,6 +119,7 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
     }
     assert data["progress"] == {
         "remaining_time": None,
+        "progress": None,
         "expected_energy": {
             "entity_id": washer["cycle_progress"],
             "attribute": "projected_energy_kwh",

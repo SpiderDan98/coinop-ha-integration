@@ -50,7 +50,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: CoinOpConfigEntry) -> 
                     subentry,
                     data={
                         **subentry.data,
-                        "progress": {"remaining_time": None, "expected_energy": None},
+                        "progress": {
+                            "remaining_time": None,
+                            "progress": None,
+                            "expected_energy": None,
+                        },
                     },
                 )
         hass.config_entries.async_update_entry(entry, minor_version=3)

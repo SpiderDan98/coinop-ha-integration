@@ -484,6 +484,7 @@ async def test_the_remaining_time_is_pre_filled_and_changed_in_its_section(
     data = entry.subentries[subentry.subentry_id].data
     assert data["progress"] == {
         "remaining_time": "sensor.kobra_eta",
+        "progress": None,
         "expected_energy": None,
     }
 
@@ -511,4 +512,8 @@ async def test_the_expected_energy_is_pre_filled_and_removed_in_its_section(
     await reconfigure_save(hass, result)
 
     data = entry.subentries[subentry.subentry_id].data
-    assert data["progress"] == {"remaining_time": None, "expected_energy": None}
+    assert data["progress"] == {
+        "remaining_time": None,
+        "progress": None,
+        "expected_energy": None,
+    }

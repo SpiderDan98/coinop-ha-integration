@@ -349,6 +349,7 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
         },
         "progress": {
             "remaining_time": None,
+            "progress": None,
             "expected_energy": {
                 "entity_id": washer["cycle_progress"],
                 "attribute": "projected_energy_kwh",
@@ -512,6 +513,7 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
     }
     assert data["progress"] == {
         "remaining_time": printer["time_remaining"],
+        "progress": printer["progress"],
         "expected_energy": None,
     }
     assert data["consumption"] == {
@@ -529,7 +531,14 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
 ) -> None:
     printer = add_anycubic_local(hass, images=())
     registry = er.async_get(hass)
-    for key in ("filename", "filament_used", "camera", "ace0_slot_1", "time_remaining"):
+    for key in (
+        "filename",
+        "filament_used",
+        "camera",
+        "ace0_slot_1",
+        "time_remaining",
+        "progress",
+    ):
         registry.async_remove(printer[key])
     register(hass, ENERGY, "kWh")
     entry = await add_hub(hass)
@@ -547,7 +556,11 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "drying_power": None,
     }
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
-    assert data["progress"] == {"remaining_time": None, "expected_energy": None}
+    assert data["progress"] == {
+        "remaining_time": None,
+        "progress": None,
+        "expected_energy": None,
+    }
 
 
 async def test_a_printer_needs_a_meter(hass: HomeAssistant) -> None:

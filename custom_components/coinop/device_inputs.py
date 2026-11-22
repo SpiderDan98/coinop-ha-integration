@@ -165,10 +165,27 @@ def _number(state: State | None, attribute: str | None) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def time_left(state: State | None) -> timedelta | None:
-    """The Remaining time input's minutes as the time left; None without a value."""
-    minutes = _number(state, None)
-    return None if minutes is None else timedelta(minutes=max(minutes, 0.0))
+def time_left(state: State | None, now: datetime) -> timedelta | None:
+    """The Remaining time input's duration, in minutes without a unit, or the time
+    until its finish timestamp; None without a value or with a unit that isn't a time."""
+    number = _number(state, None)
+    if state is None or number is None:
+        value = input_value(state, None)
+        finish = dt_util.parse_datetime(value) if value else None
+        return (
+            None if finish is None else max(dt_util.as_utc(finish) - now, timedelta())
+        )
+    unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or UnitOfTime.MINUTES
+    if unit not in DurationConverter.VALID_UNITS:
+        return None
+    seconds = DurationConverter.convert(number, unit, UnitOfTime.SECONDS)
+    return timedelta(seconds=max(seconds, 0.0))
+
+
+def progress_reading(state: State | None) -> float | None:
+    """The Progress input's percent, within 0 to 100; None without a value."""
+    percent = _number(state, None)
+    return None if percent is None else min(max(percent, 0.0), 100.0)
 
 
 def expected_kwh(state: State | None, attribute: str | None) -> float | None:

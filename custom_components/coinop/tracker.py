@@ -1,6 +1,7 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
 from itertools import takewhile
@@ -43,6 +44,7 @@ from .cost.projection import (
     drying_hours,
     expected_energy_rest,
     learned_drying_power,
+    progress_time_left,
     project,
     recent_power,
     running_hours_rest,
@@ -55,6 +57,7 @@ from .device_inputs import (
     expected_kwh,
     input_time,
     input_value,
+    progress_reading,
     slot_colour,
     slot_number,
     stock_reading,
@@ -97,6 +100,9 @@ from .timelines import add_flag
 FINAL_REPORT_WAIT = timedelta(minutes=5)
 # How soon after the Status that opened a Run its new job's name may still follow.
 JOB_NAME_GRACE = timedelta(minutes=1)
+# How soon before a pause's Status a progress input's change still belongs to the
+# pause: integrations write both from one update, in no set order.
+PAUSE_GRACE = timedelta(seconds=5)
 OUTCOMES = {
     Target.FINISHED: Outcome.COMPLETED,
     Target.CANCELLED: Outcome.CANCELLED,
@@ -141,6 +147,10 @@ class DeviceTracker:
         self._job_may_follow: str | None = None
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
+        # The progress inputs' states before their last change.
+        self._progress_before: dict[str, State] = {}
+        # The open Run's last pause's start and the time left held through it.
+        self._held: tuple[datetime, timedelta | None] | None = None
         self._finishing: set[str] = set()
         # The drying units' spans by active entity, and the open Run they belong to.
         self._drying_spans: dict[str, list[tuple[datetime, datetime | None]]] = {}
@@ -238,9 +248,16 @@ class DeviceTracker:
                     self._hass, [loaded_slot, *self._config.slots], self._on_slot
                 )
             )
-        if remaining := self._config.remaining_time_entity_id:
+        if progress := [
+            entity_id
+            for entity_id in (
+                self._config.remaining_time_entity_id,
+                self._config.progress_entity_id,
+            )
+            if entity_id
+        ]:
             self._unsubscribe.append(
-                async_track_state_change_event(self._hass, remaining, self._on_progress)
+                async_track_state_change_event(self._hass, progress, self._on_progress)
             )
         if expected := self._config.expected_energy:
             self._unsubscribe.append(
@@ -636,6 +653,8 @@ class DeviceTracker:
 
     @callback
     def _on_progress(self, event: Event[EventStateChangedData]) -> None:
+        if before := event.data["old_state"]:
+            self._progress_before[event.data["entity_id"]] = before
         if run := self._book.open_run(self._config.device_id):
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
@@ -744,6 +763,7 @@ class DeviceTracker:
                 run.flags.append(Flag.FAULT)
             if not run.paused:
                 run.pauses.append(Pause(at))
+                self._hold_time_left(run, at)
         elif target is Target.RUNNING:
             if run.paused:
                 run.pauses[-1].end = at
@@ -1175,8 +1195,7 @@ class DeviceTracker:
     def _projection(self, run: Run, now: datetime) -> Projection | None:
         """The open Run's rest; what depends on its time left is left out while that
         is unknown, and so is the expected end."""
-        entity_id = self._config.remaining_time_entity_id
-        left = time_left(self._hass.states.get(entity_id)) if entity_id else None
+        left = self._time_left(run, now)
         hours = None if left is None else left.total_seconds() / 3600
         kwh, drying_kwh, drying_pending = self._electricity_rest(run, now, left)
         price = self._electricity.price_now(run)
@@ -1193,6 +1212,43 @@ class DeviceTracker:
             None if left is None else now + left,
             [ProjectedPart.DRYING] if drying_pending else [],
         )
+
+    def _time_left(self, run: Run, now: datetime) -> timedelta | None:
+        """The open Run's time left, held through a pause at its value from before
+        it; None while unknown."""
+        if run.paused:
+            start = run.pauses[-1].start
+            if self._held is None or self._held[0] != start:
+                self._hold_time_left(run, start)
+            assert self._held is not None
+            if self._held[1] is not None:
+                return self._held[1]
+        return self._time_left_at(run, now, self._hass.states.get)
+
+    def _hold_time_left(self, run: Run, start: datetime) -> None:
+        """Hold the time left as the progress inputs gave it before the pause at
+        `start`, so they may drop to 0 or unknown while paused."""
+
+        def before(entity_id: str) -> State | None:
+            state = self._hass.states.get(entity_id)
+            if state is None or state.last_changed < start - PAUSE_GRACE:
+                return state
+            return self._progress_before.get(entity_id)
+
+        self._held = start, self._time_left_at(run, start, before)
+
+    def _time_left_at(
+        self, run: Run, at: datetime, state: Callable[[str], State | None]
+    ) -> timedelta | None:
+        """The time left at `at` from the Remaining time's `state`, else from the
+        Progress's; None while neither tells."""
+        remaining = self._config.remaining_time_entity_id
+        left = time_left(state(remaining), at) if remaining else None
+        if left is not None:
+            return left
+        progress = self._config.progress_entity_id
+        percent = progress_reading(state(progress)) if progress else None
+        return None if percent is None else progress_time_left(run, at, percent)
 
     def _electricity_rest(
         self, run: Run, now: datetime, left: timedelta | None

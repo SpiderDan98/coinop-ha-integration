@@ -261,15 +261,17 @@
         },
         "progress": {
           "title": "Progress",
-          "description": "Optionally pick the entity that reports how many minutes the Device's Run has left. While a Run is open, Coin-op then shows its Projected Total: the cost so far plus what the time left is expected to add. Where the Device reports how much energy is still to come, such as an EV charger, pick that as Expected energy: it then decides the electricity still to come, also without a remaining time.",
+          "description": "Optionally pick the entities that report how far the Device's Run has got. While a Run is open, Coin-op then shows its Projected Total: the cost so far plus what the time left is expected to add. Where the Device reports how much energy is still to come, such as an EV charger, pick that as Expected energy: it then decides the electricity still to come, also without a remaining time.",
           "data": {
             "remaining_time": "Remaining time (optional)",
+            "progress": "Progress (optional)",
             "expected_energy": "Expected energy (optional)",
             "expected_energy_attribute": "Expected energy attribute (optional)",
             "expected_energy_form": "Expected energy reports"
           },
           "data_description": {
-            "remaining_time": "Minutes left until the Run ends, as the Device reports them.",
+            "remaining_time": "The time left until the Run ends, in hours, minutes, seconds or milliseconds, or the time it is expected to finish.",
+            "progress": "How far the Run has got, in %. Without a remaining time, Coin-op takes the time left from the running time so far, once the Run is 5 % done.",
             "expected_energy": "The energy the Device reports for the Run, in kWh or another energy unit. An attribute's value is read as kWh.",
             "expected_energy_attribute": "Read the Expected energy from this attribute instead of the entity's state.",
             "expected_energy_form": "Whether the Expected energy is what is still to come, or the Run's total, of which the rest is what isn't measured yet."

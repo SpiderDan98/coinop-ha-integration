@@ -33,6 +33,11 @@ MAPPING = {
     "fault": ["error"],
     "ignored": ["processing", "self-testing", "idle", "off", "unknown"],
 }
+PROGRESS = {
+    "remaining_time": "sensor.k1c_print_left_time",
+    "progress": "sensor.k1c_print_progress",
+    "expected_energy": None,
+}
 
 
 async def test_quick_start_adds_a_creality_printer_with_every_input(
@@ -48,6 +53,7 @@ async def test_quick_start_adds_a_creality_printer_with_every_input(
         {"value": "manual", "label": "manual"},
     ]
     data = await quick_start(hass, entry, printer.device.id, meter=POWER, price=0.3)
+    assert data["progress"] == PROGRESS
 
     assert data["device_type"] == "3d_printer"
     assert data["status"] == {"entity_id": printer["print_status"], "attribute": None}
@@ -143,6 +149,7 @@ async def test_manual_setup_comes_pre_filled_from_a_creality_printer(
     # The material length reports cm itself, so no unit step.
     assert shown == ["status", "mapping", "job", "images", "progress"]
     data = subentry.data
+    assert data["progress"] == PROGRESS
     assert data["status"] == {"entity_id": printer["print_status"], "attribute": None}
     assert data["mapping"] == MAPPING
     assert (data["job"]["entity_id"], data["job"]["attribute"]) == (
@@ -219,11 +226,12 @@ async def test_detect_again_re_applies_a_creality_printers_inputs(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "job", "images"]
+    assert shown == ["status", "mapping", "job", "images", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 
     data = entry.subentries[subentry.subentry_id].data
+    assert data["progress"] == PROGRESS
     assert data["status"]["entity_id"] == printer["print_status"]
     assert data["mapping"] == MAPPING
     assert (data["job"]["entity_id"], data["job"]["attribute"]) == (
