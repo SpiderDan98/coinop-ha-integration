@@ -22,13 +22,17 @@ Requires Home Assistant 2026.5 or newer. Licensed under the [MIT licence](LICENS
 
 Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## What it does
+## Features
 
-- Each 3D printer you add becomes a **Device**. Coin-op reads its status (and, if available, job name, material used, loaded slots, thumbnail and camera) from the entities its printer integration already provides. The thumbnail can be an image entity or a camera that shows the print's preview, as Moonraker and PrusaLink offer it; a camera is asked for its picture while the print runs, never after it ended. It never talks to the printer itself, so any printer whose integration exposes a print status works. For the [printer integrations Coin-op has a profile for](docs/supported-integrations.md#3d-printers), the entities are filled in automatically.
-- Each print becomes a **Run**, opened and closed by that status. While it runs you see a live cost; when it ends, its costs are frozen into **Line Items**: electricity (from an energy meter, a power sensor or an estimate from average power, priced correctly across every price change), material, and anything you add by hand or from templates, such as nozzle wear per running hour.
-- A sidebar panel shows your Runs as a gallery and lets you correct every value of a Run afterwards.
-- Each Device gets sensors for cost totals, material used, energy, Run count and running time, sensors for the current and last Run's cost and the open Run's Projected Total, a Flagged Runs counter and a Run event entity for automations.
-- Coin-op ships further Device Types besides the 3D printer: each load of a washing machine or dishwasher is a Run with electricity, water and the detergent and other products dosed into it. A Device none of them fits, such as garden irrigation, a CNC router or a bread maker, is added as **Other**: you name its kind and pick what it has. See [Device Types](#device-types).
+- **Runs from the Device's status**: every print, wash, charge or mowing session opens and closes on its own, with a live cost while it runs.
+- **Costs as Line Items**: electricity, water, material, detergent and other Doses, plus anything you add by hand or from templates.
+- **Electricity from any source**: an energy meter, a power sensor or an estimate from average power, priced correctly across every price change.
+- **Many Device Types**: 3D printers, washing machines, dishwashers, tumble dryers, coffee machines, ovens, EV chargers, robotic mowers, and **Other** for anything else. See [Device Types](#device-types).
+- **Quick Start**: devices of [supported integrations](docs/supported-integrations.md) are set up in a few clicks. Coin-op only reads their entities, so a device of any integration that exposes a status works.
+- **Editable history**: a sidebar panel with a gallery of Runs, Tags, Flags and analysis, where every value can be corrected afterwards.
+- **Sensors and events**: cost totals, consumption, Run count, running time, the current and last Run's cost, the open Run's Projected Total, and a Run event entity for automations.
+- **Cost Statement**: a PDF of the selected Runs, detailed or compact, optionally with a Markup.
+- **Local and backed up**: all data stays in Home Assistant and is part of its backups.
 
 ## Screenshots
 
