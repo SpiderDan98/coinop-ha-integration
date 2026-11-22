@@ -10,8 +10,16 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 
 from .clock import Clock
-from .devices import MAPPING, add_device, add_hub, configure, walk_to_mapping
+from .devices import (
+    MAPPING,
+    add_device,
+    add_hub,
+    configure,
+    start_reconfigure,
+    walk_to_mapping,
+)
 from .stored import place_materials, stored_material
+from .test_device_flow import suggested
 from .test_lifecycle import start_coinop, stop_coinop
 from .test_persistence import live_runs
 from .test_runs import set_status, stored_runs, value
@@ -126,6 +134,140 @@ async def test_the_material_used_input_is_stored_with_the_job(
         "drying": [],
         "drying_power": None,
     }
+
+
+PLANNED = "sensor.kobra_planned_filament"
+
+
+async def test_the_planned_material_is_stored_next_to_the_material_used(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "0", {"unit_of_measurement": "mm"})
+    hass.states.async_set(PLANNED, "12", {"unit_of_measurement": "kg"})
+    entry = await add_hub(hass)
+
+    device = await add_device(hass, entry, material=FILAMENT, planned_material=PLANNED)
+
+    assert device.data["job"]["planned_material"] == {
+        "entity_id": PLANNED,
+        "attribute": None,
+        "unit": "kg",
+    }
+
+
+async def test_a_planned_material_attribute_asks_for_its_unit(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "0", {"unit_of_measurement": "mm"})
+    hass.states.async_set(PLANNED, "idle", {"estimated_filament": 12})
+    result = await walk_to_job(hass)
+
+    result = await configure(
+        hass,
+        result,
+        {
+            "material_entity_id": FILAMENT,
+            "planned_material_entity_id": PLANNED,
+            "planned_material_attribute": "estimated_filament",
+        },
+    )
+    assert result["step_id"] == "planned_material_unit"
+    refused = await configure(hass, result, {"unit": "pcs"})
+    assert refused["errors"] == {"unit": "not_length_or_mass"}
+    result = await configure(hass, refused, {"unit": "g"})
+    assert result["step_id"] == "images", result.get("errors")
+
+
+async def test_a_planned_material_without_a_unit_asks_for_it(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "0", {"unit_of_measurement": "mm"})
+    hass.states.async_set(PLANNED, "12")
+    result = await configure(
+        hass,
+        await walk_to_job(hass),
+        {"material_entity_id": FILAMENT, "planned_material_entity_id": PLANNED},
+    )
+    assert result["step_id"] == "planned_material_unit"
+
+
+async def test_both_material_attributes_ask_their_units_in_turn(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "idle", {"length": 1200, "planned": 12})
+    entry = await add_hub(hass)
+
+    device = await add_device(
+        hass,
+        entry,
+        material=FILAMENT,
+        material_attribute="length",
+        material_unit="mm",
+        planned_material=FILAMENT,
+        planned_material_attribute="planned",
+        planned_material_unit="g",
+    )
+
+    job = device.data["job"]
+    assert (job["material"]["unit"], job["planned_material"]["unit"]) == ("mm", "g")
+
+
+async def test_a_planned_material_must_be_a_length_or_a_mass(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "0", {"unit_of_measurement": "mm"})
+    hass.states.async_set(PLANNED, "12", {"unit_of_measurement": "W"})
+    result = await walk_to_job(hass)
+
+    refused = await configure(
+        hass,
+        result,
+        {"material_entity_id": FILAMENT, "planned_material_entity_id": PLANNED},
+    )
+    assert refused["errors"] == {"planned_material_entity_id": "not_length_or_mass"}
+
+
+async def test_without_material_used_a_planned_material_is_not_kept(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(PLANNED, "12", {"unit_of_measurement": "g"})
+    entry = await add_hub(hass)
+
+    device = await add_device(hass, entry, planned_material=PLANNED)
+
+    assert device.data["job"]["planned_material"] is None
+
+
+async def test_reconfigure_offers_the_planned_material_as_stored(
+    hass: HomeAssistant,
+) -> None:
+    hass.states.async_set(FILAMENT, "0", {"unit_of_measurement": "mm"})
+    hass.states.async_set(PLANNED, "idle", {"planned": 12})
+    entry = await add_hub(hass)
+    device = await add_device(
+        hass,
+        entry,
+        material=FILAMENT,
+        planned_material=PLANNED,
+        planned_material_attribute="planned",
+        planned_material_unit="g",
+    )
+
+    menu = await start_reconfigure(hass, entry, device)
+    result = await configure(hass, menu, {"next_step_id": "job"})
+    assert suggested(result, "planned_material_entity_id") == PLANNED
+    assert suggested(result, "planned_material_attribute") == "planned"
+    result = await configure(
+        hass,
+        result,
+        {
+            "material_entity_id": FILAMENT,
+            "planned_material_entity_id": PLANNED,
+            "planned_material_attribute": "planned",
+        },
+    )
+    assert result["step_id"] == "planned_material_unit"
+    assert suggested(result, "unit") == "g"
 
 
 async def test_a_measured_length_becomes_grams_of_the_default_material(
