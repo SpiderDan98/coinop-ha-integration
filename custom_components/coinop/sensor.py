@@ -216,7 +216,7 @@ class ProjectedRunCostSensor(DeviceSensor):
         run = self._book.open_run(self._device_id)
         if run is None or run.projection is None:
             return None
-        return {"ends_at": run.projection.ends}
+        return {"ends_at": run.projection.ends_at}
 
 
 class LastRunCostSensor(DeviceSensor):

@@ -534,7 +534,7 @@ class Projection:
     expected end; recomputed live and never stored (ADR 0002)."""
 
     rests: dict[ProjectedPart, float]
-    ends: datetime | None
+    ends_at: datetime | None
     # The parts that apply but can't be projected yet, such as drying before its
     # power is learned.
     pending: frozenset[ProjectedPart] = frozenset()

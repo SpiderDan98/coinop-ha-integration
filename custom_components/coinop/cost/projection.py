@@ -226,12 +226,12 @@ def running_hours_rest(run: Run, hours_left: float) -> float | None:
 
 def project(
     rests: Mapping[ProjectedPart, float | None],
-    ends: datetime | None,
+    ends_at: datetime | None,
     pending: Iterable[ProjectedPart] = (),
 ) -> Projection | None:
     """The rests that could be projected; None when none could, a rest of 0 counts."""
     projected = {part: rest for part, rest in rests.items() if rest is not None}
-    return Projection(projected, ends, frozenset(pending)) if projected else None
+    return Projection(projected, ends_at, frozenset(pending)) if projected else None
 
 
 def projected_total(run: Run, decimals: int) -> Decimal | None:

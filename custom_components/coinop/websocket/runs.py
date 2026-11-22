@@ -8,6 +8,7 @@ Corrections never recompute a cost, except that a corrected Program re-applies
 its defaults (ADR 0002).
 """
 
+from collections.abc import Container
 from datetime import datetime
 from typing import Any, cast
 
@@ -37,6 +38,7 @@ from custom_components.coinop.models import (
     LineItemKind,
     Outcome,
     ProjectedPart,
+    Projection,
     Run,
 )
 from custom_components.coinop.run_book import RunBook, RunChange
@@ -74,7 +76,7 @@ def _summary(
 ) -> dict[str, Any]:
     total = rounded_sum((i.amount for i in run.line_items), decimals)
     projected = projected_total(run, decimals)
-    ends = None if run.projection is None else run.projection.ends
+    ends_at = None if run.projection is None else run.projection.ends_at
     return {
         "id": run.id,
         "device_id": run.device_id,
@@ -88,7 +90,7 @@ def _summary(
         "running_seconds": round(running_time(run, now).total_seconds()),
         "total": float(total),
         "projected_total": None if projected is None else float(projected),
-        "projected_end": None if ends is None else ends.isoformat(),
+        "projected_end": None if ends_at is None else ends_at.isoformat(),
         "part_count": run.part_count,
         "cost_per_part": None
         if run.part_count is None
@@ -112,11 +114,16 @@ def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
     }
 
 
+def _in_order(parts: Container[ProjectedPart]) -> list[ProjectedPart]:
+    return [part for part in ProjectedPart if part in parts]
+
+
 def _detail(
     hass: HomeAssistant, run: Run, now: datetime, decimals: int
 ) -> dict[str, Any]:
     # Meter readings are long on an open Run and of no use to the panel.
     stored = run.as_dict()
+    projection = run.projection or Projection({}, None)
     for timeline in stored.get("timelines", {}).values():
         del timeline["readings"]
     return {
@@ -125,16 +132,8 @@ def _detail(
         "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
         "uploads": upload_rules(),
-        "projected_parts": [
-            part
-            for part in ProjectedPart
-            if run.projection and part in run.projection.rests
-        ],
-        "projected_pending": [
-            part
-            for part in ProjectedPart
-            if run.projection and part in run.projection.pending
-        ],
+        "projected_parts": _in_order(projection.rests),
+        "projected_pending": _in_order(projection.pending),
         "subtotals": {
             kind: float(
                 rounded_sum(
