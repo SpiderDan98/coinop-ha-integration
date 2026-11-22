@@ -484,3 +484,33 @@ async def test_a_measured_waters_rest_is_what_the_programs_litres_leave(
     assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(
         0.27 + 0.18 + 0.28
     )
+
+
+async def test_an_appliance_without_program_defaults_projects_its_recent_power(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_washer(hass, remaining_time=WASHER_REMAINING)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+
+    # No kWh in its Program Defaults: its 2.7 kW for the hour left.
+    assert float(projected(hass, WASHER_PROJECTED).state) == pytest.approx(
+        0.27 + 0.81
+    )
+
+
+async def test_an_appliance_costed_by_its_program_defaults_alone_projects_nothing(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = await add_washer(
+        hass,
+        source="per_program",
+        water="per_program",
+        remaining_time=WASHER_REMAINING,
+    )
+    await set_rows(panel, washer)
+    await heat_up(hass, clock, "Cotton 60°", 0.9)
+
+    # Its cost so far is already the Program's whole kWh and litres.
+    assert projected(hass, WASHER_PROJECTED).state == STATE_UNKNOWN
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (summary["projected_total"], summary["projected_end"]) == (None, None)

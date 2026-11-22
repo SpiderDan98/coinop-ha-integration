@@ -27,6 +27,7 @@ from .registry import (
 )
 from .test_device_flow import suggested
 from .test_integration_profiles import accepted
+from .test_program_consumption import set_rows
 from .test_quick_start import quick_start, register
 from .test_runs import stored_runs
 from .websocket import PanelClient
@@ -197,6 +198,31 @@ async def test_washdatas_projected_energy_leaves_what_the_plug_measured(
     state = hass.states.get("sensor.washer_projected_run_cost")
     assert state is not None
     assert float(state.state) == pytest.approx(0.21)
+
+
+async def test_washdatas_projected_energy_comes_before_the_programs_default(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    washer = add_washdata(hass)
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    _, subentry = await walk_pre_filled(
+        hass, entry, washer, energy={"entity_id": WASHER_ENERGY}
+    )
+    await set_rows(panel, subentry)
+
+    hass.states.async_set(washer["washer_state"], "running")
+    await clock.advance(minutes=30)
+    hass.states.async_set(WASHER_ENERGY, "100.6", {"unit_of_measurement": "kWh"})
+    hass.states.async_set(
+        washer["cycle_progress"], "40", {"projected_energy_kwh": 1.1}
+    )
+    await hass.async_block_till_done()
+
+    # The 0.5 kWh WashData expects on top, not the 0.2 the Default row's 0.8 leave.
+    state = hass.states.get("sensor.washer_projected_run_cost")
+    assert state is not None
+    assert float(state.state) == pytest.approx(0.18 + 0.15)
 
 
 def accepted_progress(washer: HaDevice) -> dict[str, Any]:
