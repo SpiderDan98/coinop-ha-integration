@@ -121,8 +121,11 @@ export interface RunDetail extends RunSummary {
   uploads: { limit: number; types: string[]; max_bytes: number };
   projected_parts: (typeof PROJECTED_PARTS)[number][];
   /** The parts that apply but can't be projected yet, such as drying before its power
-   * is learned. */
-  projected_pending: "drying"[];
+   * is learned: those with a `projected_pending.<part>` note in the translations. */
+  projected_pending: Extract<
+    (typeof PROJECTED_PARTS)[number],
+    keyof { [K in Key as K extends `projected_pending.${infer Part}` ? Part : never]: unknown }
+  >[];
   subtotals: Record<Kind, number>;
 }
 
