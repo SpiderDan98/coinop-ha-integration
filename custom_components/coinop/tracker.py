@@ -286,6 +286,7 @@ class DeviceTracker:
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
             self._record_program(run)
+            self._follow_drying(run)
             run.projection = self._projection(run, dt_util.utcnow())
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
@@ -822,6 +823,7 @@ class DeviceTracker:
         self._record_slot(run)
         self._record_program(run)
         self._record_stocks(run)
+        self._follow_drying(run)
         self._refresh(run, at)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at

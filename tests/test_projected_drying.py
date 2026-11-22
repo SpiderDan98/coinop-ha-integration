@@ -203,6 +203,24 @@ async def test_without_a_drying_power_it_is_learned_once_each_side_ran_10_minute
     )
 
 
+async def test_drying_from_the_runs_start_counts_once_it_stopped_before_a_time_left(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_drying_printer(hass)
+    await dry(hass)
+    await clock.advance(minutes=10)
+    hass.states.async_set(ENERGY, "10.0", {"unit_of_measurement": "kWh"}, True)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 300, 20)
+    await stop_drying(hass)
+    await draw(hass, clock, 150, 40)
+    await dry(hass, 40)
+    await set_remaining(hass, 120)
+
+    # 0.06 so far, 2 h at 150 W and 40 minutes at the 300 W less 150 W it drew.
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.09 + 0.03)
+
+
 async def test_two_drying_units_add_up(hass: HomeAssistant, clock: Clock) -> None:
     await add_drying_printer(
         hass, units=[(ACE, ACE_LEFT), (SECOND, SECOND_LEFT)], drying_power=100
