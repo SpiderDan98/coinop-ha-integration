@@ -1,12 +1,11 @@
 """The Run engine for one Device: its Status input opens and closes Runs."""
 
 import asyncio
-from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
 from itertools import takewhile
 import re
-from typing import Any
+from typing import Any, NamedTuple
 
 from homeassistant.core import (
     CALLBACK_TYPE,
@@ -45,24 +44,20 @@ from .cost.projection import (
     expected_energy_rest,
     learned_drying_power,
     material_rest,
-    progress_time_left,
     project,
     recent_power,
     running_hours_rest,
     total_rest,
 )
 from .cost.slots import slot_material, slot_shares
-from .device_config import Capability, DeviceConfig, ExpectedEnergyForm, Target
+from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
-    drying,
     expected_kwh,
     input_time,
     input_value,
-    progress_reading,
     slot_colour,
     slot_number,
     stock_reading,
-    time_left,
     usage_reading,
 )
 from .device_settings import (
@@ -79,6 +74,7 @@ from .models import (
     CONSUMED_KINDS,
     ConsumptionMethod,
     DoseSource,
+    ExpectedEnergyForm,
     Flag,
     LineItem,
     LineItemKind,
@@ -92,6 +88,7 @@ from .models import (
     Stock,
     Usage,
 )
+from .projection_inputs import Drying, Progress
 from .quantities import ELECTRICITY, QUANTITIES, WATER
 from .run_book import RunBook
 from .spoolman import Spoolman
@@ -101,9 +98,6 @@ from .timelines import add_flag
 FINAL_REPORT_WAIT = timedelta(minutes=5)
 # How soon after the Status that opened a Run its new job's name may still follow.
 JOB_NAME_GRACE = timedelta(minutes=1)
-# How soon before a pause's Status a progress input's change still belongs to the
-# pause: integrations write both from one update, in no set order.
-PAUSE_GRACE = timedelta(seconds=5)
 OUTCOMES = {
     Target.FINISHED: Outcome.COMPLETED,
     Target.CANCELLED: Outcome.CANCELLED,
@@ -148,17 +142,9 @@ class DeviceTracker:
         self._job_may_follow: str | None = None
         self._final_waits: dict[str, CALLBACK_TYPE] = {}
         self._finalised: dict[str, asyncio.Future[None]] = {}
-        # The progress inputs' states before their last change.
-        self._progress_before: dict[str, State] = {}
-        # The open Run's last pause's start, and the time left and Progress held
-        # through it.
-        self._held: tuple[datetime, timedelta | None, float | None] | None = None
+        self._progress = Progress(hass, config)
+        self._drying = Drying(hass, config)
         self._finishing: set[str] = set()
-        # The drying units' spans by active entity, and the open Run they belong to.
-        self._drying_spans: dict[str, list[tuple[datetime, datetime | None]]] = {}
-        self._drying_run: str | None = None
-        # Before it, whether a unit dried in the open Run is unknown.
-        self._drying_known = dt_util.utcnow()
         self._electricity = Metering(
             hass,
             ELECTRICITY,
@@ -288,7 +274,7 @@ class DeviceTracker:
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
             self._record_program(run)
-            self._follow_drying(run)
+            self._drying.follow(run)
             run.projection = self._projection(run, dt_util.utcnow())
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():
@@ -663,8 +649,7 @@ class DeviceTracker:
 
     @callback
     def _on_progress(self, event: Event[EventStateChangedData]) -> None:
-        if before := event.data["old_state"]:
-            self._progress_before[event.data["entity_id"]] = before
+        self._progress.remember(event)
         if run := self._book.open_run(self._config.device_id):
             self._refresh(run, dt_util.utcnow())
             self._book.async_update(run)
@@ -673,49 +658,9 @@ class DeviceTracker:
     def _on_drying(self, event: Event[EventStateChangedData]) -> None:
         if not (run := self._book.open_run(self._config.device_id)):
             return
-        self._follow_drying(run)
-        spans = self._drying_spans[event.data["entity_id"]]
-        state = event.data["new_state"]
-        at = dt_util.utcnow() if state is None else state.last_changed
-        if drying(state) and (not spans or spans[-1][1] is not None):
-            spans.append((at, None))
-        elif not drying(state) and spans and spans[-1][1] is None:
-            spans[-1] = (spans[-1][0], at)
+        self._drying.on_change(run, event)
         self._refresh(run, dt_util.utcnow())
         self._book.async_update(run)
-
-    def _follow_drying(self, run: Run) -> None:
-        """Start following the drying units for the open Run, from what they show."""
-        if self._drying_run == run.id:
-            return
-        self._drying_run = run.id
-        self._drying_spans = {}
-        self._drying_known = run.started
-        for unit in self._config.drying:
-            state = self._hass.states.get(unit["active"])
-            if state:
-                self._drying_known = max(self._drying_known, state.last_changed)
-            self._drying_spans[unit["active"]] = (
-                [(max(run.started, state.last_changed), None)]
-                if state and drying(state)
-                else []
-            )
-
-    def _dried(
-        self, run: Run, until: datetime
-    ) -> list[list[tuple[datetime, datetime]]]:
-        """Each drying unit's spans of drying in the open Run up to `until`, as far as
-        Coin-op saw them: not kept over a restart."""
-        self._follow_drying(run)
-        return [
-            [(start, end or until) for start, end in spans]
-            for spans in self._drying_spans.values()
-        ]
-
-    def _drying_unknown(self, run: Run) -> list[tuple[datetime, datetime]]:
-        """The open Run's time before Coin-op saw each drying unit's state."""
-        self._follow_drying(run)
-        return [(run.started, self._drying_known)]
 
     @callback
     def _on_tick(self, now: datetime) -> None:
@@ -781,7 +726,7 @@ class DeviceTracker:
                 run.flags.append(Flag.FAULT)
             if not run.paused:
                 run.pauses.append(Pause(at))
-                self._hold_time_left(run, at)
+                self._progress.hold(run, at)
         elif target is Target.RUNNING:
             if run.paused:
                 run.pauses[-1].end = at
@@ -833,7 +778,7 @@ class DeviceTracker:
         self._record_slot(run)
         self._record_program(run)
         self._record_stocks(run)
-        self._follow_drying(run)
+        self._drying.follow(run)
         self._refresh(run, at)
         add_templates(
             run, self._catalog.find_templates(settings[AUTOMATIC_TEMPLATES]), at
@@ -1218,80 +1163,23 @@ class DeviceTracker:
     def _projection(self, run: Run, now: datetime) -> Projection | None:
         """The open Run's rest; what depends on its time left is left out while that
         is unknown, and so is the expected end."""
-        left = self._time_left(run, now)
+        left = self._progress.time_left(run, now)
         hours = None if left is None else left.total_seconds() / 3600
-        kwh, drying_kwh, drying_pending = self._electricity_rest(run, now, left)
+        electricity = self._electricity_rest(run, now, left)
         price = self._electricity.price_now(run)
         return project(
             {
-                ProjectedPart.ELECTRICITY: None if kwh is None else kwh * price,
+                ProjectedPart.ELECTRICITY: _priced(electricity.kwh, price),
                 ProjectedPart.WATER: self._water_rest(run),
                 ProjectedPart.MATERIAL: self._material_rest(run, now),
-                ProjectedPart.DRYING: None
-                if drying_kwh is None
-                else drying_kwh * price,
+                ProjectedPart.DRYING: _priced(electricity.drying_kwh, price),
                 ProjectedPart.RUNNING_HOURS: None
                 if hours is None
                 else running_hours_rest(run, hours),
             },
             None if left is None else now + left,
-            [ProjectedPart.DRYING] if drying_pending else [],
+            [ProjectedPart.DRYING] if electricity.drying_pending else [],
         )
-
-    def _time_left(self, run: Run, now: datetime) -> timedelta | None:
-        """The open Run's time left, held through a pause at its value from before
-        it; None while unknown."""
-        if (held := self._held_now(run)) and held[1] is not None:
-            return held[1]
-        return self._time_left_at(run, now, self._hass.states.get)
-
-    def _percent(self, run: Run) -> float | None:
-        """The open Run's Progress, held through a pause like the time left."""
-        if (held := self._held_now(run)) and held[2] is not None:
-            return held[2]
-        progress = self._config.progress_entity_id
-        return progress_reading(self._hass.states.get(progress)) if progress else None
-
-    def _held_now(
-        self, run: Run
-    ) -> tuple[datetime, timedelta | None, float | None] | None:
-        """What is held through the open Run's current pause; None while it runs."""
-        if not run.paused:
-            return None
-        start = run.pauses[-1].start
-        if self._held is None or self._held[0] != start:
-            self._hold_time_left(run, start)
-        return self._held
-
-    def _hold_time_left(self, run: Run, start: datetime) -> None:
-        """Hold the time left and Progress as the progress inputs gave them before
-        the pause at `start`, so they may drop to 0 or unknown while paused."""
-
-        def before(entity_id: str) -> State | None:
-            state = self._hass.states.get(entity_id)
-            if state is None or state.last_changed < start - PAUSE_GRACE:
-                return state
-            return self._progress_before.get(entity_id)
-
-        progress = self._config.progress_entity_id
-        self._held = (
-            start,
-            self._time_left_at(run, start, before),
-            progress_reading(before(progress)) if progress else None,
-        )
-
-    def _time_left_at(
-        self, run: Run, at: datetime, state: Callable[[str], State | None]
-    ) -> timedelta | None:
-        """The time left at `at` from the Remaining time's `state`, else from the
-        Progress's; None while neither tells."""
-        remaining = self._config.remaining_time_entity_id
-        left = time_left(state(remaining), at) if remaining else None
-        if left is not None:
-            return left
-        progress = self._config.progress_entity_id
-        percent = progress_reading(state(progress)) if progress else None
-        return None if percent is None else progress_time_left(run, at, percent)
 
     def _material_rest(self, run: Run, now: datetime) -> float | None:
         """What the Material still to come costs, priced like the measured Line
@@ -1299,96 +1187,81 @@ class DeviceTracker:
         if self._config.material is None:
             return None
         planned = self._config.planned_material
-        rest = material_rest(
-            run.usage,
+        reading = (
             usage_reading(self._hass.states.get(planned["entity_id"]), planned)
             if planned
-            else None,
-            self._percent(run),
+            else None
+        )
+        rest = material_rest(
+            run.usage,
+            None if reading is None else Usage(now, *reading),
+            self._progress.percent(run),
             [i for i in run.line_items if i.measured],
+            now,
         )
         if rest is None:
             return None
-        items = self._measured_items(run, now, Usage(now, *rest))
+        items = self._measured_items(run, now, rest)
         if any(item.quantity is None for item in items):
             return None
         return sum(item.amount for item in items)
 
     def _electricity_rest(
         self, run: Run, now: datetime, left: timedelta | None
-    ) -> tuple[float | None, float | None, bool]:
+    ) -> ElectricityRest:
         """The kWh still to come: from the Expected energy, else what the Program
         default leaves, else the base power over the time left, and apart from it
-        the drying's; None for a Run without an
-        Electricity Line Item, and for drying while no unit dries or its power is
-        unknown, which the last says."""
-        item = next(
-            (i for i in run.line_items if i.kind is LineItemKind.ELECTRICITY), None
-        )
-        if item is None:
-            return None, None, False
+        the drying's."""
+        if (item := self._electricity.line_item(run)) is None:
+            return ElectricityRest()
         if (expected := self._config.expected_energy) and (
             kwh := expected_kwh(
                 self._hass.states.get(expected["entity_id"]), expected["attribute"]
             )
         ) is not None:
-            total = expected["form"] == ExpectedEnergyForm.TOTAL
-            return expected_energy_rest(kwh, item.quantity or 0.0, total), None, False
-        if (default := self._default_rest(run, self._electricity)) is not None:
-            return default, None, False
-        if left is None or (power := self._base_power(run, now)) is None:
-            return None, None, False
-        base = power * left.total_seconds() / 3_600_000
-        states = self._hass.states
-        drying_left = [
-            time_left(states.get(unit["drying_left"]), now)
-            if unit["drying_left"]
-            else None
-            for unit in self._config.drying
-            if drying(states.get(unit["active"]))
-            and not (
-                unit["drying_left"]
-                and time_left(states.get(unit["drying_left"]), now) is None
+            form = ExpectedEnergyForm(expected["form"])
+            return ElectricityRest(
+                expected_energy_rest(kwh, item.quantity or 0.0, form)
             )
-        ]
-        if not drying_left:
-            return base, None, False
-        if (drying_power := self._drying_power(run, now, item.method)) is None:
-            return base, None, True
-        return base, drying_power * drying_hours(left, drying_left) / 1000, False
+        if (default := self._default_rest(run, self._electricity)) is not None:
+            return ElectricityRest(default)
+        if left is None or (power := self._base_power(run, now, item)) is None:
+            return ElectricityRest()
+        base = power * left.total_seconds() / 3_600_000
+        if not (drying_left := self._drying.left(now)):
+            return ElectricityRest(base)
+        if (drying_power := self._drying_power(run, now, item)) is None:
+            return ElectricityRest(base, drying_pending=True)
+        return ElectricityRest(
+            base, drying_power * drying_hours(left, drying_left) / 1000
+        )
 
-    def _drying_power(
-        self, run: Run, now: datetime, method: ConsumptionMethod | None
-    ) -> float | None:
+    def _drying_power(self, run: Run, now: datetime, item: LineItem) -> float | None:
         """The extra W a unit draws while drying: the Device's setting, else learned
         from a metered Run."""
         if self._config.drying_power is not None:
             return self._config.drying_power
-        if method is not ConsumptionMethod.MEASURED:
+        if item.method is not ConsumptionMethod.MEASURED:
             return None
         return learned_drying_power(
             run,
             now,
             self._electricity.model(run),
-            self._dried(run, now),
-            self._drying_unknown(run),
+            self._drying.dried(run, now),
+            self._drying.unknown(run),
         )
 
     def _water_rest(self, run: Run) -> float | None:
         """The water still to come, priced: what the Program's litres leave after
         the measured; None otherwise."""
-        if (
-            self._water is None
-            or (litres := self._default_rest(run, self._water)) is None
-        ):
+        if self._water is None:
             return None
-        return litres * self._water.price_now(run)
+        return _priced(self._default_rest(run, self._water), self._water.price_now(run))
 
     def _default_rest(self, run: Run, metering: Metering) -> float | None:
         """What the Run's Program default leaves after what `metering` measured;
         None without a default or a measurement."""
-        kind = metering.quantity.kind
-        item = next((i for i in run.line_items if i.kind is kind), None)
+        item = metering.line_item(run)
         if (
             not self._per_program
             or item is None
@@ -1398,25 +1271,34 @@ class DeviceTracker:
         default = self._program_row(run)[0].get(metering.quantity.default_key)
         return None if default is None else total_rest(default, item.quantity or 0.0)
 
-    def _base_power(self, run: Run, now: datetime) -> float | None:
+    def _base_power(self, run: Run, now: datetime, item: LineItem) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running
         power; None for electricity that isn't drawn over time."""
-        item = next(
-            (i for i in run.line_items if i.kind is LineItemKind.ELECTRICITY), None
-        )
-        method = None if item is None else item.method
-        if method is ConsumptionMethod.MEASURED:
+        if item.method is ConsumptionMethod.MEASURED:
             return recent_power(
                 run,
                 now,
                 self._electricity.model(run),
-                self._dried(run, now),
+                self._drying.dried(run, now),
                 self._config.drying_power,
-                self._drying_unknown(run),
+                self._drying.unknown(run),
             )
-        if method is ConsumptionMethod.ESTIMATED and run.average_powers:
+        if item.method is ConsumptionMethod.ESTIMATED and run.average_powers:
             return run.average_powers[-1][1]
         return None
+
+
+class ElectricityRest(NamedTuple):
+    """The kWh still to come, None without one; apart from it the drying's, None
+    while no unit dries or its power is unknown, which `drying_pending` says."""
+
+    kwh: float | None = None
+    drying_kwh: float | None = None
+    drying_pending: bool = False
+
+
+def _priced(amount: float | None, price: float) -> float | None:
+    return None if amount is None else amount * price
 
 
 def _reapplied(run: Run, item: LineItem, amount: float | None) -> LineItem:

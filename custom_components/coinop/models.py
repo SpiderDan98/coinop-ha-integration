@@ -510,6 +510,14 @@ class Pause:
     end: datetime | None = None
 
 
+class ExpectedEnergyForm(StrEnum):
+    """What the Expected energy input reports: the energy still to come, or the
+    Run's total, of which the rest is what isn't measured yet."""
+
+    REMAINING = "remaining"
+    TOTAL = "total"
+
+
 class ProjectedPart(StrEnum):
     """What a Projected Total's rest can come from."""
 

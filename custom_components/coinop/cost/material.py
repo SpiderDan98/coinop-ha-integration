@@ -31,6 +31,13 @@ def grams_of_length(length: float, material: Material) -> float | None:
     return cubic_mm / 1000 * material.density
 
 
+def length_of_grams(grams: float, material: Material | MaterialCopy) -> float | None:
+    """The mm of the Material's filament `grams` make; None without a diameter."""
+    if not material.diameter or not material.density:
+        return None
+    return grams / material.density * 1000 / (math.pi * (material.diameter / 2) ** 2)
+
+
 def line_unit(material: Material | None, unit: str) -> str:
     """The unit a Line Item counts the Material in: pieces for one priced per
     piece, else g or ml as before (ml when it is bought by volume)."""

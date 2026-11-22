@@ -36,7 +36,6 @@ from .device_config import (
     NO_SOURCE,
     Capability,
     ConsumptionSource,
-    ExpectedEnergyForm,
     Target,
     WaterSource,
     capabilities_of,
@@ -52,6 +51,7 @@ from .device_inputs import (
     unit_scale,
     usage_scale,
 )
+from .models import ExpectedEnergyForm
 from .profiles import METERS, Candidate, candidates, detect, known_integrations
 from .quantities import ELECTRICITY, WATER, Quantity
 from .run_book import unfinalised

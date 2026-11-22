@@ -13,7 +13,8 @@ from custom_components.coinop.const import (
     DEVICE_TYPE_TUMBLE_DRYER,
     DEVICE_TYPE_WASHING_MACHINE,
 )
-from custom_components.coinop.device_config import ExpectedEnergyForm, WaterSource
+from custom_components.coinop.device_config import WaterSource
+from custom_components.coinop.models import ExpectedEnergyForm
 
 from .base import (
     Find,

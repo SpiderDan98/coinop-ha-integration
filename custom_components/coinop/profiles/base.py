@@ -10,9 +10,9 @@ from homeassistant.helpers import device_registry as dr
 
 from custom_components.coinop.device_config import (
     ConsumptionSource,
-    ExpectedEnergyForm,
     Target,
 )
+from custom_components.coinop.models import ExpectedEnergyForm
 
 
 class Find(Protocol):

@@ -7,9 +7,9 @@ Source's current unit price. Nothing here is stored (ADR 0002).
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
-import math
 
 from custom_components.coinop.models import (
+    ExpectedEnergyForm,
     LineItem,
     ProjectedPart,
     Projection,
@@ -20,7 +20,10 @@ from custom_components.coinop.models import (
 )
 
 from .consumption import Model
+from .material import length_of_grams
 from .rounding import rounded_sum
+
+type Span = tuple[datetime, datetime]
 
 # The running time a metered Run's base power is averaged over, so its start's
 # preheating soon stops counting.
@@ -32,19 +35,10 @@ LEARNING = timedelta(minutes=10)
 MIN_PROGRESS = 5.0
 
 
-def running_spans(run: Run, until: datetime) -> list[tuple[datetime, datetime]]:
+def running_spans(run: Run, until: datetime) -> list[Span]:
     """The Run's running intervals up to `until`, pauses left out, in order."""
-    spans = []
-    start = run.started
-    for pause in run.pauses:
-        if pause.start >= until:
-            break
-        if pause.start > start:
-            spans.append((start, pause.start))
-        start = max(start, pause.end or until)
-    if start < until:
-        spans.append((start, until))
-    return spans
+    pauses = [(pause.start, pause.end or until) for pause in run.pauses]
+    return _without([(run.started, until)], pauses) if run.started < until else []
 
 
 def progress_time_left(run: Run, until: datetime, percent: float) -> timedelta | None:
@@ -57,9 +51,9 @@ def progress_time_left(run: Run, until: datetime, percent: float) -> timedelta |
 
 
 def _without(
-    spans: Iterable[tuple[datetime, datetime]],
-    holes: Iterable[tuple[datetime, datetime]],
-) -> list[tuple[datetime, datetime]]:
+    spans: Iterable[Span],
+    holes: Iterable[Span],
+) -> list[Span]:
     """The parts of the ordered `spans` outside every one of the `holes`."""
     holes = sorted(holes)
     kept = []
@@ -76,9 +70,9 @@ def _without(
 
 
 def _within(
-    spans: Iterable[tuple[datetime, datetime]],
-    window: Iterable[tuple[datetime, datetime]],
-) -> list[tuple[datetime, datetime]]:
+    spans: Iterable[Span],
+    window: Iterable[Span],
+) -> list[Span]:
     """The parts of the `spans` inside the `window`."""
     window = list(window)
     return [
@@ -89,13 +83,13 @@ def _within(
     ]
 
 
-def _seconds(spans: Iterable[tuple[datetime, datetime]]) -> float:
+def _seconds(spans: Iterable[Span]) -> float:
     return sum((end - start).total_seconds() for start, end in spans)
 
 
 def _latest(
-    spans: list[tuple[datetime, datetime]],
-) -> list[tuple[datetime, datetime]]:
+    spans: list[Span],
+) -> list[Span]:
     """The last `RECENT` of the ordered `spans`, or all of them if they are shorter."""
     left, latest = RECENT, []
     for start, end in reversed(spans):
@@ -107,7 +101,7 @@ def _latest(
     return latest
 
 
-def _watts(spans: list[tuple[datetime, datetime]], measured: Model) -> float:
+def _watts(spans: list[Span], measured: Model) -> float:
     return sum(measured(s, e) for s, e in spans) * 3_600_000 / _seconds(spans)
 
 
@@ -115,9 +109,9 @@ def recent_power(
     run: Run,
     until: datetime,
     measured: Model,
-    drying: Iterable[list[tuple[datetime, datetime]]] = (),
+    drying: Iterable[list[Span]] = (),
     drying_power: float | None = None,
-    unknown: Iterable[tuple[datetime, datetime]] = (),
+    unknown: Iterable[Span] = (),
 ) -> float | None:
     """The average W the `measured` kWh make over the Run's most recent half hour of
     running time outside the drying units' `drying` spans and the `unknown` ones, or
@@ -141,8 +135,8 @@ def learned_drying_power(
     run: Run,
     until: datetime,
     measured: Model,
-    drying: Iterable[list[tuple[datetime, datetime]]],
-    unknown: Iterable[tuple[datetime, datetime]] = (),
+    drying: Iterable[list[Span]],
+    unknown: Iterable[Span] = (),
 ) -> float | None:
     """The extra W a unit drew while drying in this Run: the average power while any
     dried less the average while none did, per drying unit, leaving out the `unknown`
@@ -172,28 +166,35 @@ def total_rest(total: float, so_far: float) -> float:
     return max(total - so_far, 0.0)
 
 
-def expected_energy_rest(expected: float, so_far: float, total: bool) -> float:
-    """The kWh still to come from the Expected energy: itself, or as the Run's
-    `total` what the `so_far` kWh leave of it."""
-    return total_rest(expected, so_far) if total else expected
+def expected_energy_rest(
+    expected: float, so_far: float, form: ExpectedEnergyForm
+) -> float:
+    """The kWh still to come from the Expected energy in its `form`: itself, or as
+    the Run's total what the `so_far` kWh leave of it."""
+    if form is ExpectedEnergyForm.TOTAL:
+        return total_rest(expected, so_far)
+    return expected
 
 
 def material_rest(
     measured: Usage | None,
-    planned: tuple[float, UsageUnit] | None,
+    planned: Usage | None,
     percent: float | None,
     items: list[LineItem],
-) -> tuple[float, UsageUnit] | None:
-    """The Material still to come in mm or g: what the plan leaves of the `measured`
-    total, else as much per percent as so far once past `MIN_PROGRESS`; None while
-    neither tells. The measured Line Items' Materials convert between the two."""
+    now: datetime,
+) -> Usage | None:
+    """The Material still to come at `now` in mm or g: what the plan leaves of the
+    `measured` total, else as much per percent as so far once past `MIN_PROGRESS`;
+    None while neither tells. The measured Line Items' Materials convert between
+    the two."""
     if planned is not None:
-        total, unit = planned
-        so_far = _measured_in(measured, unit, items)
-        return None if so_far is None else (max(total - so_far, 0.0), unit)
+        so_far = _measured_in(measured, planned.unit, items)
+        if so_far is None:
+            return None
+        return Usage(now, total_rest(planned.value, so_far), planned.unit)
     if measured is None or percent is None or percent < MIN_PROGRESS:
         return None
-    return measured.value * (100 - percent) / percent, measured.unit
+    return Usage(now, measured.value * (100 - percent) / percent, measured.unit)
 
 
 def _measured_in(
@@ -206,30 +207,13 @@ def _measured_in(
         return measured.value
     total = 0.0
     for item in items:
-        value = item.quantity if unit is UsageUnit.GRAM else _length(item)
+        value = item.quantity
+        if value is not None and unit is UsageUnit.MILLIMETRE:
+            value = length_of_grams(value, item.material) if item.material else None
         if value is None:
             return None
         total += value
     return total
-
-
-def _length(item: LineItem) -> float | None:
-    """The mm of filament the Line Item's grams make; None without the Material's
-    density and diameter."""
-    material = item.material
-    if (
-        item.quantity is None
-        or material is None
-        or not material.density
-        or not material.diameter
-    ):
-        return None
-    return (
-        item.quantity
-        / material.density
-        * 1000
-        / (math.pi * (material.diameter / 2) ** 2)
-    )
 
 
 def running_hours_rest(run: Run, hours_left: float) -> float | None:

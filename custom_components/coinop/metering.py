@@ -313,9 +313,7 @@ class Metering:
         self, run: Run, until: datetime, model: Model, method: ConsumptionMethod
     ) -> LineItem:
         """The Line Item of what `model` counts from the Run's start to `until`."""
-        existing = next(
-            (i for i in run.line_items if i.kind is self.quantity.kind), None
-        )
+        existing = self.line_item(run)
         return priced_line_item(
             ulid_now() if existing is None else existing.id,
             self.quantity.kind,
@@ -362,6 +360,10 @@ class Metering:
         if value is None:
             item.quantity, item.segments = None, []
         return item
+
+    def line_item(self, run: Run) -> LineItem | None:
+        """The Run's Line Item of this quantity, if it has one."""
+        return next((i for i in run.line_items if i.kind is self.quantity.kind), None)
 
     def _item(self, run: Run) -> LineItem:
         return next(i for i in run.line_items if i.kind is self.quantity.kind)

@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
 from custom_components.coinop.const import DEVICE_TYPE_EV_CHARGER
-from custom_components.coinop.device_config import ExpectedEnergyForm
+from custom_components.coinop.models import ExpectedEnergyForm
 
 from .base import (
     Find,
