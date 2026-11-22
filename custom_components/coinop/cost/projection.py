@@ -200,11 +200,13 @@ def _measured_in(
         return 0.0
     if measured.unit is unit:
         return measured.value
-    if unit is UsageUnit.GRAM:
-        grams = [item.quantity for item in items]
-        return None if None in grams else sum(g for g in grams if g is not None)
-    lengths = [_length(item) for item in items]
-    return None if None in lengths else sum(m for m in lengths if m is not None)
+    total = 0.0
+    for item in items:
+        value = item.quantity if unit is UsageUnit.GRAM else _length(item)
+        if value is None:
+            return None
+        total += value
+    return total
 
 
 def _length(item: LineItem) -> float | None:
