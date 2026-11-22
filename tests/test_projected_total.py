@@ -175,3 +175,29 @@ async def test_the_panel_gets_the_projected_total_its_end_and_what_it_includes(
     assert run["projected_parts"] == []
     [summary] = (await panel.call("coinop/runs/list"))["runs"]
     assert (summary["projected_total"], summary["projected_end"]) == (None, None)
+
+
+async def add_timed_printer(hass: HomeAssistant, **inputs: str) -> None:
+    """200 W on average powers at 0.30 per kWh: 0.06 an hour."""
+    entry = await add_hub(hass)
+    await add_device(hass, entry, running_power=200, price=0.30, **inputs)
+
+
+@pytest.mark.parametrize(
+    ("value", "unit"),
+    [("1.5", "h"), ("90", "min"), ("5400", "s"), ("5400000", "ms"), ("90", None)],
+)
+async def test_a_remaining_time_counts_in_the_unit_it_reports(
+    hass: HomeAssistant, clock: Clock, value: str, unit: str | None
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    attributes = {"unit_of_measurement": unit} if unit else {}
+    hass.states.async_set(REMAINING, value, attributes)
+    await hass.async_block_till_done()
+
+    # 0.03 so far, and 1.5 h at 200 W.
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.03 + 0.09)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=90)

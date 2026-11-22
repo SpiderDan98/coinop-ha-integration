@@ -13,12 +13,14 @@ from homeassistant.const import (
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, State, split_entity_id
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import (
     DistanceConverter,
+    DurationConverter,
     MassConverter,
     VolumeConverter,
 )
@@ -163,9 +165,16 @@ def _number(state: State | None, attribute: str | None) -> float | None:
 
 
 def time_left(state: State | None) -> timedelta | None:
-    """The Remaining time input's minutes as the time left; None without a value."""
-    minutes = _number(state, None)
-    return None if minutes is None else timedelta(minutes=max(minutes, 0.0))
+    """The Remaining time input's duration as the time left, in minutes without a
+    unit; None without a value or with a unit that isn't a time."""
+    number = _number(state, None)
+    if state is None or number is None:
+        return None
+    unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) or UnitOfTime.MINUTES
+    if unit not in DurationConverter.VALID_UNITS:
+        return None
+    seconds = DurationConverter.convert(number, unit, UnitOfTime.SECONDS)
+    return timedelta(seconds=max(seconds, 0.0))
 
 
 def _reported_unit(state: State, attribute: str | None) -> str | None:
