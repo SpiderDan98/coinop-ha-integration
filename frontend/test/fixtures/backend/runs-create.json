@@ -96,6 +96,8 @@
     "program": null,
     "running_seconds": 7200,
     "total": 0.07,
+    "projected_total": null,
+    "projected_end": null,
     "cost_per_part": 0.07,
     "cover": null,
     "uploads": {
@@ -107,6 +109,7 @@
       ],
       "max_bytes": 20971520
     },
+    "projected_parts": [],
     "subtotals": {
       "electricity": 0.07,
       "water": 0.0,

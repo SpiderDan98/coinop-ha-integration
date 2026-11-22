@@ -148,3 +148,30 @@ async def test_the_projection_follows_the_time_left_and_ends_with_the_run(
     assert "ends_at" not in projected(hass).attributes
     [run] = stored_runs(hass_storage)
     assert not any("project" in key for key in run)
+
+
+async def test_the_panel_gets_the_projected_total_its_end_and_what_it_includes(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_metered_printer(hass)
+    await preheat_then_print(hass, clock)
+    await set_remaining(hass, 120)
+    ends = (clock.now() + timedelta(hours=2)).isoformat()
+
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (summary["projected_total"], summary["projected_end"]) == (0.24, ends)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert (run["projected_total"], run["projected_end"]) == (0.24, ends)
+    assert run["projected_parts"] == ["electricity"]
+
+    await add_template(panel, run["id"], await create(panel, **WEAR))
+    await clock.advance(minutes=1)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["electricity", "running_hours"]
+
+    await set_status(hass, "finished")
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert (run["projected_total"], run["projected_end"]) == (None, None)
+    assert run["projected_parts"] == []
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert (summary["projected_total"], summary["projected_end"]) == (None, None)

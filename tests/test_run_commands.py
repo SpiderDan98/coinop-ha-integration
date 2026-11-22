@@ -39,6 +39,8 @@ async def test_the_list_shows_what_a_gallery_tile_needs(
         "finalised": True,
         "running_seconds": 7200,
         "total": 0.07,
+        "projected_total": None,
+        "projected_end": None,
         "part_count": 1,
         "cost_per_part": 0.07,
         "flags": NO_MATERIAL,

@@ -123,6 +123,8 @@
       "program": null,
       "running_seconds": 4500,
       "total": 0.86,
+      "projected_total": null,
+      "projected_end": null,
       "cost_per_part": 0.22,
       "cover": {
         "id": "benchy-thumbnail",
@@ -140,6 +142,7 @@
         ],
         "max_bytes": 20971520
       },
+      "projected_parts": [],
       "subtotals": {
         "electricity": 0.05,
         "water": 0.0,
@@ -247,6 +250,8 @@
       "program": null,
       "running_seconds": 32400,
       "total": 0.3,
+      "projected_total": null,
+      "projected_end": null,
       "cost_per_part": 0.3,
       "cover": {
         "id": "helmet-snapshot",
@@ -264,6 +269,7 @@
         ],
         "max_bytes": 20971520
       },
+      "projected_parts": [],
       "subtotals": {
         "electricity": 0.3,
         "water": 0.0,
@@ -329,6 +335,8 @@
       "program": null,
       "running_seconds": 1800,
       "total": 0.07,
+      "projected_total": null,
+      "projected_end": null,
       "cost_per_part": 0.07,
       "cover": null,
       "uploads": {
@@ -340,6 +348,7 @@
         ],
         "max_bytes": 20971520
       },
+      "projected_parts": [],
       "subtotals": {
         "electricity": 0.07,
         "water": 0.0,
@@ -486,6 +495,8 @@
       "program": null,
       "running_seconds": 2700,
       "total": 0.25,
+      "projected_total": 0.49,
+      "projected_end": "2026-01-15T12:00:00+00:00",
       "cost_per_part": 0.25,
       "cover": null,
       "uploads": {
@@ -497,6 +508,10 @@
         ],
         "max_bytes": 20971520
       },
+      "projected_parts": [
+        "electricity",
+        "running_hours"
+      ],
       "subtotals": {
         "electricity": 0.03,
         "water": 0.0,

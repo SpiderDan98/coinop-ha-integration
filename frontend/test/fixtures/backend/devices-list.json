@@ -54,7 +54,7 @@
           "snapshot": false
         },
         "progress": {
-          "remaining_time": null
+          "remaining_time": "sensor.kobra_time_remaining"
         },
         "consumption": {
           "source": "estimate",

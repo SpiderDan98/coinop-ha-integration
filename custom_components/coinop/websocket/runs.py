@@ -22,6 +22,7 @@ from homeassistant.util import dt as dt_util
 
 from custom_components.coinop.aggregates import run_measures
 from custom_components.coinop.const import DOMAIN
+from custom_components.coinop.cost.projection import projected_total
 from custom_components.coinop.cost.rounding import (
     currency_decimals,
     round_amount,
@@ -35,6 +36,7 @@ from custom_components.coinop.models import (
     LineItem,
     LineItemKind,
     Outcome,
+    ProjectedPart,
     Run,
 )
 from custom_components.coinop.run_book import RunBook, RunChange
@@ -71,6 +73,8 @@ def _summary(
     hass: HomeAssistant, run: Run, now: datetime, decimals: int
 ) -> dict[str, Any]:
     total = rounded_sum((i.amount for i in run.line_items), decimals)
+    projected = projected_total(run, decimals)
+    ends = None if run.projection is None else run.projection.ends
     return {
         "id": run.id,
         "device_id": run.device_id,
@@ -83,6 +87,8 @@ def _summary(
         "finalised": run.finalised,
         "running_seconds": round(running_time(run, now).total_seconds()),
         "total": float(total),
+        "projected_total": None if projected is None else float(projected),
+        "projected_end": None if ends is None else ends.isoformat(),
         "part_count": run.part_count,
         "cost_per_part": None
         if run.part_count is None
@@ -119,6 +125,11 @@ def _detail(
         "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
         "uploads": upload_rules(),
+        "projected_parts": [
+            part
+            for part in ProjectedPart
+            if run.projection and part in run.projection.rests
+        ],
         "subtotals": {
             kind: float(
                 rounded_sum(

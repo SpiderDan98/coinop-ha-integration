@@ -62,6 +62,7 @@ from .websocket import PanelClient
 
 DAY = timedelta(days=1)
 FILAMENT = "sensor.kobra_filament_used"
+REMAINING = "sensor.kobra_time_remaining"
 WEAR = {
     "label": "Wear Kobra",
     "unit": "h",
@@ -204,6 +205,7 @@ async def test_record_the_runs_the_panel_shows(
     hass.states.async_set(STATUS, "idle")
     used = {"unit_of_measurement": "mm"}
     hass.states.async_set(FILAMENT, "0", used)
+    hass.states.async_set(REMAINING, "75", {"unit_of_measurement": "min"})
     await panel.subscribe("coinop/runs/subscribe")
     events = [await panel.event()]
     subentry = await add_device(
@@ -214,6 +216,7 @@ async def test_record_the_runs_the_panel_shows(
         running_power=120,
         paused_power=8,
         price=0.30,
+        remaining_time=REMAINING,
     )
     wear = await panel.call("coinop/templates/create", template=WEAR)
     await panel.call(

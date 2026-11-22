@@ -114,6 +114,8 @@
     "cover_id": null,
     "running_seconds": 5400,
     "total": 0.75,
+    "projected_total": null,
+    "projected_end": null,
     "cost_per_part": null,
     "cover": null,
     "uploads": {
@@ -125,6 +127,7 @@
       ],
       "max_bytes": 20971520
     },
+    "projected_parts": [],
     "subtotals": {
       "electricity": 0.36,
       "water": 0.0,
