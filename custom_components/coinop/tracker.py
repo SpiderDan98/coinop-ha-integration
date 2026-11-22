@@ -39,10 +39,17 @@ from .cost.material import (
     slot_line_items,
 )
 from .cost.pricing import priced_line_item
-from .cost.projection import project, recent_power, running_hours_rest
+from .cost.projection import (
+    drying_hours,
+    project,
+    recent_power,
+    running_hours_rest,
+)
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, Target
 from .device_inputs import (
+    drying,
+    drying_left as drying_left_of,
     input_time,
     input_value,
     slot_colour,
@@ -228,6 +235,17 @@ class DeviceTracker:
         if remaining := self._config.remaining_time_entity_id:
             self._unsubscribe.append(
                 async_track_state_change_event(self._hass, remaining, self._on_progress)
+            )
+        if drying_inputs := [
+            entity_id
+            for unit in self._config.drying
+            for entity_id in unit.values()
+            if entity_id
+        ]:
+            self._unsubscribe.append(
+                async_track_state_change_event(
+                    self._hass, drying_inputs, self._on_progress
+                )
             )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
@@ -1110,15 +1128,33 @@ class DeviceTracker:
             return None
         hours = left.total_seconds() / 3600
         power = self._base_power(run, now)
+        price = self._electricity.price_now(run)
         return project(
             {
                 ProjectedPart.ELECTRICITY: None
                 if power is None
-                else power * hours / 1000 * self._electricity.price_now(run),
+                else power * hours / 1000 * price,
+                ProjectedPart.DRYING: None
+                if power is None
+                else self._drying_rest(left, price),
                 ProjectedPart.RUNNING_HOURS: running_hours_rest(run, hours),
             },
             now + left,
         )
+
+    def _drying_rest(self, left: timedelta, price: float) -> float | None:
+        """What the drying units add within the time left; None while none dries."""
+        states = self._hass.states
+        drying_left = [
+            drying_left_of(states.get(unit["drying_left"]))
+            if unit["drying_left"]
+            else None
+            for unit in self._config.drying
+            if drying(states.get(unit["active"]))
+        ]
+        if not drying_left or (power := self._config.drying_power) is None:
+            return None
+        return power * drying_hours(left, drying_left) / 1000 * price
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running

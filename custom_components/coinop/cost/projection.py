@@ -4,7 +4,7 @@ Each rest is what one part adds from now to the expected end, priced at its Cost
 Source's current unit price. Nothing here is stored (ADR 0002).
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -50,6 +50,15 @@ def recent_power(run: Run, until: datetime, measured: Model) -> float | None:
         if left <= timedelta():
             break
     return kwh * 3_600_000 / seconds if seconds else None
+
+
+def drying_hours(left: timedelta, drying_left: Iterable[timedelta | None]) -> float:
+    """The hours the drying units dry within the time `left`, added up: each for its
+    drying left, or for all of the time left without one."""
+    return sum(
+        (left if unit is None else min(unit, left)).total_seconds() / 3600
+        for unit in drying_left
+    )
 
 
 def running_hours_rest(run: Run, hours_left: float) -> float | None:
