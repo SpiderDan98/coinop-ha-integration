@@ -2,7 +2,7 @@
 // (or merged into another by its name) in a dialog, and deleted once confirmed. The
 // catalogue follows by subscription.
 import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
+import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createTag, deleteTag, getAggregates, renameTag, type RunSummary } from "./api";
 import { confirmDialog, formDialog } from "./dialog";
@@ -173,16 +173,7 @@ export class TagsPage extends LitElement {
     }
   }
 
-  static override styles = [
-    shared,
-    tableStyles,
-    pagerStyles,
-    css`
-      .tags {
-        max-width: 900px;
-      }
-    `,
-  ];
+  static override styles = [shared, tableStyles, pagerStyles];
 }
 
 declare global {

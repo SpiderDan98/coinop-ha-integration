@@ -305,9 +305,6 @@ export class TemplatesPage extends LitElement {
     tableStyles,
     pagerStyles,
     css`
-      .templates {
-        max-width: 1100px;
-      }
       :host > p.small {
         margin: 10px 0 0;
       }
