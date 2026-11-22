@@ -76,3 +76,19 @@ def _states(
         include_start_time_state=False,
     )
     return [*during.get(entity_id, []), *after.get(entity_id, [])]
+
+
+async def async_state_at(
+    hass: HomeAssistant, entity_id: str, at: datetime
+) -> State | None:
+    """The entity's recorded state at `at`; None without one."""
+    if not _recording(hass):
+        return None
+    return await get_instance(hass).async_add_executor_job(
+        _state_at, hass, entity_id, at
+    )
+
+
+def _state_at(hass: HomeAssistant, entity_id: str, at: datetime) -> State | None:
+    states = history.state_changes_during_period(hass, at - LOOKBACK, at, entity_id)
+    return next(reversed(states.get(entity_id, [])), None)

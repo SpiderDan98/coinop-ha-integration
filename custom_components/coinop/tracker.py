@@ -275,6 +275,7 @@ class DeviceTracker:
             self._record_slot(run)
             self._record_program(run)
             self._drying.follow(run)
+            await self._progress.async_recover(run)
             run.projection = self._projection(run, dt_util.utcnow())
             await self._async_follow_device(run)
         for run in self._unfinalised_runs():

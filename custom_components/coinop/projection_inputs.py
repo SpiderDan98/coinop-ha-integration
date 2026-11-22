@@ -11,6 +11,7 @@ from typing import NamedTuple
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
 from homeassistant.util import dt as dt_util
 
+from . import recorded
 from .cost.projection import Span, progress_time_left
 from .device_config import DeviceConfig
 from .device_inputs import drying, progress_reading, time_left
@@ -56,6 +57,24 @@ class Progress:
             return held.percent
         progress = self._config.progress_entity_id
         return progress_reading(self._hass.states.get(progress)) if progress else None
+
+    async def async_recover(self, run: Run) -> None:
+        """Hold what the recorder kept from before the open Run's pause, which
+        Coin-op didn't see while it wasn't running."""
+        if not run.paused:
+            return
+        start = run.pauses[-1].start
+        for entity_id in (
+            self._config.remaining_time_entity_id,
+            self._config.progress_entity_id,
+        ):
+            if entity_id and (
+                state := await recorded.async_state_at(
+                    self._hass, entity_id, start - PAUSE_GRACE
+                )
+            ):
+                self._before[entity_id] = state
+        self.hold(run, start)
 
     def hold(self, run: Run, start: datetime) -> None:
         """Hold the values the progress inputs gave before the pause at `start`."""

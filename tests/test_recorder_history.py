@@ -1,5 +1,6 @@
 """Meter reports Coin-op missed while it was stopped come from recorder history."""
 
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -9,11 +10,19 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 )
 from pytest_homeassistant_custom_component.typing import RecorderInstanceGenerator
 
+from custom_components.coinop.const import DOMAIN
+
 from .clock import Clock
 from .devices import add_device, add_hub
 from .test_dynamic_price import PRICE_ENTITY, set_price
 from .test_lifecycle import start_coinop, stop_coinop
 from .test_measured import add_metered_device, electricity, set_meter
+from .test_projected_total import (
+    REMAINING,
+    add_timed_printer,
+    projected,
+    set_remaining,
+)
 from .test_runs import NO_MATERIAL, set_status, stored_runs
 
 
@@ -77,3 +86,27 @@ async def test_price_changes_missed_while_stopped_come_from_recorder_history(
     [run] = stored_runs(hass_storage)
     assert [s["unit_price"] for s in electricity(run)["segments"]] == [0.20, 0.40]
     assert electricity(run)["amount"] == pytest.approx(0.5 * 0.20 + 0.5 * 0.40)
+
+
+async def test_a_restart_during_a_pause_holds_the_time_left_from_before_it(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    [entry] = hass.config_entries.async_entries(DOMAIN)
+    await set_status(hass, "printing")
+    await set_remaining(hass, 90)
+    await clock.advance(minutes=30)
+    await set_remaining(hass, 60)
+    await clock.advance(seconds=10)
+    await set_status(hass, "paused")
+    await set_remaining(hass, 0)
+    await clock.advance(minutes=20)
+    await async_wait_recording_done(hass)
+
+    await stop_coinop(hass, entry)
+    await start_coinop(hass, entry)
+
+    # 0.03 so far, and the hour left before the pause at 200 W.
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.03 + 0.06)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=60)
