@@ -68,6 +68,7 @@
         "tags_for_new_runs": [],
         "automatic_templates": [],
         "default_material": "mdf",
+        "cover_kind": "thumbnail",
         "doses": [],
         "program_defaults": {
           "default": {

@@ -200,6 +200,49 @@ async def test_set_as_cover_picks_the_cover_image(
     assert colour(await http.content((await only_run(panel))["cover"]["url"])) == "blue"
 
 
+async def test_a_device_can_prefer_its_runs_newest_photo_as_cover_image(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    run_id, [_thumbnail, green, blue] = await run_with_photos(hass, clock, panel, http)
+    device_id = (await only_run(panel))["device_id"]
+    await panel.subscribe("coinop/runs/subscribe")
+    await panel.event()
+
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device_id,
+        settings={"cover_kind": "upload"},
+    )
+
+    pushed = await panel.event()
+    assert (pushed["change"], pushed["run"]["cover"]["id"]) == ("updated", blue["id"])
+    detail = (await panel.call("coinop/runs/get", run_id=run_id))["run"]
+    assert detail["cover"]["id"] == blue["id"]
+    await panel.call("coinop/images/set_cover", run_id=run_id, image_id=green["id"])
+    assert (await only_run(panel))["cover"]["id"] == green["id"]
+
+
+async def test_without_an_image_of_the_preferred_kind_the_rule_picks_the_cover(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    _run_id, [thumbnail, *_] = await run_with_photos(hass, clock, panel, http)
+    device_id = (await only_run(panel))["device_id"]
+
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device_id,
+        settings={"cover_kind": "snapshot"},
+    )
+    wrong = await panel.error(
+        "coinop/devices/update_settings",
+        device_id=device_id,
+        settings={"cover_kind": "photo"},
+    )
+
+    assert (await only_run(panel))["cover"]["id"] == thumbnail["id"]
+    assert wrong["code"] == "invalid_format"
+
+
 async def test_the_cover_image_choice_outlives_a_restart(
     hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
 ) -> None:

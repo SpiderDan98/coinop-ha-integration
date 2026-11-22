@@ -12,7 +12,7 @@ from typing import Any
 from homeassistant.core import CALLBACK_TYPE
 
 from .device_inputs import stock_scale
-from .models import DoseSource
+from .models import DoseSource, ImageKind
 from .schema import vol
 from .store import CoinOpStore
 from .tags import retag, tag_name
@@ -22,6 +22,7 @@ AUTOMATIC_TEMPLATES = "automatic_templates"
 DEFAULT_MATERIAL = "default_material"
 DOSES = "doses"
 PROGRAM_DEFAULTS = "program_defaults"
+COVER_KIND = "cover_kind"
 
 
 def _unique_ids(doses: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -62,6 +63,7 @@ FIELDS: dict[str, tuple[Any, Any]] = {
     TAGS_FOR_NEW_RUNS: ([], [tag_name]),
     AUTOMATIC_TEMPLATES: ([], vol.All([str], vol.Unique())),
     DEFAULT_MATERIAL: (None, vol.Any(None, str)),
+    COVER_KIND: (ImageKind.THUMBNAIL, vol.Coerce(ImageKind)),
     DOSES: (
         [],
         vol.All(
@@ -124,6 +126,13 @@ class DeviceSettings:
             name: deepcopy(stored.get(name, default))
             for name, (default, _) in FIELDS.items()
         }
+
+    def cover_kind(self, device_id: str) -> ImageKind:
+        """The kind of image its Runs show as Cover Image unless one is picked;
+        the default for a removed Device."""
+        return ImageKind(
+            self._devices.get(device_id, {}).get(COVER_KIND, ImageKind.THUMBNAIL)
+        )
 
     def program_row(
         self, device_id: str, program: str | None

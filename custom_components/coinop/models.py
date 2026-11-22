@@ -604,11 +604,17 @@ class Run:
             self.images, key=lambda image: (order.index(image.kind), image.created)
         )
 
-    @property
-    def cover(self) -> RunImage | None:
-        """The picked image, else the first in order; a deleted pick falls back."""
+    def cover(self, preferred: ImageKind = ImageKind.THUMBNAIL) -> RunImage | None:
+        """The picked image, else the newest of the `preferred` kind, else the first
+        in order; a deleted pick falls back."""
         picked = (image for image in self.images if image.id == self.cover_id)
-        return next(picked, None) or next(iter(self.images_in_order), None)
+        ordered = self.images_in_order
+        of_kind = [image for image in ordered if image.kind is preferred]
+        return (
+            next(picked, None)
+            or next(reversed(of_kind), None)
+            or next(iter(ordered), None)
+        )
 
     def as_dict(self) -> dict[str, Any]:
         # A Run stored without timelines (by an older or newer minor version) keeps that shape.

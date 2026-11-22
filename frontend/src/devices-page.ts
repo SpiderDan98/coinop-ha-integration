@@ -105,6 +105,17 @@ const waterOf = (hass: HomeAssistant, device: Device, t: Localize, format: Forma
 };
 
 type Settings = Device["settings"];
+const COVER_KINDS = ["thumbnail", "snapshot", "upload"] as const satisfies Settings["cover_kind"][];
+
+/** The kinds of image its Runs get; no choice without an automatic one. */
+const coverKinds = ({ ha_settings: { images } }: Device) => {
+  const has = {
+    thumbnail: Boolean(images?.thumbnail),
+    snapshot: Boolean(images?.camera && images.snapshot),
+    upload: true,
+  };
+  return has.thumbnail || has.snapshot ? COVER_KINDS.filter((kind) => has[kind]) : [];
+};
 
 /** The unit a Dose of the Material counts in; Spoolman prices by weight. */
 const unitOf = (material?: Material) =>
@@ -279,6 +290,12 @@ export class DevicesPage extends LitElement {
                 </dd>`
             : nothing
         }
+        ${
+          coverKinds(device).length
+            ? html`<dt>${t("device.cover_kind")}</dt>
+                <dd class="cover-kind">${t(`cover_kind.${settings.cover_kind}`)}</dd>`
+            : nothing
+        }
         <dt>${t("device.tags_for_new_runs")}</dt>
         <dd class="new-run-tags">${chips(settings.tags_for_new_runs, "tag", t("device.none"))}</dd>
         <dt>${t("device.automatic_templates")}</dt>
@@ -411,6 +428,21 @@ export class DevicesPage extends LitElement {
       content: html`${
           device.capabilities.includes("material")
             ? this.renderDefaultMaterial(device, draft.default_material, change, t)
+            : nothing
+        }
+        ${
+          coverKinds(device).length
+            ? field(
+                t("device.cover_kind"),
+                select({
+                  value: draft.cover_kind,
+                  options: coverKinds(device).map(
+                    (kind) => [kind, t(`cover_kind.${kind}`)] as const,
+                  ),
+                  onChange: (kind) => change({ cover_kind: kind as Settings["cover_kind"] }),
+                }),
+                { name: "cover-kind", hint: t("device.cover_kind_hint") },
+              )
             : nothing
         }
         ${field(

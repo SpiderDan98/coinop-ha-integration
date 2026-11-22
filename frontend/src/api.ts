@@ -172,6 +172,8 @@ export interface Device {
     tags_for_new_runs: string[];
     automatic_templates: string[];
     default_material: string | null;
+    /** What its Runs show as Cover Image unless the user picks one: the newest of this kind. */
+    cover_kind: RunImage["kind"];
     /** In order; each Dose becomes a Material Line Item on Runs that dose it. */
     doses: {
       id: string;

@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from custom_components.coinop.device_config import (
     TYPE_KEYS,
@@ -17,6 +18,7 @@ from custom_components.coinop.device_config import (
 from custom_components.coinop.device_inputs import offered_values
 from custom_components.coinop.device_settings import (
     AUTOMATIC_TEMPLATES,
+    COVER_KIND,
     DEFAULT_MATERIAL,
     DOSES,
     TAGS_FOR_NEW_RUNS,
@@ -29,11 +31,13 @@ from custom_components.coinop.models import (
     Run,
 )
 from custom_components.coinop.quantities import QUANTITIES
+from custom_components.coinop.run_book import RunChange
 from custom_components.coinop.runtime import CoinOp
 from custom_components.coinop.schema import vol
 
 from .command import command, found
 from .materials import pickable
+from .runs import SIGNAL_RUN_CHANGED
 
 
 def _known_programs(
@@ -110,7 +114,8 @@ async def _update_settings(
     Naming a Tag that doesn't exist yet creates it; automatic templates must exist;
     the default Material and a new Dose's Material must exist and not be archived,
     and only a Device Type with Doses has a Dose list. Only a Dose counted in g or
-    ml can have a stock input.
+    ml can have a stock input. A new preferred Cover Image kind re-sends the
+    Device's Runs to the galleries.
     """
     device_id = msg["device_id"]
     device = next((d for d in coinop.devices if d.device_id == device_id), None)
@@ -162,7 +167,12 @@ async def _update_settings(
         changes[TAGS_FOR_NEW_RUNS] = await coinop.catalog.async_add_tags(
             changes[TAGS_FOR_NEW_RUNS]
         )
+    cover_kind = coinop.settings.cover_kind(device_id)
     settings = await coinop.settings.async_update(msg["device_id"], changes)
+    if settings[COVER_KIND] != cover_kind:
+        for run in coinop.book.runs():
+            if run.device_id == device_id:
+                async_dispatcher_send(hass, SIGNAL_RUN_CHANGED, RunChange.UPDATED, run)
     connection.send_result(msg["id"], {"settings": settings})
 
 

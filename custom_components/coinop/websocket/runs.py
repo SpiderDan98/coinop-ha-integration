@@ -9,7 +9,7 @@ its defaults (ADR 0002).
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components import websocket_api
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -30,9 +30,15 @@ from custom_components.coinop.cost.rounding import (
 from custom_components.coinop.cost.running_time import running_time
 from custom_components.coinop.device_config import Capability
 from custom_components.coinop.images import image_info, upload_rules
-from custom_components.coinop.models import LineItem, LineItemKind, Outcome, Run
+from custom_components.coinop.models import (
+    ImageKind,
+    LineItem,
+    LineItemKind,
+    Outcome,
+    Run,
+)
 from custom_components.coinop.run_book import RunBook, RunChange
-from custom_components.coinop.runtime import CoinOp
+from custom_components.coinop.runtime import CoinOp, CoinOpConfigEntry
 from custom_components.coinop.schema import vol
 from custom_components.coinop.tags import tag_name
 from custom_components.coinop.tracker import DeviceTracker
@@ -51,7 +57,19 @@ def async_announce(hass: HomeAssistant, book: RunBook) -> CALLBACK_TYPE:
     )
 
 
-def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
+def _cover_kind(hass: HomeAssistant, run: Run) -> ImageKind:
+    """Looked up on each call: a subscription outlives a reload of the hub entry."""
+    entries = hass.config_entries.async_loaded_entries(DOMAIN)
+    if not entries:
+        return ImageKind.THUMBNAIL
+    return cast(CoinOpConfigEntry, entries[0]).runtime_data.settings.cover_kind(
+        run.device_id
+    )
+
+
+def _summary(
+    hass: HomeAssistant, run: Run, now: datetime, decimals: int
+) -> dict[str, Any]:
     total = rounded_sum((i.amount for i in run.line_items), decimals)
     return {
         "id": run.id,
@@ -71,7 +89,9 @@ def _summary(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
         else float(round_amount(float(total) / run.part_count, decimals)),
         "flags": list(run.flags),
         "tags": list(run.tags),
-        "cover": None if (cover := run.cover) is None else image_info(run, cover),
+        "cover": None
+        if (cover := run.cover(_cover_kind(hass, run))) is None
+        else image_info(run, cover),
     }
 
 
@@ -86,14 +106,16 @@ def _line_item(run: Run, item: LineItem, decimals: int) -> dict[str, Any]:
     }
 
 
-def _detail(run: Run, now: datetime, decimals: int) -> dict[str, Any]:
+def _detail(
+    hass: HomeAssistant, run: Run, now: datetime, decimals: int
+) -> dict[str, Any]:
     # Meter readings are long on an open Run and of no use to the panel.
     stored = run.as_dict()
     for timeline in stored.get("timelines", {}).values():
         del timeline["readings"]
     return {
         **stored,
-        **_summary(run, now, decimals),
+        **_summary(hass, run, now, decimals),
         "line_items": [_line_item(run, item, decimals) for item in run.line_items],
         "images": [image_info(run, image) for image in run.images_in_order],
         "uploads": upload_rules(),
@@ -122,7 +144,7 @@ def _list(
     now, decimals = dt_util.utcnow(), _decimals(hass)
     connection.send_result(
         msg["id"],
-        {"runs": [_summary(run, now, decimals) for run in coinop.book.runs()]},
+        {"runs": [_summary(hass, run, now, decimals) for run in coinop.book.runs()]},
     )
 
 
@@ -139,7 +161,10 @@ def _subscribe(
     def forward(change: RunChange, run: Run) -> None:
         connection.send_event(
             msg["id"],
-            {"change": change, "run": _summary(run, dt_util.utcnow(), _decimals(hass))},
+            {
+                "change": change,
+                "run": _summary(hass, run, dt_util.utcnow(), _decimals(hass)),
+            },
         )
 
     connection.subscriptions[msg["id"]] = async_dispatcher_connect(
@@ -149,7 +174,7 @@ def _subscribe(
     now, decimals = dt_util.utcnow(), _decimals(hass)
     connection.send_event(
         msg["id"],
-        {"runs": [_summary(run, now, decimals) for run in coinop.book.runs()]},
+        {"runs": [_summary(hass, run, now, decimals) for run in coinop.book.runs()]},
     )
 
 
@@ -170,7 +195,7 @@ def _send_run(
     run: Run,
 ) -> None:
     connection.send_result(
-        msg_id, {"run": _detail(run, dt_util.utcnow(), _decimals(hass))}
+        msg_id, {"run": _detail(hass, run, dt_util.utcnow(), _decimals(hass))}
     )
 
 

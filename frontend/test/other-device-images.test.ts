@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { recorded, recordedBackend } from "./fake-hass";
-import { click, iconButton, mountPanel, query, queryAll, text } from "./render";
+import { click, fill, iconButton, mountPanel, query, queryAll, text } from "./render";
 
 const LIST = "coinop/devices/list";
 const GET = "coinop/runs/get";
+const SETTINGS = "coinop/devices/update_settings";
 const cards = (panel: Element) => queryAll(panel, ".device").map(text);
 const facts = (panel: Element) => text(query(panel, ".facts dl"));
 const kiln = recorded.studioKiln;
@@ -24,14 +25,50 @@ describe("An Other Device with images and a Part Count and no job", () => {
         "Consumption source Estimate from average power 2,000 W running " +
         "Electricity price €0.30 per kWh " +
         "Reconfigure in Home Assistant " +
+        "Preferred Cover Image Thumbnail " +
         "Tags for new Runs None " +
         "Automatic templates None",
     ]);
     await click(panel, iconButton(panel, "Edit settings of Studio kiln"));
     expect(queryAll(panel, ".settings-dialog .field .label").map(text)).toEqual([
+      "Preferred Cover Image",
       "Tags for new Runs",
       "Automatic templates",
     ]);
+  });
+
+  it("prefers the kind of image its Runs show as Cover Image, of those it gets", async () => {
+    const backend = recordedBackend()
+      .reply(LIST, () => ({ devices: [kiln] }))
+      .reply(SETTINGS, (msg) => ({ settings: { ...kiln.settings, ...(msg.settings as object) } }));
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    await click(panel, iconButton(panel, "Edit settings of Studio kiln"));
+    const dialog = query(panel, ".settings-dialog");
+    expect(queryAll(dialog, ".cover-kind option").map(text)).toEqual([
+      "Thumbnail",
+      "Snapshot",
+      "Newest photo",
+    ]);
+    await fill(panel, query(dialog, ".cover-kind select"), "upload");
+    await click(panel, query(dialog, "ha-button.save"));
+
+    expect(backend.sent(SETTINGS)).toEqual([
+      { type: SETTINGS, device_id: kiln.id, settings: { cover_kind: "upload" } },
+    ]);
+    expect(text(query(panel, ".device .cover-kind"))).toBe("Newest photo");
+  });
+
+  it("offers no choice of Cover Image without a Thumbnail or Snapshot", async () => {
+    const images = { thumbnail: null, camera: "camera.kiln", snapshot: false };
+    const backend = recordedBackend().reply(LIST, () => ({
+      devices: [{ ...kiln, ha_settings: { ...kiln.ha_settings, images } }],
+    }));
+    const panel = await mountPanel(backend, { path: "/devices" });
+
+    await click(panel, iconButton(panel, "Edit settings of Studio kiln"));
+
+    expect(queryAll(panel, ".cover-kind")).toEqual([]);
   });
 
   it("names only the image inputs as not used when it uses neither", async () => {

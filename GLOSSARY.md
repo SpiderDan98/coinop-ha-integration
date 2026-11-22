@@ -80,7 +80,7 @@ _Avoid_: Photo, picture, completion image
 _German UI_: Kamerabild
 
 **Cover Image**:
-The one image that stands for a Run wherever only one is shown: the one the user picked, otherwise the first of its Thumbnail, Snapshot and uploaded images.
+The one image that stands for a Run wherever only one is shown: the one the user picked, otherwise the newest of the kind its Device prefers (Thumbnail, Snapshot or uploaded photo), otherwise the first of its Thumbnail, Snapshot and uploaded images.
 _Avoid_: Main image, title image
 _German UI_: Titelbild
 

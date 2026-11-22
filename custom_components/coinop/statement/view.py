@@ -65,7 +65,8 @@ class CostStatementView(HomeAssistantView):
         covers = {
             run.id: coinop.images.path(run, cover, "full")
             for run in runs
-            if export.options.images and (cover := run.cover)
+            if export.options.images
+            and (cover := run.cover(coinop.settings.cover_kind(run.device_id)))
         }
         pdf = await hass.async_add_executor_job(
             lambda: render(

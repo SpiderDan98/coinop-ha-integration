@@ -71,6 +71,7 @@
           "template-wear"
         ],
         "default_material": "pla-black",
+        "cover_kind": "thumbnail",
         "doses": [],
         "program_defaults": {
           "default": {
