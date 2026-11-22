@@ -13,9 +13,17 @@ from custom_components.coinop.const import (
     DEVICE_TYPE_TUMBLE_DRYER,
     DEVICE_TYPE_WASHING_MACHINE,
 )
-from custom_components.coinop.device_config import WaterSource
+from custom_components.coinop.device_config import ExpectedEnergyForm, WaterSource
 
-from .base import Find, NoDeviceType, energy_source, entity_input, found, mapping
+from .base import (
+    Find,
+    NoDeviceType,
+    energy_source,
+    entity_input,
+    expected_energy,
+    found,
+    mapping,
+)
 
 # The Device Types an appliance of WashData, Miele or Home Connect can be.
 DEVICE_TYPES = (
@@ -57,6 +65,11 @@ def washdata(find: Find) -> dict[str, Any]:
             ),
         ),
         "program": entity_input(program, ignored=WASHDATA_PLACEHOLDERS),
+        "progress": expected_energy(
+            find("sensor", "_cycle_progress"),
+            ExpectedEnergyForm.TOTAL,
+            attribute="projected_energy_kwh",
+        ),
     }
 
 

@@ -292,7 +292,10 @@ async def test_quick_start_shows_what_the_profile_found(hass: HomeAssistant) -> 
         "device": "Washer",
         "device_type": "Washing machine",
         "integration": "WashData",
-        "inputs": f"- Washer State\n- {washer['washer_program']}",
+        "inputs": (
+            f"- Washer State\n- {washer['washer_program']}\n"
+            f"- {washer['cycle_progress']}"
+        ),
         "currency": "EUR",
     }
 
@@ -344,7 +347,14 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
                 "unknown",
             ],
         },
-        "progress": {"remaining_time": None, "expected_energy": None},
+        "progress": {
+            "remaining_time": None,
+            "expected_energy": {
+                "entity_id": washer["cycle_progress"],
+                "attribute": "projected_energy_kwh",
+                "form": "total",
+            },
+        },
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,

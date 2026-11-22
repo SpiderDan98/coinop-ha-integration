@@ -116,7 +116,14 @@ async def test_a_washdata_device_of_a_generic_kind_is_asked_its_device_type(
             "attribute": None,
             "ignored": WASHDATA_PLACEHOLDERS,
         },
-        "progress": {"remaining_time": None, "expected_energy": None},
+        "progress": {
+            "remaining_time": None,
+            "expected_energy": {
+                "entity_id": plug["cycle_progress"],
+                "attribute": "projected_energy_kwh",
+                "form": "total",
+            },
+        },
         "consumption": {"source": "per_program"},
         "price": {"source": "fixed", "value": 0.3},
     }
