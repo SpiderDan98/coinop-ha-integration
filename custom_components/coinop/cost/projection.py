@@ -218,7 +218,12 @@ def _length(item: LineItem) -> float | None:
         or not material.diameter
     ):
         return None
-    return item.quantity / material.density * 1000 / (math.pi * (material.diameter / 2) ** 2)
+    return (
+        item.quantity
+        / material.density
+        * 1000
+        / (math.pi * (material.diameter / 2) ** 2)
+    )
 
 
 def running_hours_rest(run: Run, hours_left: float) -> float | None:

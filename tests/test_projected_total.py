@@ -9,12 +9,14 @@ import pytest
 
 from .clock import Clock
 from .devices import ENERGY, add_device, add_hub
-from .test_ev_chargers import add_charger, set_charger, set_session
 from .stored import place_materials, stored_material
+from .test_ev_chargers import add_charger, set_charger, set_session
 from .test_material_usage import GRAMS_PER_METRE, add_measuring_device, set_usage
 from .test_measured import set_meter
 from .test_program_consumption import set_rows
 from .test_runs import set_status, stored_runs
+from .test_slots import LOADED, SLOTS, fill, load
+from .test_spoolman import linked_material
 from .test_templates import WEAR, add_template, create
 from .test_water import set_water
 from .washing import add_washer, set_energy, set_program, set_washer
@@ -519,7 +521,9 @@ async def test_an_appliance_costed_by_its_program_defaults_alone_projects_nothin
 PLANNED = "sensor.kobra_planned_filament"
 
 
-async def set_planned(hass: HomeAssistant, planned: float | str, unit: str = "g") -> None:
+async def set_planned(
+    hass: HomeAssistant, planned: float | str, unit: str = "g"
+) -> None:
     hass.states.async_set(PLANNED, str(planned), {"unit_of_measurement": unit})
     await hass.async_block_till_done()
 
@@ -552,3 +556,81 @@ async def test_a_planned_mass_leaves_what_the_measured_length_weighs(
     assert float(projected(hass).state) == pytest.approx(
         round(20 * GRAMS_PER_METRE * 0.02, 2)
     )
+
+
+async def test_without_a_plan_the_material_to_come_follows_the_progress(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await add_planning_printer(hass, panel, hass_storage, progress=PROGRESS)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_usage(hass, 1000)
+    await set_progress(hass, 4)
+    # 1 % more would multiply the 2.98 g measured far too much.
+    assert projected(hass).state == STATE_UNKNOWN
+
+    await set_progress(hass, 25)
+    # 0.06 for the first 25 %, three times that for the other 75.
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.18)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["material"]
+
+    await set_progress(hass, 100)
+    assert float(projected(hass).state) == pytest.approx(0.06)
+
+
+async def test_a_pause_holds_the_progress_the_material_to_come_follows(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await add_planning_printer(hass, panel, hass_storage, progress=PROGRESS)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_usage(hass, 1000)
+    await set_progress(hass, 25)
+    await clock.advance(minutes=1)
+
+    await set_status(hass, "paused")
+    await set_progress(hass, 0)
+    await clock.advance(minutes=20)
+
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.18)
+
+
+async def test_a_planned_length_leaves_what_the_measured_mass_is_long(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await set_planned(hass, 4, "m")
+    await add_planning_printer(hass, panel, hass_storage, planned_material=PLANNED)
+    await set_status(hass, "printing")
+    await set_usage(hass, 10, "g")
+
+    # 4 m weigh 11.93 g: 0.20 for the 10 so far, 0.04 for the 1.93 to come.
+    assert float(projected(hass).state) == pytest.approx(0.20 + 0.04)
+
+
+async def test_the_material_to_come_is_priced_like_the_loaded_slots_filament(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(
+        hass_storage,
+        stored_material("pla"),
+        linked_material("red-pla", 0.05, name="Red PLA", colour="#ff0000"),
+    )
+    await fill(hass, 2, "PLA", "#ff0000")
+    await load(hass, 2)
+    await set_planned(hass, 3000, "mm")
+    await add_measuring_device(
+        hass,
+        panel,
+        source="none",
+        slots=SLOTS,
+        colour_attribute="color_hex",
+        loaded_slot=LOADED,
+        planned_material=PLANNED,
+    )
+    await set_status(hass, "printing")
+    await set_usage(hass, 1000)
+
+    # The Spoolman Filament's 0.05 a gram, not the default PLA's 0.02.
+    assert float(projected(hass).state) == pytest.approx(0.15 + 0.30)
