@@ -119,7 +119,7 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
     }
     assert data["progress"] == {
         "remaining_time": "sensor.anycubic_kobra_s1_time_remaining",
-        "progress": None,
+        "progress": "sensor.anycubic_kobra_s1_progress",
     }
 
 
@@ -197,6 +197,10 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
         "thumbnail": "image.kobra_s1_job_preview",
         "camera": "camera.kobra_s1_camera",
         "snapshot": True,
+    }
+    assert data["progress"] == {
+        "remaining_time": "sensor.kobra_s1_job_time_remaining",
+        "progress": "sensor.kobra_s1_job_progress",
     }
 
 
@@ -304,6 +308,7 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
             "filament_used",
             "camera",
             "time_remaining",
+            "progress",
         )
     }
     menu = await start_reconfigure(hass, entry, subentry)
@@ -323,7 +328,10 @@ async def test_detect_again_repairs_the_mapping_in_one_go(
     assert data["job"]["entity_id"] == renamed["filename"]
     assert data["job"]["material"]["entity_id"] == renamed["filament_used"]
     assert data["images"]["camera"] == renamed["camera"]
-    assert data["progress"]["remaining_time"] == renamed["time_remaining"]
+    assert data["progress"] == {
+        "remaining_time": renamed["time_remaining"],
+        "progress": renamed["progress"],
+    }
 
 
 async def test_detect_again_pre_fills_the_profiles_values(

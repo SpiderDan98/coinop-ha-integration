@@ -500,7 +500,7 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
     }
     assert data["progress"] == {
         "remaining_time": printer["time_remaining"],
-        "progress": None,
+        "progress": printer["progress"],
     }
     assert data["consumption"] == {
         "source": "power",
@@ -517,7 +517,14 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
 ) -> None:
     printer = add_anycubic_local(hass, images=())
     registry = er.async_get(hass)
-    for key in ("filename", "filament_used", "camera", "ace0_slot_1", "time_remaining"):
+    for key in (
+        "filename",
+        "filament_used",
+        "camera",
+        "ace0_slot_1",
+        "time_remaining",
+        "progress",
+    ):
         registry.async_remove(printer[key])
     register(hass, ENERGY, "kWh")
     entry = await add_hub(hass)

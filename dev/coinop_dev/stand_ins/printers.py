@@ -60,6 +60,7 @@ def anycubic_local(
         ),
         own("sensor", "filament_used", state="0", unit="g"),
         own("sensor", "time_remaining", state="0", unit="min"),
+        own("sensor", "progress", state="0", unit="%"),
         own("sensor", "pause_reason", state="none"),
         own("binary_sensor", "printing", state="off"),
         own("camera", "camera", state=CAMERA),
@@ -108,6 +109,8 @@ def anycubic_cloud(
         add("sensor", "job_name", state="benchy"),
         add("sensor", "job_filament_used", state="0", unit="mm"),
         add("sensor", "job_filament_required", state="0"),
+        add("sensor", "job_time_remaining", state="0", unit="min"),
+        add("sensor", "job_progress", state="0", unit="%"),
         add("sensor", "job_energy", state="0", unit="kWh"),
         add("sensor", "job_electricity_cost", state="0"),
         add("sensor", "last_job_total_cost", state="0.42"),
@@ -202,6 +205,7 @@ def bambu_lab(*, serial: str = "01P00A123456789", camera: bool = True) -> Regist
         own("sensor", "print_weight", state="12.4", unit="g"),
         own("sensor", "print_length", state="4.1", unit="m"),
         own("sensor", "print_progress", state="0", unit="%"),
+        own("sensor", "remaining_time", state="0", unit="min"),
         own("sensor", "active_tray", state="none"),
         own("image", "cover_image", state=PICTURE),
         own("image", "pick_image", state=PICTURE),
@@ -266,6 +270,7 @@ def prusalink(*, title: str = "Prusa MK4") -> Registration:
         ),
         own("sensor", "job.filename", state="unknown"),
         own("sensor", "job.progress", state="unknown", unit="%"),
+        own("sensor", "job.finish", state="unknown"),
         # The filament type, not an amount.
         own("sensor", "printer.telemetry.material", state="PLA"),
         own(
@@ -403,6 +408,8 @@ def creality(*, host: str = "192.168.1.50", camera: bool = True) -> Registration
         own("sensor", "expected_material_length", state="0", unit="cm"),
         own("sensor", "filament_consumption", state="0", unit="g"),
         own("sensor", "print_job_time", state="0", unit="s"),
+        own("sensor", "print_left_time", state="0", unit="s"),
+        own("sensor", "print_progress", state="0", unit="%"),
         own("image", "current_print_preview", state=PICTURE),
         *([own("camera", "camera", state=CAMERA)] if camera else []),
     ]
@@ -480,6 +487,7 @@ def elegoo(
         own("sensor", "current_status", state="idle"),
         own("sensor", "filename", state="benchy.gcode"),
         own("sensor", "percent_complete", state="0", unit="%"),
+        own("sensor", "ticks_remaining", state="0", unit="ms"),
         *(
             []
             if resin
@@ -544,6 +552,8 @@ def moonraker(*, webcam: bool = True) -> Registration:
         own("sensor", "total_filament_used", state="1523.4", unit="m"),
         own("sensor", "filament_used", state="0", unit="m"),
         own("sensor", "progress", state="0", unit="%"),
+        own("sensor", "print_time_left", state="0", unit="h"),
+        own("sensor", "slicer_print_time_left_estimate", state="0", unit="h"),
         own("camera", "thumbnail", state=CAMERA),
         *([own("camera", "Chamber_0", state=CAMERA)] if webcam else []),
     ]
