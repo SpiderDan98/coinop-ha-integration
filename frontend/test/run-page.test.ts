@@ -121,6 +121,21 @@ describe("Run page", () => {
     expect(text(query(panel, ".facts .ended"))).toBe("Jan 15, 2026, 10:45 AM");
   });
 
+  it("shows an open Run's Projected Total, its expected end and what it includes", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/run/print-live" });
+
+    expect(text(query(panel, ".totals .projected"))).toBe("Projected Total ≈ €0.49");
+    expect(text(query(panel, ".totals .projection"))).toBe(
+      "Expected end Jan 15, 2026, 12:00 PM · Includes electricity and running hours",
+    );
+  });
+
+  it("shows no Projected Total for an ended Run", async () => {
+    const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
+
+    expect(queryAll(panel, ".totals .projected, .totals .projection")).toEqual([]);
+  });
+
   it("says so when the Run is deleted while shown", async () => {
     const backend = recordedBackend();
     const panel = await mountPanel(backend, { path: "/run/benchy" });
@@ -149,6 +164,17 @@ describe("Run page", () => {
       "Aus der Durchschnittsleistung geschätzt 0,15 kWh × 0,30 € = 0,05 €",
     ]);
     expect(text(query(panel, ".totals"))).toBe("Gesamt 0,86 € Kosten pro Teil (4) 0,22 €");
+  });
+
+  it("names the Projected Total in German when Home Assistant is", async () => {
+    const panel = await mountPanel(recordedBackend({ language: "de" }), {
+      path: "/run/print-live",
+    });
+
+    expect(text(query(panel, ".totals .projected"))).toBe("Voraussichtlich ≈ 0,49 €");
+    expect(text(query(panel, ".totals .projection"))).toBe(
+      "Voraussichtliches Ende 15.01.2026, 12:00 · Enthält Strom und Betriebsstunden",
+    );
   });
 
   it("has no Part Count for a washing machine Run", async () => {

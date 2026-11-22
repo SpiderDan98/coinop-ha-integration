@@ -38,6 +38,7 @@ export function formatter(hass: HomeAssistant) {
     timeZone,
   });
   const timeOfDay = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
+  const conjunction = new Intl.ListFormat(locale, { type: "conjunction" });
   const wallClockParts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
@@ -97,6 +98,8 @@ export function formatter(hass: HomeAssistant) {
     },
     date: (iso: string) => date.format(new Date(iso)),
     dateTime: (iso: string) => dateTime.format(new Date(iso)),
+    /** "a, b and c" in the language. */
+    list: (items: string[]) => conjunction.format(items),
     timeRange: (start: string, end: string) =>
       timeOfDay.formatRange(new Date(start), new Date(end)),
     /** "40 min", "3 h", "2 h 35 min"; never broken across lines. */

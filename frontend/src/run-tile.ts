@@ -62,7 +62,18 @@ export function runTile(
               </div>`
             : nothing
         }
-        <div class="row between foot">${outcomeChip(run, t)}<b>${format.money(run.total)}</b></div>
+        <div class="row between foot">
+          ${outcomeChip(run, t)}
+          <span
+            ><b>${format.money(run.total)}</b>${
+              run.projected_total === null
+                ? nothing
+                : html` <span class="muted projected" title=${t("run.projected_total")}
+                    >${t("run.projected", { amount: format.money(run.projected_total) })}</span
+                  >`
+            }</span
+          >
+        </div>
       </div>
     </a>
     ${

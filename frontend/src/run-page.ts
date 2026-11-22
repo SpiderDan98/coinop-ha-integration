@@ -78,6 +78,17 @@ const evidence = (item: LineItem, t: Localize, format: Format) =>
     .filter(Boolean)
     .join(" · ");
 
+/** When an open Run is expected to end and what its Projected Total includes. */
+function projection(run: RunDetail, t: Localize, format: Format) {
+  const parts = format.list(run.projected_parts.map((part) => t(`projected_part.${part}`)));
+  return [
+    ...(run.projected_end
+      ? [t("run.projected_end", { end: format.dateTime(run.projected_end) })]
+      : []),
+    t("run.projected_parts", { parts }),
+  ].join(" · ");
+}
+
 /** How far corrected split Line Items are from the printer's measured total, in grams. */
 const splitHint = (items: LineItem[], t: Localize, format: Format) => {
   const split = items.filter((item) => item.share !== null);
@@ -635,6 +646,16 @@ export class RunPage extends LitElement {
           <div class="card totals">
             <span class="big">${t("run.total")}</span
             ><span class="big num">${format.money(run.total)}</span>
+            ${
+              run.projected_total === null
+                ? nothing
+                : html`<span class="projected"
+                      ><span class="muted">${t("run.projected_total")}</span
+                      ><span class="muted num"
+                        >${t("run.projected", { amount: format.money(run.projected_total) })}</span
+                      ></span
+                    ><span class="muted small projection">${projection(run, t, format)}</span>`
+            }
             ${
               run.part_count === null || run.cost_per_part === null
                 ? nothing
@@ -1379,6 +1400,12 @@ export class RunPage extends LitElement {
         display: grid;
         grid-template-columns: 1fr auto;
         gap: 4px 16px;
+      }
+      .totals .projected {
+        display: contents;
+      }
+      .totals .projection {
+        grid-column: 1 / -1;
       }
       .big {
         font-size: 22px;

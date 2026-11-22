@@ -26,12 +26,12 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, started);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min Batch 7 In progress €0.00",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min Batch 7 In progress €0.00 ≈ €0.05",
     );
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 In progress €0.25",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 In progress €0.25 ≈ €0.49",
     );
     backend.push(SUBSCRIBE, ended);
     await settle(panel);
@@ -41,6 +41,21 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, { ...ended, change: "deleted" });
     await settle(panel);
     expect(tiles(panel)).toHaveLength(3);
+  });
+
+  it("shows an open Run's Projected Total muted next to its cost so far", async () => {
+    const backend = recordedBackend();
+    const panel = await mountPanel(backend, { path: "/runs" });
+
+    backend.push(SUBSCRIBE, updated);
+    await settle(panel);
+    const projected = query(panel, ".tile .projected");
+    expect(text(projected)).toBe("≈ €0.49");
+    expect(projected.classList).toContain("muted");
+    expect(projected.title).toBe("Projected Total");
+    backend.push(SUBSCRIBE, { ...updated, run: { ...updated.run, projected_total: null } });
+    await settle(panel);
+    expect(queryAll(panel, ".tile .projected")).toEqual([]);
   });
 
   it("subscribes once to Runs and catalogue, loads Devices and totals once and never polls", async () => {
