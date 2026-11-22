@@ -20,7 +20,7 @@ _Avoid_: Custom type, type label, category
 _German UI_: Typbezeichnung
 
 **Device Input**:
-A Home Assistant value a Device reads, such as its print status, material used, remaining time, thumbnail or camera, chosen by the user.
+A Home Assistant value a Device reads, such as its print status, material used, remaining time, expected energy, thumbnail or camera, chosen by the user.
 _Avoid_: Sensor mapping, source
 _German UI_: Geräteeingang
 
