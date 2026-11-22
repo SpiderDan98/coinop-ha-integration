@@ -59,6 +59,8 @@ async def test_quick_start_adds_a_prusalink_printer_with_its_job_preview(
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     }
     # The job preview is a camera, so the Thumbnail; there is no webcam.
     assert data["images"] == {

@@ -203,6 +203,36 @@
             "unit": "Einheit"
           }
         },
+        "drying": {
+          "title": "Trocknen",
+          "description": "Wähle optional für jede Mehrmaterial-Einheit, die ihr Material trocknen kann, die Entität, die eingeschaltet ist, solange die Einheit trocknet. Solange ein Lauf offen ist, rechnet Coin-op die zusätzliche Leistung des Trocknens dann in die voraussichtlichen Kosten ein, so lange die Einheit während des Laufs weiter trocknet.",
+          "data": {
+            "active": "Trocknungs-Entitäten (optional)"
+          },
+          "data_description": {
+            "active": "Ein Schalter oder Binärsensor pro Einheit, eingeschaltet, solange sie trocknet."
+          }
+        },
+        "drying_left": {
+          "title": "Restliche Trocknungszeit",
+          "description": "Wähle optional die Entität, die meldet, wie lange {unit} noch trocknet. Ohne sie geht Coin-op davon aus, dass die Einheit bis zum Ende des Laufs trocknet.",
+          "data": {
+            "drying_left": "Restliche Trocknungszeit (optional)"
+          },
+          "data_description": {
+            "drying_left": "Die Zeit, die die Einheit noch trocknet, in Minuten, wenn die Entität keine andere Einheit meldet."
+          }
+        },
+        "drying_power": {
+          "title": "Trocknungsleistung",
+          "description": "Gib optional die zusätzliche Leistung ein, die eine Einheit beim Trocknen aufnimmt.",
+          "data": {
+            "drying_power": "Trocknungsleistung (optional)"
+          },
+          "data_description": {
+            "drying_power": "Leer lassen, damit Coin-op sie aus den Zählerständen jedes Laufs lernt, sobald der Lauf mindestens 10 Minuten mit und 10 ohne Trocknen gelaufen ist."
+          }
+        },
         "images": {
           "title": "Bilder",
           "description": "Wähle optional, woher die Bilder eines Laufs kommen. Das Vorschaubild wird kopiert, solange der Lauf offen ist; das Kamerabild nimmt die Kamera am Ende des Laufs auf. Bilder werden verkleinert und ohne Metadaten gespeichert.",

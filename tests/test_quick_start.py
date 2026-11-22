@@ -492,6 +492,8 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
         "slots": [printer[f"ace0_slot_{number}"] for number in range(1, 5)],
         "colour_attribute": "color",
         "loaded_slot": printer["ace0_loaded_slot"],
+        "drying": [],
+        "drying_power": None,
     }
     assert data["images"] == {
         "thumbnail": printer["object_top_view"],
@@ -528,6 +530,8 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": printer["ace0_loaded_slot"],
+        "drying": [],
+        "drying_power": None,
     }
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
     assert data["progress"] == {"remaining_time": None}

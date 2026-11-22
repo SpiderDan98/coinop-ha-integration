@@ -88,6 +88,8 @@ UNUSED: dict[str, dict[str, Any]] = {
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
@@ -170,6 +172,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         self._meter: dict[str, Any] = {}
         self._price: dict[str, Any] = {}
         self._job: dict[str, Any] = {}
+        # The drying unit whose drying left is being asked for.
+        self._unit = 0
         # The sections reconfigure walks before it returns to its menu.
         self._walking: frozenset[str] = frozenset()
         self._candidate: Candidate | None = None
@@ -884,7 +888,89 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
 
     async def _job_done(self) -> SubentryFlowResult:
-        self._data["job"] = self._job
+        # A profile may find a unit's drying on a Device without Slots, as on Bambu Lab.
+        if self._job["slots"] or self._stored_drying():
+            return await self.async_step_drying()
+        return await self._drying_done([])
+
+    def _stored_drying(self) -> list[dict[str, Any]]:
+        return list((self._data.get("job") or {}).get("drying") or [])
+
+    async def async_step_drying(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        stored = {unit["active"]: unit for unit in self._stored_drying()}
+        if user_input is not None:
+            self._job["drying"] = [
+                {
+                    "active": active,
+                    "drying_left": stored.get(active, {}).get("drying_left"),
+                }
+                for active in user_input.get("active", [])
+            ]
+            if not self._job["drying"]:
+                return await self._drying_done([])
+            self._unit = 0
+            return await self.async_step_drying_left()
+        schema = vol.Schema(
+            {
+                vol.Optional("active"): EntitySelector(
+                    EntitySelectorConfig(
+                        domain=["switch", "binary_sensor"], multiple=True
+                    )
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="drying",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, {"active": list(stored)}
+            ),
+        )
+
+    async def async_step_drying_left(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        units = self._job["drying"]
+        if user_input is not None:
+            units[self._unit]["drying_left"] = user_input.get("drying_left")
+            self._unit += 1
+        if self._unit == len(units):
+            return await self.async_step_drying_power()
+        unit = units[self._unit]
+        state = self.hass.states.get(unit["active"])
+        schema = vol.Schema(
+            {
+                vol.Optional("drying_left"): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                )
+            }
+        )
+        return self.async_show_form(
+            step_id="drying_left",
+            data_schema=self.add_suggested_values_to_schema(schema, unit),
+            description_placeholders={"unit": state.name if state else unit["active"]},
+        )
+
+    async def async_step_drying_power(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        if user_input is not None:
+            return await self._drying_done(
+                self._job["drying"], user_input.get("drying_power")
+            )
+        schema = vol.Schema({vol.Optional("drying_power"): _watts(0)})
+        return self.async_show_form(
+            step_id="drying_power",
+            data_schema=self.add_suggested_values_to_schema(
+                schema, self._data.get("job") or {}
+            ),
+        )
+
+    async def _drying_done(
+        self, units: list[dict[str, Any]], drying_power: float | None = None
+    ) -> SubentryFlowResult:
+        self._data["job"] = self._job | {"drying": units, "drying_power": drying_power}
         return await self._section_done("job")
 
     async def async_step_images(

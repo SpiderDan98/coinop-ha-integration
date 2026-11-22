@@ -63,6 +63,8 @@ async def test_quick_start_adds_a_bambu_lab_printer_with_every_input(
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     }
     assert data["images"] == {
         "thumbnail": printer["cover_image"],

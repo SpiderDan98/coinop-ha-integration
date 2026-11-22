@@ -122,6 +122,8 @@ async def test_the_material_used_input_is_stored_with_the_job(
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
+        "drying": [],
+        "drying_power": None,
     }
 
 
