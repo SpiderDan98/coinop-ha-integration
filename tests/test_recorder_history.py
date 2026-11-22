@@ -17,6 +17,7 @@ from .devices import add_device, add_hub
 from .test_dynamic_price import PRICE_ENTITY, set_price
 from .test_lifecycle import start_coinop, stop_coinop
 from .test_measured import add_metered_device, electricity, set_meter
+from .test_projected_drying import add_drying_printer, draw, dry, stop_drying
 from .test_projected_total import (
     REMAINING,
     add_timed_printer,
@@ -35,8 +36,11 @@ async def mock_recorder_before_hass(
 
 @pytest.fixture(autouse=True)
 async def recorder(
-    hass: HomeAssistant, async_setup_recorder_instance: RecorderInstanceGenerator
+    hass: HomeAssistant,
+    clock: Clock,
+    async_setup_recorder_instance: RecorderInstanceGenerator,
 ) -> None:
+    """Recording from `CLOCK_START` on."""
     await async_setup_recorder_instance(hass)
 
 
@@ -110,3 +114,24 @@ async def test_a_restart_during_a_pause_holds_the_time_left_from_before_it(
     state = projected(hass)
     assert float(state.state) == pytest.approx(0.03 + 0.06)
     assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=60)
+
+
+async def test_a_restart_mid_run_learns_from_the_drying_the_recorder_kept(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    entry = await add_drying_printer(hass)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass)
+    await draw(hass, clock, 300, 20)
+    await stop_drying(hass)
+    await draw(hass, clock, 150, 40)
+    await async_wait_recording_done(hass)
+
+    await stop_coinop(hass, entry)
+    await start_coinop(hass, entry)
+    await dry(hass, 40)
+    await set_remaining(hass, 120)
+
+    # 0.09 so far, 2 h at 150 W and 40 minutes at the 300 W less 150 W it drew.
+    assert float(projected(hass).state) == pytest.approx(0.09 + 0.09 + 0.03)

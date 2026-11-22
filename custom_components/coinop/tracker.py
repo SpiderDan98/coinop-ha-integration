@@ -274,7 +274,7 @@ class DeviceTracker:
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
             self._record_program(run)
-            self._drying.follow(run)
+            await self._drying.async_follow(run)
             await self._progress.async_recover(run)
             run.projection = self._projection(run, dt_util.utcnow())
             await self._async_follow_device(run)

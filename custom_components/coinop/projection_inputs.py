@@ -144,10 +144,31 @@ class Drying:
                 else None
             )
 
+    async def async_follow(self, run: Run) -> None:
+        """Start following the units for a Run that was open before Coin-op
+        started, from what the recorder kept of them if it recorded throughout."""
+        self.follow(run)
+        now = dt_util.utcnow()
+        if not await recorded.async_covers(self._hass, run.started, now):
+            return
+        for unit in self._config.drying:
+            entity_id = unit["active"]
+            self._spans[entity_id], self._since[entity_id] = [], None
+            states = [
+                *await recorded.async_states(self._hass, entity_id, run.started, now),
+                self._hass.states.get(entity_id),
+            ]
+            for state in filter(None, states):
+                self._apply(entity_id, state, max(run.started, state.last_changed))
+        self._known = run.started
+
     def on_change(self, run: Run, event: Event[EventStateChangedData]) -> None:
         self.follow(run)
-        entity_id, state = event.data["entity_id"], event.data["new_state"]
+        state = event.data["new_state"]
         at = dt_util.utcnow() if state is None else state.last_changed
+        self._apply(event.data["entity_id"], state, at)
+
+    def _apply(self, entity_id: str, state: State | None, at: datetime) -> None:
         since = self._since[entity_id]
         if drying(state) and since is None:
             self._since[entity_id] = at
