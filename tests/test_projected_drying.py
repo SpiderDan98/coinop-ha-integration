@@ -7,10 +7,16 @@ from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
-from .devices import ENERGY
+from .devices import ENERGY, add_device, add_hub
 from .test_measured import set_meter
-from .test_projected_total import add_metered_printer, projected, set_remaining
+from .test_projected_total import (
+    REMAINING,
+    add_metered_printer,
+    projected,
+    set_remaining,
+)
 from .test_runs import set_status
+from .websocket import PanelClient
 
 ACE = "switch.ace_drying"
 ACE_LEFT = "sensor.ace_drying_remaining"
@@ -130,3 +136,82 @@ async def test_a_run_that_dried_all_along_takes_the_drying_power_off_its_base(
 
     # 0.06 so far; 2 h at 300 W less the 150 W of drying, and 40 minutes at 150 W.
     assert float(projected(hass).state) == pytest.approx(0.06 + 0.09 + 0.03)
+
+
+async def test_without_a_drying_power_it_is_learned_once_each_side_ran_10_minutes(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient
+) -> None:
+    await add_drying_printer(hass)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass, 48)
+    await set_remaining(hass, 120)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+
+    # Until then: 0.03 so far and 2 h at 150 W, without the drying.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert (run["projected_parts"], run["projected_pending"]) == (
+        ["electricity"],
+        ["drying"],
+    )
+
+    await draw(hass, clock, 400, 10)
+    await dry(hass, 48)
+
+    # 0.05 so far, 2 h at 150 W and 48 minutes at the 400 W less 150 W it drew.
+    assert float(projected(hass).state) == pytest.approx(0.05 + 0.09 + 0.06)
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert (run["projected_parts"], run["projected_pending"]) == (
+        ["electricity", "drying"],
+        [],
+    )
+
+
+async def test_two_drying_units_add_up(hass: HomeAssistant, clock: Clock) -> None:
+    await add_drying_printer(
+        hass, units=[(ACE, ACE_LEFT), (SECOND, SECOND_LEFT)], drying_power=100
+    )
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass, 60)
+    await dry(hass, 60, unit=SECOND, left=SECOND_LEFT)
+    await set_remaining(hass, 120)
+
+    # 2 h at 150 W, and each unit 1 h at 100 W.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09 + 0.06)
+
+
+@pytest.mark.parametrize(
+    ("drying_power", "total", "pending"),
+    [(200, 0.03 + 0.09 + 0.03, []), (None, 0.03 + 0.09, ["drying"])],
+)
+async def test_a_device_on_average_powers_adds_the_drying_power_it_was_given(
+    hass: HomeAssistant,
+    clock: Clock,
+    panel: PanelClient,
+    drying_power: float | None,
+    total: float,
+    pending: list[str],
+) -> None:
+    entry = await add_hub(hass)
+    await add_device(
+        hass,
+        entry,
+        running_power=150,
+        remaining_time=REMAINING,
+        slots=SLOTS,
+        drying=[(ACE, ACE_LEFT)],
+        drying_power=drying_power,
+    )
+    await set_status(hass, "printing")
+    await clock.advance(minutes=40)
+    await dry(hass, 30)
+    await set_remaining(hass, 120)
+
+    # 0.03 so far, its running power over the 2 h left, and with a drying power
+    # half an hour of it; without one, nothing is learned from an estimate.
+    assert float(projected(hass).state) == pytest.approx(total)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_pending"] == pending

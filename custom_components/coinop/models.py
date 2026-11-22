@@ -525,6 +525,9 @@ class Projection:
 
     rests: dict[ProjectedPart, float]
     ends: datetime | None
+    # The parts that apply but can't be projected yet, such as drying before its
+    # power is learned.
+    pending: frozenset[ProjectedPart] = frozenset()
 
 
 @dataclass

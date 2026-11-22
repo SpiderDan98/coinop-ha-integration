@@ -42,6 +42,7 @@ from .cost.pricing import priced_line_item
 from .cost.projection import (
     drying_hours,
     expected_energy_rest,
+    learned_drying_power,
     project,
     recent_power,
     running_hours_rest,
@@ -1177,7 +1178,7 @@ class DeviceTracker:
         entity_id = self._config.remaining_time_entity_id
         left = time_left(self._hass.states.get(entity_id)) if entity_id else None
         hours = None if left is None else left.total_seconds() / 3600
-        kwh, drying_kwh = self._electricity_rest(run, now, left)
+        kwh, drying_kwh, drying_pending = self._electricity_rest(run, now, left)
         price = self._electricity.price_now(run)
         return project(
             {
@@ -1190,32 +1191,31 @@ class DeviceTracker:
                 else running_hours_rest(run, hours),
             },
             None if left is None else now + left,
+            [ProjectedPart.DRYING] if drying_pending else [],
         )
 
     def _electricity_rest(
         self, run: Run, now: datetime, left: timedelta | None
-    ) -> tuple[float | None, float | None]:
+    ) -> tuple[float | None, float | None, bool]:
         """The kWh still to come: from the Expected energy, else the base power over
         the time left, and apart from it the drying's; None for a Run without an
-        Electricity Line Item, and for drying while no unit dries."""
+        Electricity Line Item, and for drying while no unit dries or its power is
+        unknown, which the last says."""
         item = next(
             (i for i in run.line_items if i.kind is LineItemKind.ELECTRICITY), None
         )
         if item is None:
-            return None, None
+            return None, None, False
         if (expected := self._config.expected_energy) and (
             kwh := expected_kwh(
                 self._hass.states.get(expected["entity_id"]), expected["attribute"]
             )
         ) is not None:
             total = expected["form"] == ExpectedEnergyForm.TOTAL
-            return expected_energy_rest(kwh, item.quantity or 0.0, total), None
+            return expected_energy_rest(kwh, item.quantity or 0.0, total), None, False
         if left is None or (power := self._base_power(run, now)) is None:
-            return None, None
-        return power * left.total_seconds() / 3_600_000, self._drying_rest(left)
-
-    def _drying_rest(self, left: timedelta) -> float | None:
-        """The kWh the drying units add within the time left; None while none dries."""
+            return None, None, False
+        base = power * left.total_seconds() / 3_600_000
         states = self._hass.states
         drying_left = [
             drying_left_of(states.get(unit["drying_left"]))
@@ -1224,9 +1224,24 @@ class DeviceTracker:
             for unit in self._config.drying
             if drying(states.get(unit["active"]))
         ]
-        if not drying_left or (power := self._config.drying_power) is None:
+        if not drying_left:
+            return base, None, False
+        if (drying_power := self._drying_power(run, now, item.method)) is None:
+            return base, None, True
+        return base, drying_power * drying_hours(left, drying_left) / 1000, False
+
+    def _drying_power(
+        self, run: Run, now: datetime, method: ConsumptionMethod | None
+    ) -> float | None:
+        """The extra W a unit draws while drying: the Device's setting, else learned
+        from a metered Run."""
+        if self._config.drying_power is not None:
+            return self._config.drying_power
+        if method is not ConsumptionMethod.MEASURED:
             return None
-        return power * drying_hours(left, drying_left) / 1000
+        return learned_drying_power(
+            run, now, self._electricity.model(run), self._dried(run, now)
+        )
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running

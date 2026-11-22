@@ -21,6 +21,9 @@ from .rounding import rounded_sum
 # The running time a metered Run's base power is averaged over, so its start's
 # preheating soon stops counting.
 RECENT = timedelta(minutes=30)
+# The running time with and without drying a Run needs before its drying power is
+# learned from it.
+LEARNING = timedelta(minutes=10)
 
 
 def running_spans(run: Run, until: datetime) -> list[tuple[datetime, datetime]]:
@@ -116,6 +119,26 @@ def recent_power(
     return _watts(recent, measured) - (drying_power or 0.0) * dried / _seconds(recent)
 
 
+def learned_drying_power(
+    run: Run,
+    until: datetime,
+    measured: Model,
+    drying: Iterable[list[tuple[datetime, datetime]]],
+) -> float | None:
+    """The extra W a unit drew while drying in this Run: the average power while any
+    dried less the average while none did, per drying unit; None until each side ran
+    for `LEARNING`."""
+    drying = list(drying)
+    running = running_spans(run, until)
+    clear = _without(running, (span for unit in drying for span in unit))
+    dried = _without(running, clear)
+    if min(_seconds(clear), _seconds(dried)) < LEARNING.total_seconds():
+        return None
+    units = sum(_seconds(_within(unit, running)) for unit in drying)
+    extra = (_watts(dried, measured) - _watts(clear, measured)) * _seconds(dried)
+    return max(extra / units, 0.0)
+
+
 def drying_hours(left: timedelta, drying_left: Iterable[timedelta | None]) -> float:
     """The hours the drying units dry within the time `left`, added up: each for its
     drying left, or for all of the time left without one."""
@@ -140,11 +163,13 @@ def running_hours_rest(run: Run, hours_left: float) -> float | None:
 
 
 def project(
-    rests: Mapping[ProjectedPart, float | None], ends: datetime | None
+    rests: Mapping[ProjectedPart, float | None],
+    ends: datetime | None,
+    pending: Iterable[ProjectedPart] = (),
 ) -> Projection | None:
     """The rests that could be projected; None when none could, a rest of 0 counts."""
     projected = {part: rest for part, rest in rests.items() if rest is not None}
-    return Projection(projected, ends) if projected else None
+    return Projection(projected, ends, frozenset(pending)) if projected else None
 
 
 def projected_total(run: Run, decimals: int) -> Decimal | None:

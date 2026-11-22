@@ -96,6 +96,7 @@
       "max_bytes": 20971520
     },
     "projected_parts": [],
+    "projected_pending": [],
     "subtotals": {
       "electricity": 0.08,
       "water": 0.0,

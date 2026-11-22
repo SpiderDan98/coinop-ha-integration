@@ -130,6 +130,11 @@ def _detail(
             for part in ProjectedPart
             if run.projection and part in run.projection.rests
         ],
+        "projected_pending": [
+            part
+            for part in ProjectedPart
+            if run.projection and part in run.projection.pending
+        ],
         "subtotals": {
             kind: float(
                 rounded_sum(
