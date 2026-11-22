@@ -103,6 +103,7 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
             "attribute": "length_mm",
             "unit": "mm",
         },
+        "planned_material": None,
         "slots": [
             "sensor.ace_pro_slot_1",
             "sensor.ace_pro_slot_2",
@@ -185,6 +186,7 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
             "attribute": None,
             "unit": "mm",
         },
+        "planned_material": None,
         "slots": [
             "sensor.kobra_s1_ace_pro_ace_slot_1",
             "sensor.kobra_s1_ace_pro_ace_slot_2",

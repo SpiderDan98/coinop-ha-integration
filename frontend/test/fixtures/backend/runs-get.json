@@ -495,7 +495,7 @@
       "program": null,
       "running_seconds": 2700,
       "total": 0.25,
-      "projected_total": 0.49,
+      "projected_total": 0.68,
       "projected_end": "2026-01-15T12:00:00+00:00",
       "cost_per_part": 0.25,
       "cover": null,
@@ -510,6 +510,7 @@
       },
       "projected_parts": [
         "electricity",
+        "material",
         "running_hours"
       ],
       "subtotals": {

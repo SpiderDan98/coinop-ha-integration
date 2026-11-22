@@ -7,12 +7,16 @@ Source's current unit price. Nothing here is stored (ADR 0002).
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
+import math
 
 from custom_components.coinop.models import (
+    LineItem,
     ProjectedPart,
     Projection,
     QuantityBasis,
     Run,
+    Usage,
+    UsageUnit,
 )
 
 from .consumption import Model
@@ -67,6 +71,53 @@ def expected_energy_rest(expected: float, so_far: float, total: bool) -> float:
     """The kWh still to come from the Expected energy: itself, or as the Run's
     `total` what the `so_far` kWh leave of it, at least 0."""
     return max(expected - so_far, 0.0) if total else expected
+
+
+def material_rest(
+    measured: Usage | None,
+    planned: tuple[float, UsageUnit] | None,
+    percent: float | None,
+    items: list[LineItem],
+) -> tuple[float, UsageUnit] | None:
+    """The Material still to come in mm or g: what the plan leaves of the `measured`
+    total, else as much per percent as so far once past `MIN_PROGRESS`; None while
+    neither tells. The measured Line Items' Materials convert between the two."""
+    if planned is not None:
+        total, unit = planned
+        so_far = _measured_in(measured, unit, items)
+        return None if so_far is None else (max(total - so_far, 0.0), unit)
+    if measured is None or percent is None or percent < MIN_PROGRESS:
+        return None
+    return measured.value * (100 - percent) / percent, measured.unit
+
+
+def _measured_in(
+    measured: Usage | None, unit: UsageUnit, items: list[LineItem]
+) -> float | None:
+    """The `measured` total in `unit`; None where a Material can't convert it."""
+    if measured is None:
+        return 0.0
+    if measured.unit is unit:
+        return measured.value
+    if unit is UsageUnit.GRAM:
+        grams = [item.quantity for item in items]
+        return None if None in grams else sum(g for g in grams if g is not None)
+    lengths = [_length(item) for item in items]
+    return None if None in lengths else sum(m for m in lengths if m is not None)
+
+
+def _length(item: LineItem) -> float | None:
+    """The mm of filament the Line Item's grams make; None without the Material's
+    density and diameter."""
+    material = item.material
+    if (
+        item.quantity is None
+        or material is None
+        or not material.density
+        or not material.diameter
+    ):
+        return None
+    return item.quantity / material.density * 1000 / (math.pi * (material.diameter / 2) ** 2)
 
 
 def running_hours_rest(run: Run, hours_left: float) -> float | None:

@@ -226,6 +226,8 @@ class DeviceConfig:
     program_ignored: frozenset[str]
     # The Material used input: entity_id, attribute and unit.
     material: Mapping[str, Any] | None
+    # The Planned material input, in the Material used input's shape.
+    planned_material: Mapping[str, Any] | None
     # The Slot entities in Slot order, their colour attribute and the Loaded slot input.
     slots: tuple[str, ...]
     colour_attribute: str | None
@@ -268,6 +270,7 @@ class DeviceConfig:
             program_attribute=program.get("attribute"),
             program_ignored=frozenset(program.get("ignored", ())),
             material=job.get("material"),
+            planned_material=job.get("planned_material"),
             slots=tuple(job.get("slots", ())),
             colour_attribute=job.get("colour_attribute"),
             loaded_slot_entity_id=job.get("loaded_slot"),

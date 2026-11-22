@@ -182,6 +182,8 @@
             "attribute": "Attribute (optional)",
             "material_entity_id": "Material used entity (optional)",
             "material_attribute": "Material used attribute (optional)",
+            "planned_material_entity_id": "Planned material entity (optional)",
+            "planned_material_attribute": "Planned material attribute (optional)",
             "slots": "Slot entities (optional)",
             "colour_attribute": "Slot colour attribute (optional)",
             "loaded_slot": "Loaded slot entity (optional)"
@@ -191,6 +193,8 @@
             "attribute": "Read this attribute instead of the entity's state, e.g. the file name attribute of an event entity that fires for each job.",
             "material_entity_id": "The Device's measured total for the job, as a length (e.g. mm of filament) or a mass (g). A length is converted to grams through the Material's diameter and density. Without it, each Run gets a Material Line Item with an empty quantity to fill in.",
             "material_attribute": "Read this attribute instead of the entity's state, e.g. the length attribute of a filament sensor.",
+            "planned_material_entity_id": "The total the slicer planned for the job, as a length or a mass. While a Run is open, the Material still to come is the plan minus what was used so far. Without a plan, Coin-op takes it from the Material used so far and the Progress, once the Run is 5 % done. Only used together with Material used.",
+            "planned_material_attribute": "Read the Planned material from this attribute instead of the entity's state.",
             "slots": "One entity per Slot of a multi-material unit, in Slot order: the first is Slot 1. Each reports the type of the Material in it (e.g. PLA) as its state.",
             "colour_attribute": "The attribute of the Slot entities that carries the Material's colour as a hex code, e.g. color_hex.",
             "loaded_slot": "Reports the number of the Slot the Device takes its Material from right now; any other value means no Slot. Each Slot reported during a Run is matched to a Material by type and colour."
@@ -199,6 +203,13 @@
         "material_unit": {
           "title": "Unit of the Material used attribute",
           "description": "In which unit does the attribute report the Material used? It must be a length or a mass.",
+          "data": {
+            "unit": "Unit"
+          }
+        },
+        "planned_material_unit": {
+          "title": "Unit of the Planned material",
+          "description": "In which unit does the Planned material report the job's total? It must be a length or a mass.",
           "data": {
             "unit": "Unit"
           }

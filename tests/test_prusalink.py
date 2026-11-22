@@ -62,6 +62,7 @@ async def test_quick_start_adds_a_prusalink_printer_with_its_job_preview(
         "entity_id": printer["job.filename"],
         "attribute": None,
         "material": None,
+        "planned_material": None,
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,

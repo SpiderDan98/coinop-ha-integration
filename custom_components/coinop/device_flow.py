@@ -87,6 +87,7 @@ UNUSED: dict[str, dict[str, Any]] = {
         "entity_id": None,
         "attribute": None,
         "material": None,
+        "planned_material": None,
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
@@ -111,6 +112,13 @@ SOURCE_NEEDS: dict[str, dict[StrEnum, Capability]] = {
     },
     WATER.source_key: {WaterSource.PER_PROGRAM: Capability.PROGRAM_CONSUMPTION},
 }
+
+
+def _usage_input(entity_id: str | None, attribute: str | None) -> dict[str, Any] | None:
+    """A Material used or Planned material input, its unit still to be found."""
+    if not entity_id:
+        return None
+    return {"entity_id": entity_id, "attribute": attribute or None, "unit": None}
 
 
 def _watts(minimum: float) -> NumberSelector:
@@ -814,35 +822,44 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             material = user_input.get("material_entity_id")
+            # A plan only says what is still to come of a measured total.
+            planned = user_input.get("planned_material_entity_id") if material else None
             self._job = {
                 "entity_id": user_input.get("entity_id"),
                 "attribute": user_input.get("attribute") or None,
-                "material": {
-                    "entity_id": material,
-                    "attribute": user_input.get("material_attribute") or None,
-                    "unit": None,
-                }
-                if material
-                else None,
+                "material": _usage_input(
+                    material, user_input.get("material_attribute")
+                ),
+                "planned_material": _usage_input(
+                    planned, user_input.get("planned_material_attribute")
+                ),
                 "slots": list(user_input.get("slots", [])),
                 "colour_attribute": user_input.get("colour_attribute") or None,
                 "loaded_slot": user_input.get("loaded_slot"),
             }
-            usage = self._job["material"]
-            if usage is None:
-                return await self._job_done()
-            if usage["attribute"]:
-                return await self.async_step_material_unit()
-            usage["unit"] = entity_unit(self.hass, usage["entity_id"])
-            if usage_scale(usage["unit"]):
-                return await self._job_done()
-            errors["material_entity_id"] = "not_length_or_mass"
+            usage, planned_usage = self._job["material"], self._job["planned_material"]
+            if usage and not usage["attribute"]:
+                usage["unit"] = entity_unit(self.hass, usage["entity_id"])
+                if not usage_scale(usage["unit"]):
+                    errors["material_entity_id"] = "not_length_or_mass"
+            if planned_usage and not planned_usage["attribute"]:
+                planned_usage["unit"] = entity_unit(
+                    self.hass, planned_usage["entity_id"]
+                )
+                if planned_usage["unit"] and not usage_scale(planned_usage["unit"]):
+                    errors["planned_material_entity_id"] = "not_length_or_mass"
+            if not errors:
+                if usage and usage["attribute"]:
+                    return await self.async_step_material_unit()
+                return await self._material_done()
         schema = vol.Schema(
             {
                 vol.Optional("entity_id"): EntitySelector(),
                 vol.Optional("attribute"): TextSelector(),
                 vol.Optional("material_entity_id"): EntitySelector(),
                 vol.Optional("material_attribute"): TextSelector(),
+                vol.Optional("planned_material_entity_id"): EntitySelector(),
+                vol.Optional("planned_material_attribute"): TextSelector(),
                 # The order picked is the Slot order.
                 vol.Optional("slots"): EntitySelector(
                     EntitySelectorConfig(multiple=True, reorder=True)
@@ -853,6 +870,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         )
         stored = self._data.get("job") or {}
         usage = stored.get("material") or {}
+        planned_usage = stored.get("planned_material") or {}
         return self.async_show_form(
             step_id="job",
             data_schema=self.add_suggested_values_to_schema(
@@ -862,6 +880,8 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 | {
                     "material_entity_id": usage.get("entity_id"),
                     "material_attribute": usage.get("attribute"),
+                    "planned_material_entity_id": planned_usage.get("entity_id"),
+                    "planned_material_attribute": planned_usage.get("attribute"),
                 },
             ),
             errors=errors,
@@ -870,11 +890,28 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_material_unit(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        return await self._usage_unit("material_unit", "material", user_input)
+
+    async def async_step_planned_material_unit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._usage_unit(
+            "planned_material_unit", "planned_material", user_input
+        )
+
+    async def _usage_unit(
+        self, step_id: str, key: str, user_input: dict[str, Any] | None
+    ) -> SubentryFlowResult:
+        """Ask the unit of the job's `key` input, which reports none of its own."""
         errors: dict[str, str] = {}
         if user_input is not None:
             if usage_scale(user_input["unit"]):
-                self._job["material"]["unit"] = user_input["unit"]
-                return await self._job_done()
+                self._job[key]["unit"] = user_input["unit"]
+                return (
+                    await self._material_done()
+                    if key == "material"
+                    else await self._job_done()
+                )
             errors["unit"] = "not_length_or_mass"
         schema = vol.Schema(
             {
@@ -883,14 +920,20 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
                 )
             }
         )
-        stored = (self._data.get("job") or {}).get("material")
+        stored = (self._data.get("job") or {}).get(key)
         return self.async_show_form(
-            step_id="material_unit",
+            step_id=step_id,
             data_schema=self.add_suggested_values_to_schema(
                 schema, user_input or stored
             ),
             errors=errors,
         )
+
+    async def _material_done(self) -> SubentryFlowResult:
+        planned = self._job["planned_material"]
+        if planned and not usage_scale(planned["unit"]):
+            return await self.async_step_planned_material_unit()
+        return await self._job_done()
 
     async def _job_done(self) -> SubentryFlowResult:
         self._data["job"] = self._job

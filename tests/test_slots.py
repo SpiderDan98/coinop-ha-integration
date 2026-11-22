@@ -76,6 +76,7 @@ async def test_the_slots_are_stored_in_order_with_the_job(hass: HomeAssistant) -
         "entity_id": None,
         "attribute": None,
         "material": None,
+        "planned_material": None,
         "slots": [SLOTS[2], SLOTS[0]],
         "colour_attribute": "color_hex",
         "loaded_slot": LOADED,

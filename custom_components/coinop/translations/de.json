@@ -182,6 +182,8 @@
             "attribute": "Attribut (optional)",
             "material_entity_id": "Materialverbrauch-Entität (optional)",
             "material_attribute": "Materialverbrauch-Attribut (optional)",
+            "planned_material_entity_id": "Geplantes-Material-Entität (optional)",
+            "planned_material_attribute": "Geplantes-Material-Attribut (optional)",
             "slots": "Fach-Entitäten (optional)",
             "colour_attribute": "Farb-Attribut der Fächer (optional)",
             "loaded_slot": "Entität für das geladene Fach (optional)"
@@ -191,6 +193,8 @@
             "attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Dateinamen-Attribut einer Ereignis-Entität, die für jeden Auftrag auslöst.",
             "material_entity_id": "Die vom Gerät gemessene Gesamtmenge des Auftrags, als Länge (z. B. mm Filament) oder Masse (g). Eine Länge wird über Durchmesser und Dichte des Materials in Gramm umgerechnet. Ohne sie bekommt jeder Lauf einen Material-Posten mit leerer Menge zum Ausfüllen.",
             "material_attribute": "Dieses Attribut statt des Zustands der Entität lesen, z. B. das Längen-Attribut eines Filament-Sensors.",
+            "planned_material_entity_id": "Die vom Slicer für den Auftrag geplante Gesamtmenge, als Länge oder Masse. Solange ein Lauf offen ist, ist das noch kommende Material der Plan abzüglich des bisherigen Verbrauchs. Ohne Plan leitet Coin-op es aus dem bisherigen Materialverbrauch und dem Fortschritt ab, sobald der Lauf zu 5 % fertig ist. Nur zusammen mit dem Materialverbrauch genutzt.",
+            "planned_material_attribute": "Das geplante Material aus diesem Attribut lesen statt aus dem Zustand der Entität.",
             "slots": "Eine Entität je Fach einer Mehrmaterial-Einheit, in Fach-Reihenfolge: die erste ist Fach 1. Jede meldet als Zustand den Typ des eingelegten Materials (z. B. PLA).",
             "colour_attribute": "Das Attribut der Fach-Entitäten, das die Farbe des Materials als Hex-Code enthält, z. B. color_hex.",
             "loaded_slot": "Meldet die Nummer des Fachs, aus dem das Gerät gerade sein Material nimmt; jeder andere Wert bedeutet kein Fach. Jedes während eines Laufs gemeldete Fach wird über Typ und Farbe einem Material zugeordnet."
@@ -199,6 +203,13 @@
         "material_unit": {
           "title": "Einheit des Materialverbrauch-Attributs",
           "description": "In welcher Einheit meldet das Attribut den Materialverbrauch? Es muss eine Länge oder eine Masse sein.",
+          "data": {
+            "unit": "Einheit"
+          }
+        },
+        "planned_material_unit": {
+          "title": "Einheit des geplanten Materials",
+          "description": "In welcher Einheit meldet das geplante Material die Gesamtmenge des Auftrags? Es muss eine Länge oder eine Masse sein.",
           "data": {
             "unit": "Einheit"
           }

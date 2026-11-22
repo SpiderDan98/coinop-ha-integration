@@ -42,6 +42,7 @@ from .cost.material import (
 from .cost.pricing import priced_line_item
 from .cost.projection import (
     expected_energy_rest,
+    material_rest,
     progress_time_left,
     project,
     recent_power,
@@ -145,8 +146,9 @@ class DeviceTracker:
         self._finalised: dict[str, asyncio.Future[None]] = {}
         # The progress inputs' states before their last change.
         self._progress_before: dict[str, State] = {}
-        # The open Run's last pause's start and the time left held through it.
-        self._held: tuple[datetime, timedelta | None] | None = None
+        # The open Run's last pause's start, and the time left and Progress held
+        # through it.
+        self._held: tuple[datetime, timedelta | None, float | None] | None = None
         self._finishing: set[str] = set()
         self._electricity = Metering(
             hass,
@@ -241,11 +243,13 @@ class DeviceTracker:
                     self._hass, [loaded_slot, *self._config.slots], self._on_slot
                 )
             )
+        planned = self._config.planned_material
         if progress := [
             entity_id
             for entity_id in (
                 self._config.remaining_time_entity_id,
                 self._config.progress_entity_id,
+                planned and planned["entity_id"],
             )
             if entity_id
         ]:
@@ -1046,8 +1050,10 @@ class DeviceTracker:
     def _slot_fell_back(self, slot: SlotReport) -> bool:
         return slot_material(slot, self._catalog.materials()) is None
 
-    def _measured_items(self, run: Run, until: datetime) -> list[LineItem]:
-        """The measured total attributed through the loaded Slots, else to the default."""
+    def _measured_items(
+        self, run: Run, until: datetime, usage: Usage | None
+    ) -> list[LineItem]:
+        """The `usage` attributed through the loaded Slots, else to the default."""
         ids = {i.material_id: i.id for i in run.line_items if i.measured}
         spare = list(ids.values())
 
@@ -1060,10 +1066,10 @@ class DeviceTracker:
 
         shares = slot_shares(run.loaded_slots, run.pauses, until)
         if not shares:
-            return [material_line_item(item_id(None), run.usage, self._material())]
+            return [material_line_item(item_id(None), usage, self._material())]
         materials = self._catalog.materials()
         return slot_line_items(
-            run.usage,
+            usage,
             shares,
             lambda slot: slot_material(slot, materials) or self._material(),
             item_id,
@@ -1119,7 +1125,9 @@ class DeviceTracker:
         ]
         # A quantity without measurement or fallback keeps a Line Item entered by hand.
         kinds = {item.kind for item in consumed}
-        materials = self._measured_items(run, until) if self._config.material else []
+        materials = (
+            self._measured_items(run, until, run.usage) if self._config.material else []
+        )
         doses = self._doses(run)
         run.line_items = [
             *consumed,
@@ -1145,6 +1153,7 @@ class DeviceTracker:
                 ProjectedPart.ELECTRICITY: None
                 if kwh is None
                 else kwh * self._electricity.price_now(run),
+                ProjectedPart.MATERIAL: self._material_rest(run, now),
                 ProjectedPart.RUNNING_HOURS: None
                 if hours is None
                 else running_hours_rest(run, hours),
@@ -1155,18 +1164,31 @@ class DeviceTracker:
     def _time_left(self, run: Run, now: datetime) -> timedelta | None:
         """The open Run's time left, held through a pause at its value from before
         it; None while unknown."""
-        if run.paused:
-            start = run.pauses[-1].start
-            if self._held is None or self._held[0] != start:
-                self._hold_time_left(run, start)
-            assert self._held is not None
-            if self._held[1] is not None:
-                return self._held[1]
+        if (held := self._held_now(run)) and held[1] is not None:
+            return held[1]
         return self._time_left_at(run, now, self._hass.states.get)
 
+    def _percent(self, run: Run) -> float | None:
+        """The open Run's Progress, held through a pause like the time left."""
+        if (held := self._held_now(run)) and held[2] is not None:
+            return held[2]
+        progress = self._config.progress_entity_id
+        return progress_reading(self._hass.states.get(progress)) if progress else None
+
+    def _held_now(
+        self, run: Run
+    ) -> tuple[datetime, timedelta | None, float | None] | None:
+        """What is held through the open Run's current pause; None while it runs."""
+        if not run.paused:
+            return None
+        start = run.pauses[-1].start
+        if self._held is None or self._held[0] != start:
+            self._hold_time_left(run, start)
+        return self._held
+
     def _hold_time_left(self, run: Run, start: datetime) -> None:
-        """Hold the time left as the progress inputs gave it before the pause at
-        `start`, so they may drop to 0 or unknown while paused."""
+        """Hold the time left and Progress as the progress inputs gave them before
+        the pause at `start`, so they may drop to 0 or unknown while paused."""
 
         def before(entity_id: str) -> State | None:
             state = self._hass.states.get(entity_id)
@@ -1174,7 +1196,12 @@ class DeviceTracker:
                 return state
             return self._progress_before.get(entity_id)
 
-        self._held = start, self._time_left_at(run, start, before)
+        progress = self._config.progress_entity_id
+        self._held = (
+            start,
+            self._time_left_at(run, start, before),
+            progress_reading(before(progress)) if progress else None,
+        )
 
     def _time_left_at(
         self, run: Run, at: datetime, state: Callable[[str], State | None]
@@ -1188,6 +1215,27 @@ class DeviceTracker:
         progress = self._config.progress_entity_id
         percent = progress_reading(state(progress)) if progress else None
         return None if percent is None else progress_time_left(run, at, percent)
+
+    def _material_rest(self, run: Run, now: datetime) -> float | None:
+        """What the Material still to come costs, priced like the measured Line
+        Items; None for a Run without a Material used input or a rest to tell."""
+        if self._config.material is None:
+            return None
+        planned = self._config.planned_material
+        rest = material_rest(
+            run.usage,
+            usage_reading(self._hass.states.get(planned["entity_id"]), planned)
+            if planned
+            else None,
+            self._percent(run),
+            [i for i in run.line_items if i.measured],
+        )
+        if rest is None:
+            return None
+        items = self._measured_items(run, now, Usage(now, *rest))
+        if any(item.quantity is None for item in items):
+            return None
+        return sum(item.amount for item in items)
 
     def _electricity_rest(
         self, run: Run, now: datetime, hours: float | None

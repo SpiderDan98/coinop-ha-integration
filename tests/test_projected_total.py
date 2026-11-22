@@ -10,6 +10,8 @@ import pytest
 from .clock import Clock
 from .devices import ENERGY, add_device, add_hub
 from .test_ev_chargers import add_charger, set_charger, set_session
+from .stored import place_materials, stored_material
+from .test_material_usage import GRAMS_PER_METRE, add_measuring_device, set_usage
 from .test_measured import set_meter
 from .test_runs import set_status, stored_runs
 from .test_templates import WEAR, add_template, create
@@ -415,3 +417,41 @@ async def test_the_runs_total_energy_leaves_what_was_measured_and_comes_first(
 
     await set_expected(hass, 4)
     assert float(projected(hass, CHARGER_PROJECTED).state) == pytest.approx(1.50)
+
+
+PLANNED = "sensor.kobra_planned_filament"
+
+
+async def set_planned(hass: HomeAssistant, planned: float | str, unit: str = "g") -> None:
+    hass.states.async_set(PLANNED, str(planned), {"unit_of_measurement": unit})
+    await hass.async_block_till_done()
+
+
+async def add_planning_printer(
+    hass: HomeAssistant, panel: PanelClient, hass_storage: dict[str, Any], **inputs: Any
+) -> None:
+    """Material used in mm and nothing else to cost, on the default PLA at 0.02 a gram."""
+    place_materials(hass_storage, stored_material("pla"))
+    await add_measuring_device(hass, panel, source="none", **inputs)
+
+
+async def test_a_planned_mass_leaves_what_the_measured_length_weighs(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    await set_planned(hass, 50)
+    await add_planning_printer(hass, panel, hass_storage, planned_material=PLANNED)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_usage(hass, 1000)
+
+    # 1 m weighs 2.98 g of the 50 planned: 0.06 so far, 0.94 to come.
+    assert float(projected(hass).state) == pytest.approx(1.00)
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    run = (await panel.call("coinop/runs/get", run_id=summary["id"]))["run"]
+    assert run["projected_parts"] == ["material"]
+
+    # Past the plan, nothing more is to come.
+    await set_usage(hass, 20000)
+    assert float(projected(hass).state) == pytest.approx(
+        round(20 * GRAMS_PER_METRE * 0.02, 2)
+    )

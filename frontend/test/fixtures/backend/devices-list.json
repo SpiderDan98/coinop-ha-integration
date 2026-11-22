@@ -44,6 +44,11 @@
             "attribute": null,
             "unit": "mm"
           },
+          "planned_material": {
+            "entity_id": "sensor.kobra_planned_filament",
+            "attribute": null,
+            "unit": "g"
+          },
           "slots": [],
           "colour_attribute": null,
           "loaded_slot": null

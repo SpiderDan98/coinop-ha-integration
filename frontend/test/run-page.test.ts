@@ -124,9 +124,9 @@ describe("Run page", () => {
   it("shows an open Run's Projected Total, its expected end and what it includes", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/print-live" });
 
-    expect(text(query(panel, ".totals .projected"))).toBe("Projected Total ≈ €0.49");
+    expect(text(query(panel, ".totals .projected"))).toBe("Projected Total ≈ €0.68");
     expect(text(query(panel, ".totals .projection"))).toBe(
-      "Expected end Jan 15, 2026, 12:00 PM · Includes electricity and running hours",
+      "Expected end Jan 15, 2026, 12:00 PM · Includes electricity, material, and running hours",
     );
   });
 
@@ -171,9 +171,9 @@ describe("Run page", () => {
       path: "/run/print-live",
     });
 
-    expect(text(query(panel, ".totals .projected"))).toBe("Voraussichtlich ≈ 0,49 €");
+    expect(text(query(panel, ".totals .projected"))).toBe("Voraussichtlich ≈ 0,68 €");
     expect(text(query(panel, ".totals .projection"))).toBe(
-      "Voraussichtliches Ende 15.01.2026, 12:00 · Enthält Strom und Betriebsstunden",
+      "Voraussichtliches Ende 15.01.2026, 12:00 · Enthält Strom, Material und Betriebsstunden",
     );
   });
 

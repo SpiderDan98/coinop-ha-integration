@@ -45,6 +45,7 @@
             "attribute": null,
             "unit": "g"
           },
+          "planned_material": null,
           "slots": [],
           "colour_attribute": null,
           "loaded_slot": null

@@ -90,6 +90,7 @@ async def test_quick_start_adds_an_elegoo_printer_with_every_input(
             "attribute": None,
             "unit": "mm",
         },
+        "planned_material": None,
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,

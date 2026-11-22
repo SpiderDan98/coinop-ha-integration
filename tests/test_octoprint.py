@@ -69,6 +69,7 @@ async def test_quick_start_adds_an_octoprint_printer_with_every_input(
         "entity_id": printer["Current File"],
         "attribute": None,
         "material": None,
+        "planned_material": None,
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,

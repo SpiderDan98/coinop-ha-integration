@@ -167,6 +167,9 @@ async def add_device(
     material: str | None = None,
     material_attribute: str | None = None,
     material_unit: str | None = None,
+    planned_material: str | None = None,
+    planned_material_attribute: str | None = None,
+    planned_material_unit: str | None = None,
     slots: list[str] | None = None,
     colour_attribute: str | None = None,
     loaded_slot: str | None = None,
@@ -185,7 +188,9 @@ async def add_device(
     "none" nothing, and no price either.
     A fixed `price` is a number; a dict is the price entity step's input.
     `material` is the Material used entity; with `material_attribute`, `material_unit`
-    answers the unit step. `slots` are the Slot entities in Slot order.
+    answers the unit step. `planned_material` is the Planned material entity, and
+    `planned_material_unit` answers its unit step. `slots` are the Slot entities in
+    Slot order.
     `remaining_time` and `progress` answer the progress step, as in every `add_...`
     helper here.
     """
@@ -201,6 +206,8 @@ async def add_device(
             ("attribute", job_attribute),
             ("material_entity_id", material),
             ("material_attribute", material_attribute),
+            ("planned_material_entity_id", planned_material),
+            ("planned_material_attribute", planned_material_attribute),
             ("slots", slots),
             ("colour_attribute", colour_attribute),
             ("loaded_slot", loaded_slot),
@@ -211,6 +218,9 @@ async def add_device(
     if material_attribute:
         assert result["step_id"] == "material_unit", result.get("errors")
         result = await configure(hass, result, {"unit": material_unit})
+    if planned_material_unit:
+        assert result["step_id"] == "planned_material_unit", result.get("errors")
+        result = await configure(hass, result, {"unit": planned_material_unit})
     assert result["step_id"] == "images", result.get("errors")
     result = await configure(hass, result, images_input(thumbnail, camera, snapshot))
     estimate = {"running_power": running_power} | (

@@ -26,12 +26,12 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, started);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min Batch 7 In progress €0.00 ≈ €0.05",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 0 min Batch 7 In progress €0.00 ≈ €0.35",
     );
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     expect(tiles(panel)[0]).toBe(
-      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 In progress €0.25 ≈ €0.49",
+      "No image Untitled Run Kobra · Jan 15, 2026 · 45 min Batch 7 In progress €0.25 ≈ €0.68",
     );
     backend.push(SUBSCRIBE, ended);
     await settle(panel);
@@ -50,7 +50,7 @@ describe("Run gallery", () => {
     backend.push(SUBSCRIBE, updated);
     await settle(panel);
     const projected = query(panel, ".tile .projected");
-    expect(text(projected)).toBe("≈ €0.49");
+    expect(text(projected)).toBe("≈ €0.68");
     expect(projected.classList).toContain("muted");
     expect(projected.title).toBe("Projected Total");
     backend.push(SUBSCRIBE, { ...updated, run: { ...updated.run, projected_total: null } });

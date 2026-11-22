@@ -38,6 +38,7 @@
   "run.projected_end": "Voraussichtliches Ende {end}",
   "run.projected_parts": "Enthält {parts}",
   "projected_part.electricity": "Strom",
+  "projected_part.material": "Material",
   "projected_part.running_hours": "Betriebsstunden",
   "run.cost_per_part": "Kosten pro Teil ({count})",
   "run.per_part": "{amount} pro Teil × {count}",
