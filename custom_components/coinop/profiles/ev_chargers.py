@@ -21,6 +21,7 @@ from .base import (
     expected_energy,
     found,
     mapping,
+    progress_inputs,
 )
 
 DEVICE_TYPES = (DEVICE_TYPE_EV_CHARGER,)
@@ -104,7 +105,7 @@ def evcc(find: Find) -> dict[str, Any]:
             session="_charged_energy",
             session_first=True,
         ),
-        "progress": found(remaining, remaining_time=remaining)
+        "progress": progress_inputs(remaining, None)
         | expected_energy(
             find("sensor", "_charge_remaining_energy"), ExpectedEnergyForm.REMAINING
         ),

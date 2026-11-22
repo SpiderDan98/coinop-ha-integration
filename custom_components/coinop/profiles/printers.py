@@ -109,8 +109,7 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
         | found(
             filament, material={"entity_id": filament, "attribute": None, "unit": "mm"}
         )
-        # The slicer's plan declares no unit: grams, as its library's gcode
-        # `filament_used` is.
+        # Its plan declares no unit and none is confirmed upstream: grams assumed.
         | _planned(filament, job, "g", attribute="estimated_filament")
         | found(slots, slots=slots, colour_attribute="color_hex")
         | found(loaded, loaded_slot=loaded)
@@ -350,7 +349,6 @@ def elegoo(find: Find) -> dict[str, Any]:
         | _planned(extrusion, find("sensor", "_total_filament_used"), "g"),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
-        # Milliseconds.
         "progress": progress_inputs(
             find("sensor", "_ticks_remaining"), find("sensor", "_percent_complete")
         ),
