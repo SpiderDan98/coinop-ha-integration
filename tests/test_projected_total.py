@@ -178,10 +178,20 @@ async def test_the_panel_gets_the_projected_total_its_end_and_what_it_includes(
     assert (summary["projected_total"], summary["projected_end"]) == (None, None)
 
 
-async def add_timed_printer(hass: HomeAssistant, **inputs: str) -> None:
-    """200 W on average powers at 0.30 per kWh: 0.06 an hour."""
+async def add_timed_printer(
+    hass: HomeAssistant, remaining_time: str | None = None, progress: str | None = None
+) -> None:
+    """200 W on average powers, none while paused, at 0.30 per kWh: 0.06 an hour."""
     entry = await add_hub(hass)
-    await add_device(hass, entry, running_power=200, price=0.30, **inputs)
+    await add_device(
+        hass,
+        entry,
+        running_power=200,
+        paused_power=0,
+        price=0.30,
+        remaining_time=remaining_time,
+        progress=progress,
+    )
 
 
 @pytest.mark.parametrize(
@@ -266,3 +276,83 @@ async def test_a_remaining_time_comes_before_the_progress(
 
     await set_remaining(hass, 30)
     assert float(projected(hass).state) == pytest.approx(0.03 + 0.03)
+
+
+@pytest.mark.parametrize("dropped", ["0", STATE_UNKNOWN])
+async def test_a_pause_holds_the_time_left_from_before_it(
+    hass: HomeAssistant, clock: Clock, dropped: str
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    await set_status(hass, "printing")
+    await set_remaining(hass, 90)
+    await clock.advance(minutes=30)
+    await set_remaining(hass, 60)
+    await clock.advance(seconds=10)
+
+    await set_status(hass, "paused")
+    await set_remaining(hass, dropped)
+    await clock.advance(minutes=20)
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.03 + 0.06)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=60)
+
+    await set_status(hass, "printing")
+    await set_remaining(hass, 50)
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.05)
+
+
+async def test_a_time_left_dropped_right_before_the_pause_is_still_held(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    await set_status(hass, "printing")
+    await set_remaining(hass, 90)
+    await clock.advance(minutes=30)
+
+    # The integration wrote its time left a moment before its Status.
+    await set_remaining(hass, 0)
+    await set_status(hass, "paused")
+    await set_remaining(hass, STATE_UNKNOWN)
+
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09)
+
+
+async def test_a_held_finish_time_leaves_the_time_from_the_pauses_start(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    finish = clock.now() + timedelta(hours=1)
+    hass.states.async_set(REMAINING, finish.isoformat(), {"device_class": "timestamp"})
+    await clock.advance(minutes=10)
+
+    await set_status(hass, "paused")
+    await set_remaining(hass, STATE_UNKNOWN)
+    await clock.advance(minutes=20)
+
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.04 + 0.05)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=50)
+
+
+async def test_a_pause_holds_the_time_left_from_the_progress(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, progress=PROGRESS)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=29)
+    await set_progress(hass, 25)
+    await clock.advance(minutes=1)
+
+    await set_status(hass, "paused")
+    await set_progress(hass, 0)
+    await clock.advance(minutes=20)
+
+    # 30 minutes for 25 %, the pause not counted: 90 more.
+    assert float(projected(hass).state) == pytest.approx(0.03 + 0.09)
+
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    await set_progress(hass, 50)
+    assert float(projected(hass).state) == pytest.approx(0.06 + 0.06)
