@@ -104,6 +104,23 @@ async def test_quick_start_adds_an_elegoo_printer_with_every_input(
     }
 
 
+async def test_a_cc2_elegoo_printer_plans_its_material_in_grams(
+    hass: HomeAssistant,
+) -> None:
+    printer = add_elegoo(hass, cc2=True)
+    register(hass, POWER, "W")
+    entry = await add_hub(hass)
+
+    data = await quick_start(hass, entry, printer.device.id, meter=POWER, price=0.3)
+
+    # Its total declares no unit: the slicer's grams.
+    assert data["job"]["planned_material"] == {
+        "entity_id": printer["total_filament_used"],
+        "attribute": None,
+        "unit": "g",
+    }
+
+
 async def test_a_resin_elegoo_printer_has_no_material_used(
     hass: HomeAssistant,
 ) -> None:

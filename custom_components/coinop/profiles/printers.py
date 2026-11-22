@@ -26,6 +26,16 @@ def _drying(*units: tuple[str | None, str | None]) -> dict[str, Any]:
     return {"drying": drying} if drying else {}
 
 
+def _planned(
+    material: str | None, planned: str | None, unit: str, attribute: str | None = None
+) -> dict[str, Any]:
+    """The Planned material input, kept only next to a Material used input."""
+    return found(
+        material and planned,
+        planned_material={"entity_id": planned, "attribute": attribute, "unit": unit},
+    )
+
+
 def anycubic(find: Find) -> dict[str, Any]:
     """chrisfore/anycubic_ha_local: unique ids `<serial>_<key>`, the ACE `<serial>_ace0_<key>`."""
     status = find("event", "_print_event")
@@ -99,6 +109,9 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
         | found(
             filament, material={"entity_id": filament, "attribute": None, "unit": "mm"}
         )
+        # The slicer's plan declares no unit: grams, as its library's gcode
+        # `filament_used` is.
+        | _planned(filament, job, "g", attribute="estimated_filament")
         | found(slots, slots=slots, colour_attribute="color_hex")
         | found(loaded, loaded_slot=loaded)
         # Its drying left declares no unit: minutes, as its own card shows them.
@@ -144,6 +157,8 @@ def bambu_lab(find: Find) -> dict[str, Any]:
         ),
         "job": entity_input(job)
         | found(weight, material={"entity_id": weight, "attribute": None, "unit": "g"})
+        # Measured and planned alike, so no Material is still to come.
+        | _planned(weight, weight, "g")
         # Only an AMS that dries has these, each on its own HA device.
         | _drying(
             *(
@@ -265,7 +280,8 @@ def creality(find: Find) -> dict[str, Any]:
         "job": found(status, entity_id=status, attribute="file")
         | found(
             material, material={"entity_id": material, "attribute": None, "unit": "cm"}
-        ),
+        )
+        | _planned(material, find("sensor", "-expected_material_length"), "cm"),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         "progress": progress_inputs(
@@ -329,7 +345,9 @@ def elegoo(find: Find) -> dict[str, Any]:
         | found(
             extrusion,
             material={"entity_id": extrusion, "attribute": None, "unit": "mm"},
-        ),
+        )
+        # The CC2 protocol's slicer total, in grams though it declares no unit.
+        | _planned(extrusion, find("sensor", "_total_filament_used"), "g"),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         # Milliseconds.

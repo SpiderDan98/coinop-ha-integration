@@ -18,10 +18,12 @@ from .devices import (
     start_reconfigure,
 )
 from .registry import HaDevice, add_bambu_lab
+from .stored import place_materials, stored_material
 from .test_integration_profiles import accepted, walk_pre_filled
 from .test_lifecycle import at
 from .test_quick_start import offered, open_add_device, quick_start, register
 from .test_runs import stored_runs
+from .websocket import PanelClient
 
 MAPPING = {
     "running": ["running", "prepare"],
@@ -66,7 +68,11 @@ async def test_quick_start_adds_a_bambu_lab_printer_with_every_input(
             "attribute": None,
             "unit": "g",
         },
-        "planned_material": None,
+        "planned_material": {
+            "entity_id": printer["print_weight"],
+            "attribute": None,
+            "unit": "g",
+        },
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,
@@ -326,3 +332,32 @@ async def test_detect_again_offers_the_ams_drying_without_slots(
             "drying_left": "sensor.ams_1_remaining_drying_time",
         }
     ]
+
+
+async def test_a_bambu_lab_prints_planned_weight_leaves_no_material_to_come(
+    hass: HomeAssistant, clock: Clock, panel: PanelClient, hass_storage: dict[str, Any]
+) -> None:
+    place_materials(hass_storage, stored_material("pla"))
+    printer = add_bambu_lab(hass)
+    await report_status(hass, printer["print_status"], "idle")
+    entry = await add_hub(hass)
+    _, device = await walk_pre_filled(hass, entry, printer)
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device.subentry_id,
+        settings={"default_material": "pla"},
+    )
+
+    await report_status(hass, printer["print_status"], "running")
+    await set_weight(hass, printer, 12.5)
+    await clock.advance(hours=1)
+    percent = {"unit_of_measurement": "%"}
+    hass.states.async_set(printer["print_progress"], "50", percent)
+    minutes = {"unit_of_measurement": "min"}
+    hass.states.async_set(printer["remaining_time"], "60", minutes)
+    await hass.async_block_till_done()
+
+    # The weight is the slicer's whole plan: 0.25 for it, and 0.04 of electricity
+    # so far and to come, not twice the material at 50 %.
+    [summary] = (await panel.call("coinop/runs/list"))["runs"]
+    assert summary["projected_total"] == 0.33

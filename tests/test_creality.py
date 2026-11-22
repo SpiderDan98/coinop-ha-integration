@@ -66,7 +66,11 @@ async def test_quick_start_adds_a_creality_printer_with_every_input(
             "attribute": None,
             "unit": "cm",
         },
-        "planned_material": None,
+        "planned_material": {
+            "entity_id": printer["expected_material_length"],
+            "attribute": None,
+            "unit": "cm",
+        },
         "slots": [],
         "colour_attribute": None,
         "loaded_slot": None,

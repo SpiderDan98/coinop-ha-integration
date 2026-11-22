@@ -523,11 +523,13 @@ def elegoo(
     machine_id: str = "f25273b12b094c5a8b9513a30ca60049",
     resin: bool = False,
     cover_image: bool = True,
+    cc2: bool = False,
 ) -> Registration:
     """danielcherubini/elegoo-homeassistant (domain `elegoo_printer`): a Centauri
     Carbon (FDM, with OpenCentauri firmware), or with `resin` a Saturn, which has no
     extrusion sensor, unique ids `<machine id>_<key>`. Without `cover_image` the
-    printer speaks the MQTT protocol, which has no cover image."""
+    printer speaks the MQTT protocol, which has no cover image. With `cc2` it speaks
+    the CC2 protocol, which adds the slicer's planned total."""
 
     def own(platform: str, key: str, **kwargs: Any) -> tuple[str, EntityShape]:
         return key, EntityShape(platform, f"{machine_id}_{key}", **kwargs)
@@ -546,6 +548,7 @@ def elegoo(
             else [
                 own("sensor", "current_extrusion", state="0", unit="mm"),
                 own("sensor", "total_extrusion", state="123456.7", unit="mm"),
+                *([own("sensor", "total_filament_used", state="0")] if cc2 else []),
             ]
         ),
         *([own("image", "cover_image", state=PICTURE)] if cover_image else []),

@@ -179,11 +179,12 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
 
     shown, subentry = await walk_pre_filled(hass, entry, printer)
 
-    # The Material used entity reports mm itself, so no unit step.
+    # The Material used entity reports mm itself; the plan is an attribute.
     assert shown == [
         "status",
         "mapping",
         "job",
+        "planned_material_unit",
         "drying",
         "drying_left",
         "drying_left",
@@ -213,7 +214,12 @@ async def test_hass_anycubic_fills_every_input(hass: HomeAssistant) -> None:
             "attribute": None,
             "unit": "mm",
         },
-        "planned_material": None,
+        # The slicer's plan, in grams like Anycubic's own `filament_used`.
+        "planned_material": {
+            "entity_id": "sensor.kobra_s1_job_name",
+            "attribute": "estimated_filament",
+            "unit": "g",
+        },
         "slots": [
             "sensor.kobra_s1_ace_pro_ace_slot_1",
             "sensor.kobra_s1_ace_pro_ace_slot_2",
@@ -415,7 +421,10 @@ async def test_detect_again_pre_fills_the_profiles_values(
     job = await configure(hass, mapping, accepted(mapping))
     assert suggested(job, "colour_attribute") == "color_hex"
     assert suggested(job, "loaded_slot") == printer["ace_loaded_slot"]
-    drying = await configure(hass, job, accepted(job))
+    assert suggested(job, "planned_material_attribute") == "estimated_filament"
+    unit = await configure(hass, job, accepted(job))
+    assert suggested(unit, "unit") == "g"
+    drying = await configure(hass, unit, accepted(unit))
     assert suggested(drying, "active") == [
         printer["dry_status_is_drying"],
         printer["secondary_dry_status_is_drying"],
