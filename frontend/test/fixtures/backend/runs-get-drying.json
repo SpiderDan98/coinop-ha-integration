@@ -1,0 +1,223 @@
+[
+  {
+    "run": {
+      "id": "drying",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": null,
+      "job_name": null,
+      "started": "2026-01-15T10:00:00+00:00",
+      "last_seen": "2026-01-15T10:40:00+00:00",
+      "ended": null,
+      "outcome": null,
+      "end_reconstructed": false,
+      "finalised": false,
+      "pauses": [],
+      "flags": [],
+      "part_count": 1,
+      "note": null,
+      "tags": [],
+      "timelines": {
+        "electricity": {
+          "source": {
+            "source": "energy",
+            "entity_id": "sensor.kobra_plug_energy",
+            "attribute": null,
+            "unit": "kWh",
+            "factor": null
+          },
+          "cost_source": {
+            "source": "fixed",
+            "value": 0.3
+          },
+          "prices": [
+            [
+              "2026-01-15T10:00:00+00:00",
+              0.3
+            ]
+          ]
+        }
+      },
+      "average_powers": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          null,
+          null
+        ]
+      ],
+      "usage": null,
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "drying-electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 0.10000000000000142,
+          "unit": "kWh",
+          "unit_price": 0.3,
+          "amount": 0.03,
+          "method": "measured",
+          "segments": [
+            {
+              "start": "2026-01-15T10:00:00+00:00",
+              "end": "2026-01-15T10:40:00+00:00",
+              "kwh": 0.10000000000000142,
+              "unit_price": 0.3
+            }
+          ],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        }
+      ],
+      "images": [],
+      "cover_id": null,
+      "program": null,
+      "running_seconds": 2400,
+      "total": 0.03,
+      "projected_total": 0.12,
+      "projected_end": "2026-01-15T12:40:00+00:00",
+      "cost_per_part": 0.03,
+      "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "projected_parts": [
+        "electricity"
+      ],
+      "projected_pending": [
+        "drying"
+      ],
+      "subtotals": {
+        "electricity": 0.03,
+        "water": 0.0,
+        "material": 0.0,
+        "other": 0.0
+      }
+    }
+  },
+  {
+    "run": {
+      "id": "drying",
+      "device_id": "device-kobra",
+      "device_name": "Kobra",
+      "name": null,
+      "job_name": null,
+      "started": "2026-01-15T10:00:00+00:00",
+      "last_seen": "2026-01-15T10:50:00+00:00",
+      "ended": null,
+      "outcome": null,
+      "end_reconstructed": false,
+      "finalised": false,
+      "pauses": [],
+      "flags": [],
+      "part_count": 1,
+      "note": null,
+      "tags": [],
+      "timelines": {
+        "electricity": {
+          "source": {
+            "source": "energy",
+            "entity_id": "sensor.kobra_plug_energy",
+            "attribute": null,
+            "unit": "kWh",
+            "factor": null
+          },
+          "cost_source": {
+            "source": "fixed",
+            "value": 0.3
+          },
+          "prices": [
+            [
+              "2026-01-15T10:00:00+00:00",
+              0.3
+            ]
+          ]
+        }
+      },
+      "average_powers": [
+        [
+          "2026-01-15T10:00:00+00:00",
+          null,
+          null
+        ]
+      ],
+      "usage": null,
+      "loaded_slots": [],
+      "line_items": [
+        {
+          "id": "drying-electricity",
+          "kind": "electricity",
+          "label": null,
+          "material_id": null,
+          "material": null,
+          "measured": false,
+          "length": null,
+          "slots": [],
+          "share": null,
+          "template_id": null,
+          "basis": null,
+          "quantity": 0.16666666666666785,
+          "unit": "kWh",
+          "unit_price": 0.3,
+          "amount": 0.05,
+          "method": "measured",
+          "segments": [
+            {
+              "start": "2026-01-15T10:00:00+00:00",
+              "end": "2026-01-15T10:50:00+00:00",
+              "kwh": 0.16666666666666785,
+              "unit_price": 0.3
+            }
+          ],
+          "computed": null,
+          "locked": true,
+          "deletable": false
+        }
+      ],
+      "images": [],
+      "cover_id": null,
+      "program": null,
+      "running_seconds": 3000,
+      "total": 0.05,
+      "projected_total": 0.2,
+      "projected_end": "2026-01-15T12:50:00+00:00",
+      "cost_per_part": 0.05,
+      "cover": null,
+      "uploads": {
+        "limit": 10,
+        "types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_bytes": 20971520
+      },
+      "projected_parts": [
+        "electricity",
+        "drying"
+      ],
+      "projected_pending": [],
+      "subtotals": {
+        "electricity": 0.05,
+        "water": 0.0,
+        "material": 0.0,
+        "other": 0.0
+      }
+    }
+  }
+]
