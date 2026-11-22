@@ -23,6 +23,7 @@ from .base import (
     expected_energy,
     found,
     mapping,
+    progress_inputs,
 )
 
 # The Device Types an appliance of WashData, Miele or Home Connect can be.
@@ -51,6 +52,7 @@ def washdata(find: Find) -> dict[str, Any]:
     """
     status = find("sensor", "_washer_state")
     program = find("sensor", "_washer_program")
+    progress = find("sensor", "_cycle_progress")
     return {
         "status": entity_input(status),
         "mapping": found(
@@ -65,10 +67,9 @@ def washdata(find: Find) -> dict[str, Any]:
             ),
         ),
         "program": entity_input(program, ignored=WASHDATA_PLACEHOLDERS),
-        "progress": expected_energy(
-            find("sensor", "_cycle_progress"),
-            ExpectedEnergyForm.TOTAL,
-            attribute="projected_energy_kwh",
+        "progress": progress_inputs(find("sensor", "_time_remaining"), progress)
+        | expected_energy(
+            progress, ExpectedEnergyForm.TOTAL, attribute="projected_energy_kwh"
         ),
     }
 

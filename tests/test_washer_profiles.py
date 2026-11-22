@@ -119,8 +119,8 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
         "ignored": WASHDATA_PLACEHOLDERS,
     }
     assert data["progress"] == {
-        "remaining_time": None,
-        "progress": None,
+        "remaining_time": washer["time_remaining"],
+        "progress": washer["cycle_progress"],
         "expected_energy": {
             "entity_id": washer["cycle_progress"],
             "attribute": "projected_energy_kwh",
@@ -214,9 +214,7 @@ async def test_washdatas_projected_energy_comes_before_the_programs_default(
     hass.states.async_set(washer["washer_state"], "running")
     await clock.advance(minutes=30)
     hass.states.async_set(WASHER_ENERGY, "100.6", {"unit_of_measurement": "kWh"})
-    hass.states.async_set(
-        washer["cycle_progress"], "40", {"projected_energy_kwh": 1.1}
-    )
+    hass.states.async_set(washer["cycle_progress"], "40", {"projected_energy_kwh": 1.1})
     await hass.async_block_till_done()
 
     # The 0.5 kWh WashData expects on top, not the 0.2 the Default row's 0.8 leave.

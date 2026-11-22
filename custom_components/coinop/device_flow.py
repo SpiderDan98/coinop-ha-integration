@@ -676,7 +676,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         }
 
     def _found_inputs(self, found: dict[str, Any]) -> list[str]:
-        """The names of the entities Quick Start took from the profile."""
+        """The names of the entities Quick Start took from the profile, each once."""
         job = found.get("job", {})
         images = found.get("images", {})
         entity_ids = [
@@ -695,7 +695,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
         ]
         return [
             state.name if (state := self.hass.states.get(entity_id)) else entity_id
-            for entity_id in entity_ids
+            for entity_id in dict.fromkeys(entity_ids)
             if entity_id
         ]
 

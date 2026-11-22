@@ -294,7 +294,7 @@ async def test_quick_start_shows_what_the_profile_found(hass: HomeAssistant) -> 
         "integration": "WashData",
         "inputs": (
             f"- Washer State\n- {washer['washer_program']}\n"
-            f"- {washer['cycle_progress']}"
+            f"- {washer['time_remaining']}\n- {washer['cycle_progress']}"
         ),
         "currency": "EUR",
     }
@@ -348,8 +348,8 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
             ],
         },
         "progress": {
-            "remaining_time": None,
-            "progress": None,
+            "remaining_time": washer["time_remaining"],
+            "progress": washer["cycle_progress"],
             "expected_energy": {
                 "entity_id": washer["cycle_progress"],
                 "attribute": "projected_energy_kwh",

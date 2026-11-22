@@ -39,6 +39,7 @@ def washdata(
         "last_cycle_cost": (None, "0.27"),
         # Carries WashData's own projection as attributes while a cycle runs.
         "cycle_progress": ("%", "0"),
+        "time_remaining": ("min", "0"),
     }
     return Registration(
         "ha_washdata",
