@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
+from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
@@ -39,6 +40,8 @@ class Charger:
     unit: str = "kWh"
     # The counter's reading in kWh before the session.
     start: float = 1200
+    # The session energy limit in Wh, where the charger has one.
+    limit: str | None = None
 
 
 EASEE = Charger(
@@ -126,6 +129,7 @@ GOE_MQTT = Charger(
         "fault": "error",
     },
     unit="Wh",
+    limit="dwo",
 )
 # Its car state is a display text in HA's language: German, else English.
 GOE_API2 = Charger(
@@ -148,6 +152,7 @@ GOE_API2 = Charger(
         "done": "Complete",
         "fault": "Error",
     },
+    limit="dwo",
 )
 GOE_API2_GERMAN = replace(
     GOE_API2,
@@ -171,6 +176,10 @@ SESSIONS = CHARGERS | {"goecharger_api2-de": GOE_API2_GERMAN}
 # Zaptec reports no fault.
 FAULTS = {
     key: charger for key, charger in SESSIONS.items() if "fault" in charger.states
+}
+LIMITED = {key: charger for key, charger in SESSIONS.items() if charger.limit}
+WITHOUT_TARGET = {
+    key: charger for key, charger in CHARGERS.items() if not charger.limit
 }
 
 
@@ -207,6 +216,16 @@ async def test_quick_start_adds_the_charger_with_its_energy_counter(
         "factor": None,
     }
     assert data["price"] == {"source": "fixed", "value": 0.3}
+    assert data["progress"] == {
+        "remaining_time": None,
+        "expected_energy": {
+            "entity_id": device[charger.limit],
+            "attribute": None,
+            "form": "total",
+        }
+        if charger.limit
+        else None,
+    }
 
 
 @each(CHARGERS)
@@ -350,3 +369,57 @@ async def test_manual_setup_of_the_charger_comes_pre_filled(
     assert data["status"] == {"entity_id": device[charger.status], "attribute": None}
     assert data["mapping"] == charger.mapping
     assert data["consumption"]["entity_id"] == device[charger.counter]
+
+
+def projected(hass: HomeAssistant) -> str:
+    [entity_id] = [
+        entity_id
+        for entity_id in hass.states.async_entity_ids("sensor")
+        if entity_id.endswith("_projected_run_cost")
+    ]
+    state = hass.states.get(entity_id)
+    assert state is not None
+    return state.state
+
+
+async def set_limit(
+    hass: HomeAssistant, charger: Charger, device: HaDevice, wh: float | str
+) -> None:
+    assert charger.limit
+    hass.states.async_set(device[charger.limit], str(wh), {"unit_of_measurement": "Wh"})
+    await hass.async_block_till_done()
+
+
+@each(LIMITED)
+async def test_a_session_energy_limit_projects_what_it_leaves_to_charge(
+    hass: HomeAssistant, clock: Clock, charger: Charger
+) -> None:
+    device = await add_charger_device(hass, charger)
+    await set_limit(hass, charger, device, STATE_UNKNOWN)
+
+    await set_status(hass, charger, device, "charging")
+    await clock.advance(hours=1)
+    await set_counter(hass, charger, device, 7)
+    # Without a limit nothing tells how much is still to come.
+    assert projected(hass) == STATE_UNKNOWN
+
+    await set_limit(hass, charger, device, 20000)
+    # 7 kWh so far, 13 left of the limit, at 0.30.
+    assert float(projected(hass)) == pytest.approx(2.10 + 3.90)
+
+    await set_limit(hass, charger, device, STATE_UNKNOWN)
+    assert projected(hass) == STATE_UNKNOWN
+
+
+@each(WITHOUT_TARGET)
+async def test_a_charger_without_a_target_has_no_projected_total(
+    hass: HomeAssistant, clock: Clock, charger: Charger
+) -> None:
+    device = await add_charger_device(hass, charger)
+
+    await set_status(hass, charger, device, "charging")
+    await clock.advance(hours=1)
+    await set_counter(hass, charger, device, 7)
+    await clock.advance(minutes=1)
+
+    assert projected(hass) == STATE_UNKNOWN

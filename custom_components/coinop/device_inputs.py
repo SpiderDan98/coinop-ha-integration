@@ -25,8 +25,9 @@ from homeassistant.util.unit_conversion import (
     VolumeConverter,
 )
 
+from .device_config import ConsumptionSource
 from .models import UsageUnit
-from .quantities import Quantity
+from .quantities import ELECTRICITY, Quantity
 
 ON_OFF_DOMAINS = frozenset({"binary_sensor", "switch", "input_boolean"})
 USAGE_UNITS = (
@@ -168,6 +169,19 @@ def time_left(state: State | None) -> timedelta | None:
     """The Remaining time input's minutes as the time left; None without a value."""
     minutes = _number(state, None)
     return None if minutes is None else timedelta(minutes=max(minutes, 0.0))
+
+
+def expected_kwh(state: State | None, attribute: str | None) -> float | None:
+    """The Expected energy input's kWh, an attribute's or a unitless state's read as
+    kWh; None without a value or with a unit that is no energy."""
+    number = _number(state, attribute)
+    if state is None or number is None:
+        return None
+    unit = _reported_unit(state, attribute)
+    scale = (
+        1.0 if unit is None else unit_scale(ELECTRICITY, ConsumptionSource.ENERGY, unit)
+    )
+    return None if scale is None else max(number, 0.0) * scale
 
 
 def _reported_unit(state: State, attribute: str | None) -> str | None:

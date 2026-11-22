@@ -116,7 +116,14 @@ async def test_a_washdata_device_of_a_generic_kind_is_asked_its_device_type(
             "attribute": None,
             "ignored": WASHDATA_PLACEHOLDERS,
         },
-        "progress": {"remaining_time": None},
+        "progress": {
+            "remaining_time": None,
+            "expected_energy": {
+                "entity_id": plug["cycle_progress"],
+                "attribute": "projected_energy_kwh",
+                "form": "total",
+            },
+        },
         "consumption": {"source": "per_program"},
         "price": {"source": "fixed", "value": 0.3},
     }
@@ -506,7 +513,7 @@ async def test_a_home_connect_device_without_a_telling_entity_is_asked_its_devic
         "mapping": HOME_CONNECT_MAPPING,
         # Neither type has programs, so the integration registers no program select.
         "program": {"entity_id": None, "attribute": None},
-        "progress": {"remaining_time": None},
+        "progress": {"remaining_time": None, "expected_energy": None},
         "consumption": {"source": "per_program"},
         "price": {"source": "fixed", "value": 0.3},
     }

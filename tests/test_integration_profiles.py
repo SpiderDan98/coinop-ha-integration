@@ -128,7 +128,8 @@ async def test_the_local_anycubic_fills_every_input(hass: HomeAssistant) -> None
         "snapshot": True,
     }
     assert data["progress"] == {
-        "remaining_time": "sensor.anycubic_kobra_s1_time_remaining"
+        "remaining_time": "sensor.anycubic_kobra_s1_time_remaining",
+        "expected_energy": None,
     }
 
 

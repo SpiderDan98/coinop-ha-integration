@@ -245,6 +245,7 @@ async def add_basic_device(
     source: str = "energy",
     price: float | dict[str, Any] = 0.30,
     remaining_time: str | None = None,
+    expected_energy: dict[str, Any] | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device to the end for a Device Type with only the sections every
     Device has: HA device and name, Status, mapping, electricity source and price.
@@ -256,7 +257,7 @@ async def add_basic_device(
         hass, entry, name=name, status=status, device_type=device_type
     )
     result = await answer_progress(
-        hass, await configure(hass, result, mapping), remaining_time
+        hass, await configure(hass, result, mapping), remaining_time, expected_energy
     )
     assert (result["step_id"], result["menu_options"]) == (
         "consumption",
@@ -485,14 +486,19 @@ async def answer_drying(
 
 
 async def answer_progress(
-    hass: HomeAssistant, result: Any, remaining_time: str | None = None
+    hass: HomeAssistant,
+    result: Any,
+    remaining_time: str | None = None,
+    expected_energy: dict[str, Any] | None = None,
 ) -> Any:
-    """Answer the progress step `result` with the Remaining time entity, if any."""
+    """Answer the progress step `result` with the Remaining time entity, if any, and
+    `expected_energy`, the Expected energy fields as the step names them."""
     assert result["step_id"] == "progress", result.get("errors")
     return await configure(
         hass,
         result,
-        {} if remaining_time is None else {"remaining_time": remaining_time},
+        ({} if remaining_time is None else {"remaining_time": remaining_time})
+        | (expected_energy or {}),
     )
 
 
@@ -537,6 +543,7 @@ async def add_washing_machine(
     water_price: float | dict[str, Any] = 4.0,
     device_type: str = "washing_machine",
     remaining_time: str | None = None,
+    expected_energy: dict[str, Any] | None = None,
 ) -> ConfigSubentry:
     """Walk Add Device for a washing machine to the end; by default with its plug's
     energy meter, no Program input and no water source. `device_type` walks it for
@@ -560,7 +567,7 @@ async def add_washing_machine(
     result = await configure(hass, result, program or {})
     result = await answer_electricity(
         hass,
-        await answer_progress(hass, result, remaining_time),
+        await answer_progress(hass, result, remaining_time, expected_energy),
         source,
         meter or {"entity_id": WASHER_ENERGY},
         price,

@@ -66,6 +66,8 @@ EVCC_LOADPOINT_ENTITIES = {
     "charged_energy": ("sensor", "kWh", "0"),
     "session_energy": ("sensor", "kWh", "0"),
     "session_price": ("sensor", "EUR", "0"),
+    "charge_remaining_energy": ("sensor", "kWh", "0"),
+    "charge_remaining_duration": ("sensor", "s", "0"),
 }
 
 
@@ -328,6 +330,8 @@ def goe_mqtt(
                     "eto": ("sensor", f"{serial}-sensor-eto-0", "Wh", "6789000"),
                     "wh": ("sensor", f"{serial}-sensor-wh-0", "Wh", "0"),
                     "etop": ("sensor", f"{serial}-sensor-etop-0", "Wh", "0"),
+                    # The session energy limit, unknown while none is set.
+                    "dwo": ("number", f"{serial}-number-dwo-0", "Wh", "unknown"),
                     "car_connected": (
                         "binary_sensor",
                         f"{serial}-binary_sensor-car-1",
@@ -354,21 +358,23 @@ def goe_api2(
 ) -> Registration:
     """HACS `goecharger_api2`: one HA device per charger, unique ids
     `goecharger_api2.goe_<serial>_<key>`. The raw car state `car` is disabled by
-    default; both energy counters are native Wh, shown in kWh."""
+    default; both energy counters are native Wh, shown in kWh. The session energy
+    limit `dwo` is unknown while none is set."""
     keys = {
-        "car_value": (None, "Idle"),
-        "car": (None, "1"),
-        "eto": ("kWh", "6789.0"),
-        "wh": ("kWh", "0"),
-        "cus_value": (None, "Unlocked"),
+        "car_value": ("sensor", None, "Idle"),
+        "car": ("sensor", None, "1"),
+        "eto": ("sensor", "kWh", "6789.0"),
+        "wh": ("sensor", "kWh", "0"),
+        "cus_value": ("sensor", None, "Unlocked"),
+        "dwo": ("number", "Wh", "unknown"),
     }
     return Registration(
         "goecharger_api2",
         (
             _charger(
                 {
-                    key: ("sensor", f"goecharger_api2.goe_{serial}_{key}", unit, state)
-                    for key, (unit, state) in keys.items()
+                    key: (platform, f"goecharger_api2.goe_{serial}_{key}", unit, state)
+                    for key, (platform, unit, state) in keys.items()
                 },
                 disabled=disabled,
                 missing=missing,

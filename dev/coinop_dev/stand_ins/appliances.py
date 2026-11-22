@@ -37,6 +37,8 @@ def washdata(
         "energy_total": ("kWh", "123.4"),
         "last_cycle_energy": ("kWh", "0.9"),
         "last_cycle_cost": (None, "0.27"),
+        # Carries WashData's own projection as attributes while a cycle runs.
+        "cycle_progress": ("%", "0"),
     }
     return Registration(
         "ha_washdata",

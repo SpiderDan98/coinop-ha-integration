@@ -292,7 +292,10 @@ async def test_quick_start_shows_what_the_profile_found(hass: HomeAssistant) -> 
         "device": "Washer",
         "device_type": "Washing machine",
         "integration": "WashData",
-        "inputs": f"- Washer State\n- {washer['washer_program']}",
+        "inputs": (
+            f"- Washer State\n- {washer['washer_program']}\n"
+            f"- {washer['cycle_progress']}"
+        ),
         "currency": "EUR",
     }
 
@@ -344,7 +347,14 @@ async def test_a_washing_machine_is_added_with_its_plugs_meter_and_a_price(
                 "unknown",
             ],
         },
-        "progress": {"remaining_time": None},
+        "progress": {
+            "remaining_time": None,
+            "expected_energy": {
+                "entity_id": washer["cycle_progress"],
+                "attribute": "projected_energy_kwh",
+                "form": "total",
+            },
+        },
         "consumption": {
             "source": "energy",
             "entity_id": WASHER_ENERGY,
@@ -500,7 +510,10 @@ async def test_a_printer_is_added_with_every_input_its_profile_finds(
         "camera": printer["camera"],
         "snapshot": True,
     }
-    assert data["progress"] == {"remaining_time": printer["time_remaining"]}
+    assert data["progress"] == {
+        "remaining_time": printer["time_remaining"],
+        "expected_energy": None,
+    }
     assert data["consumption"] == {
         "source": "power",
         "entity_id": POWER,
@@ -534,7 +547,7 @@ async def test_inputs_a_profile_doesnt_find_are_stored_as_unused(
         "drying_power": None,
     }
     assert data["images"] == {"thumbnail": None, "camera": None, "snapshot": False}
-    assert data["progress"] == {"remaining_time": None}
+    assert data["progress"] == {"remaining_time": None, "expected_energy": None}
 
 
 async def test_a_printer_needs_a_meter(hass: HomeAssistant) -> None:
