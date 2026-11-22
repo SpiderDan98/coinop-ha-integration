@@ -103,22 +103,9 @@ export class RunImages extends LitElement {
 
   private renderImage(image: RunImage, isCover: boolean) {
     const t = localize(this.hass);
-    return html`<figure>
-      <coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
-      <figcaption>${t(`image.${image.kind}`)}</figcaption>
-      <div class="actions">
-        ${
-          isCover
-            ? html`<span class="is-cover">${t("images.is_cover")}</span>`
-            : html`<ha-button
-                class="small set-cover"
-                appearance="plain"
-                ?disabled=${this.busy}
-                @click=${() => this.change(() => setCover(this.hass, this.run.id, image.id))}
-              >
-                ${t("images.set_cover")}
-              </ha-button>`
-        }
+    return html`<figure class=${isCover ? "cover-pick" : ""}>
+      <div class="frame">
+        <coinop-run-image .hass=${this.hass} .src=${image.tile_url}></coinop-run-image>
         <ha-icon-button
           class="delete-image"
           .label=${t("images.delete")}
@@ -127,6 +114,19 @@ export class RunImages extends LitElement {
           @click=${() => (this.deleting = image)}
         ></ha-icon-button>
       </div>
+      <figcaption>${t(`image.${image.kind}`)}</figcaption>
+      ${
+        isCover
+          ? html`<span class="is-cover">${t("images.is_cover")}</span>`
+          : html`<ha-button
+              class="small set-cover"
+              appearance="plain"
+              ?disabled=${this.busy}
+              @click=${() => this.change(() => setCover(this.hass, this.run.id, image.id))}
+            >
+              ${t("images.set_cover")}
+            </ha-button>`
+      }
     </figure>`;
   }
 
@@ -155,38 +155,49 @@ export class RunImages extends LitElement {
         margin-bottom: 12px;
       }
       .strip {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 8px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px 8px;
+        margin-bottom: 12px;
       }
       figure {
         margin: 0;
-        width: 96px;
-        text-align: center;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         font-size: 11px;
         color: var(--secondary-text-color);
       }
-      figure coinop-run-image {
-        border-radius: 6px;
+      .frame {
+        position: relative;
+        width: 100%;
+        border-radius: 8px;
         overflow: hidden;
-        margin-bottom: 2px;
+        margin-bottom: 4px;
       }
-      .actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 4px;
-        min-height: 20px;
-      }
-      .is-cover {
-        color: var(--primary-color);
-        font-weight: 600;
+      .cover-pick .frame {
+        box-shadow: 0 0 0 2px var(--primary-color);
       }
       .delete-image {
-        --ha-icon-button-size: 32px;
-        --mdc-icon-size: 20px;
-        color: var(--secondary-text-color);
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        --ha-icon-button-size: 28px;
+        --mdc-icon-size: 18px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+      }
+      .is-cover,
+      .set-cover {
+        white-space: nowrap;
+      }
+      .is-cover {
+        font-size: var(--ha-font-size-m, 14px);
+        line-height: 32px;
+        color: var(--primary-color);
+        font-weight: 600;
       }
       p {
         margin: 8px 0 0;
