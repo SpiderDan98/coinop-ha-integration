@@ -201,3 +201,27 @@ async def test_a_remaining_time_counts_in_the_unit_it_reports(
     state = projected(hass)
     assert float(state.state) == pytest.approx(0.03 + 0.09)
     assert state.attributes["ends_at"] == clock.now() + timedelta(minutes=90)
+
+
+async def test_a_finish_timestamp_leaves_the_time_until_it(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    await add_timed_printer(hass, remaining_time=REMAINING)
+    await set_status(hass, "printing")
+    await clock.advance(minutes=30)
+    finish = clock.now() + timedelta(hours=1)
+    hass.states.async_set(REMAINING, finish.isoformat(), {"device_class": "timestamp"})
+    await hass.async_block_till_done()
+
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.03 + 0.06)
+    assert state.attributes["ends_at"] == finish
+
+    await clock.advance(minutes=30)
+    state = projected(hass)
+    assert float(state.state) == pytest.approx(0.06 + 0.03)
+    assert state.attributes["ends_at"] == finish
+
+    await clock.advance(minutes=40)
+    # Past its finish, the rest is nothing more.
+    assert float(projected(hass).state) == pytest.approx(0.10)

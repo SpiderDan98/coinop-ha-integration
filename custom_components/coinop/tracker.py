@@ -1104,8 +1104,7 @@ class DeviceTracker:
 
     def _projection(self, run: Run, now: datetime) -> Projection | None:
         """The open Run's rest from its time left; None while that is unknown."""
-        entity_id = self._config.remaining_time_entity_id
-        left = time_left(self._hass.states.get(entity_id)) if entity_id else None
+        left = self._time_left(now)
         if left is None:
             return None
         hours = left.total_seconds() / 3600
@@ -1119,6 +1118,11 @@ class DeviceTracker:
             },
             now + left,
         )
+
+    def _time_left(self, now: datetime) -> timedelta | None:
+        """The open Run's time left from its Remaining time; None while unknown."""
+        entity_id = self._config.remaining_time_entity_id
+        return time_left(self._hass.states.get(entity_id), now) if entity_id else None
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running
