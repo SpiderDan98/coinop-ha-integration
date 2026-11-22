@@ -57,7 +57,8 @@
         },
         "progress": {
           "remaining_time": null,
-          "progress": null
+          "progress": null,
+          "expected_energy": null
         },
         "price": {
           "source": "fixed",

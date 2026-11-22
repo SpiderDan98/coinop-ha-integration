@@ -35,6 +35,7 @@ MAPPING = {
 PROGRESS = {
     "remaining_time": "sensor.prusa_mk4_job_finish",
     "progress": "sensor.prusa_mk4_job_progress",
+    "expected_energy": None,
 }
 
 

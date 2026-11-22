@@ -43,6 +43,7 @@ MAPPING = {
 PROGRESS = {
     "remaining_time": "sensor.octoprint_estimated_finish_time",
     "progress": "sensor.octoprint_job_percentage",
+    "expected_energy": None,
 }
 
 

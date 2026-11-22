@@ -216,7 +216,7 @@ async def test_the_devices_command_sends_no_capability_for_a_robotic_mower(
         "status": {"entity_id": MOWER_STATUS, "attribute": None},
         "mapping": MOWER_MAPPING
         | {"finished": [], "cancelled": [], "fault": [], "ignored": []},
-        "progress": {"remaining_time": None, "progress": None},
+        "progress": {"remaining_time": None, "progress": None, "expected_energy": None},
         "consumption": {
             "source": "energy",
             "entity_id": STATION_ENERGY,

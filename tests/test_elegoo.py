@@ -60,6 +60,7 @@ MAPPING = {
 PROGRESS = {
     "remaining_time": "sensor.centauri_carbon_ticks_remaining",
     "progress": "sensor.centauri_carbon_percent_complete",
+    "expected_energy": None,
 }
 
 

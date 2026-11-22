@@ -117,6 +117,15 @@ async def test_washdata_fills_status_mapping_and_program(hass: HomeAssistant) ->
         "attribute": None,
         "ignored": WASHDATA_PLACEHOLDERS,
     }
+    assert data["progress"] == {
+        "remaining_time": None,
+        "progress": None,
+        "expected_energy": {
+            "entity_id": washer["cycle_progress"],
+            "attribute": "projected_energy_kwh",
+            "form": "total",
+        },
+    }
     # The plug's meter, which the user picked: WashData's own sensors are ignored.
     assert data["consumption"]["entity_id"] == WASHER_ENERGY
     stored = str(dict(data))
@@ -152,6 +161,51 @@ async def test_washdatas_anti_wrinkle_completes_the_run(
     [run] = stored_runs(hass_storage)
     assert run["outcome"] == "completed"
     assert run["program"] == "Cotton 60"
+
+
+async def test_washdatas_projected_energy_leaves_what_the_plug_measured(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    washer = add_washdata(hass)
+    remaining = "sensor.washer_time_left"
+    hass.states.async_set(WASHER_ENERGY, "100", {"unit_of_measurement": "kWh"})
+    entry = await add_hub(hass)
+    progress = {"remaining_time": remaining} | accepted_progress(washer)
+    await walk_pre_filled(
+        hass, entry, washer, energy={"entity_id": WASHER_ENERGY}, progress=progress
+    )
+
+    async def report(kwh: float, projected: float) -> None:
+        hass.states.async_set(WASHER_ENERGY, str(kwh), {"unit_of_measurement": "kWh"})
+        hass.states.async_set(
+            washer["cycle_progress"], "40", {"projected_energy_kwh": projected}
+        )
+        await hass.async_block_till_done()
+
+    hass.states.async_set(washer["washer_state"], "running")
+    await clock.advance(minutes=30)
+    hass.states.async_set(remaining, "60", {"unit_of_measurement": "min"})
+    await report(100.6, 1.1)
+
+    # 0.6 kWh so far and the 0.5 WashData expects on top, not 1.2 kW for the hour left.
+    state = hass.states.get("sensor.washer_projected_run_cost")
+    assert state is not None
+    assert float(state.state) == pytest.approx(0.18 + 0.15)
+
+    await clock.advance(minutes=5)
+    await report(100.7, 0.5)
+    state = hass.states.get("sensor.washer_projected_run_cost")
+    assert state is not None
+    assert float(state.state) == pytest.approx(0.21)
+
+
+def accepted_progress(washer: HaDevice) -> dict[str, Any]:
+    """The progress step's fields as WashData's profile pre-fills them."""
+    return {
+        "expected_energy": washer["cycle_progress"],
+        "expected_energy_attribute": "projected_energy_kwh",
+        "expected_energy_form": "total",
+    }
 
 
 async def test_miele_fills_status_program_and_both_meters(
@@ -631,7 +685,7 @@ async def test_detect_again_works_on_a_dishwasher_added_from_washdata(
     while result["type"] is FlowResultType.FORM:
         shown.append(result["step_id"])
         result = await configure(hass, result, accepted(result))
-    assert shown == ["status", "mapping", "program"]
+    assert shown == ["status", "mapping", "program", "progress"]
     await configure(hass, result, {"next_step_id": "save"})
     await hass.async_block_till_done()
 

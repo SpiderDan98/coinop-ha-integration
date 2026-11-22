@@ -74,7 +74,11 @@ async def test_each_device_lists_its_ha_side_settings(
                     "loaded_slot": None,
                 },
                 "images": {"thumbnail": None, "camera": None, "snapshot": False},
-                "progress": {"remaining_time": None, "progress": None},
+                "progress": {
+                    "remaining_time": None,
+                    "progress": None,
+                    "expected_energy": None,
+                },
                 "consumption": {
                     "source": "estimate",
                     "running_power": 120,

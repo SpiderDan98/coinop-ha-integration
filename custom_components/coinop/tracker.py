@@ -41,14 +41,16 @@ from .cost.material import (
 )
 from .cost.pricing import priced_line_item
 from .cost.projection import (
+    expected_energy_rest,
     progress_time_left,
     project,
     recent_power,
     running_hours_rest,
 )
 from .cost.slots import slot_material, slot_shares
-from .device_config import Capability, DeviceConfig, Target
+from .device_config import Capability, DeviceConfig, ExpectedEnergyForm, Target
 from .device_inputs import (
+    expected_kwh,
     input_time,
     input_value,
     progress_reading,
@@ -249,6 +251,12 @@ class DeviceTracker:
         ]:
             self._unsubscribe.append(
                 async_track_state_change_event(self._hass, progress, self._on_progress)
+            )
+        if expected := self._config.expected_energy:
+            self._unsubscribe.append(
+                async_track_state_change_event(
+                    self._hass, expected["entity_id"], self._on_progress
+                )
             )
         if run := self._book.open_run(self._config.device_id):
             self._record_slot(run)
@@ -1127,20 +1135,21 @@ class DeviceTracker:
         run.projection = None if run.ended else self._projection(run, until)
 
     def _projection(self, run: Run, now: datetime) -> Projection | None:
-        """The open Run's rest from its time left; None while that is unknown."""
+        """The open Run's rest; what depends on its time left is left out while that
+        is unknown, and so is the expected end."""
         left = self._time_left(run, now)
-        if left is None:
-            return None
-        hours = left.total_seconds() / 3600
-        power = self._base_power(run, now)
+        hours = None if left is None else left.total_seconds() / 3600
+        kwh = self._electricity_rest(run, now, hours)
         return project(
             {
                 ProjectedPart.ELECTRICITY: None
-                if power is None
-                else power * hours / 1000 * self._electricity.price_now(run),
-                ProjectedPart.RUNNING_HOURS: running_hours_rest(run, hours),
+                if kwh is None
+                else kwh * self._electricity.price_now(run),
+                ProjectedPart.RUNNING_HOURS: None
+                if hours is None
+                else running_hours_rest(run, hours),
             },
-            now + left,
+            None if left is None else now + left,
         )
 
     def _time_left(self, run: Run, now: datetime) -> timedelta | None:
@@ -1179,6 +1188,28 @@ class DeviceTracker:
         progress = self._config.progress_entity_id
         percent = progress_reading(state(progress)) if progress else None
         return None if percent is None else progress_time_left(run, at, percent)
+
+    def _electricity_rest(
+        self, run: Run, now: datetime, hours: float | None
+    ) -> float | None:
+        """The kWh still to come: from the Expected energy, else the base power over
+        the time left; None for a Run without an Electricity Line Item."""
+        item = next(
+            (i for i in run.line_items if i.kind is LineItemKind.ELECTRICITY), None
+        )
+        if item is None:
+            return None
+        if (expected := self._config.expected_energy) and (
+            kwh := expected_kwh(
+                self._hass.states.get(expected["entity_id"]), expected["attribute"]
+            )
+        ) is not None:
+            return expected_energy_rest(
+                kwh, item.quantity or 0.0, expected["form"] == ExpectedEnergyForm.TOTAL
+            )
+        if hours is None or (power := self._base_power(run, now)) is None:
+            return None
+        return power * hours / 1000
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running

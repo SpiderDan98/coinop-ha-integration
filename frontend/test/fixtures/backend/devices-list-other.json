@@ -29,7 +29,8 @@
         },
         "progress": {
           "remaining_time": null,
-          "progress": null
+          "progress": null,
+          "expected_energy": null
         },
         "consumption": {
           "source": "estimate",
@@ -86,7 +87,8 @@
         },
         "progress": {
           "remaining_time": null,
-          "progress": null
+          "progress": null,
+          "expected_energy": null
         },
         "consumption": {
           "source": "energy",
@@ -145,7 +147,8 @@
         },
         "progress": {
           "remaining_time": null,
-          "progress": null
+          "progress": null,
+          "expected_energy": null
         },
         "consumption": {
           "source": "energy",

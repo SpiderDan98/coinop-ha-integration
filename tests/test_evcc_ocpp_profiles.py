@@ -1,8 +1,10 @@
 """Integration Profiles for EV chargers: evcc and OCPP."""
 
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
@@ -73,6 +75,15 @@ async def test_quick_start_adds_an_evcc_site_with_one_loadpoint(
         "factor": None,
     }
     assert data["price"] == {"source": "fixed", "value": 0.3}
+    assert data["progress"] == {
+        "remaining_time": site["charge_remaining_duration"],
+        "progress": None,
+        "expected_energy": {
+            "entity_id": site["charge_remaining_energy"],
+            "attribute": None,
+            "form": "remaining",
+        },
+    }
 
 
 async def test_quick_start_offers_each_loadpoint_of_an_evcc_site_with_several(
@@ -142,6 +153,35 @@ async def test_an_evcc_charge_is_a_run_from_on_to_off(
     assert run["flags"] == []
     assert electricity(run)["quantity"] == pytest.approx(14.5)
     assert electricity(run)["amount"] == pytest.approx(4.35)
+
+
+async def test_an_evcc_charge_projects_the_energy_evcc_has_left_to_charge(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    site = await add_evcc_loadpoint(hass)
+    [projected] = [
+        entity_id
+        for entity_id in hass.states.async_entity_ids("sensor")
+        if entity_id.endswith("_projected_run_cost")
+    ]
+
+    await set_state(hass, site["charged_energy"], "0", unit="kWh")
+    await set_state(hass, site["charging"], "on")
+    await clock.advance(hours=1)
+    await set_state(hass, site["charged_energy"], "6", unit="kWh")
+    await set_state(hass, site["charge_remaining_energy"], "14", unit="kWh")
+    await set_state(hass, site["charge_remaining_duration"], "7200", unit="s")
+
+    # 6 kWh so far and 14 still to charge, at 0.30.
+    state = hass.states.get(projected)
+    assert state is not None
+    assert float(state.state) == pytest.approx(1.80 + 4.20)
+    assert state.attributes["ends_at"] == clock.now() + timedelta(hours=2)
+
+    await set_state(hass, site["charging"], "off")
+    state = hass.states.get(projected)
+    assert state is not None
+    assert state.state == STATE_UNKNOWN
 
 
 async def test_charging_that_evcc_stops_and_starts_again_is_two_runs(

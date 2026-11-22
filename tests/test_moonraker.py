@@ -37,6 +37,7 @@ MAPPING = {
 PROGRESS = {
     "remaining_time": "sensor.voron_2_4_print_time_left",
     "progress": "sensor.voron_2_4_progress",
+    "expected_energy": None,
 }
 
 

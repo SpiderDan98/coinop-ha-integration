@@ -10,6 +10,7 @@ from homeassistant.config_entries import (
     ConfigSubentryFlow,
     SubentryFlowResult,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import (
     BooleanSelector,
@@ -35,6 +36,7 @@ from .device_config import (
     NO_SOURCE,
     Capability,
     ConsumptionSource,
+    ExpectedEnergyForm,
     Target,
     WaterSource,
     capabilities_of,
@@ -91,7 +93,7 @@ UNUSED: dict[str, dict[str, Any]] = {
     },
     "images": {"thumbnail": None, "camera": None, "snapshot": False},
     "program": {"entity_id": None, "attribute": None},
-    "progress": {"remaining_time": None, "progress": None},
+    "progress": {"remaining_time": None, "progress": None, "expected_energy": None},
 }
 # The sections only a Device with the Capability has.
 NEEDS = {
@@ -136,6 +138,11 @@ def _price_selector(quantity: Quantity, currency: str) -> NumberSelector:
 def _step(quantity: Quantity, name: str) -> str:
     """Electricity's steps keep their names; another quantity's are prefixed by it."""
     return name if quantity is ELECTRICITY else f"{quantity.source_key}_{name}"
+
+
+def _energy_unit(hass: HomeAssistant, entity_id: str) -> bool:
+    unit = entity_unit(hass, entity_id)
+    return unit_scale(ELECTRICITY, ConsumptionSource.ENERGY, unit) is not None
 
 
 def _mapping_error(mapping: dict[str, list[str]]) -> str | None:
@@ -683,6 +690,7 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
             images.get("camera"),
             found.get("progress", {}).get("remaining_time"),
             found.get("progress", {}).get("progress"),
+            (found.get("progress", {}).get("expected_energy") or {}).get("entity_id"),
             *(found.get(key, {}).get("entity_id") for key in METERS),
         ]
         return [
@@ -964,22 +972,63 @@ class DeviceSubentryFlow(ConfigSubentryFlow):
     async def async_step_progress(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._data["progress"] = {
-                key: user_input.get(key) for key in UNUSED["progress"]
-            }
-            return await self._section_done("progress")
+            expected = user_input.get("expected_energy")
+            attribute = user_input.get("expected_energy_attribute") or None
+            if expected and not attribute and not _energy_unit(self.hass, expected):
+                errors["expected_energy"] = "not_energy"
+            else:
+                self._data["progress"] = {
+                    "remaining_time": user_input.get("remaining_time"),
+                    "progress": user_input.get("progress"),
+                    "expected_energy": {
+                        "entity_id": expected,
+                        "attribute": attribute,
+                        "form": user_input["expected_energy_form"],
+                    }
+                    if expected
+                    else None,
+                }
+                return await self._section_done("progress")
         schema = vol.Schema(
             {
-                vol.Optional(key): EntitySelector(EntitySelectorConfig(domain="sensor"))
-                for key in UNUSED["progress"]
+                vol.Optional("remaining_time"): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional("progress"): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional("expected_energy"): EntitySelector(
+                    EntitySelectorConfig(domain=["sensor", "number"])
+                ),
+                vol.Optional("expected_energy_attribute"): TextSelector(),
+                vol.Optional(
+                    "expected_energy_form", default=ExpectedEnergyForm.REMAINING.value
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[form.value for form in ExpectedEnergyForm],
+                        translation_key="expected_energy_form",
+                    )
+                ),
             }
         )
+        stored = self._data.get("progress") or {}
+        expected = stored.get("expected_energy") or {}
         return self.async_show_form(
             step_id="progress",
             data_schema=self.add_suggested_values_to_schema(
-                schema, self._data.get("progress")
+                schema,
+                user_input
+                or {
+                    "remaining_time": stored.get("remaining_time"),
+                    "progress": stored.get("progress"),
+                    "expected_energy": expected.get("entity_id"),
+                    "expected_energy_attribute": expected.get("attribute"),
+                    "expected_energy_form": expected.get("form"),
+                },
             ),
+            errors=errors,
         )
 
     async def async_step_consumption(

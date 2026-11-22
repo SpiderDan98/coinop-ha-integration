@@ -36,6 +36,7 @@ MAPPING = {
 PROGRESS = {
     "remaining_time": "sensor.k1c_print_left_time",
     "progress": "sensor.k1c_print_progress",
+    "expected_energy": None,
 }
 
 

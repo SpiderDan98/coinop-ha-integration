@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr
 
 from custom_components.coinop.const import DEVICE_TYPE_EV_CHARGER
+from custom_components.coinop.device_config import ExpectedEnergyForm
 
 from .base import (
     Find,
@@ -17,6 +18,7 @@ from .base import (
     always,
     energy_source,
     entity_input,
+    expected_energy,
     found,
     mapping,
 )
@@ -44,6 +46,12 @@ def energy_meter(
     counters = (session, lifetime) if session_first else (lifetime, session)
     meter = find("sensor", *(counter for counter in counters if counter), start=start)
     return energy_source(meter)
+
+
+def session_limit(entity_id: str | None) -> dict[str, Any]:
+    """A go-e charger's session energy limit as the Run's total Expected energy; it
+    is unknown while no limit is set, and so then is the rest."""
+    return expected_energy(entity_id, ExpectedEnergyForm.TOTAL)
 
 
 def tesla_wall_connector(find: Find) -> dict[str, Any]:
@@ -86,6 +94,7 @@ def evcc(find: Find) -> dict[str, Any]:
     counter comes first.
     """
     status = find("binary_sensor", "_charging")
+    remaining = find("sensor", "_charge_remaining_duration")
     return {
         "status": entity_input(status),
         "mapping": found(status, **mapping(running=["on"], finished=["off"])),
@@ -94,6 +103,10 @@ def evcc(find: Find) -> dict[str, Any]:
             lifetime="_charge_total_import",
             session="_charged_energy",
             session_first=True,
+        ),
+        "progress": found(remaining, remaining_time=remaining)
+        | expected_energy(
+            find("sensor", "_charge_remaining_energy"), ExpectedEnergyForm.REMAINING
         ),
     }
 
@@ -219,6 +232,7 @@ def goe_mqtt(find: Find) -> dict[str, Any]:
         "consumption": energy_meter(
             find, lifetime="-sensor-eto-0", session="-sensor-wh-0"
         ),
+        "progress": session_limit(find("number", "-number-dwo-0")),
     }
 
 
@@ -247,6 +261,7 @@ def goe_api2(find: Find) -> dict[str, Any]:
             ),
         ),
         "consumption": energy_meter(find, lifetime="_eto", session="_wh"),
+        "progress": session_limit(find("number", "_dwo")),
     }
 
 

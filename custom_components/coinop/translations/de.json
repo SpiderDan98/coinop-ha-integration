@@ -231,14 +231,20 @@
         },
         "progress": {
           "title": "Fortschritt",
-          "description": "Wähle optional die Entitäten, die melden, wie weit der Lauf des Geräts ist. Solange ein Lauf offen ist, zeigt Coin-op dann seine voraussichtlichen Kosten: die bisherigen Kosten und das, was die restliche Zeit voraussichtlich dazu bringt.",
+          "description": "Wähle optional die Entitäten, die melden, wie weit der Lauf des Geräts ist. Solange ein Lauf offen ist, zeigt Coin-op dann seine voraussichtlichen Kosten: die bisherigen Kosten und das, was die restliche Zeit voraussichtlich dazu bringt. Meldet das Gerät, wie viel Energie noch kommt, wie etwa eine Wallbox, wähle das als erwartete Energie: Sie bestimmt dann den noch kommenden Strom, auch ohne Restzeit.",
           "data": {
             "remaining_time": "Restzeit (optional)",
-            "progress": "Fortschritt (optional)"
+            "progress": "Fortschritt (optional)",
+            "expected_energy": "Erwartete Energie (optional)",
+            "expected_energy_attribute": "Attribut der erwarteten Energie (optional)",
+            "expected_energy_form": "Die erwartete Energie ist"
           },
           "data_description": {
             "remaining_time": "Die Zeit bis zum Ende des Laufs, in Stunden, Minuten, Sekunden oder Millisekunden, oder der Zeitpunkt, zu dem er voraussichtlich fertig ist.",
-            "progress": "Wie weit der Lauf ist, in %. Ohne Restzeit leitet Coin-op die restliche Zeit aus der bisherigen Laufzeit ab, sobald der Lauf zu 5 % fertig ist."
+            "progress": "Wie weit der Lauf ist, in %. Ohne Restzeit leitet Coin-op die restliche Zeit aus der bisherigen Laufzeit ab, sobald der Lauf zu 5 % fertig ist.",
+            "expected_energy": "Die Energie, die das Gerät für den Lauf meldet, in kWh oder einer anderen Energieeinheit. Den Wert eines Attributs liest Coin-op als kWh.",
+            "expected_energy_attribute": "Die erwartete Energie aus diesem Attribut lesen statt aus dem Zustand der Entität.",
+            "expected_energy_form": "Ob die erwartete Energie das ist, was noch kommt, oder die Summe des Laufs, von der noch kommt, was bisher nicht gemessen wurde."
           }
         },
         "consumption": {
@@ -466,7 +472,8 @@
         "not_energy_or_power": "Coin-op erkennt die Einheit dieser Entität weder als Energie noch als Leistung. Wähle eine andere Entität oder richte das Gerät manuell ein.",
         "meter_required": "Wähle den Energiezähler oder Leistungssensor des Geräts. Ohne einen solchen Sensor richte das Gerät manuell ein: Dort lässt sich der Strom aus der Durchschnittsleistung schätzen.",
         "one_price": "Gib entweder einen festen Preis ein oder wähle eine Preis-Entität.",
-        "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen."
+        "unknown_price_unit": "Coin-op erkennt die Einheit dieser Entität nicht als Preis pro kWh. Wähle eine andere Entität oder gib einen festen Preis ein; mit einem Umrechnungsfaktor lässt sie sich später unter „Gerät neu konfigurieren“ einstellen.",
+        "not_energy": "Coin-op erkennt die Einheit dieser Entität nicht als Energie. Wähle eine andere Entität oder das Attribut, das kWh meldet."
       },
       "abort": {
         "reconfigure_successful": "Das Gerät wurde gespeichert.",
@@ -630,6 +637,12 @@
         "other": "Sonstiges",
         "quick_start": "Zurück zum Schnellstart",
         "pick_another_device": "Anderes Gerät wählen"
+      }
+    },
+    "expected_energy_form": {
+      "options": {
+        "remaining": "die noch kommende Energie",
+        "total": "die Energie des ganzen Laufs"
       }
     }
   }

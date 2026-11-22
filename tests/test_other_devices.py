@@ -484,7 +484,7 @@ async def test_the_devices_command_sends_an_other_devices_type_name_and_what_it_
         "status": {"entity_id": KILN_STATUS, "attribute": None},
         "mapping": OTHER_MAPPING
         | {"paused": [], "finished": [], "cancelled": [], "fault": [], "ignored": []},
-        "progress": {"remaining_time": None, "progress": None},
+        "progress": {"remaining_time": None, "progress": None, "expected_energy": None},
         "consumption": {
             "source": "estimate",
             "running_power": 2000,
