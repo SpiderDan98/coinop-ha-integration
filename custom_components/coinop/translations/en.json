@@ -203,6 +203,36 @@
             "unit": "Unit"
           }
         },
+        "drying": {
+          "title": "Drying",
+          "description": "Optionally pick, for each multi-material unit that can dry its Material, the entity that is on while the unit dries. While a Run is open, Coin-op then counts the drying's extra power in the Projected Total, for as long as the unit keeps drying during the Run.",
+          "data": {
+            "active": "Drying entities (optional)"
+          },
+          "data_description": {
+            "active": "One switch or binary sensor per unit, on while it dries."
+          }
+        },
+        "drying_left": {
+          "title": "Drying left",
+          "description": "Optionally pick the entity that reports how long {unit} keeps drying. Without it, Coin-op expects the unit to dry until the Run ends.",
+          "data": {
+            "drying_left": "Drying left (optional)"
+          },
+          "data_description": {
+            "drying_left": "The time the unit has left to dry, in minutes unless the entity reports another unit."
+          }
+        },
+        "drying_power": {
+          "title": "Drying power",
+          "description": "Optionally enter the extra power a unit draws while it dries.",
+          "data": {
+            "drying_power": "Drying power (optional)"
+          },
+          "data_description": {
+            "drying_power": "Leave empty to have Coin-op learn it from each Run's meter readings, once the Run has run at least 10 minutes with and 10 without drying."
+          }
+        },
         "images": {
           "title": "Images",
           "description": "Optionally pick where a Run's images come from. The Thumbnail is copied while the Run is open; the camera takes the Snapshot when the Run ends. Images are stored downscaled and without metadata.",

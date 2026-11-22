@@ -34,11 +34,14 @@ def anycubic_local(
     def own(platform: str, key: str, **kwargs: Any) -> tuple[str, EntityShape]:
         return key, EntityShape(platform, f"{serial}_{key}", **kwargs)
 
-    def ace(key: str, state: str) -> tuple[str, EntityShape]:
+    def ace(
+        key: str, state: str, platform: str = "sensor", unit: str | None = None
+    ) -> tuple[str, EntityShape]:
         return f"ace0_{key}", EntityShape(
-            "sensor",
+            platform,
             f"{serial}_ace0_{key}",
             state=state,
+            unit=unit,
             object_id=f"ace_pro_{key}",
             linked=True,
         )
@@ -68,6 +71,8 @@ def anycubic_local(
         *(ace(f"slot_{number}", "PLA") for number in range(1, 5)),
         ace("loaded_slot", "1"),
         ace("humidity", "32"),
+        ace("drying", "off", platform="switch"),
+        ace("drying_remaining", "0", unit="min"),
     ]
     return Registration(
         "anycubic",
@@ -101,8 +106,10 @@ def anycubic_cloud(
     def add(platform: str, key: str, **kwargs: Any) -> tuple[str, EntityShape]:
         return key, EntityShape(platform, f"{mac}-{key}", **kwargs)
 
-    def ace(key: str, **kwargs: Any) -> tuple[str, EntityShape]:
-        return add("sensor", key, linked=True, **kwargs)
+    def ace(
+        key: str, platform: str = "sensor", **kwargs: Any
+    ) -> tuple[str, EntityShape]:
+        return add(platform, key, linked=True, **kwargs)
 
     entities = [
         add("sensor", "job_state", state="idle"),
@@ -139,6 +146,14 @@ def anycubic_cloud(
         ),
         ace("ace_loaded_slot", state="1"),
         ace("secondary_ace_loaded_slot", state="unknown"),
+        *(
+            entry
+            for ace_key in ("dry_status", "secondary_dry_status")
+            for entry in (
+                ace(f"{ace_key}_is_drying", "binary_sensor", state="off"),
+                ace(f"{ace_key}_remaining_time", state="0"),
+            )
+        ),
     ]
     return Registration(
         "anycubic_cloud",
@@ -176,23 +191,58 @@ BAMBU_LAB_PRINT_STATUS_OPTIONS = [
 ]
 
 
-def bambu_lab(*, serial: str = "01P00A123456789", camera: bool = True) -> Registration:
-    """greghesp/ha-bambulab (domain `bambu_lab`): a P1S with an AMS, unique ids
-    `<serial>_<key>`; the AMS is its own HA device linked to the printer, its unique
-    ids `<model>_<serial>_AMS_<AMS serial>_<key>`. Without `camera` the printer has the
+def bambu_lab(
+    *,
+    serial: str = "01P00A123456789",
+    camera: bool = True,
+    ams: tuple[str, ...] = ("AMS",),
+) -> Registration:
+    """greghesp/ha-bambulab (domain `bambu_lab`): a P1S with an AMS of each of the
+    `ams` models, unique ids `<serial>_<key>`; each AMS is its own HA device linked to
+    the printer, its unique ids `<model>_<serial>_AMS_<AMS serial>_<key>`, and those
+    that dry (AMS 2 Pro, AMS HT) report it. Without `camera` the printer has the
     option on that offers its chamber picture as an image entity instead of a camera."""
 
     def own(platform: str, key: str, **kwargs: Any) -> tuple[str, EntityShape]:
         return key, EntityShape(platform, f"{serial}_{key}", **kwargs)
 
-    def ams(key: str, state: str) -> tuple[str, EntityShape]:
-        return f"ams_{key}", EntityShape(
-            "sensor",
-            f"P1S_{serial}_AMS_006A123456_{key}",
-            state=state,
-            object_id=f"ams_1_{key}",
-            linked=True,
-        )
+    def ams_entities(
+        number: int, model: str, *, linked: bool
+    ) -> list[tuple[str, EntityShape]]:
+        def ams(
+            key: str, state: str, platform: str = "sensor", unit: str | None = None
+        ) -> tuple[str, EntityShape]:
+            return f"ams_{key}" if number == 1 else f"ams_{number}_{key}", EntityShape(
+                platform,
+                f"P1S_{serial}_AMS_006A12345{number}_{key}",
+                state=state,
+                unit=unit,
+                object_id=f"ams_{number}_{key}",
+                linked=linked,
+            )
+
+        dries = model in ("AMS 2 Pro", "AMS HT")
+        return [
+            *(ams(f"tray_{tray}", "PLA Basic") for tray in range(1, 5)),
+            ams("ams_status", "idle"),
+            ams("humidity_index", "2"),
+            *(
+                [
+                    ams("drying", "off", platform="binary_sensor"),
+                    ams("remaining_drying_time", "0", unit="min"),
+                ]
+                if dries
+                else []
+            ),
+        ]
+
+    def ams_device(number: int, model: str) -> dict[str, Any]:
+        return {
+            "identifiers": {("bambu_lab", f"006A12345{number}")},
+            "manufacturer": "Bambu Lab",
+            "name": f"AMS {number}",
+            "model": model,
+        }
 
     entities = [
         own(
@@ -212,9 +262,7 @@ def bambu_lab(*, serial: str = "01P00A123456789", camera: bool = True) -> Regist
         own("camera", "camera", state=CAMERA)
         if camera
         else own("image", "p1p_camera", state=PICTURE),
-        *(ams(f"tray_{number}", "PLA Basic") for number in range(1, 5)),
-        ams("ams_status", "idle"),
-        ams("humidity_index", "2"),
+        *ams_entities(1, ams[0], linked=True),
     ]
     return Registration(
         "bambu_lab",
@@ -227,12 +275,16 @@ def bambu_lab(*, serial: str = "01P00A123456789", camera: bool = True) -> Regist
                     "model": "P1S",
                 },
                 dict(entities),
-                linked={
-                    "identifiers": {("bambu_lab", "006A123456")},
-                    "manufacturer": "Bambu Lab",
-                    "name": "AMS 1",
-                    "model": "AMS",
-                },
+                linked=ams_device(1, ams[0]),
+            ),
+            # Each further AMS is linked to the printer as well.
+            *(
+                HaDeviceShape(
+                    ams_device(number, model),
+                    dict(ams_entities(number, model, linked=False)),
+                    via=0,
+                )
+                for number, model in enumerate(ams[1:], start=2)
             ),
         ),
     )

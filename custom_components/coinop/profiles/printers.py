@@ -18,6 +18,14 @@ def _slots(find: Find, suffix: str) -> list[str]:
     return [entity_id for entity_id in takewhile(bool, slots) if entity_id]
 
 
+def _drying(*units: tuple[str | None, str | None]) -> dict[str, Any]:
+    """The job section's Drying inputs of the units whose active entity was found."""
+    drying = [
+        {"active": active, "drying_left": left} for active, left in units if active
+    ]
+    return {"drying": drying} if drying else {}
+
+
 def anycubic(find: Find) -> dict[str, Any]:
     """chrisfore/anycubic_ha_local: unique ids `<serial>_<key>`, the ACE `<serial>_ace0_<key>`."""
     status = find("event", "_print_event")
@@ -49,7 +57,10 @@ def anycubic(find: Find) -> dict[str, Any]:
             material={"entity_id": filament, "attribute": "length_mm", "unit": "mm"},
         )
         | found(slots, slots=slots, colour_attribute="color")
-        | found(loaded, loaded_slot=loaded),
+        | found(loaded, loaded_slot=loaded)
+        | _drying(
+            (find("switch", "_ace0_drying"), find("sensor", "_ace0_drying_remaining"))
+        ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         "progress": progress_inputs(remaining, find("sensor", "_progress")),
@@ -89,7 +100,17 @@ def anycubic_cloud(find: Find) -> dict[str, Any]:
             filament, material={"entity_id": filament, "attribute": None, "unit": "mm"}
         )
         | found(slots, slots=slots, colour_attribute="color_hex")
-        | found(loaded, loaded_slot=loaded),
+        | found(loaded, loaded_slot=loaded)
+        # Its drying left declares no unit: minutes, as its own card shows them.
+        | _drying(
+            *(
+                (
+                    find("binary_sensor", f"-{ace}dry_status_is_drying"),
+                    find("sensor", f"-{ace}dry_status_remaining_time"),
+                )
+                for ace in ("", "secondary_")
+            )
+        ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         "progress": progress_inputs(
@@ -122,7 +143,17 @@ def bambu_lab(find: Find) -> dict[str, Any]:
             ),
         ),
         "job": entity_input(job)
-        | found(weight, material={"entity_id": weight, "attribute": None, "unit": "g"}),
+        | found(weight, material={"entity_id": weight, "attribute": None, "unit": "g"})
+        # Only an AMS that dries has these, each on its own HA device.
+        | _drying(
+            *(
+                (
+                    ams("binary_sensor", "_drying"),
+                    ams("sensor", "_remaining_drying_time"),
+                )
+                for ams in find.linked()
+            )
+        ),
         "images": found(thumbnail, thumbnail=thumbnail)
         | found(camera, camera=camera, snapshot=True),
         "progress": progress_inputs(

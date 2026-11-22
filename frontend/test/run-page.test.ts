@@ -130,6 +130,25 @@ describe("Run page", () => {
     );
   });
 
+  it("names the drying among what the Projected Total includes", async () => {
+    const backend = recordedBackend().reply(GET, () => ({ run: recorded.drying[1] }));
+    const panel = await mountPanel(backend, { path: "/run/drying" });
+
+    expect(text(query(panel, ".totals .projected"))).toBe("Projected Total ≈ €0.20");
+    expect(text(query(panel, ".totals .projection"))).toBe(
+      "Expected end Jan 15, 2026, 12:50 PM · Includes electricity and drying",
+    );
+  });
+
+  it("says that drying isn't included yet while its power is still being learned", async () => {
+    const backend = recordedBackend().reply(GET, () => ({ run: recorded.drying[0] }));
+    const panel = await mountPanel(backend, { path: "/run/drying" });
+
+    expect(text(query(panel, ".totals .projection"))).toBe(
+      "Expected end Jan 15, 2026, 12:40 PM · Includes electricity · Drying isn't included yet",
+    );
+  });
+
   it("shows no Projected Total for an ended Run", async () => {
     const panel = await mountPanel(recordedBackend(), { path: "/run/benchy" });
 
@@ -174,6 +193,21 @@ describe("Run page", () => {
     expect(text(query(panel, ".totals .projected"))).toBe("Voraussichtlich ≈ 0,49 €");
     expect(text(query(panel, ".totals .projection"))).toBe(
       "Voraussichtliches Ende 15.01.2026, 12:00 · Enthält Strom und Betriebsstunden",
+    );
+  });
+
+  it("names the drying in German when Home Assistant is", async () => {
+    const backend = recordedBackend({ language: "de" });
+    backend.reply(GET, () => ({ run: recorded.drying[1] }));
+    const included = await mountPanel(backend, { path: "/run/drying" });
+    expect(text(query(included, ".totals .projection"))).toBe(
+      "Voraussichtliches Ende 15.01.2026, 12:50 · Enthält Strom und Trocknen",
+    );
+
+    backend.reply(GET, () => ({ run: recorded.drying[0] }));
+    const pending = await mountPanel(backend, { path: "/run/drying" });
+    expect(text(query(pending, ".totals .projection"))).toBe(
+      "Voraussichtliches Ende 15.01.2026, 12:40 · Enthält Strom · Trocknen noch nicht enthalten",
     );
   });
 

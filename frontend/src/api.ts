@@ -20,7 +20,7 @@ export const CAPABILITIES = [
 ] as const;
 export const DOSE_SOURCES = ["program_default", "default_row", "stock_input"] as const;
 /** What an open Run's Projected Total can include, in the order the Run page names them. */
-export const PROJECTED_PARTS = ["electricity", "water", "running_hours"] as const;
+export const PROJECTED_PARTS = ["electricity", "water", "drying", "running_hours"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 export type Kind = (typeof KINDS)[number];
 /** The kinds to show: Water only where one of the Devices has water or something counts it. */
@@ -114,6 +114,9 @@ export interface RunDetail extends RunSummary {
   /** How many photos a Run takes, of which media types and how large. */
   uploads: { limit: number; types: string[]; max_bytes: number };
   projected_parts: (typeof PROJECTED_PARTS)[number][];
+  /** The parts that apply but can't be projected yet, such as drying before its power
+   * is learned. */
+  projected_pending: "drying"[];
   subtotals: Record<Kind, number>;
 }
 

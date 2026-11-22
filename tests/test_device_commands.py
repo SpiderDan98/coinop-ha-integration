@@ -72,6 +72,8 @@ async def test_each_device_lists_its_ha_side_settings(
                     "slots": [],
                     "colour_attribute": None,
                     "loaded_slot": None,
+                    "drying": [],
+                    "drying_power": None,
                 },
                 "images": {"thumbnail": None, "camera": None, "snapshot": False},
                 "progress": {

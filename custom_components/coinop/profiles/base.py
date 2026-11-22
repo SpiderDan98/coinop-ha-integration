@@ -29,6 +29,11 @@ class Find(Protocol):
         exclude: str | None = None,
     ) -> str | None: ...
 
+    def linked(self) -> list[Find]:
+        """A finder for each linked HA device alone, such as each multi-material
+        unit, in the registry's order."""
+        ...
+
 
 class NoDeviceType(Enum):
     """What a kind check answers for an HA device it has no Device Type for."""
