@@ -20,7 +20,7 @@ _Avoid_: Custom type, type label, category
 _German UI_: Typbezeichnung
 
 **Device Input**:
-A Home Assistant value a Device reads, such as its print status, material used, thumbnail or camera, chosen by the user.
+A Home Assistant value a Device reads, such as its print status, material used, remaining time, thumbnail or camera, chosen by the user.
 _Avoid_: Sensor mapping, source
 _German UI_: Geräteeingang
 
@@ -103,6 +103,11 @@ _German UI_: Preisquelle
 A document that lists selected ended Runs with their costs and a total, optionally plus a Markup; explicitly not an invoice.
 _Avoid_: Invoice, bill, Rechnung, quote
 _German UI_: Kostenaufstellung
+
+**Projected Total**:
+The cost an open Run is expected to reach by its end: its cost so far plus the rest still to come, such as its recent power draw over the time it has left. Only an open Run has one, and only when there is something to project the rest from. It is never stored, is not a Line Item and is never part of a Cost Statement; once the Run ends, only its real costs remain.
+_Avoid_: Estimate, forecast, preliminary price
+_German UI_: Voraussichtlich
 
 **Markup**:
 A percentage added on top of a Cost Statement's total; never part of a Run's own costs.
