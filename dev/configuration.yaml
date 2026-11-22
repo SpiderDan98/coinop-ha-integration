@@ -114,6 +114,34 @@ input_text:
     name: Voron 2.4 file
 
 input_number:
+  prusa_time_left:
+    name: Prusa MK4 time left
+    min: 0
+    max: 10000
+    step: 1
+    mode: box
+    unit_of_measurement: min
+  prusa_progress:
+    name: Prusa MK4 progress
+    min: 0
+    max: 100
+    step: 1
+    mode: box
+    unit_of_measurement: "%"
+  bambu_time_left:
+    name: Bambu Lab X1C time left
+    min: 0
+    max: 10000
+    step: 1
+    mode: box
+    unit_of_measurement: min
+  bambu_progress:
+    name: Bambu Lab X1C progress
+    min: 0
+    max: 100
+    step: 1
+    mode: box
+    unit_of_measurement: "%"
   kobra_power:
     name: Kobra S1 power
     min: 0

@@ -31,6 +31,11 @@ def printer(key: str) -> dict[str, Any]:
             "loaded_slot": None,
         },
         "images": {"thumbnail": None, "camera": None, "snapshot": False},
+        "progress": {
+            "remaining_time": f"input_number.{key}_time_left",
+            "progress": f"input_number.{key}_progress",
+            "expected_energy": None,
+        },
         "consumption": {
             "source": "estimate",
             "running_power": PRINTERS[key],

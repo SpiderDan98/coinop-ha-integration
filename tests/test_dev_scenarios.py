@@ -303,6 +303,24 @@ async def test_a_preset_fills_coinop_from_scratch(
 
 
 @pytest.mark.usefixtures("helpers")
+async def test_printing_now_shows_the_open_runs_projected_total(
+    hass: HomeAssistant,
+    hass_admin_user: MockUser,
+    panel: PanelClient,
+    files: Path,
+    clock: Clock,
+) -> None:
+    await async_load(hass, "printing-now", hass_admin_user)
+    await hass.async_block_till_done()
+    await clock.advance(minutes=10)
+
+    runs = (await panel.call("coinop/runs/list"))["runs"]
+    [run] = [run for run in runs if run["ended"] is None]
+    assert run["projected_total"] > run["total"]
+    assert run["projected_end"] is not None
+
+
+@pytest.mark.usefixtures("helpers")
 @pytest.mark.parametrize(
     ("piece", "expected"),
     [

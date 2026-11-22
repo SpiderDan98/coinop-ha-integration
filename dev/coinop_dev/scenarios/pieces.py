@@ -108,6 +108,13 @@ def _printer_helpers(key: str, idle: str = "idle") -> dict[str, str | float]:
     return {f"input_text.{key}_job": "", f"input_select.{key}_status": idle}
 
 
+def _history_printer_helpers(key: str) -> dict[str, str | float]:
+    return _printer_helpers(key) | {
+        f"input_number.{key}_time_left": 0,
+        f"input_number.{key}_progress": 0,
+    }
+
+
 def _washdata_helpers(key: str, program: str) -> dict[str, str | float]:
     return {
         f"input_select.{key}_status": "off",
@@ -130,12 +137,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         "3d_printer",
         "Prusa MK4",
         "7 Runs on 3 filaments, or two years of them on all 8; with Tags and Thumbnails.",
-        _printer_helpers("prusa"),
+        _history_printer_helpers("prusa"),
         device=devices.printer("prusa"),
         short=histories.prusa,
         long=partial(histories.printer_years, printer="prusa", gaps=range(1, 7)),
         start={
             "input_text.prusa_job": "Gridfinity bins 3x2.gcode",
+            "input_number.prusa_time_left": 95,
+            "input_number.prusa_progress": 18,
             "input_select.prusa_status": "printing",
         },
         needs=("filaments", "tags", "template"),
@@ -144,12 +153,14 @@ PIECES: dict[str, DeviceWithHistory | QuickStartPiece] = {
         "3d_printer",
         "Bambu Lab X1C",
         "10 Runs on 5 filaments, or two years of them on all 8; with Tags and Thumbnails.",
-        _printer_helpers("bambu"),
+        _history_printer_helpers("bambu"),
         device=devices.printer("bambu"),
         short=histories.bambu,
         long=partial(histories.printer_years, printer="bambu", gaps=range(3, 10)),
         start={
             "input_text.bambu_job": "Spool holder.gcode",
+            "input_number.bambu_time_left": 140,
+            "input_number.bambu_progress": 9,
             "input_select.bambu_status": "printing",
         },
         needs=("filaments", "tags", "template"),
