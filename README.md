@@ -13,7 +13,7 @@
 A Home Assistant custom integration that records what each Run of your household devices costs, such as each print of a 3D printer or each program of a washing machine or dishwasher: electricity, water, material, detergent and anything else you add, kept as an editable history of Runs.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/overview.png" alt="The Coin-op panel's overview: cost this month and in total, cost per month, cost by Material and the most recent Runs" width="100%">
+  <img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/demo.gif" alt="A washing machine load starts on its own and its cost rises live on the overview; once it has finished, its Line Items for electricity, water and detergent show, a dose of fabric softener is corrected and the Total follows; then a 3D print's Run with its Thumbnail, electricity and filament" width="100%">
 </p>
 
 Requires Home Assistant 2026.5 or newer. Licensed under the [MIT licence](LICENSE).
@@ -35,6 +35,12 @@ Contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Screenshots
 
 <table>
+  <tr>
+    <td colspan="2" valign="top">
+      <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/overview.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/overview.png" alt="The Coin-op panel's overview: cost this month and in total, cost per month, cost by Material and the most recent Runs"></a>
+      <br><sub>The overview: this month, all time, cost per month and by Material, and the most recent Runs</sub>
+    </td>
+  </tr>
   <tr>
     <td width="50%" valign="top">
       <a href="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/runs.png"><img src="https://raw.githubusercontent.com/SpiderDan98/coinop-ha-integration/main/docs/images/screenshots/runs.png" alt="The Runs gallery"></a>

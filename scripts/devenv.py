@@ -279,14 +279,14 @@ def wait_for_service(domain: str, access: str) -> None:
     sys.exit(f"{domain} did not load; see: uv run scripts/devenv.py logs")
 
 
-def load(preset: str) -> None:
-    print(f"Loading the Preset {preset}", flush=True)
-    request(
-        "POST",
-        "/api/services/coinop_dev/load",
-        {"preset": preset},
-        access_token(),
-    )
+def load(scenario: str | dict[str, Any]) -> None:
+    """Loads a Preset by its name, or a selection of Pieces and Options."""
+    if isinstance(scenario, str):
+        print(f"Loading the Preset {scenario}", flush=True)
+        scenario = {"preset": scenario}
+    else:
+        print(f"Loading the Pieces {', '.join(scenario['pieces'])}", flush=True)
+    request("POST", "/api/services/coinop_dev/load", scenario, access_token())
 
 
 def reload_coinop() -> None:
