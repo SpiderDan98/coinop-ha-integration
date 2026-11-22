@@ -63,10 +63,15 @@ def recent_power(run: Run, until: datetime, measured: Model) -> float | None:
     return kwh * 3_600_000 / seconds if seconds else None
 
 
+def total_rest(total: float, so_far: float) -> float:
+    """What the amount `so_far` leaves of the Run's `total`, at least 0."""
+    return max(total - so_far, 0.0)
+
+
 def expected_energy_rest(expected: float, so_far: float, total: bool) -> float:
     """The kWh still to come from the Expected energy: itself, or as the Run's
-    `total` what the `so_far` kWh leave of it, at least 0."""
-    return max(expected - so_far, 0.0) if total else expected
+    `total` what the `so_far` kWh leave of it."""
+    return total_rest(expected, so_far) if total else expected
 
 
 def running_hours_rest(run: Run, hours_left: float) -> float | None:

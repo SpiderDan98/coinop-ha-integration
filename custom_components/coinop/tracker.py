@@ -46,6 +46,7 @@ from .cost.projection import (
     project,
     recent_power,
     running_hours_rest,
+    total_rest,
 )
 from .cost.slots import slot_material, slot_shares
 from .device_config import Capability, DeviceConfig, ExpectedEnergyForm, Target
@@ -87,7 +88,7 @@ from .models import (
     Stock,
     Usage,
 )
-from .quantities import ELECTRICITY, QUANTITIES, WATER
+from .quantities import ELECTRICITY, QUANTITIES, WATER, Quantity
 from .run_book import RunBook
 from .spoolman import Spoolman
 from .templates import add_templates, count_running_hours
@@ -1207,9 +1208,21 @@ class DeviceTracker:
             return expected_energy_rest(
                 kwh, item.quantity or 0.0, expected["form"] == ExpectedEnergyForm.TOTAL
             )
+        if (default := self._default_rest(run, ELECTRICITY, item)) is not None:
+            return default
         if hours is None or (power := self._base_power(run, now)) is None:
             return None
         return power * hours / 1000
+
+    def _default_rest(
+        self, run: Run, quantity: Quantity, item: LineItem
+    ) -> float | None:
+        """What the Run's Program default leaves after the measured `item`; None
+        without a default or a measurement."""
+        if not self._per_program or item.method is not ConsumptionMethod.MEASURED:
+            return None
+        default = self._program_row(run)[0].get(quantity.default_key)
+        return None if default is None else total_rest(default, item.quantity or 0.0)
 
     def _base_power(self, run: Run, now: datetime) -> float | None:
         """The W the rest is expected to draw: measured lately, else the running
