@@ -36,7 +36,7 @@ describe("Runs tab", () => {
     expect(url()).toBe("/coinop/runs");
     expect(query(panel, "a.tab.on").title).toBe("Runs");
     expect(text(query(panel, ".page-title"))).toBe("Runs");
-    expect(text(query(panel, "coinop-run-list .head"))).toBe("3 Runs · €1.23");
+    expect(text(query(panel, "coinop-run-list .head .muted"))).toBe("3 Runs · €1.23");
     expect(names(panel)).toEqual(["Untitled Run", "Helmet", "Benchy"]);
     expect(queryAll(panel, ".name-filter, ha-button.manual-run")).toHaveLength(2);
     expect(queryAll(panel, ".stat, .charts")).toEqual([]);

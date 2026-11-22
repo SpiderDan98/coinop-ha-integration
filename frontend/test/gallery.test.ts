@@ -16,7 +16,7 @@ describe("Run gallery", () => {
       "⚑ 2 Helmet Kobra · Jan 13, 2026 · 9 h Cosplay helmet Gift Failed €0.30",
       "Benchy Kobra · Jan 12, 2026 · 1 h 15 min €0.22 per part × 4 Gift Completed €0.86",
     ]);
-    expect(text(query(panel, "coinop-run-list .head"))).toBe("3 Runs · €1.23");
+    expect(text(query(panel, "coinop-run-list .head .muted"))).toBe("3 Runs · €1.23");
   });
 
   it("follows Runs as they start, progress, end and are deleted", async () => {

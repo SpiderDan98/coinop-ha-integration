@@ -610,7 +610,7 @@ describe("Runs of removed Devices", () => {
     expect(tiles(panel)).toEqual([
       "No image Untitled Run Mini (removed) · Jan 14, 2026 · 30 min Cancelled €0.07",
     ]);
-    expect(text(query(panel, "coinop-run-list .head"))).toBe("1 Run · €0.07");
+    expect(text(query(panel, "coinop-run-list .head .muted"))).toBe("1 Run · €0.07");
     await filterBy(panel, "device-kobra");
     expect(tiles(panel).map((tile) => tile.split(" · ")[0])).toEqual([
       "⚑ 2 Helmet Kobra",

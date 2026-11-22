@@ -151,9 +151,20 @@ export class RunList extends LitElement {
         <span class="muted"
           >${runCount(runs.length, t)}${total === undefined ? nothing : ` · ${format.money(total)}`}</span
         >
+        ${
+          runs.some(selectable)
+            ? html`<ha-button
+                class="small select-all"
+                appearance="plain"
+                @click=${() => this.selectAll(runs)}
+              >
+                ${t("runs.select_all")}
+              </ha-button>`
+            : nothing
+        }
         ${this.renderToggle(t)}
       </div>
-      ${all.length ? this.renderFilters(all, runs, t, format) : ""}
+      ${all.length ? this.renderFilters(all, t, format) : ""}
       ${
         !runs.length
           ? html`<p class="muted empty">${t(all.length ? "runs.no_match" : "runs.empty")}</p>`
@@ -305,7 +316,7 @@ export class RunList extends LitElement {
     </tr>`;
   }
 
-  private renderFilters(runs: RunSummary[], shown: RunSummary[], t: Localize, format: Format) {
+  private renderFilters(runs: RunSummary[], t: Localize, format: Format) {
     const devices = new Map(this.devices?.map((device) => [device.id, device.name]));
     for (const run of runs) {
       if (!devices.has(run.device_id)) devices.set(run.device_id, deviceName(run, this.devices, t));
@@ -377,17 +388,6 @@ export class RunList extends LitElement {
             this.setFilter({ flagged: (event.target as HTMLInputElement).checked })}
         />⚑ ${t("runs.flagged_only")}
       </label>
-      ${
-        shown.some(selectable)
-          ? html`<ha-button
-              class="small select-all"
-              appearance="plain"
-              @click=${() => this.selectAll(shown)}
-            >
-              ${t("runs.select_all")}
-            </ha-button>`
-          : nothing
-      }
     </div>`;
   }
 

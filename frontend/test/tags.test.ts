@@ -345,7 +345,7 @@ describe("Tags in the gallery", () => {
     await fill(panel, query(panel, "select.device-filter"), "device-kobra");
 
     expect(shown(panel)).toEqual(["Helmet"]);
-    expect(text(query(panel, "coinop-run-list .head"))).toBe("1 Run · €0.30");
+    expect(text(query(panel, "coinop-run-list .head .muted"))).toBe("1 Run · €0.30");
   });
 });
 
