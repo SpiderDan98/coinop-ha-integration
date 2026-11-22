@@ -3,12 +3,14 @@ the Run's time left."""
 
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 import pytest
 
 from .clock import Clock
 from .devices import ENERGY, add_device, add_hub
+from .test_lifecycle import start_coinop, stop_coinop
 from .test_measured import set_meter
 from .test_projected_total import (
     REMAINING,
@@ -30,9 +32,9 @@ async def add_drying_printer(
     hass: HomeAssistant,
     units: list[tuple[str, str | None]] | None = None,
     **options: Any,
-) -> None:
+) -> ConfigEntry:
     """A metered printer at 0.30 per kWh with one ACE, unless `units` says otherwise."""
-    await add_metered_printer(
+    return await add_metered_printer(
         hass, slots=SLOTS, drying=units or [(ACE, ACE_LEFT)], **options
     )
 
@@ -155,6 +157,26 @@ async def test_the_base_power_leaves_out_the_drying(
     # 0.06 so far; 2 h at the 150 W before the drying, not the last half hour's
     # 250 W, and 40 minutes at 150 W.
     assert float(projected(hass).state) == pytest.approx(0.06 + 0.09 + 0.03)
+
+
+async def test_after_a_restart_the_time_before_it_counts_as_neither_side(
+    hass: HomeAssistant, clock: Clock
+) -> None:
+    entry = await add_drying_printer(hass, drying_power=150)
+    await set_status(hass, "printing")
+    await draw(hass, clock, 150, 40)
+    await dry(hass)
+    await draw(hass, clock, 300, 20)
+    await stop_drying(hass)
+    await draw(hass, clock, 200, 10)
+
+    await stop_coinop(hass, entry)
+    await start_coinop(hass, entry)
+    await set_remaining(hass, 120)
+
+    # 0.07 so far; whether it dried before its last change is unknown after the
+    # restart, so 2 h at the 200 W since, not the last half hour's 267 W.
+    assert float(projected(hass).state) == pytest.approx(0.07 + 0.12)
 
 
 async def test_a_run_that_dried_all_along_takes_the_drying_power_off_its_base(

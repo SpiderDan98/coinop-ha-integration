@@ -157,6 +157,8 @@ class DeviceTracker:
         # The drying units' spans by active entity, and the open Run they belong to.
         self._drying_spans: dict[str, list[tuple[datetime, datetime | None]]] = {}
         self._drying_run: str | None = None
+        # Before it, whether a unit dried in the open Run is unknown.
+        self._drying_known = dt_util.utcnow()
         self._electricity = Metering(
             hass,
             ELECTRICITY,
@@ -688,8 +690,11 @@ class DeviceTracker:
             return
         self._drying_run = run.id
         self._drying_spans = {}
+        self._drying_known = run.started
         for unit in self._config.drying:
             state = self._hass.states.get(unit["active"])
+            if state:
+                self._drying_known = max(self._drying_known, state.last_changed)
             self._drying_spans[unit["active"]] = (
                 [(max(run.started, state.last_changed), None)]
                 if state and drying(state)
@@ -706,6 +711,11 @@ class DeviceTracker:
             [(start, end or until) for start, end in spans]
             for spans in self._drying_spans.values()
         ]
+
+    def _drying_unknown(self, run: Run) -> list[tuple[datetime, datetime]]:
+        """The open Run's time before Coin-op saw each drying unit's state."""
+        self._follow_drying(run)
+        return [(run.started, self._drying_known)]
 
     @callback
     def _on_tick(self, now: datetime) -> None:
@@ -1357,7 +1367,11 @@ class DeviceTracker:
         if method is not ConsumptionMethod.MEASURED:
             return None
         return learned_drying_power(
-            run, now, self._electricity.model(run), self._dried(run, now)
+            run,
+            now,
+            self._electricity.model(run),
+            self._dried(run, now),
+            self._drying_unknown(run),
         )
 
     def _water_rest(self, run: Run) -> float | None:
@@ -1398,6 +1412,7 @@ class DeviceTracker:
                 self._electricity.model(run),
                 self._dried(run, now),
                 self._config.drying_power,
+                self._drying_unknown(run),
             )
         if method is ConsumptionMethod.ESTIMATED and run.average_powers:
             return run.average_powers[-1][1]

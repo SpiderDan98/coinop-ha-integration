@@ -3,6 +3,7 @@
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
 import pytest
@@ -38,7 +39,7 @@ def projected(hass: HomeAssistant, entity_id: str = PROJECTED) -> State:
     return state
 
 
-async def add_metered_printer(hass: HomeAssistant, **options: Any) -> None:
+async def add_metered_printer(hass: HomeAssistant, **options: Any) -> ConfigEntry:
     await set_meter(hass, 10.0)
     entry = await add_hub(hass)
     await add_device(
@@ -50,6 +51,7 @@ async def add_metered_printer(hass: HomeAssistant, **options: Any) -> None:
         remaining_time=REMAINING,
         **options,
     )
+    return entry
 
 
 async def preheat_then_print(hass: HomeAssistant, clock: Clock) -> None:

@@ -117,18 +117,21 @@ def recent_power(
     measured: Model,
     drying: Iterable[list[tuple[datetime, datetime]]] = (),
     drying_power: float | None = None,
+    unknown: Iterable[tuple[datetime, datetime]] = (),
 ) -> float | None:
     """The average W the `measured` kWh make over the Run's most recent half hour of
-    running time outside the drying units' `drying` spans, or all of it if it ran
-    less; None before it ran at all.
+    running time outside the drying units' `drying` spans and the `unknown` ones, or
+    all of it if it ran less; None before it ran at all.
 
     A Run that dried all along gives its recent power less the units' `drying_power`.
     """
     drying = list(drying)
     running = running_spans(run, until)
-    if clear := _without(running, (span for unit in drying for span in unit)):
+    observed = _without(running, unknown)
+    if clear := _without(observed, (span for unit in drying for span in unit)):
         return _watts(_latest(clear), measured)
-    if not (recent := _latest(running)):
+    # Until anything was seen, the recent power is all there is to go by.
+    if not (recent := _latest(observed) or _latest(running)):
         return None
     dried = sum(_seconds(_within(unit, recent)) for unit in drying)
     return _watts(recent, measured) - (drying_power or 0.0) * dried / _seconds(recent)
@@ -139,12 +142,13 @@ def learned_drying_power(
     until: datetime,
     measured: Model,
     drying: Iterable[list[tuple[datetime, datetime]]],
+    unknown: Iterable[tuple[datetime, datetime]] = (),
 ) -> float | None:
     """The extra W a unit drew while drying in this Run: the average power while any
-    dried less the average while none did, per drying unit; None until each side ran
-    for `LEARNING`."""
+    dried less the average while none did, per drying unit, leaving out the `unknown`
+    spans; None until each side ran for `LEARNING`."""
     drying = list(drying)
-    running = running_spans(run, until)
+    running = _without(running_spans(run, until), unknown)
     clear = _without(running, (span for unit in drying for span in unit))
     dried = _without(running, clear)
     if min(_seconds(clear), _seconds(dried)) < LEARNING.total_seconds():
