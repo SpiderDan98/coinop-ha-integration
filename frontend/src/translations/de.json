@@ -227,7 +227,7 @@
   "device.default_material": "Standardmaterial",
   "device.default_material_hint": "Wird für den gemessenen Verbrauch eines Laufs berechnet und vorausgefüllt, wenn das Gerät keinen meldet.",
   "device.cover_kind": "Bevorzugtes Titelbild",
-  "device.cover_kind_hint": "Ein Lauf zeigt sein neuestes Bild dieser Art als Titelbild, solange du kein anderes wählst; ohne eines sein Vorschaubild, Kamerabild oder erstes Foto.",
+  "device.cover_kind_hint": "Ein Lauf zeigt sein neuestes Bild dieser Art als Titelbild, solange du kein anderes wählst; ohne eines das Bild der Art, die ihr in der Reihenfolge Vorschaubild, Kamerabild, Foto am nächsten liegt.",
   "cover_kind.thumbnail": "Vorschaubild",
   "cover_kind.snapshot": "Kamerabild",
   "cover_kind.upload": "Neuestes Foto",

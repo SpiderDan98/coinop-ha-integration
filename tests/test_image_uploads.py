@@ -11,7 +11,15 @@ from pytest_homeassistant_custom_component.common import MockUser
 from .clock import Clock
 from .devices import add_device, add_hub
 from .http import HttpClient
-from .images import THUMBNAIL, add_thumbnail, colour, opened, picture
+from .images import (
+    CAMERA,
+    THUMBNAIL,
+    add_camera,
+    add_thumbnail,
+    colour,
+    opened,
+    picture,
+)
 from .test_images import only_run, run_images, stored_files
 from .test_lifecycle import start_coinop, stop_coinop
 from .test_runs import set_status
@@ -241,6 +249,31 @@ async def test_without_an_image_of_the_preferred_kind_the_rule_picks_the_cover(
 
     assert (await only_run(panel))["cover"]["id"] == thumbnail["id"]
     assert wrong["code"] == "invalid_format"
+
+
+async def test_preferring_the_newest_photo_without_one_shows_the_snapshot(
+    hass: HomeAssistant, clock: Clock, files: Path, panel: PanelClient, http: HttpClient
+) -> None:
+    await add_thumbnail(hass, picture("red"))
+    await add_camera(hass, picture("blue"))
+    entry = await add_hub(hass)
+    await add_device(hass, entry, thumbnail=THUMBNAIL, camera=CAMERA)
+    await set_status(hass, "printing")
+    await clock.advance(hours=1)
+    await set_status(hass, "finished")
+    device_id = (await only_run(panel))["device_id"]
+
+    await panel.call(
+        "coinop/devices/update_settings",
+        device_id=device_id,
+        settings={"cover_kind": "upload"},
+    )
+
+    cover = (await only_run(panel))["cover"]
+    assert (cover["kind"], colour(await http.content(cover["url"]))) == (
+        "snapshot",
+        "blue",
+    )
 
 
 async def test_the_cover_image_choice_outlives_a_restart(
