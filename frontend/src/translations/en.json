@@ -227,7 +227,7 @@
   "device.default_material": "Default Material",
   "device.default_material_hint": "Charged for a Run's measured usage, and pre-filled when the Device reports none.",
   "device.cover_kind": "Preferred Cover Image",
-  "device.cover_kind_hint": "A Run shows its newest image of this kind as its Cover Image unless you pick another; without one, its Thumbnail, Snapshot or first photo.",
+  "device.cover_kind_hint": "A Run shows its newest image of this kind as its Cover Image unless you pick another; without one, the image of the kind nearest it in the order Thumbnail, Snapshot, photo.",
   "cover_kind.thumbnail": "Thumbnail",
   "cover_kind.snapshot": "Snapshot",
   "cover_kind.upload": "Newest photo",

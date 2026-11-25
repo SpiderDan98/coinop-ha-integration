@@ -638,14 +638,19 @@ class Run:
 
     def cover(self, preferred: ImageKind = ImageKind.THUMBNAIL) -> RunImage | None:
         """The picked image, else the newest of the `preferred` kind, else the first
-        in order; a deleted pick falls back."""
+        in order of the kind nearest it; a deleted pick falls back."""
         picked = (image for image in self.images if image.id == self.cover_id)
+        order = list(ImageKind)
         ordered = self.images_in_order
         of_kind = [image for image in ordered if image.kind is preferred]
         return (
             next(picked, None)
             or next(reversed(of_kind), None)
-            or next(iter(ordered), None)
+            or min(
+                ordered,
+                key=lambda image: abs(order.index(image.kind) - order.index(preferred)),
+                default=None,
+            )
         )
 
     def as_dict(self) -> dict[str, Any]:
