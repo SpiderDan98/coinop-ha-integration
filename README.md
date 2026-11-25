@@ -97,13 +97,15 @@ Washing machines and the other appliances, EV chargers, robotic mowers and Other
 
 ## Installation
 
-Coin-op is installed through HACS (Home Assistant 2026.10 and older) or the built-in Marketplace (Home Assistant 2026.11 and newer). Until it is in the default catalog, add it as a custom repository:
+Coin-op is in the default catalog of HACS (Home Assistant 2026.10 and older) and the built-in Marketplace (Home Assistant 2026.11 and newer).
 
 [![Open your Home Assistant instance and open this repository in HACS or the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=SpiderDan98&repository=coinop-ha-integration&category=integration)
 
-1. Select the badge above, or add `https://github.com/SpiderDan98/coinop-ha-integration` as a custom repository of type **Integration**. On the Marketplace this needs a GitHub connection.
+1. Select the badge above, or search for **Coin-op** in HACS or the Marketplace.
 2. Download Coin-op. With HACS, restart Home Assistant afterwards; the Marketplace needs no restart for a first install. Updates always need a restart.
 3. Go to **Settings > Devices & services > Add integration**, pick **Coin-op** and add your first Device.
+
+If Coin-op does not show up in the search yet, add `https://github.com/SpiderDan98/coinop-ha-integration` as a custom repository of type **Integration** instead. On the Marketplace this needs a GitHub connection.
 
 ## Quick Start
 
