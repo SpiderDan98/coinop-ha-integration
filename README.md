@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/SpiderDan98/coinop-ha-integration/releases"><img src="https://img.shields.io/github/v/release/SpiderDan98/coinop-ha-integration?include_prereleases&sort=semver" alt="Release"></a>
   <a href="https://github.com/SpiderDan98/coinop-ha-integration/actions/workflows/ci.yaml"><img src="https://github.com/SpiderDan98/coinop-ha-integration/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI"></a>
-  <a href="https://hacs.xyz/docs/faq/custom_repositories"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=SpiderDan98&repository=coinop-ha-integration&category=integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FSpiderDan98%2Fcoinop-ha-integration%2Fmain%2Fhacs.json&query=%24.homeassistant&label=Home%20Assistant&suffix=%2B&color=41BDF5&logo=homeassistant&logoColor=white" alt="Minimum Home Assistant version">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/SpiderDan98/coinop-ha-integration" alt="License"></a>
 </p>
